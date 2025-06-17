@@ -95,7 +95,10 @@ export class LazorKitProgram {
     smartWallet: anchor.web3.PublicKey
   ): [anchor.web3.PublicKey, number] {
     const hash = hashSeeds(passkey, smartWallet);
-    return anchor.web3.PublicKey.findProgramAddressSync([hash], this.programId);
+    return anchor.web3.PublicKey.findProgramAddressSync(
+      [constants.SMART_WALLET_AUTHENTICATOR_SEED, smartWallet.toBuffer(), hash],
+      this.programId
+    );
   }
 
   async getSmartWalletAuthenticatorData(

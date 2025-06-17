@@ -34,9 +34,14 @@ pub fn create_smart_wallet(
         bump: ctx.bumps.smart_wallet_authenticator,
     });
     let signer = PdaSigner {
-        seeds: vec![passkey_pubkey
-            .to_hashed_bytes(ctx.accounts.smart_wallet.key())
-            .to_vec()],
+        seeds: vec![
+            SmartWalletAuthenticator::PREFIX_SEED.to_vec(),
+            ctx.accounts.smart_wallet.key().as_ref().to_vec(),
+            passkey_pubkey
+                .to_hashed_bytes(ctx.accounts.smart_wallet.key())
+                .as_ref()
+                .to_vec(),
+        ],
         bump: ctx.bumps.smart_wallet_authenticator,
     };
 

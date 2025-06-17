@@ -195,6 +195,6 @@ export function instructionToAccountMetas(
   return ix.keys.map((k) => ({
     pubkey: k.pubkey,
     isWritable: k.isWritable,
-    isSigner: k.isSigner || k.pubkey.equals(payer),
+    isSigner: k.pubkey.equals(payer),
   }));
 }
