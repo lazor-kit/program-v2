@@ -14,6 +14,7 @@ use crate::{
     ID,
 };
 use anchor_lang::solana_program::sysvar::instructions::ID as IX_ID;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 
 const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
 
@@ -72,7 +73,7 @@ pub fn execute_instruction(
         .smart_wallet_config
         .last_nonce
         .checked_add(1)
-        .ok_or(LazorKitError::InvalidNonce)?;
+        .ok_or(LazorKitError::NonceOverflow)?;
 
     Ok(())
 }
@@ -84,11 +85,16 @@ fn verify_passkey_and_signature(
 ) -> Result<()> {
     let authenticator = &ctx.accounts.smart_wallet_authenticator;
 
-    // --- Passkey and wallet validation ---
+    // --- Passkey validation ---
     require!(
-        authenticator.passkey_pubkey == args.passkey_pubkey
-            && authenticator.smart_wallet == ctx.accounts.smart_wallet.key(),
-        LazorKitError::InvalidPasskey
+        authenticator.passkey_pubkey == args.passkey_pubkey,
+        LazorKitError::PasskeyMismatch
+    );
+
+    // --- Smart wallet validation ---
+    require!(
+        authenticator.smart_wallet == ctx.accounts.smart_wallet.key(),
+        LazorKitError::SmartWalletMismatch
     );
 
     // --- Signature verification using secp256r1 ---
@@ -104,28 +110,43 @@ fn verify_passkey_and_signature(
     message.extend_from_slice(client_hash.as_ref());
 
     let json_str = core::str::from_utf8(&args.client_data_json_raw)
-        .map_err(|_| ProgramError::InvalidInstructionData)?;
+        .map_err(|_| LazorKitError::ClientDataInvalidUtf8)?;
     let parsed: serde_json::Value =
-        serde_json::from_str(json_str).map_err(|_| ProgramError::InvalidInstructionData)?;
+        serde_json::from_str(json_str).map_err(|_| LazorKitError::ClientDataJsonParseError)?;
     let challenge = parsed["challenge"]
         .as_str()
-        .ok_or(ProgramError::InvalidInstructionData)?;
+        .ok_or(LazorKitError::ChallengeMissing)?;
 
-    let msg = Message::try_from_slice(challenge.as_bytes())?;
+    msg!("challenge: {:?}", challenge);
+
+    // Remove surrounding quotes, slashes and whitespace from challenge
+    let challenge_clean = challenge
+        .trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
+    let challenge_bytes = STANDARD_NO_PAD
+        .decode(challenge_clean)
+        .map_err(|_| LazorKitError::ChallengeBase64DecodeError)?;
+
+    msg!("challenge_bytes: {:?}", challenge_bytes);
+    msg!("As UTF-8: {}", String::from_utf8_lossy(&challenge_bytes));
+
+
+    let msg = Message::try_from_slice(&challenge_bytes)
+        .map_err(|_| LazorKitError::ChallengeDeserializationError)?;
 
     msg!("msg: {:?}", msg);
 
     let now = Clock::get()?.unix_timestamp;
 
     // check if timestamp is within the allowed drift
-    require!(
-        now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) <= msg.timestamp &&
-        msg.timestamp <= now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS),
-        LazorKitError::InvalidTimestamp
-    );
+    if msg.timestamp < now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) {
+        return Err(LazorKitError::TimestampTooOld.into());
+    }
+    if msg.timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
+        return Err(LazorKitError::TimestampTooNew.into());
+    }
 
     // check if nonce matches the expected nonce
-    require!(msg.nonce == last_nonce, LazorKitError::InvalidNonce);
+    require!(msg.nonce == last_nonce, LazorKitError::NonceMismatch);
 
     verify_secp256r1_instruction(
         &secp_ix,
@@ -155,7 +176,7 @@ fn handle_execute_cpi(
     // --- Rule instruction discriminator check ---
     require!(
         args.rule_data.data.get(0..8) == Some(&sighash("global", "check_rule")),
-        LazorKitError::InvalidRuleInstruction
+        LazorKitError::InvalidCheckRuleDiscriminator
     );
 
     // --- Execute rule CPI ---
@@ -170,7 +191,7 @@ fn handle_execute_cpi(
     let cpi_data = args
         .cpi_data
         .as_ref()
-        .ok_or(LazorKitError::InvalidAccountInput)?;
+        .ok_or(LazorKitError::CpiDataMissing)?;
     let cpi_accounts = &ctx.remaining_accounts
         [cpi_data.start_index as usize..(cpi_data.start_index as usize + cpi_data.length as usize)];
 
@@ -180,7 +201,7 @@ fn handle_execute_cpi(
     {
         require!(
             ctx.remaining_accounts.len() >= 2,
-            LazorKitError::InvalidAccountInput
+            LazorKitError::SolTransferInsufficientAccounts
         );
         let amount = u64::from_le_bytes(cpi_data.data[4..12].try_into().unwrap());
         transfer_sol_from_pda(
@@ -218,7 +239,7 @@ fn handle_change_program_rule(
     let cpi_data = args
         .cpi_data
         .as_ref()
-        .ok_or(LazorKitError::InvalidAccountInput)?;
+        .ok_or(LazorKitError::CpiDataMissing)?;
 
     check_whitelist(whitelist, &old_rule_program_key)?;
     check_whitelist(whitelist, &new_rule_program_key)?;
@@ -226,20 +247,25 @@ fn handle_change_program_rule(
     // --- Destroy/init discriminators check ---
     require!(
         args.rule_data.data.get(0..8) == Some(&sighash("global", "destroy")),
-        LazorKitError::InvalidRuleInstruction
+        LazorKitError::InvalidDestroyDiscriminator
     );
     require!(
         cpi_data.data.get(0..8) == Some(&sighash("global", "init_rule")),
-        LazorKitError::InvalidRuleInstruction
+        LazorKitError::InvalidInitRuleDiscriminator
     );
 
-    // --- Only one of the programs can be the default, and they must differ ---
+    // --- Ensure programs are different ---
+    require!(
+        old_rule_program_key != new_rule_program_key,
+        LazorKitError::RuleProgramsIdentical
+    );
+
+    // --- Only one of the programs can be the default ---
     let default_rule_program = ctx.accounts.config.default_rule_program;
     require!(
-        (old_rule_program_key == default_rule_program
-            || new_rule_program_key == default_rule_program)
-            && (old_rule_program_key != new_rule_program_key),
-        LazorKitError::InvalidRuleProgram
+        old_rule_program_key == default_rule_program
+            || new_rule_program_key == default_rule_program,
+        LazorKitError::NoDefaultRuleProgram
     );
 
     // --- Update rule program in config ---
@@ -287,12 +313,12 @@ fn handle_call_rule_program(
             .accounts
             .new_smart_wallet_authenticator
             .as_mut()
-            .ok_or(LazorKitError::InvalidAccountInput)?;
+            .ok_or(LazorKitError::NewAuthenticatorMissing)?;
         new_auth.smart_wallet = ctx.accounts.smart_wallet.key();
         new_auth.passkey_pubkey = new_authenticator_pubkey;
         new_auth.bump = ctx.bumps.new_smart_wallet_authenticator.unwrap_or_default();
     } else {
-        return Err(LazorKitError::InvalidAccountInput.into());
+        return Err(LazorKitError::NewAuthenticatorPasskeyMissing.into());
     }
 
     let rule_signer = get_pda_signer(

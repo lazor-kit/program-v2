@@ -407,7 +407,7 @@ export class LazorKitProgram {
           kind: 'struct',
           fields: [
             ['nonce', 'u64'],
-            ['timestamp', 'u64'],
+            ['timestamp', 'i64'],
           ],
         },
       ],

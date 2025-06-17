@@ -110,7 +110,7 @@ pub fn verify_secp256r1_instruction(
     let expected_len =
         (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
     if ix.program_id != SECP256R1_ID || !ix.accounts.is_empty() || ix.data.len() != expected_len {
-        return Err(LazorKitError::InvalidLengthForVerification.into());
+        return Err(LazorKitError::Secp256r1InvalidLength.into());
     }
     verify_secp256r1_data(&ix.data, pubkey, msg, sig)
 }
@@ -126,11 +126,11 @@ fn verify_secp256r1_data(
     let offsets = calculate_secp_offsets(msg_len);
 
     if !verify_secp_header(data, &offsets) {
-        return Err(LazorKitError::VerifyHeaderMismatchError.into());
+        return Err(LazorKitError::Secp256r1HeaderMismatch.into());
     }
 
     if !verify_secp_data(data, &public_key, &signature, &message) {
-        return Err(LazorKitError::VerifyDataMismatchError.into());
+        return Err(LazorKitError::Secp256r1DataMismatch.into());
     }
 
     Ok(())
@@ -225,7 +225,7 @@ pub fn get_account_slice<'a>(
 ) -> Result<&'a [AccountInfo<'a>]> {
     accounts
         .get(start as usize..(start as usize + len as usize))
-        .ok_or(crate::error::LazorKitError::InvalidAccountInput.into())
+        .ok_or(crate::error::LazorKitError::AccountSliceOutOfBounds.into())
 }
 
 /// Helper: Create a PDA signer struct
@@ -247,7 +247,7 @@ pub fn check_whitelist(
 ) -> Result<()> {
     require!(
         whitelist.list.contains(program),
-        crate::error::LazorKitError::InvalidRuleProgram
+        crate::error::LazorKitError::RuleProgramNotWhitelisted
     );
     Ok(())
 }
