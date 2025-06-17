@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { sha256 } from "js-sha256";
+import * as anchor from '@coral-xyz/anchor';
+import { sha256 } from 'js-sha256';
 
 export function hashSeeds(
   passkey: number[],
@@ -22,7 +22,7 @@ const COMPRESSED_PUBKEY_SERIALIZED_SIZE = 33;
 const FIELD_SIZE = 32;
 
 const SECP256R1_NATIVE_PROGRAM = new anchor.web3.PublicKey(
-  "Secp256r1SigVerify1111111111111111111111111"
+  'Secp256r1SigVerify1111111111111111111111111'
 );
 
 // Order of secp256r1 curve (same as in Rust code)
@@ -129,7 +129,7 @@ export function createSecp256r1Instruction(
       pubkey.length !== COMPRESSED_PUBKEY_SERIALIZED_SIZE ||
       signature.length !== SIGNATURE_SERIALIZED_SIZE
     ) {
-      throw new Error("Invalid key or signature length");
+      throw new Error('Invalid key or signature length');
     }
 
     // Calculate total size and create instruction data
@@ -175,4 +175,26 @@ export function createSecp256r1Instruction(
   } catch (error) {
     throw new Error(`Failed to create secp256r1 instruction: ${error}`);
   }
+}
+
+/**
+ * Convenience helper: convert a {@link anchor.web3.TransactionInstruction}'s `keys`
+ * array into the `AccountMeta` objects Anchor expects for
+ * `remainingAccounts(...)`.
+ *
+ * The mapping uses the original `isWritable` flag from the instruction and
+ * marks the account as a signer if either:
+ *  • the instruction already flagged it as signer, or
+ *  • the account equals the provided {@link payer} (the wallet paying for the
+ *    transaction).
+ */
+export function instructionToAccountMetas(
+  ix: anchor.web3.TransactionInstruction,
+  payer: anchor.web3.PublicKey
+): anchor.web3.AccountMeta[] {
+  return ix.keys.map((k) => ({
+    pubkey: k.pubkey,
+    isWritable: k.isWritable,
+    isSigner: k.isSigner || k.pubkey.equals(payer),
+  }));
 }

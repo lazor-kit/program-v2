@@ -12,6 +12,7 @@ use crate::{
 pub fn create_smart_wallet(
     ctx: Context<CreateSmartWallet>,
     passkey_pubkey: [u8; PASSKEY_SIZE],
+    credential_id: Vec<u8>,
     rule_data: Vec<u8>,
 ) -> Result<()> {
     let wallet_data = &mut ctx.accounts.smart_wallet_config;
@@ -21,6 +22,7 @@ pub fn create_smart_wallet(
     wallet_data.set_inner(SmartWalletConfig {
         rule_program: ctx.accounts.config.default_rule_program,
         id: sequence_account.seq,
+        last_nonce: 0,
         bump: ctx.bumps.smart_wallet,
     });
 
@@ -28,19 +30,19 @@ pub fn create_smart_wallet(
     smart_wallet_authenticator.set_inner(SmartWalletAuthenticator {
         passkey_pubkey,
         smart_wallet: ctx.accounts.smart_wallet.key(),
+        credential_id,
         bump: ctx.bumps.smart_wallet_authenticator,
     });
-
     let signer = PdaSigner {
-        seeds: passkey_pubkey
+        seeds: vec![passkey_pubkey
             .to_hashed_bytes(ctx.accounts.smart_wallet.key())
-            .to_vec(),
+            .to_vec()],
         bump: ctx.bumps.smart_wallet_authenticator,
     };
 
     execute_cpi(
         &ctx.remaining_accounts,
-        rule_data,
+        &rule_data,
         &ctx.accounts.default_rule_program,
         Some(signer),
     )?;
@@ -100,7 +102,11 @@ pub struct CreateSmartWallet<'info> {
         init,
         payer = signer,
         space = 8 + SmartWalletAuthenticator::INIT_SPACE,
-        seeds = [passkey_pubkey.to_hashed_bytes(smart_wallet.key()).as_ref()],
+        seeds = [
+            SmartWalletAuthenticator::PREFIX_SEED,
+            smart_wallet.key().as_ref(),
+            passkey_pubkey.to_hashed_bytes(smart_wallet.key()).as_ref()
+        ],
         bump
     )]
     pub smart_wallet_authenticator: Box<Account<'info, SmartWalletAuthenticator>>,

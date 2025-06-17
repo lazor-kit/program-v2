@@ -6,14 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-lazorkit = "3CFG1eVGpUVAxMeuFnNw7CbBA1GQ746eQDdMWPoFTAD8"
-transfer_limit = "HjgdxTNPqpL59KLRVDwQ28cqam2SxBirnNN5SFAFGHZ8"
-default_rule = "B98ooLRYBP6m6Zsrd3Hnzn4UAejfVZwyDgMFaBNzVR2W"
+lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
+transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
+default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
 
 [programs.localnet]
-lazorkit = "3CFG1eVGpUVAxMeuFnNw7CbBA1GQ746eQDdMWPoFTAD8"
-transfer_limit = "HjgdxTNPqpL59KLRVDwQ28cqam2SxBirnNN5SFAFGHZ8"
-default_rule = "B98ooLRYBP6m6Zsrd3Hnzn4UAejfVZwyDgMFaBNzVR2W"
+lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
+transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
+default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
 
 [registry]
 url = "https://api.apr.dev"

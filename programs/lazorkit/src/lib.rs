@@ -9,7 +9,7 @@ pub mod utils;
 use constants::PASSKEY_SIZE;
 use instructions::*;
 
-declare_id!("3CFG1eVGpUVAxMeuFnNw7CbBA1GQ746eQDdMWPoFTAD8");
+declare_id!("6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo");
 
 /// The Lazor Kit program provides smart wallet functionality with passkey authentication
 #[program]
@@ -25,9 +25,10 @@ pub mod lazorkit {
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
         passkey_pubkey: [u8; PASSKEY_SIZE],
+        credential_id: Vec<u8>,
         rule_data: Vec<u8>,
     ) -> Result<()> {
-        instructions::create_smart_wallet(ctx, passkey_pubkey, rule_data)
+        instructions::create_smart_wallet(ctx, passkey_pubkey, credential_id, rule_data)
     }
 
     /// Execute an instruction with passkey authentication
