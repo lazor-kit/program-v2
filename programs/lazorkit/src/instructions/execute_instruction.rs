@@ -14,7 +14,7 @@ use crate::{
     ID,
 };
 use anchor_lang::solana_program::sysvar::instructions::ID as IX_ID;
-use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
 
@@ -117,23 +117,15 @@ fn verify_passkey_and_signature(
         .as_str()
         .ok_or(LazorKitError::ChallengeMissing)?;
 
-    msg!("challenge: {:?}", challenge);
-
     // Remove surrounding quotes, slashes and whitespace from challenge
     let challenge_clean = challenge
         .trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
-    let challenge_bytes = STANDARD_NO_PAD
+    let challenge_bytes = URL_SAFE_NO_PAD
         .decode(challenge_clean)
         .map_err(|_| LazorKitError::ChallengeBase64DecodeError)?;
 
-    msg!("challenge_bytes: {:?}", challenge_bytes);
-    msg!("As UTF-8: {}", String::from_utf8_lossy(&challenge_bytes));
-
-
     let msg = Message::try_from_slice(&challenge_bytes)
         .map_err(|_| LazorKitError::ChallengeDeserializationError)?;
-
-    msg!("msg: {:?}", msg);
 
     let now = Clock::get()?.unix_timestamp;
 

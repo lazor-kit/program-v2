@@ -387,10 +387,6 @@ export class LazorKitProgram {
       new anchor.web3.PublicKey(smartWallet)
     );
 
-    // NOTE: field name may differ; adjust to your IDL
-    const nonce =
-      (smartWalletData as any).nonce ?? (smartWalletData as any).lastNonce;
-
     class Message {
       nonce: anchor.BN;
       timestamp: anchor.BN;
@@ -415,7 +411,10 @@ export class LazorKitProgram {
 
     const encoded = borsh.serialize(
       schema,
-      new Message({ nonce, timestamp: new anchor.BN(Date.now()) })
+      new Message({
+        nonce: smartWalletData.lastNonce,
+        timestamp: new anchor.BN(Date.now()),
+      })
     );
     return Buffer.from(encoded);
   }
