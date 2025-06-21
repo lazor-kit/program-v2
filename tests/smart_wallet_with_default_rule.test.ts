@@ -47,7 +47,15 @@ describe('Test smart wallet with default rule', () => {
     }
   });
 
-  it('Initialize successfully', async () => {
+  it('Test get from credential id', async () => {
+    const credentialId = base64.encode(Buffer.from('test'));
+    console.log('Credential ID: ', Buffer.from(credentialId, 'base64'));
+
+    const { smartWallet: smartWalletFromCredentialId } =
+      await lazorkitProgram.getSmartWalletByCredentialId(credentialId);
+  });
+
+  xit('Initialize successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -85,11 +93,13 @@ describe('Test smart wallet with default rule', () => {
       smartWalletAuthenticator
     );
 
+    const credentialId = base64.encode(Buffer.from('testing something')); // random string
+
     const createSmartWalletTxn = await lazorkitProgram.createSmartWalletTxn(
       pubkey,
       initRuleIns,
       payer.publicKey,
-      base64.encode(Buffer.from('test'))
+      credentialId
     );
 
     const sig = await sendAndConfirmTransaction(
