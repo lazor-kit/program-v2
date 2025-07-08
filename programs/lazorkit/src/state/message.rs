@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 
-#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug, InitSpace)]
+#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct Message {
     pub nonce: u64,
-    pub timestamp: i64,
+    pub current_timestamp: i64,
+    pub instruction_data: Vec<u8>,
 }
+
