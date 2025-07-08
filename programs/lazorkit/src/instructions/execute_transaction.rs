@@ -1,10 +1,28 @@
-use anchor_lang::solana_program::hash::hash;
-use anchor_lang::{prelude::*, solana_program::sysvar::instructions::load_instruction_at_checked};
+//! Execute a user-requested transaction on behalf of a smart-wallet.
+//!
+//! High-level flow
+//! 1. `verify_authorization` – verifies passkey, signature, timestamp & nonce.
+//! 2. Forward *rule* check instruction (must succeed) to the rule program.
+//! 3. Depending on the desired action:
+//!    • If the CPI data represents a SOL transfer → perform a lamport move
+//!      directly with PDA authority (cheaper than a CPI).
+//!    • Otherwise → invoke the target program via CPI, signing with the
+//!      smart-wallet PDA.
+//! 4. Increment the smart-wallet nonce.
+//!
+//! The account layout & args mirror the original monolithic implementation,
+//! but the business logic now lives in smaller helpers for clarity.
 
-use crate::state::{Config, Message, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms};
+// -----------------------------------------------------------------------------
+//  Imports
+// -----------------------------------------------------------------------------
+
+use anchor_lang::prelude::*;
+
+use crate::state::{Config, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms};
 use crate::utils::{
     check_whitelist, execute_cpi, get_pda_signer, sighash, transfer_sol_from_pda,
-    verify_secp256r1_instruction, PasskeyExt, PdaSigner,
+    verify_authorization, PasskeyExt, PdaSigner,
 };
 use crate::{
     constants::{SMART_WALLET_SEED, SOL_TRANSFER_DISCRIMINATOR},
@@ -12,11 +30,8 @@ use crate::{
     ID,
 };
 use anchor_lang::solana_program::sysvar::instructions::ID as IX_ID;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 use super::common::CpiData;
-
-const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
 
 /// Arguments for the `execute_transaction` entrypoint (formerly `ExecuteCpi` action)
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -35,7 +50,17 @@ pub fn execute_transaction(
     mut ctx: Context<ExecuteTransaction>,
     args: ExecuteTransactionArgs,
 ) -> Result<()> {
-    verify_passkey_and_signature(&ctx, &args, ctx.accounts.smart_wallet_config.last_nonce)?;
+    verify_authorization(
+        &ctx.accounts.ix_sysvar,
+        &ctx.accounts.smart_wallet_authenticator,
+        ctx.accounts.smart_wallet.key(),
+        args.passkey_pubkey,
+        args.signature.clone(),
+        &args.client_data_json_raw,
+        &args.authenticator_data_raw,
+        args.verify_instruction_index,
+        ctx.accounts.smart_wallet_config.last_nonce,
+    )?;
 
     handle_execute_cpi(&mut ctx, &args)?;
 
@@ -48,76 +73,6 @@ pub fn execute_transaction(
         .ok_or(LazorKitError::NonceOverflow)?;
 
     Ok(())
-}
-
-fn verify_passkey_and_signature(
-    ctx: &Context<ExecuteTransaction>,
-    args: &ExecuteTransactionArgs,
-    last_nonce: u64,
-) -> Result<()> {
-    let authenticator = &ctx.accounts.smart_wallet_authenticator;
-
-    // Passkey validation
-    require!(
-        authenticator.passkey_pubkey == args.passkey_pubkey,
-        LazorKitError::PasskeyMismatch
-    );
-
-    // Smart wallet validation
-    require!(
-        authenticator.smart_wallet == ctx.accounts.smart_wallet.key(),
-        LazorKitError::SmartWalletMismatch
-    );
-
-    // Signature verification using secp256r1
-    let secp_ix = load_instruction_at_checked(
-        args.verify_instruction_index as usize,
-        &ctx.accounts.ix_sysvar,
-    )?;
-
-    let client_hash = hash(&args.client_data_json_raw);
-
-    let mut message = Vec::with_capacity(args.authenticator_data_raw.len() + client_hash.as_ref().len());
-    message.extend_from_slice(&args.authenticator_data_raw);
-    message.extend_from_slice(client_hash.as_ref());
-
-    let json_str = core::str::from_utf8(&args.client_data_json_raw)
-        .map_err(|_| LazorKitError::ClientDataInvalidUtf8)?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(json_str).map_err(|_| LazorKitError::ClientDataJsonParseError)?;
-    let challenge = parsed["challenge"]
-        .as_str()
-        .ok_or(LazorKitError::ChallengeMissing)?;
-
-    // Remove surrounding quotes, slashes and whitespace from challenge
-    let challenge_clean = challenge
-        .trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
-    let challenge_bytes = URL_SAFE_NO_PAD
-        .decode(challenge_clean)
-        .map_err(|_| LazorKitError::ChallengeBase64DecodeError)?;
-
-    let msg = Message::try_from_slice(&challenge_bytes)
-        .map_err(|_| LazorKitError::ChallengeDeserializationError)?;
-
-    let now = Clock::get()?.unix_timestamp;
-
-    // Timestamp drift check
-    if msg.current_timestamp < now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(LazorKitError::TimestampTooOld.into());
-    }
-    if msg.current_timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(LazorKitError::TimestampTooNew.into());
-    }
-
-    // Nonce match check
-    require!(msg.nonce == last_nonce, LazorKitError::NonceMismatch);
-
-    verify_secp256r1_instruction(
-        &secp_ix,
-        authenticator.passkey_pubkey,
-        message,
-        args.signature.clone(),
-    )
 }
 
 fn handle_execute_cpi(
@@ -252,4 +207,4 @@ pub struct ExecuteTransaction<'info> {
 
     /// CHECK: Used for CPI, not deserialized.
     pub cpi_program: UncheckedAccount<'info>,
-} 
+}

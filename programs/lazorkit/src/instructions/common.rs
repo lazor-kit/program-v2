@@ -10,4 +10,4 @@ pub struct CpiData {
     pub start_index: u8,
     /// Number of accounts to take from `remaining_accounts`
     pub length: u8,
-} 
+}

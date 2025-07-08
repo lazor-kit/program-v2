@@ -1,22 +1,29 @@
-use anchor_lang::solana_program::hash::hash;
-use anchor_lang::{prelude::*, solana_program::sysvar::instructions::load_instruction_at_checked};
+//! Invoke an arbitrary instruction inside the *current* rule program.
+//!
+//! Optionally allows onboarding a **new authenticator** in the same
+//! transaction. The caller must supply the new passkey pubkey; the PDA is
+//! created with `init_if_needed`.
+//!
+//! Flow
+//! 1. `verify_authorization`.
+//! 2. (optional) create `new_smart_wallet_authenticator` PDA.
+//! 3. Forward `rule_data` CPI signed by the *existing* authenticator PDA.
+//! 4. Increment nonce.
 
-use crate::state::{Config, Message, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms};
+// -----------------------------------------------------------------------------
+//  Imports
+// -----------------------------------------------------------------------------
+
+use anchor_lang::prelude::*;
+
+use crate::state::{Config, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms};
 use crate::utils::{
-    check_whitelist, execute_cpi, get_pda_signer,
-    verify_secp256r1_instruction, PasskeyExt, PdaSigner,
+    check_whitelist, execute_cpi, get_pda_signer, verify_authorization, PasskeyExt,
 };
-use crate::{
-    constants::SMART_WALLET_SEED,
-    error::LazorKitError,
-    ID,
-};
+use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 use anchor_lang::solana_program::sysvar::instructions::ID as IX_ID;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 use super::common::CpiData;
-
-const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
 
 /// Arguments for invoking a custom function on the rule program
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -35,7 +42,17 @@ pub fn call_rule_program(
     mut ctx: Context<CallRuleProgram>,
     args: CallRuleProgramArgs,
 ) -> Result<()> {
-    verify_passkey_and_signature(&ctx, &args, ctx.accounts.smart_wallet_config.last_nonce)?;
+    verify_authorization(
+        &ctx.accounts.ix_sysvar,
+        &ctx.accounts.smart_wallet_authenticator,
+        ctx.accounts.smart_wallet.key(),
+        args.passkey_pubkey,
+        args.signature.clone(),
+        &args.client_data_json_raw,
+        &args.authenticator_data_raw,
+        args.verify_instruction_index,
+        ctx.accounts.smart_wallet_config.last_nonce,
+    )?;
 
     handle_call_rule_program(&mut ctx, &args)?;
 
@@ -47,68 +64,6 @@ pub fn call_rule_program(
         .ok_or(LazorKitError::NonceOverflow)?;
 
     Ok(())
-}
-
-fn verify_passkey_and_signature(
-    ctx: &Context<CallRuleProgram>,
-    args: &CallRuleProgramArgs,
-    last_nonce: u64,
-) -> Result<()> {
-    let authenticator = &ctx.accounts.smart_wallet_authenticator;
-
-    require!(
-        authenticator.passkey_pubkey == args.passkey_pubkey,
-        LazorKitError::PasskeyMismatch
-    );
-    require!(
-        authenticator.smart_wallet == ctx.accounts.smart_wallet.key(),
-        LazorKitError::SmartWalletMismatch
-    );
-
-    let secp_ix = load_instruction_at_checked(
-        args.verify_instruction_index as usize,
-        &ctx.accounts.ix_sysvar,
-    )?;
-
-    let client_hash = hash(&args.client_data_json_raw);
-
-    let mut message = Vec::with_capacity(args.authenticator_data_raw.len() + client_hash.as_ref().len());
-    message.extend_from_slice(&args.authenticator_data_raw);
-    message.extend_from_slice(client_hash.as_ref());
-
-    let json_str = core::str::from_utf8(&args.client_data_json_raw)
-        .map_err(|_| LazorKitError::ClientDataInvalidUtf8)?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(json_str).map_err(|_| LazorKitError::ClientDataJsonParseError)?;
-    let challenge = parsed["challenge"]
-        .as_str()
-        .ok_or(LazorKitError::ChallengeMissing)?;
-
-    let challenge_clean = challenge
-        .trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
-    let challenge_bytes = URL_SAFE_NO_PAD
-        .decode(challenge_clean)
-        .map_err(|_| LazorKitError::ChallengeBase64DecodeError)?;
-
-    let msg = Message::try_from_slice(&challenge_bytes)
-        .map_err(|_| LazorKitError::ChallengeDeserializationError)?;
-
-    let now = Clock::get()?.unix_timestamp;
-    if msg.current_timestamp < now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(LazorKitError::TimestampTooOld.into());
-    }
-    if msg.current_timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(LazorKitError::TimestampTooNew.into());
-    }
-
-    require!(msg.nonce == last_nonce, LazorKitError::NonceMismatch);
-
-    verify_secp256r1_instruction(
-        &secp_ix,
-        authenticator.passkey_pubkey,
-        message,
-        args.signature.clone(),
-    )
 }
 
 fn handle_call_rule_program(
@@ -137,8 +92,8 @@ fn handle_call_rule_program(
         ctx.accounts.smart_wallet.key(),
         ctx.bumps.smart_wallet_authenticator,
     );
-    let rule_accounts = &ctx.remaining_accounts
-        [args.rule_data.start_index as usize..(args.rule_data.start_index as usize + args.rule_data.length as usize)];
+    let rule_accounts = &ctx.remaining_accounts[args.rule_data.start_index as usize
+        ..(args.rule_data.start_index as usize + args.rule_data.length as usize)];
     execute_cpi(
         rule_accounts,
         &args.rule_data.data,

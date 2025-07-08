@@ -251,3 +251,83 @@ pub fn check_whitelist(
     );
     Ok(())
 }
+
+/// Maximum allowed clock drift when validating the signed `Message`.
+pub const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
+
+/// Unified helper used by all instruction handlers to verify
+/// 1. passkey matches the authenticator
+/// 2. authenticator belongs to the smart-wallet
+/// 3. secp256r1 signature & message integrity
+/// 4. timestamp & nonce constraints
+#[allow(clippy::too_many_arguments)]
+pub fn verify_authorization(
+    ix_sysvar: &AccountInfo,
+    authenticator: &crate::state::SmartWalletAuthenticator,
+    smart_wallet_key: Pubkey,
+    passkey_pubkey: [u8; 33],
+    signature: Vec<u8>,
+    client_data_json_raw: &[u8],
+    authenticator_data_raw: &[u8],
+    verify_instruction_index: u8,
+    last_nonce: u64,
+) -> Result<()> {
+    use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use crate::state::Message;
+
+    // 1) passkey & wallet checks --------------------------------------------------------------
+    require!(
+        authenticator.passkey_pubkey == passkey_pubkey,
+        crate::error::LazorKitError::PasskeyMismatch
+    );
+    require!(
+        authenticator.smart_wallet == smart_wallet_key,
+        crate::error::LazorKitError::SmartWalletMismatch
+    );
+
+    // 2) locate the secp256r1 verify instruction ----------------------------------------------
+    let secp_ix = load_instruction_at_checked(verify_instruction_index as usize, ix_sysvar)?;
+
+    // 3) reconstruct signed message (authenticatorData || SHA256(clientDataJSON))
+    let client_hash = hash(client_data_json_raw);
+    let mut message = Vec::with_capacity(authenticator_data_raw.len() + client_hash.as_ref().len());
+    message.extend_from_slice(authenticator_data_raw);
+    message.extend_from_slice(client_hash.as_ref());
+
+    // 4) parse the challenge from clientDataJSON ---------------------------------------------
+    let json_str = core::str::from_utf8(client_data_json_raw)
+        .map_err(|_| crate::error::LazorKitError::ClientDataInvalidUtf8)?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(json_str).map_err(|_| crate::error::LazorKitError::ClientDataJsonParseError)?;
+    let challenge = parsed["challenge"]
+        .as_str()
+        .ok_or(crate::error::LazorKitError::ChallengeMissing)?;
+
+    // strip surrounding quotes, whitespace, slashes
+    let challenge_clean = challenge.trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
+    let challenge_bytes = URL_SAFE_NO_PAD
+        .decode(challenge_clean)
+        .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
+
+    let msg = Message::try_from_slice(&challenge_bytes)
+        .map_err(|_| crate::error::LazorKitError::ChallengeDeserializationError)?;
+
+    // 5) timestamp / nonce policy -------------------------------------------------------------
+    let now = Clock::get()?.unix_timestamp;
+    if msg.current_timestamp < now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) {
+        return Err(crate::error::LazorKitError::TimestampTooOld.into());
+    }
+    if msg.current_timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
+        return Err(crate::error::LazorKitError::TimestampTooNew.into());
+    }
+    require!(msg.nonce == last_nonce, crate::error::LazorKitError::NonceMismatch);
+
+    // 6) finally verify the secp256r1 signature ----------------------------------------------
+    verify_secp256r1_instruction(
+        &secp_ix,
+        authenticator.passkey_pubkey,
+        message,
+        signature,
+    )
+}
