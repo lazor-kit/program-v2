@@ -31,12 +31,28 @@ pub mod lazorkit {
         instructions::create_smart_wallet(ctx, passkey_pubkey, credential_id, rule_data)
     }
 
-    /// Execute an instruction with passkey authentication
-    pub fn execute_instruction(
-        ctx: Context<ExecuteInstruction>,
-        args: ExecuteInstructionArgs,
+    /// Spend or mint tokens from the smart wallet after rule check and passkey auth
+    pub fn execute_transaction(
+        ctx: Context<ExecuteTransaction>,
+        args: ExecuteTransactionArgs,
     ) -> Result<()> {
-        instructions::execute_instruction(ctx, args)
+        instructions::execute_transaction(ctx, args)
+    }
+
+    /// Swap the rule program associated with the smart wallet
+    pub fn update_rule_program(
+        ctx: Context<UpdateRuleProgram>,
+        args: UpdateRuleProgramArgs,
+    ) -> Result<()> {
+        instructions::update_rule_program(ctx, args)
+    }
+
+    /// Call an arbitrary instruction inside the rule program (and optionally create a new authenticator)
+    pub fn call_rule_program(
+        ctx: Context<CallRuleProgram>,
+        args: CallRuleProgramArgs,
+    ) -> Result<()> {
+        instructions::call_rule_program(ctx, args)
     }
 
     /// Update the list of whitelisted rule programs
