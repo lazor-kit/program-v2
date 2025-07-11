@@ -48,6 +48,8 @@ pub enum LazorKitError {
     // === Rule Program Errors ===
     #[msg("Rule program not found in whitelist")]
     RuleProgramNotWhitelisted,
+    #[msg("The whitelist of rule programs is full.")]
+    WhitelistFull,
     #[msg("Invalid instruction discriminator for check_rule")]
     InvalidCheckRuleDiscriminator,
     #[msg("Invalid instruction discriminator for destroy")]
@@ -60,8 +62,12 @@ pub enum LazorKitError {
     NoDefaultRuleProgram,
 
     // === Account & CPI Errors ===
+    #[msg("Invalid remaining accounts")]
+    InvalidRemainingAccounts,
     #[msg("CPI data is required but not provided")]
     CpiDataMissing,
+    #[msg("CPI data is invalid or malformed")]
+    InvalidCpiData,
     #[msg("Insufficient remaining accounts for rule instruction")]
     InsufficientRuleAccounts,
     #[msg("Insufficient remaining accounts for CPI instruction")]
@@ -88,4 +94,12 @@ pub enum LazorKitError {
     InvalidAccountOwner,
     #[msg("Account discriminator mismatch")]
     InvalidAccountDiscriminator,
+
+    // === Program Errors ===
+    #[msg("Invalid program ID")]
+    InvalidProgramId,
+    #[msg("Program not executable")]
+    ProgramNotExecutable,
+    #[msg("Smart wallet authenticator already initialized")]
+    SmartWalletAuthenticatorAlreadyInitialized,
 }

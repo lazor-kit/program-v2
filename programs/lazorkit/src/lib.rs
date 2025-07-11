@@ -8,6 +8,7 @@ pub mod utils;
 
 use constants::PASSKEY_SIZE;
 use instructions::*;
+use state::*;
 
 declare_id!("6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo");
 
@@ -21,6 +22,15 @@ pub mod lazorkit {
         instructions::initialize(ctx)
     }
 
+    /// Update the program configuration
+    pub fn update_config(
+        ctx: Context<UpdateConfig>,
+        param: UpdateConfigType,
+        value: u64,
+    ) -> Result<()> {
+        instructions::update_config(ctx, param, value)
+    }
+
     /// Create a new smart wallet with passkey authentication
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
@@ -31,35 +41,18 @@ pub mod lazorkit {
         instructions::create_smart_wallet(ctx, passkey_pubkey, credential_id, rule_data)
     }
 
-    /// Spend or mint tokens from the smart wallet after rule check and passkey auth
-    pub fn execute_transaction(
-        ctx: Context<ExecuteTransaction>,
-        args: ExecuteTransactionArgs,
+    /// Unified execute entrypoint covering all smart-wallet actions
+    pub fn execute<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
+        args: ExecuteArgs,
     ) -> Result<()> {
-        instructions::execute_transaction(ctx, args)
+        instructions::execute(ctx, args)
     }
 
-    /// Swap the rule program associated with the smart wallet
-    pub fn update_rule_program(
-        ctx: Context<UpdateRuleProgram>,
-        args: UpdateRuleProgramArgs,
+    /// Add a program to the whitelist of rule programs
+    pub fn add_whitelist_rule_program(
+        ctx: Context<AddWhitelistRuleProgram>,
     ) -> Result<()> {
-        instructions::update_rule_program(ctx, args)
-    }
-
-    /// Call an arbitrary instruction inside the rule program (and optionally create a new authenticator)
-    pub fn call_rule_program(
-        ctx: Context<CallRuleProgram>,
-        args: CallRuleProgramArgs,
-    ) -> Result<()> {
-        instructions::call_rule_program(ctx, args)
-    }
-
-    /// Update the list of whitelisted rule programs
-    pub fn upsert_whitelist_rule_programs(
-        ctx: Context<UpsertWhitelistRulePrograms>,
-        program_id: Pubkey,
-    ) -> Result<()> {
-        instructions::upsert_whitelist_rule_programs(ctx, program_id)
+        instructions::add_whitelist_rule_program(ctx)
     }
 }
