@@ -35,15 +35,18 @@ describe('Test smart wallet with default rule', () => {
       lazorkitProgram.smartWalletSeq
     );
 
-    if (smartWalletSeqAccountInfo == null) {
+    if (smartWalletSeqAccountInfo === null) {
       const txn = await lazorkitProgram.initializeTxn(
         payer.publicKey,
         defaultRuleProgram.programId
       );
 
-      await sendAndConfirmTransaction(connection, txn, [payer], {
+      const sig = await sendAndConfirmTransaction(connection, txn, [payer], {
         commitment: 'confirmed',
+        skipPreflight: true,
       });
+
+      console.log('Initialize txn: ', sig);
     }
   });
 
@@ -55,7 +58,7 @@ describe('Test smart wallet with default rule', () => {
       await lazorkitProgram.getSmartWalletByCredentialId(credentialId);
   });
 
-  xit('Initialize successfully', async () => {
+  it('Initialize successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -138,6 +141,73 @@ describe('Test smart wallet with default rule', () => {
     expect(smartWalletAuthenticatorData.smartWallet.toString()).to.be.equal(
       smartWallet.toString()
     );
+  });
+
+  it('Add another device successfully', async () => {
+    const privateKey = ECDSA.generateKey();
+
+    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+
+    const pubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+
+    const smartWallet = await lazorkitProgram.getLastestSmartWallet();
+
+    const [smartWalletAuthenticator] = lazorkitProgram.smartWalletAuthenticator(
+      pubkey,
+      smartWallet
+    );
+
+    // the user has deposit 0.01 SOL to the smart-wallet
+    const depositSolIns = anchor.web3.SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: smartWallet,
+      lamports: LAMPORTS_PER_SOL / 100,
+    });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new anchor.web3.Transaction().add(depositSolIns),
+      [payer],
+      {
+        commitment: 'confirmed',
+      }
+    );
+
+    const initRuleIns = await defaultRuleProgram.initRuleIns(
+      payer.publicKey,
+      smartWallet,
+      smartWalletAuthenticator
+    );
+
+    const credentialId = base64.encode(Buffer.from('testing something')); // random string
+
+    const createSmartWalletTxn = await lazorkitProgram.createSmartWalletTxn(
+      pubkey,
+      initRuleIns,
+      payer.publicKey,
+      credentialId
+    );
+
+    const sig = await sendAndConfirmTransaction(
+      connection,
+      createSmartWalletTxn,
+      [payer],
+      {
+        commitment: 'confirmed',
+        skipPreflight: true,
+      }
+    );
+
+    console.log('Create smart-wallet: ', sig);
+
+    const newPrivateKey = ECDSA.generateKey();
+
+    const newPublicKeyBase64 = newPrivateKey.toCompressedPublicKey();
+
+    const newPubkey = Array.from(Buffer.from(newPublicKeyBase64, 'base64'));
+
+    const [newSmartWalletAuthenticator] =
+      lazorkitProgram.smartWalletAuthenticator(newPubkey, smartWallet);
   });
 
   // xit('Spend SOL successfully', async () => {

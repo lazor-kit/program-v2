@@ -1,11 +1,11 @@
-import * as anchor from "@coral-xyz/anchor";
-import { DefaultRule } from "../target/types/default_rule";
-import * as types from "./types";
-import * as constants from "./constants";
+import * as anchor from '@coral-xyz/anchor';
+import { DefaultRule } from '../target/types/default_rule';
+import * as types from './types';
+import * as constants from './constants';
 
 export class DefaultRuleProgram {
   private connection: anchor.web3.Connection;
-  private Idl: anchor.Idl = require("../target/idl/default_rule.json");
+  private Idl: anchor.Idl = require('../target/idl/default_rule.json');
 
   constructor(connection: anchor.web3.Connection) {
     this.connection = connection;
@@ -21,16 +21,9 @@ export class DefaultRuleProgram {
     return this.program.programId;
   }
 
-  rule(smartWallet: anchor.web3.PublicKey): anchor.web3.PublicKey {
+  rule(smartWalletAuthenticator: anchor.web3.PublicKey): anchor.web3.PublicKey {
     return anchor.web3.PublicKey.findProgramAddressSync(
-      [constants.RULE_SEED, smartWallet.toBuffer()],
-      this.programId
-    )[0];
-  }
-
-  get config(): anchor.web3.PublicKey {
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [constants.CONFIG_SEED],
+      [constants.RULE_SEED, smartWalletAuthenticator.toBuffer()],
       this.programId
     )[0];
   }
@@ -65,17 +58,19 @@ export class DefaultRuleProgram {
       .instruction();
   }
 
-  async destroyIns(
+  async addDeviceIns(
     payer: anchor.web3.PublicKey,
-    smartWallet: anchor.web3.PublicKey,
-    smartWalletAuthenticator: anchor.web3.PublicKey
+    smartWalletAuthenticator: anchor.web3.PublicKey,
+    newSmartWalletAuthenticator: anchor.web3.PublicKey
   ) {
     return await this.program.methods
-      .destroy()
+      .addDevice()
       .accountsPartial({
-        rule: this.rule(smartWallet),
+        payer,
         smartWalletAuthenticator,
-        smartWallet,
+        newSmartWalletAuthenticator,
+        rule: this.rule(smartWalletAuthenticator),
+        newRule: this.rule(newSmartWalletAuthenticator),
       })
       .instruction();
   }

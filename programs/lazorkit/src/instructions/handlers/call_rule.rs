@@ -36,7 +36,7 @@ pub fn handle<'c: 'info, 'info>(
     }
 
     // 3. signer & account slice
-    let rule_signer = get_pda_signer(
+    let rule_signer: crate::utils::PdaSigner = get_pda_signer(
         &args.passkey_pubkey,
         ctx.accounts.smart_wallet.key(),
         ctx.bumps.smart_wallet_authenticator,

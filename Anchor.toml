@@ -6,20 +6,20 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
-transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
-default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
+lazorkit = "HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL"
+transfer_limit = "34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY"
+default_rule = "FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX"
 
 [programs.localnet]
-lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
-transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
-default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
+lazorkit = "HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL"
+transfer_limit = "34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY"
+default_rule = "FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

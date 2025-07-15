@@ -3,7 +3,6 @@ import * as anchor from '@coral-xyz/anchor';
 import { Lazorkit } from '../target/types/lazorkit';
 import { TransferLimit } from '../target/types/transfer_limit';
 
-export type CpiData = anchor.IdlTypes<Lazorkit>['cpiData'];
 export type SmartWalletSeq = anchor.IdlTypes<Lazorkit>['smartWalletSeq'];
 export type SmartWalletConfig = anchor.IdlTypes<Lazorkit>['smartWalletConfig'];
 export type SmartWalletAuthenticator =

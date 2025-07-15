@@ -59,9 +59,9 @@ anchor build
 
 ## Program IDs
 
-- LazorKit Program: `6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo`
-- Transfer Limit Program: `EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB`
-- Default Rule Program: `7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs`
+- LazorKit Program: `HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL`
+- Transfer Limit Program: `34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY`
+- Default Rule Program: `FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX`
 
 ## Deployment
 
@@ -69,22 +69,22 @@ To deploy the programs and initialize the IDL:
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl init -f ./target/idl/lazorkit.json 6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo
+anchor idl init -f ./target/idl/lazorkit.json HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL
 
 # Initialize IDL for Transfer Limit
-anchor idl init -f ./target/idl/transfer_limit.json EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB
+anchor idl init -f ./target/idl/transfer_limit.json 34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY
 
 # Initialize IDL for Default Rule
-anchor idl init -f ./target/idl/default_rule.json 7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs
+anchor idl init -f ./target/idl/default_rule.json FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX
 
 # Upgrade IDL for LazorKit
-anchor idl upgrade 6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo -f ./target/idl/lazorkit.json
+anchor idl upgrade HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL -f ./target/idl/lazorkit.json
 
 # Upgrade IDL for Transfer Limit
-anchor idl upgrade EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB -f ./target/idl/transfer_limit.json
+anchor idl upgrade 34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY -f ./target/idl/transfer_limit.json
 
 # Upgrade IDL for Default Rule
-anchor idl upgrade 7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs -f ./target/idl/default_rule.json
+anchor idl upgrade FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX -f ./target/idl/default_rule.json
 ```
 
 ## Testing

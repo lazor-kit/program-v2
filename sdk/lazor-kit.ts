@@ -167,12 +167,19 @@ export class LazorKitProgram {
     ruleProgram: anchor.web3.PublicKey
   ): Promise<anchor.web3.Transaction> {
     const ix = await this.program.methods
-      .upsertWhitelistRulePrograms(ruleProgram)
+      .addWhitelistRuleProgram()
       .accountsPartial({
         authority: payer,
         config: this._config ?? this.config,
         whitelistRulePrograms: this.whitelistRulePrograms,
       })
+      .remainingAccounts([
+        {
+          pubkey: ruleProgram,
+          isWritable: false,
+          isSigner: false,
+        },
+      ])
       .instruction();
     return new anchor.web3.Transaction().add(ix);
   }
@@ -227,122 +234,122 @@ export class LazorKitProgram {
     return tx;
   }
 
-  async executeInstructionTxn(
-    passkeyPubkey: number[],
-    clientDataJsonRaw: Buffer,
-    authenticatorDataRaw: Buffer,
-    signature: Buffer,
-    payer: anchor.web3.PublicKey,
-    smartWallet: anchor.web3.PublicKey,
-    ruleIns: anchor.web3.TransactionInstruction | null = null,
-    cpiIns: anchor.web3.TransactionInstruction | null = null,
-    executeAction: anchor.IdlTypes<Lazorkit>['action'] = types.ExecuteAction
-      .ExecuteCpi,
-    createNewAuthenticator: number[] = null,
-    verifyInstructionIndex: number = 1
-  ): Promise<anchor.web3.Transaction> {
-    const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
-      passkeyPubkey,
-      smartWallet
-    );
+  // async executeInstructionTxn(
+  //   passkeyPubkey: number[],
+  //   clientDataJsonRaw: Buffer,
+  //   authenticatorDataRaw: Buffer,
+  //   signature: Buffer,
+  //   payer: anchor.web3.PublicKey,
+  //   smartWallet: anchor.web3.PublicKey,
+  //   ruleIns: anchor.web3.TransactionInstruction | null = null,
+  //   cpiIns: anchor.web3.TransactionInstruction | null = null,
+  //   executeAction: anchor.IdlTypes<Lazorkit>['action'] = types.ExecuteAction
+  //     .ExecuteCpi,
+  //   createNewAuthenticator: number[] = null,
+  //   verifyInstructionIndex: number = 1
+  // ): Promise<anchor.web3.Transaction> {
+  //   const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
+  //     passkeyPubkey,
+  //     smartWallet
+  //   );
 
-    const ruleInstruction =
-      ruleIns ||
-      (await this.defaultRuleProgram.checkRuleIns(
-        smartWallet,
-        smartWalletAuthenticator
-      ));
+  //   const ruleInstruction =
+  //     ruleIns ||
+  //     (await this.defaultRuleProgram.checkRuleIns(
+  //       smartWallet,
+  //       smartWalletAuthenticator
+  //     ));
 
-    const ruleData: types.CpiData = {
-      data: ruleInstruction.data,
-      startIndex: 0,
-      length: ruleInstruction.keys.length,
-    };
+  //   const ruleData: types.CpiData = {
+  //     data: ruleInstruction.data,
+  //     startIndex: 0,
+  //     length: ruleInstruction.keys.length,
+  //   };
 
-    let cpiData: types.CpiData | null = null;
+  //   let cpiData: types.CpiData | null = null;
 
-    const remainingAccounts: anchor.web3.AccountMeta[] = [];
+  //   const remainingAccounts: anchor.web3.AccountMeta[] = [];
 
-    if (cpiIns) {
-      cpiData = {
-        data: cpiIns.data,
-        startIndex: 0,
-        length: cpiIns.keys.length,
-      };
+  //   if (cpiIns) {
+  //     cpiData = {
+  //       data: cpiIns.data,
+  //       startIndex: 0,
+  //       length: cpiIns.keys.length,
+  //     };
 
-      // The order matters: first CPI accounts, then rule accounts.
-      remainingAccounts.push(...instructionToAccountMetas(cpiIns, payer));
+  //     // The order matters: first CPI accounts, then rule accounts.
+  //     remainingAccounts.push(...instructionToAccountMetas(cpiIns, payer));
 
-      ruleData.startIndex = cpiIns.keys.length;
-    }
+  //     ruleData.startIndex = cpiIns.keys.length;
+  //   }
 
-    // Rule program accounts always follow.
-    remainingAccounts.push(
-      ...instructionToAccountMetas(ruleInstruction, payer)
-    );
+  //   // Rule program accounts always follow.
+  //   remainingAccounts.push(
+  //     ...instructionToAccountMetas(ruleInstruction, payer)
+  //   );
 
-    const message = Buffer.concat([
-      authenticatorDataRaw,
-      Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-    ]);
+  //   const message = Buffer.concat([
+  //     authenticatorDataRaw,
+  //     Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
+  //   ]);
 
-    const verifySignatureIx = createSecp256r1Instruction(
-      message,
-      Buffer.from(passkeyPubkey),
-      signature
-    );
+  //   const verifySignatureIx = createSecp256r1Instruction(
+  //     message,
+  //     Buffer.from(passkeyPubkey),
+  //     signature
+  //   );
 
-    let newSmartWalletAuthenticator: anchor.web3.PublicKey | null = null;
-    if (createNewAuthenticator) {
-      [newSmartWalletAuthenticator] = this.smartWalletAuthenticator(
-        createNewAuthenticator,
-        smartWallet
-      );
-    }
+  //   let newSmartWalletAuthenticator: anchor.web3.PublicKey | null = null;
+  //   if (createNewAuthenticator) {
+  //     [newSmartWalletAuthenticator] = this.smartWalletAuthenticator(
+  //       createNewAuthenticator,
+  //       smartWallet
+  //     );
+  //   }
 
-    const executeInstructionIx = await this.program.methods
-      .executeInstruction({
-        passkeyPubkey,
-        signature,
-        clientDataJsonRaw,
-        authenticatorDataRaw,
-        verifyInstructionIndex,
-        ruleData: ruleData,
-        cpiData: cpiData,
-        action: executeAction,
-        createNewAuthenticator,
-      })
-      .accountsPartial({
-        payer,
-        config: this.config,
-        smartWallet,
-        smartWalletConfig: this.smartWalletConfig(smartWallet),
-        smartWalletAuthenticator,
-        whitelistRulePrograms: this.whitelistRulePrograms,
-        authenticatorProgram: ruleInstruction.programId,
-        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        cpiProgram: cpiIns ? cpiIns.programId : anchor.web3.PublicKey.default,
-        newSmartWalletAuthenticator: newSmartWalletAuthenticator,
-      })
-      .remainingAccounts(remainingAccounts)
-      .instruction();
+  //   const executeInstructionIx = await this.program.methods
+  //     .executeInstruction({
+  //       passkeyPubkey,
+  //       signature,
+  //       clientDataJsonRaw,
+  //       authenticatorDataRaw,
+  //       verifyInstructionIndex,
+  //       ruleData: ruleData,
+  //       cpiData: cpiData,
+  //       action: executeAction,
+  //       createNewAuthenticator,
+  //     })
+  //     .accountsPartial({
+  //       payer,
+  //       config: this.config,
+  //       smartWallet,
+  //       smartWalletConfig: this.smartWalletConfig(smartWallet),
+  //       smartWalletAuthenticator,
+  //       whitelistRulePrograms: this.whitelistRulePrograms,
+  //       authenticatorProgram: ruleInstruction.programId,
+  //       ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+  //       systemProgram: anchor.web3.SystemProgram.programId,
+  //       cpiProgram: cpiIns ? cpiIns.programId : anchor.web3.PublicKey.default,
+  //       newSmartWalletAuthenticator: newSmartWalletAuthenticator,
+  //     })
+  //     .remainingAccounts(remainingAccounts)
+  //     .instruction();
 
-    const txn = new anchor.web3.Transaction()
-      .add(
-        anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
-          units: 300_000,
-        })
-      )
-      .add(verifySignatureIx)
-      .add(executeInstructionIx);
+  //   const txn = new anchor.web3.Transaction()
+  //     .add(
+  //       anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
+  //         units: 300_000,
+  //       })
+  //     )
+  //     .add(verifySignatureIx)
+  //     .add(executeInstructionIx);
 
-    txn.feePayer = payer;
-    txn.recentBlockhash = (
-      await this.connection.getLatestBlockhash()
-    ).blockhash;
-    return txn;
-  }
+  //   txn.feePayer = payer;
+  //   txn.recentBlockhash = (
+  //     await this.connection.getLatestBlockhash()
+  //   ).blockhash;
+  //   return txn;
+  // }
 
   /**
    * Query the chain for the smart-wallet associated with a passkey.

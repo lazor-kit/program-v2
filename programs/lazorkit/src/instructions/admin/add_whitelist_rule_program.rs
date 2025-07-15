@@ -52,4 +52,4 @@ pub struct AddWhitelistRuleProgram<'info> {
         bump,
     )]
     pub whitelist_rule_programs: Account<'info, WhitelistRulePrograms>,
-} 
+}

@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{error::LazorKitError, state::{Config, SmartWalletSeq, WhitelistRulePrograms}};
+use crate::{
+    error::LazorKitError,
+    state::{Config, SmartWalletSeq, WhitelistRulePrograms},
+};
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     // Check if the default rule program is executable
@@ -29,7 +32,7 @@ pub struct Initialize<'info> {
 
     /// The program's configuration account.
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = 8 + Config::INIT_SPACE,
         seeds = [Config::PREFIX_SEED],
@@ -39,7 +42,7 @@ pub struct Initialize<'info> {
 
     /// The list of whitelisted rule programs that can be used with smart wallets.
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = 8 + WhitelistRulePrograms::INIT_SPACE,
         seeds = [WhitelistRulePrograms::PREFIX_SEED],
@@ -49,7 +52,7 @@ pub struct Initialize<'info> {
 
     /// The sequence tracker for creating new smart wallets.
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = 8 + SmartWalletSeq::INIT_SPACE,
         seeds = [SmartWalletSeq::PREFIX_SEED],
