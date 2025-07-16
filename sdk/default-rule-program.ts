@@ -1,6 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
 import { DefaultRule } from '../target/types/default_rule';
-import * as types from './types';
 import * as constants from './constants';
 
 export class DefaultRuleProgram {
@@ -39,7 +38,7 @@ export class DefaultRuleProgram {
         payer,
         smartWallet,
         smartWalletAuthenticator,
-        rule: this.rule(smartWallet),
+        rule: this.rule(smartWalletAuthenticator),
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();

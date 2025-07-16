@@ -18,22 +18,22 @@ pub fn handle<'c: 'info, 'info>(
     }
     check_whitelist(&ctx.accounts.whitelist_rule_programs, &rule_program.key())?;
 
-    // 2. Optionally create a new authenticator
-    if let Some(new_passkey) = args.create_new_authenticator {
-        let new_smart_wallet_authenticator = &ctx
-            .remaining_accounts
-            .first()
-            .ok_or(LazorKitError::InvalidRemainingAccounts)?;
+    // // 2. Optionally create a new authenticator
+    // if let Some(new_passkey) = args.create_new_authenticator {
+    //     let new_smart_wallet_authenticator = &ctx
+    //         .remaining_accounts
+    //         .first()
+    //         .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
-        SmartWalletAuthenticator::init(
-            &new_smart_wallet_authenticator,
-            ctx.accounts.payer.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-            ctx.accounts.smart_wallet.key(),
-            new_passkey,
-            Vec::new(),
-        )?;
-    }
+    //     SmartWalletAuthenticator::init(
+    //         &new_smart_wallet_authenticator,
+    //         ctx.accounts.payer.to_account_info(),
+    //         ctx.accounts.system_program.to_account_info(),
+    //         ctx.accounts.smart_wallet.key(),
+    //         new_passkey,
+    //         Vec::new(),
+    //     )?;
+    // }
 
     // 3. signer & account slice
     let rule_signer: crate::utils::PdaSigner = get_pda_signer(

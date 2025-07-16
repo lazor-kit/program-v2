@@ -33,8 +33,8 @@ pub struct ExecuteArgs {
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub action: Action,
-    /// optional new authenticator passkey (only for `CallRuleProgram`)
-    pub create_new_authenticator: Option<[u8; 33]>,
+    // /// optional new authenticator passkey (only for `CallRuleProgram`)
+    // pub create_new_authenticator: Option<[u8  ; 33]>,
 }
 
 /// Single entry-point for all smart-wallet interactions
@@ -125,7 +125,11 @@ pub struct Execute<'info> {
     )]
     pub smart_wallet_authenticator: Box<Account<'info, SmartWalletAuthenticator>>,
 
-    #[account(seeds = [WhitelistRulePrograms::PREFIX_SEED], bump, owner = ID)]
+    #[account(
+        seeds = [WhitelistRulePrograms::PREFIX_SEED], 
+        bump, 
+        owner = ID
+    )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
     /// CHECK: rule program being interacted with
@@ -140,8 +144,8 @@ pub struct Execute<'info> {
     /// CHECK: target program for CPI (if any)
     pub cpi_program: UncheckedAccount<'info>,
 
-    // The new authenticator is an optional account that is only initialized
-    // by the `CallRuleProgram` action. It is passed as an UncheckedAccount
-    // and created via CPI if needed.
-    pub new_smart_wallet_authenticator: Option<UncheckedAccount<'info>>,
+    // // The new authenticator is an optional account that is only initialized
+    // // by the `CallRuleProgram` action. It is passed as an UncheckedAccount
+    // // and created via CPI if needed.
+    // pub new_smart_wallet_authenticator: Option<UncheckedAccount<'info>>,
 }

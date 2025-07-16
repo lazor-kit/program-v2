@@ -432,40 +432,53 @@ export class LazorKitProgram {
   /**
    * Build the serialized Message struct used for signing requests.
    */
-  async getMessage(smartWallet: string): Promise<Buffer> {
+  async getMessage(
+    smartWallet: string,
+    ruleInstruction: anchor.web3.TransactionInstruction,
+    cpiInstruction: anchor.web3.TransactionInstruction
+  ): Promise<Buffer> {
     const smartWalletData = await this.getSmartWalletConfigData(
       new anchor.web3.PublicKey(smartWallet)
     );
 
-    class Message {
-      nonce: anchor.BN;
-      timestamp: anchor.BN;
-      constructor(fields: { nonce: anchor.BN; timestamp: anchor.BN }) {
-        this.nonce = fields.nonce;
-        this.timestamp = fields.timestamp;
-      }
-    }
+    // Manually serialize the message struct:
+    // - nonce (u64): 8 bytes
+    // - current_timestamp (i64): 8 bytes (unix seconds)
+    // - split_index (u16): 2 bytes
+    // - rule_data (Vec<u8>): 4 bytes length + data bytes
+    // - cpi_data (Vec<u8>): 4 bytes length + data bytes
 
-    const schema = new Map([
-      [
-        Message,
-        {
-          kind: 'struct',
-          fields: [
-            ['nonce', 'u64'],
-            ['timestamp', 'i64'],
-          ],
-        },
-      ],
-    ]);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
 
-    const encoded = borsh.serialize(
-      schema,
-      new Message({
-        nonce: smartWalletData.lastNonce,
-        timestamp: new anchor.BN(Date.now()),
-      })
+    // Calculate total buffer size: 8 + 8 + 2 + 4 + instructionDataLength + 4 + instructionDataLength
+    const buffer = Buffer.alloc(
+      26 + ruleInstruction.data.length + cpiInstruction.data.length
     );
-    return Buffer.from(encoded);
+
+    // Write nonce as little-endian u64 (bytes 0-7)
+    buffer.writeBigUInt64LE(BigInt(smartWalletData.lastNonce.toString()), 0);
+
+    // Write current_timestamp as little-endian i64 (bytes 8-15)
+    buffer.writeBigInt64LE(BigInt(currentTimestamp), 8);
+
+    // Write split_index as little-endian u16 (bytes 16-17)
+    buffer.writeUInt16LE(ruleInstruction.keys.length, 16);
+
+    // Write rule_data length as little-endian u32 (bytes 18-21)
+    buffer.writeUInt32LE(ruleInstruction.data.length, 18);
+
+    // Write rule_data bytes (starting at byte 22)
+    ruleInstruction.data.copy(buffer, 22);
+
+    // Write cpi_data length as little-endian u32 (bytes 26-29)
+    buffer.writeUInt32LE(
+      cpiInstruction.data.length,
+      22 + ruleInstruction.data.length
+    );
+
+    // Write cpi_data bytes (starting at byte 30)
+    cpiInstruction.data.copy(buffer, 26 + ruleInstruction.data.length);
+
+    return buffer;
   }
 }

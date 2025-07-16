@@ -72,7 +72,8 @@ pub fn handle<'c: 'info, 'info>(
                 .map_err(|_| LazorKitError::InvalidCpiData)?,
         );
 
-        let destination_account = &cpi_accounts[0];
+        let destination_account = &cpi_accounts[1];
+
         transfer_sol_from_pda(&ctx.accounts.smart_wallet, destination_account, amount)?;
     } else {
         // This is a general CPI

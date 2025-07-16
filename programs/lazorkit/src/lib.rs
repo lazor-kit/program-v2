@@ -46,13 +46,12 @@ pub mod lazorkit {
         ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
         args: ExecuteArgs,
     ) -> Result<()> {
+        msg!("Run here");
         instructions::execute(ctx, args)
     }
 
     /// Add a program to the whitelist of rule programs
-    pub fn add_whitelist_rule_program(
-        ctx: Context<AddWhitelistRuleProgram>,
-    ) -> Result<()> {
+    pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
         instructions::add_whitelist_rule_program(ctx)
     }
 }

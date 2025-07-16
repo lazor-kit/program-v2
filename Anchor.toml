@@ -19,7 +19,7 @@ default_rule = "FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
