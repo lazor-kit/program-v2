@@ -6,14 +6,12 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-lazorkit = "HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL"
-transfer_limit = "34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY"
-default_rule = "FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX"
+lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [programs.localnet]
-lazorkit = "HKAM6aGJsNuyxoVKNk8kgqMTUNSDjA3ciZUikHYemQzL"
-transfer_limit = "34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY"
-default_rule = "FcHpLspZz2U5JykpRmFBjaAsfJvPZsfKSBpegNBnjFbX"
+lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [registry]
 url = "https://api.apr.dev"

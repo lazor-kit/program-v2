@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{Config, SmartWalletSeq, WhitelistRulePrograms},
+    state::{Config, WhitelistRulePrograms},
 };
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
@@ -13,9 +13,6 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
 
     let whitelist_rule_programs = &mut ctx.accounts.whitelist_rule_programs;
     whitelist_rule_programs.list = vec![ctx.accounts.default_rule_program.key()];
-
-    let smart_wallet_seq = &mut ctx.accounts.smart_wallet_seq;
-    smart_wallet_seq.seq = 0;
 
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
@@ -56,16 +53,6 @@ pub struct Initialize<'info> {
         bump
     )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
-
-    /// The sequence tracker for creating new smart wallets.
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + SmartWalletSeq::INIT_SPACE,
-        seeds = [SmartWalletSeq::PREFIX_SEED],
-        bump
-    )]
-    pub smart_wallet_seq: Box<Account<'info, SmartWalletSeq>>,
 
     /// The default rule program to be used for new smart wallets.
     /// CHECK: This is checked to be executable.

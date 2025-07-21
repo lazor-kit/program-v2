@@ -3,11 +3,9 @@ use anchor_lang::prelude::*;
 use crate::{
     constants::{PASSKEY_SIZE, SMART_WALLET_SEED},
     error::LazorKitError,
-    events::{SmartWalletCreated, FeeCollected},
+    events::{FeeCollected, SmartWalletCreated},
     security::validation,
-    state::{
-        Config, SmartWalletAuthenticator, SmartWalletConfig, SmartWalletSeq, WhitelistRulePrograms,
-    },
+    state::{Config, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms},
     utils::{execute_cpi, transfer_sol_from_pda, PasskeyExt, PdaSigner},
     ID,
 };
@@ -17,35 +15,36 @@ pub fn create_smart_wallet(
     passkey_pubkey: [u8; PASSKEY_SIZE],
     credential_id: Vec<u8>,
     rule_data: Vec<u8>,
+    wallet_id: u64, // Random ID provided by client
 ) -> Result<()> {
     // === Input Validation ===
     validation::validate_credential_id(&credential_id)?;
     validation::validate_rule_data(&rule_data)?;
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    
+
     // Validate passkey format (ensure it's a valid compressed public key)
     require!(
         passkey_pubkey[0] == 0x02 || passkey_pubkey[0] == 0x03,
         LazorKitError::InvalidPasskeyFormat
     );
-    
-    // === Sequence and Configuration ===
+
+    // Validate wallet ID is not zero (reserved)
+    require!(wallet_id != 0, LazorKitError::InvalidSequenceNumber);
+
+    // Additional validation: ensure wallet ID is within reasonable bounds
+    require!(wallet_id < u64::MAX, LazorKitError::InvalidSequenceNumber);
+
+    // === Configuration ===
     let wallet_data = &mut ctx.accounts.smart_wallet_config;
-    let sequence_account = &mut ctx.accounts.smart_wallet_seq;
     let smart_wallet_authenticator = &mut ctx.accounts.smart_wallet_authenticator;
-    
-    // Check for potential sequence overflow
-    let new_seq = sequence_account.seq
-        .checked_add(1)
-        .ok_or(LazorKitError::IntegerOverflow)?;
-    
+
     // Validate default rule program
     validation::validate_program_executable(&ctx.accounts.default_rule_program)?;
-    
+
     // === Initialize Smart Wallet Config ===
     wallet_data.set_inner(SmartWalletConfig {
         rule_program: ctx.accounts.config.default_rule_program,
-        id: sequence_account.seq,
+        id: wallet_id,
         last_nonce: 0,
         bump: ctx.bumps.smart_wallet,
     });
@@ -57,7 +56,7 @@ pub fn create_smart_wallet(
         credential_id: credential_id.clone(),
         bump: ctx.bumps.smart_wallet_authenticator,
     });
-    
+
     // === Create PDA Signer ===
     let signer = PdaSigner {
         seeds: vec![
@@ -79,42 +78,38 @@ pub fn create_smart_wallet(
         Some(signer),
     )?;
 
-    // === Update Sequence ===
-    sequence_account.seq = new_seq;
-
     // === Collect Creation Fee ===
     let fee = ctx.accounts.config.create_smart_wallet_fee;
     if fee > 0 {
         // Ensure the smart wallet has sufficient balance after fee deduction
         let smart_wallet_balance = ctx.accounts.smart_wallet.lamports();
         let rent = Rent::get()?.minimum_balance(0);
-        
+
         require!(
             smart_wallet_balance >= fee + rent,
             LazorKitError::InsufficientBalanceForFee
         );
-        
-        transfer_sol_from_pda(
-            &ctx.accounts.smart_wallet,
-            &ctx.accounts.signer,
-            fee,
-        )?;
+
+        transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.signer, fee)?;
     }
 
     // === Emit Events ===
     msg!("Smart wallet created: {}", ctx.accounts.smart_wallet.key());
-    msg!("Authenticator: {}", ctx.accounts.smart_wallet_authenticator.key());
-    msg!("Sequence ID: {}", sequence_account.seq.saturating_sub(1));
-    
+    msg!(
+        "Authenticator: {}",
+        ctx.accounts.smart_wallet_authenticator.key()
+    );
+    msg!("Wallet ID: {}", wallet_id);
+
     // Emit wallet creation event
     SmartWalletCreated::emit_event(
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.smart_wallet_authenticator.key(),
-        sequence_account.seq.saturating_sub(1),
+        wallet_id,
         ctx.accounts.config.default_rule_program,
         passkey_pubkey,
     )?;
-    
+
     // Emit fee collection event if fee was charged
     if fee > 0 {
         emit!(FeeCollected {
@@ -130,19 +125,10 @@ pub fn create_smart_wallet(
 }
 
 #[derive(Accounts)]
-#[instruction(passkey_pubkey: [u8; PASSKEY_SIZE], credential_id: Vec<u8>, rule_data: Vec<u8>)]
+#[instruction(passkey_pubkey: [u8; PASSKEY_SIZE], credential_id: Vec<u8>, rule_data: Vec<u8>, wallet_id: u64)]
 pub struct CreateSmartWallet<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-
-    /// Smart wallet sequence tracker
-    #[account(
-        mut,
-        seeds = [SmartWalletSeq::PREFIX_SEED],
-        bump,
-        constraint = smart_wallet_seq.seq < u64::MAX @ LazorKitError::MaxWalletLimitReached
-    )]
-    pub smart_wallet_seq: Account<'info, SmartWalletSeq>,
 
     /// Whitelist of allowed rule programs
     #[account(
@@ -153,12 +139,12 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub whitelist_rule_programs: Account<'info, WhitelistRulePrograms>,
 
-    /// The smart wallet PDA being created
+    /// The smart wallet PDA being created with random ID
     #[account(
         init,
         payer = signer,
         space = 0,
-        seeds = [SMART_WALLET_SEED, smart_wallet_seq.seq.to_le_bytes().as_ref()],
+        seeds = [SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
         bump
     )]
     /// CHECK: This account is only used for its public key and seeds.

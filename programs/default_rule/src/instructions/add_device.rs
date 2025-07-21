@@ -22,9 +22,6 @@ pub struct AddDevice<'info> {
     )]
     pub smart_wallet_authenticator: Account<'info, SmartWalletAuthenticator>,
 
-    #[account(
-        owner = lazorkit.key(),
-    )]
     /// CHECK:
     pub new_smart_wallet_authenticator: UncheckedAccount<'info>,
 

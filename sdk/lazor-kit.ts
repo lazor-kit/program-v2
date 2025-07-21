@@ -1,4 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
+import * as web3 from '@solana/web3.js';
 import IDL from '../target/idl/lazorkit.json';
 import * as bs58 from 'bs58';
 import { Lazorkit } from '../target/types/lazorkit';
@@ -11,8 +12,8 @@ import {
 import * as types from './types';
 import { sha256 } from 'js-sha256';
 import { DefaultRuleProgram } from './default-rule-program';
-import * as borsh from 'borsh';
 import { Buffer } from 'buffer';
+import { PublicKey } from '@solana/web3.js';
 
 // Polyfill for structuredClone (e.g. React Native/Expo)
 if (typeof globalThis.structuredClone !== 'function') {
@@ -23,96 +24,35 @@ if (typeof globalThis.structuredClone !== 'function') {
 }
 
 export class LazorKitProgram {
-  /** Network connection used by all RPC / account queries */
   readonly connection: anchor.web3.Connection;
+  readonly program: anchor.Program<Lazorkit>;
+  readonly programId: anchor.web3.PublicKey;
 
-  /** Cached IDL to avoid repeated JSON parsing */
-  readonly Idl: anchor.Idl = IDL as Lazorkit;
-
-  /** Lazily-instantiated (and cached) Anchor `Program` wrapper */
-  private _program?: anchor.Program<Lazorkit>;
-
-  /** Frequently-used PDA caches (network-independent, so safe to memoise) */
-  private _smartWalletSeq?: anchor.web3.PublicKey;
-  private _whitelistRulePrograms?: anchor.web3.PublicKey;
+  // Caches for PDAs
   private _config?: anchor.web3.PublicKey;
+  private _whitelistRulePrograms?: anchor.web3.PublicKey;
+  private _lookupTableAccount?: web3.AddressLookupTableAccount;
 
   readonly defaultRuleProgram: DefaultRuleProgram;
 
   constructor(connection: anchor.web3.Connection) {
     this.connection = connection;
+    this.program = new anchor.Program(IDL as anchor.Idl, {
+      connection,
+    }) as unknown as anchor.Program<Lazorkit>;
+    this.programId = this.program.programId;
     this.defaultRuleProgram = new DefaultRuleProgram(connection);
   }
 
-  get program(): anchor.Program<Lazorkit> {
-    if (!this._program) {
-      this._program = new anchor.Program(this.Idl, {
-        connection: this.connection,
-      });
-    }
-    return this._program;
-  }
-
-  get programId(): anchor.web3.PublicKey {
-    return this.program.programId;
-  }
-
-  get smartWalletSeq(): anchor.web3.PublicKey {
-    if (!this._smartWalletSeq) {
-      this._smartWalletSeq = anchor.web3.PublicKey.findProgramAddressSync(
-        [constants.SMART_WALLET_SEQ_SEED],
+  // PDA getters
+  get config(): anchor.web3.PublicKey {
+    if (!this._config) {
+      this._config = anchor.web3.PublicKey.findProgramAddressSync(
+        [constants.CONFIG_SEED],
         this.programId
       )[0];
     }
-    return this._smartWalletSeq;
-  }
-
-  get smartWalletSeqData(): Promise<types.SmartWalletSeq> {
-    return this.program.account.smartWalletSeq.fetch(this.smartWalletSeq);
-  }
-
-  async getLastestSmartWallet(): Promise<anchor.web3.PublicKey> {
-    const seqData = await this.program.account.smartWalletSeq.fetch(
-      this.smartWalletSeq
-    );
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [constants.SMART_WALLET_SEED, seqData.seq.toArrayLike(Buffer, 'le', 8)],
-      this.programId
-    )[0];
-  }
-
-  async getSmartWalletConfigData(
-    smartWallet: anchor.web3.PublicKey
-  ): Promise<types.SmartWalletConfig> {
-    return this.program.account.smartWalletConfig.fetch(
-      this.smartWalletConfig(smartWallet)
-    );
-  }
-
-  smartWalletAuthenticator(
-    passkey: number[],
-    smartWallet: anchor.web3.PublicKey
-  ): [anchor.web3.PublicKey, number] {
-    const hash = hashSeeds(passkey, smartWallet);
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [constants.SMART_WALLET_AUTHENTICATOR_SEED, smartWallet.toBuffer(), hash],
-      this.programId
-    );
-  }
-
-  async getSmartWalletAuthenticatorData(
-    smartWalletAuthenticator: anchor.web3.PublicKey
-  ): Promise<types.SmartWalletAuthenticator> {
-    return this.program.account.smartWalletAuthenticator.fetch(
-      smartWalletAuthenticator
-    );
-  }
-
-  smartWalletConfig(smartWallet: anchor.web3.PublicKey): anchor.web3.PublicKey {
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [constants.SMART_WALLET_CONFIG_SEED, smartWallet.toBuffer()],
-      this.programId
-    )[0];
+    return this._config;
   }
 
   get whitelistRulePrograms(): anchor.web3.PublicKey {
@@ -126,15 +66,171 @@ export class LazorKitProgram {
     return this._whitelistRulePrograms;
   }
 
-  get config(): anchor.web3.PublicKey {
-    if (!this._config) {
-      this._config = anchor.web3.PublicKey.findProgramAddressSync(
-        [constants.CONFIG_SEED],
-        this.programId
-      )[0];
+  /**
+   * Get or fetch the address lookup table account
+   */
+  async getLookupTableAccount(): Promise<web3.AddressLookupTableAccount | null> {
+    if (!this._lookupTableAccount) {
+      try {
+        const response = await this.connection.getAddressLookupTable(
+          constants.ADDRESS_LOOKUP_TABLE
+        );
+        this._lookupTableAccount = response.value;
+      } catch (error) {
+        console.warn('Failed to fetch lookup table account:', error);
+        return null;
+      }
     }
-    return this._config;
+    return this._lookupTableAccount;
   }
+
+  /**
+   * Generate a random wallet ID
+   * Uses timestamp + random number to minimize collision probability
+   */
+  generateWalletId(): bigint {
+    // Use timestamp in milliseconds (lower 48 bits)
+    const timestamp = BigInt(Date.now()) & BigInt('0xFFFFFFFFFFFF');
+
+    // Generate random 16 bits
+    const randomPart = BigInt(Math.floor(Math.random() * 0xffff));
+
+    // Combine: timestamp (48 bits) + random (16 bits) = 64 bits
+    const walletId = (timestamp << BigInt(16)) | randomPart;
+
+    // Ensure it's not zero (reserved)
+    return walletId === BigInt(0) ? BigInt(1) : walletId;
+  }
+
+  /**
+   * Check if a wallet ID already exists on-chain
+   */
+  async isWalletIdTaken(walletId: bigint): Promise<boolean> {
+    try {
+      const smartWalletPda = this.smartWallet(walletId);
+      const accountInfo = await this.connection.getAccountInfo(smartWalletPda);
+      return accountInfo !== null;
+    } catch (error) {
+      // If there's an error checking, assume it's not taken
+      return false;
+    }
+  }
+
+  /**
+   * Generate a unique wallet ID by checking for collisions
+   * Retries up to maxAttempts times if collisions are found
+   */
+  async generateUniqueWalletId(maxAttempts: number = 10): Promise<bigint> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const walletId = this.generateWalletId();
+
+      // Check if this ID is already taken
+      const isTaken = await this.isWalletIdTaken(walletId);
+
+      if (!isTaken) {
+        return walletId;
+      }
+
+      // If taken, log and retry
+      console.warn(
+        `Wallet ID ${walletId} already exists, retrying... (attempt ${
+          attempt + 1
+        }/${maxAttempts})`
+      );
+
+      // Add small delay to avoid rapid retries
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    throw new Error(
+      `Failed to generate unique wallet ID after ${maxAttempts} attempts`
+    );
+  }
+
+  async generateUniqueWalletIdWithRetry(
+    maxAttempts: number = 10
+  ): Promise<PublicKey> {
+    const walletId = await this.generateUniqueWalletId(maxAttempts);
+    return this.smartWallet(walletId);
+  }
+
+  /**
+   * Find smart wallet PDA with given ID
+   */
+  smartWallet(walletId: bigint): anchor.web3.PublicKey {
+    const idBytes = new Uint8Array(8);
+    const view = new DataView(idBytes.buffer);
+    view.setBigUint64(0, walletId, true); // little-endian
+
+    return anchor.web3.PublicKey.findProgramAddressSync(
+      [constants.SMART_WALLET_SEED, idBytes],
+      this.programId
+    )[0];
+  }
+
+  smartWalletConfig(smartWallet: anchor.web3.PublicKey) {
+    return anchor.web3.PublicKey.findProgramAddressSync(
+      [constants.SMART_WALLET_CONFIG_SEED, smartWallet.toBuffer()],
+      this.programId
+    )[0];
+  }
+
+  smartWalletAuthenticator(
+    passkeyPubkey: number[],
+    smartWallet: anchor.web3.PublicKey
+  ) {
+    const hashedPasskey = hashSeeds(passkeyPubkey, smartWallet);
+    return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        constants.SMART_WALLET_AUTHENTICATOR_SEED,
+        smartWallet.toBuffer(),
+        hashedPasskey,
+      ],
+      this.programId
+    );
+  }
+
+  // async methods
+
+  async getConfigData(): Promise<types.Config> {
+    return await this.program.account.config.fetch(this.config);
+  }
+
+  async getSmartWalletConfigData(smartWallet: anchor.web3.PublicKey) {
+    const config = this.smartWalletConfig(smartWallet);
+    return await this.program.account.smartWalletConfig.fetch(config);
+  }
+
+  async getSmartWalletAuthenticatorData(
+    smartWalletAuthenticator: anchor.web3.PublicKey
+  ) {
+    return await this.program.account.smartWalletAuthenticator.fetch(
+      smartWalletAuthenticator
+    );
+  }
+
+  // Helper method to create versioned transactions
+  private async createVersionedTransaction(
+    instructions: web3.TransactionInstruction[],
+    payer: anchor.web3.PublicKey
+  ): Promise<web3.VersionedTransaction> {
+    const lookupTableAccount = await this.getLookupTableAccount();
+    const { blockhash } = await this.connection.getLatestBlockhash();
+
+    // Create v0 compatible transaction message
+    const messageV0 = new web3.TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message(lookupTableAccount ? [lookupTableAccount] : []);
+
+    // Create v0 transaction from the v0 message
+    return new web3.VersionedTransaction(messageV0);
+  }
+
+  // txn methods
 
   async initializeTxn(
     payer: anchor.web3.PublicKey
@@ -144,27 +240,49 @@ export class LazorKitProgram {
       .accountsPartial({
         signer: payer,
         config: this.config,
-        smartWalletSeq: this.smartWalletSeq,
+        whitelistRulePrograms: this.whitelistRulePrograms,
+        defaultRuleProgram: this.defaultRuleProgram.programId,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .remainingAccounts([
-        {
-          pubkey: anchor.web3.BPF_LOADER_PROGRAM_ID,
-          isWritable: false,
-          isSigner: false,
-        },
-      ])
       .instruction();
     return new anchor.web3.Transaction().add(ix);
   }
 
+  async updateConfigTxn(
+    authority: anchor.web3.PublicKey,
+    param: types.UpdateConfigType,
+    value: number,
+    remainingAccounts: anchor.web3.AccountMeta[] = []
+  ): Promise<anchor.web3.Transaction> {
+    const ix = await this.program.methods
+      .updateConfig(param, new anchor.BN(value))
+      .accountsPartial({
+        authority,
+        config: this._config ?? this.config,
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction();
+    return new anchor.web3.Transaction().add(ix);
+  }
+
+  /**
+   * Create smart wallet with automatic collision detection
+   */
   async createSmartWalletTxn(
     passkeyPubkey: number[],
     payer: anchor.web3.PublicKey,
     credentialId: string = '',
-    ruleIns: anchor.web3.TransactionInstruction | null = null
-  ): Promise<anchor.web3.Transaction> {
-    const smartWallet = await this.getLastestSmartWallet();
+    ruleIns: anchor.web3.TransactionInstruction | null = null,
+    walletId?: bigint
+  ): Promise<{
+    transaction: anchor.web3.Transaction;
+    walletId: bigint;
+    smartWallet: anchor.web3.PublicKey;
+  }> {
+    // Generate unique ID if not provided
+    const id = walletId ?? (await this.generateUniqueWalletId());
+
+    const smartWallet = this.smartWallet(id);
     const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
       passkeyPubkey,
       smartWallet
@@ -185,11 +303,12 @@ export class LazorKitProgram {
       .createSmartWallet(
         passkeyPubkey,
         Buffer.from(credentialId, 'base64'),
-        ruleInstruction.data
+        ruleInstruction.data,
+        new anchor.BN(id.toString())
       )
       .accountsPartial({
         signer: payer,
-        smartWalletSeq: this.smartWalletSeq,
+        whitelistRulePrograms: this.whitelistRulePrograms,
         smartWallet,
         smartWalletConfig: this.smartWalletConfig(smartWallet),
         smartWalletAuthenticator,
@@ -203,7 +322,62 @@ export class LazorKitProgram {
     const tx = new anchor.web3.Transaction().add(createSmartWalletIx);
     tx.feePayer = payer;
     tx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
-    return tx;
+
+    return {
+      transaction: tx,
+      walletId: id,
+      smartWallet,
+    };
+  }
+
+  /**
+   * Create smart wallet with retry logic for collision handling
+   */
+  async createSmartWalletWithRetry(
+    passkeyPubkey: number[],
+    payer: anchor.web3.PublicKey,
+    credentialId: string = '',
+    ruleIns: anchor.web3.TransactionInstruction | null = null,
+    maxRetries: number = 3
+  ): Promise<{
+    transaction: web3.Transaction;
+    walletId: bigint;
+    smartWallet: anchor.web3.PublicKey;
+  }> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.createSmartWalletTxn(
+          passkeyPubkey,
+          payer,
+          credentialId,
+          ruleIns
+        );
+      } catch (error) {
+        lastError = error as Error;
+
+        // Check if this is a collision error (account already exists)
+        if (
+          error instanceof Error &&
+          error.message.includes('already in use')
+        ) {
+          console.warn(
+            `Wallet creation failed due to collision, retrying... (attempt ${
+              attempt + 1
+            }/${maxRetries})`
+          );
+          continue;
+        }
+
+        // If it's not a collision error, don't retry
+        throw error;
+      }
+    }
+
+    throw new Error(
+      `Failed to create smart wallet after ${maxRetries} attempts. Last error: ${lastError?.message}`
+    );
   }
 
   async executeInstructionTxn(
@@ -218,7 +392,7 @@ export class LazorKitProgram {
     action: types.ExecuteActionType = types.ExecuteAction.ExecuteTx,
     newPasskey: number[] | null = null,
     verifyInstructionIndex: number = 0
-  ): Promise<anchor.web3.Transaction> {
+  ): Promise<web3.VersionedTransaction> {
     const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
       passkeyPubkey,
       smartWallet
@@ -298,15 +472,10 @@ export class LazorKitProgram {
       .remainingAccounts(remainingAccounts)
       .instruction();
 
-    const txn = new anchor.web3.Transaction()
-      .add(verifySignatureIx)
-      .add(executeInstructionIx);
-
-    txn.feePayer = payer;
-    txn.recentBlockhash = (
-      await this.connection.getLatestBlockhash()
-    ).blockhash;
-    return txn;
+    return this.createVersionedTransaction(
+      [verifySignatureIx, executeInstructionIx],
+      payer
+    );
   }
 
   /**
