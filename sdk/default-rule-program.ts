@@ -1,10 +1,12 @@
 import * as anchor from '@coral-xyz/anchor';
 import { DefaultRule } from '../target/types/default_rule';
+import IDL from '../target/idl/default_rule.json';
+
 import * as constants from './constants';
 
 export class DefaultRuleProgram {
   private connection: anchor.web3.Connection;
-  private Idl: anchor.Idl = require('../target/idl/default_rule.json');
+  private Idl: anchor.Idl = IDL as DefaultRule;
 
   constructor(connection: anchor.web3.Connection) {
     this.connection = connection;
@@ -44,14 +46,11 @@ export class DefaultRuleProgram {
       .instruction();
   }
 
-  async checkRuleIns(
-    smartWallet: anchor.web3.PublicKey,
-    smartWalletAuthenticator: anchor.web3.PublicKey
-  ) {
+  async checkRuleIns(smartWalletAuthenticator: anchor.web3.PublicKey) {
     return await this.program.methods
       .checkRule()
       .accountsPartial({
-        rule: this.rule(smartWallet),
+        rule: this.rule(smartWalletAuthenticator),
         smartWalletAuthenticator,
       })
       .instruction();

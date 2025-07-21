@@ -50,6 +50,8 @@ pub enum LazorKitError {
     RuleProgramNotWhitelisted,
     #[msg("The whitelist of rule programs is full.")]
     WhitelistFull,
+    #[msg("Rule data is required but not provided")]
+    RuleDataRequired,
     #[msg("Invalid instruction discriminator for check_rule")]
     InvalidCheckRuleDiscriminator,
     #[msg("Invalid instruction discriminator for destroy")]
@@ -102,4 +104,112 @@ pub enum LazorKitError {
     ProgramNotExecutable,
     #[msg("Smart wallet authenticator already initialized")]
     SmartWalletAuthenticatorAlreadyInitialized,
+
+    // === Security Errors ===
+    #[msg("Credential ID exceeds maximum allowed size")]
+    CredentialIdTooLarge,
+    #[msg("Credential ID cannot be empty")]
+    CredentialIdEmpty,
+    #[msg("Rule data exceeds maximum allowed size")]
+    RuleDataTooLarge,
+    #[msg("CPI data exceeds maximum allowed size")]
+    CpiDataTooLarge,
+    #[msg("Too many remaining accounts provided")]
+    TooManyRemainingAccounts,
+    #[msg("Invalid PDA derivation")]
+    InvalidPDADerivation,
+    #[msg("Transaction is too old")]
+    TransactionTooOld,
+    #[msg("Rate limit exceeded")]
+    RateLimitExceeded,
+    #[msg("Invalid account data")]
+    InvalidAccountData,
+    #[msg("Unauthorized access attempt")]
+    Unauthorized,
+    #[msg("Program is paused")]
+    ProgramPaused,
+    #[msg("Invalid instruction data")]
+    InvalidInstructionData,
+    #[msg("Account already initialized")]
+    AccountAlreadyInitialized,
+    #[msg("Account not initialized")]
+    AccountNotInitialized,
+    #[msg("Invalid account state")]
+    InvalidAccountState,
+    #[msg("Operation would cause integer overflow")]
+    IntegerOverflow,
+    #[msg("Operation would cause integer underflow")]
+    IntegerUnderflow,
+    #[msg("Invalid fee amount")]
+    InvalidFeeAmount,
+    #[msg("Insufficient balance for fee")]
+    InsufficientBalanceForFee,
+    #[msg("Invalid authority")]
+    InvalidAuthority,
+    #[msg("Authority mismatch")]
+    AuthorityMismatch,
+    #[msg("Invalid sequence number")]
+    InvalidSequenceNumber,
+    #[msg("Duplicate transaction detected")]
+    DuplicateTransaction,
+    #[msg("Invalid transaction ordering")]
+    InvalidTransactionOrdering,
+    #[msg("Maximum wallet limit reached")]
+    MaxWalletLimitReached,
+    #[msg("Invalid wallet configuration")]
+    InvalidWalletConfiguration,
+    #[msg("Wallet not found")]
+    WalletNotFound,
+    #[msg("Invalid passkey format")]
+    InvalidPasskeyFormat,
+    #[msg("Passkey already registered")]
+    PasskeyAlreadyRegistered,
+    #[msg("Invalid message format")]
+    InvalidMessageFormat,
+    #[msg("Message size exceeds limit")]
+    MessageSizeExceedsLimit,
+    #[msg("Invalid action type")]
+    InvalidActionType,
+    #[msg("Action not supported")]
+    ActionNotSupported,
+    #[msg("Invalid split index")]
+    InvalidSplitIndex,
+    #[msg("CPI execution failed")]
+    CpiExecutionFailed,
+    #[msg("Invalid program address")]
+    InvalidProgramAddress,
+    #[msg("Whitelist operation failed")]
+    WhitelistOperationFailed,
+    #[msg("Invalid whitelist state")]
+    InvalidWhitelistState,
+    #[msg("Emergency shutdown activated")]
+    EmergencyShutdown,
+    #[msg("Recovery mode required")]
+    RecoveryModeRequired,
+    #[msg("Invalid recovery attempt")]
+    InvalidRecoveryAttempt,
+    #[msg("Audit log full")]
+    AuditLogFull,
+    #[msg("Invalid audit entry")]
+    InvalidAuditEntry,
+    #[msg("Reentrancy detected")]
+    ReentrancyDetected,
+    #[msg("Invalid call depth")]
+    InvalidCallDepth,
+    #[msg("Stack overflow protection triggered")]
+    StackOverflowProtection,
+    #[msg("Memory limit exceeded")]
+    MemoryLimitExceeded,
+    #[msg("Computation limit exceeded")]
+    ComputationLimitExceeded,
+    #[msg("Invalid rent exemption")]
+    InvalidRentExemption,
+    #[msg("Account closure failed")]
+    AccountClosureFailed,
+    #[msg("Invalid account closure")]
+    InvalidAccountClosure,
+    #[msg("Refund failed")]
+    RefundFailed,
+    #[msg("Invalid refund amount")]
+    InvalidRefundAmount,
 }

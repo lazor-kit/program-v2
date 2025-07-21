@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 
 pub mod constants;
 pub mod error;
+pub mod events;
 pub mod instructions;
+pub mod security;
 pub mod state;
 pub mod utils;
 
@@ -46,7 +48,6 @@ pub mod lazorkit {
         ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
         args: ExecuteArgs,
     ) -> Result<()> {
-        msg!("Run here");
         instructions::execute(ctx, args)
     }
 

@@ -20,7 +20,14 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
     config.create_smart_wallet_fee = 0; // LAMPORTS
+    config.execute_fee = 0; // LAMPORTS
     config.default_rule_program = ctx.accounts.default_rule_program.key();
+    config.is_paused = false;
+    
+    msg!("LazorKit initialized successfully");
+    msg!("Authority: {}", config.authority);
+    msg!("Default rule program: {}", config.default_rule_program);
+    
     Ok(())
 }
 

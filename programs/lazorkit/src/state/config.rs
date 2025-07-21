@@ -7,6 +7,7 @@ pub struct Config {
     pub create_smart_wallet_fee: u64,
     pub execute_fee: u64,
     pub default_rule_program: Pubkey,
+    pub is_paused: bool,
 }
 
 impl Config {
@@ -19,4 +20,6 @@ pub enum UpdateConfigType {
     ExecuteFee = 1,
     DefaultRuleProgram = 2,
     Admin = 3,
+    PauseProgram = 4,
+    UnpauseProgram = 5,
 }
