@@ -15,7 +15,8 @@ pub fn create_smart_wallet(
     passkey_pubkey: [u8; PASSKEY_SIZE],
     credential_id: Vec<u8>,
     rule_data: Vec<u8>,
-    wallet_id: u64, // Random ID provided by client
+    wallet_id: u64, // Random ID provided by client,
+    is_pay_for_user: bool,
 ) -> Result<()> {
     // === Input Validation ===
     validation::validate_credential_id(&credential_id)?;
@@ -78,19 +79,32 @@ pub fn create_smart_wallet(
         Some(signer),
     )?;
 
-    // === Collect Creation Fee ===
-    let fee = ctx.accounts.config.create_smart_wallet_fee;
-    if fee > 0 {
-        // Ensure the smart wallet has sufficient balance after fee deduction
-        let smart_wallet_balance = ctx.accounts.smart_wallet.lamports();
-        let rent = Rent::get()?.minimum_balance(0);
+    if !is_pay_for_user {
+        // === Collect Creation Fee ===
+        let fee = ctx.accounts.config.create_smart_wallet_fee;
+        if fee > 0 {
+            // Ensure the smart wallet has sufficient balance after fee deduction
+            let smart_wallet_balance = ctx.accounts.smart_wallet.lamports();
+            let rent = Rent::get()?.minimum_balance(0);
 
-        require!(
-            smart_wallet_balance >= fee + rent,
-            LazorKitError::InsufficientBalanceForFee
-        );
+            require!(
+                smart_wallet_balance >= fee + rent,
+                LazorKitError::InsufficientBalanceForFee
+            );
 
-        transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.signer, fee)?;
+            transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.signer, fee)?;
+        }
+
+        // Emit fee collection event if fee was charged
+        if fee > 0 {
+            emit!(FeeCollected {
+                smart_wallet: ctx.accounts.smart_wallet.key(),
+                fee_type: "CREATE_WALLET".to_string(),
+                amount: fee,
+                recipient: ctx.accounts.signer.key(),
+                timestamp: Clock::get()?.unix_timestamp,
+            });
+        }
     }
 
     // === Emit Events ===
@@ -109,17 +123,6 @@ pub fn create_smart_wallet(
         ctx.accounts.config.default_rule_program,
         passkey_pubkey,
     )?;
-
-    // Emit fee collection event if fee was charged
-    if fee > 0 {
-        emit!(FeeCollected {
-            smart_wallet: ctx.accounts.smart_wallet.key(),
-            fee_type: "CREATE_WALLET".to_string(),
-            amount: fee,
-            recipient: ctx.accounts.signer.key(),
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-    }
 
     Ok(())
 }

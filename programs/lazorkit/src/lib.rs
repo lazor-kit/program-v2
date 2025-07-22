@@ -40,8 +40,16 @@ pub mod lazorkit {
         credential_id: Vec<u8>,
         rule_data: Vec<u8>,
         wallet_id: u64,
+        is_pay_for_user: bool,
     ) -> Result<()> {
-        instructions::create_smart_wallet(ctx, passkey_pubkey, credential_id, rule_data, wallet_id)
+        instructions::create_smart_wallet(
+            ctx,
+            passkey_pubkey,
+            credential_id,
+            rule_data,
+            wallet_id,
+            is_pay_for_user,
+        )
     }
 
     /// Unified execute entrypoint covering all smart-wallet actions
