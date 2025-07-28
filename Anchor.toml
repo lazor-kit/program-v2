@@ -6,21 +6,19 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
-transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
-default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
+lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [programs.localnet]
-lazorkit = "6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo"
-transfer_limit = "EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB"
-default_rule = "7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs"
+lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+cluster = "https://rpc.shyft.to?api_key=gaxCgX8-zR24VN60"
+wallet = "~/.config/solana/mainnet_deployer.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"

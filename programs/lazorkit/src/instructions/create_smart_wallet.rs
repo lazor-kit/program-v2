@@ -2,9 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::{PASSKEY_SIZE, SMART_WALLET_SEED},
-    state::{
-        Config, SmartWalletAuthenticator, SmartWalletConfig, SmartWalletSeq, WhitelistRulePrograms,
-    },
+    error::LazorKitError,
+    events::{FeeCollected, SmartWalletCreated},
+    security::validation,
+    state::{Config, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms},
     utils::{execute_cpi, transfer_sol_from_pda, PasskeyExt, PdaSigner},
     ID,
 };
@@ -14,25 +15,50 @@ pub fn create_smart_wallet(
     passkey_pubkey: [u8; PASSKEY_SIZE],
     credential_id: Vec<u8>,
     rule_data: Vec<u8>,
+    wallet_id: u64, // Random ID provided by client,
+    is_pay_for_user: bool,
 ) -> Result<()> {
+    // === Input Validation ===
+    validation::validate_credential_id(&credential_id)?;
+    validation::validate_rule_data(&rule_data)?;
+    validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+
+    // Validate passkey format (ensure it's a valid compressed public key)
+    require!(
+        passkey_pubkey[0] == 0x02 || passkey_pubkey[0] == 0x03,
+        LazorKitError::InvalidPasskeyFormat
+    );
+
+    // Validate wallet ID is not zero (reserved)
+    require!(wallet_id != 0, LazorKitError::InvalidSequenceNumber);
+
+    // Additional validation: ensure wallet ID is within reasonable bounds
+    require!(wallet_id < u64::MAX, LazorKitError::InvalidSequenceNumber);
+
+    // === Configuration ===
     let wallet_data = &mut ctx.accounts.smart_wallet_config;
-    let sequence_account = &mut ctx.accounts.smart_wallet_seq;
     let smart_wallet_authenticator = &mut ctx.accounts.smart_wallet_authenticator;
 
+    // Validate default rule program
+    validation::validate_program_executable(&ctx.accounts.default_rule_program)?;
+
+    // === Initialize Smart Wallet Config ===
     wallet_data.set_inner(SmartWalletConfig {
         rule_program: ctx.accounts.config.default_rule_program,
-        id: sequence_account.seq,
+        id: wallet_id,
         last_nonce: 0,
         bump: ctx.bumps.smart_wallet,
     });
 
-    // Initialize the smart wallet authenticator
+    // === Initialize Smart Wallet Authenticator ===
     smart_wallet_authenticator.set_inner(SmartWalletAuthenticator {
         passkey_pubkey,
         smart_wallet: ctx.accounts.smart_wallet.key(),
-        credential_id,
+        credential_id: credential_id.clone(),
         bump: ctx.bumps.smart_wallet_authenticator,
     });
+
+    // === Create PDA Signer ===
     let signer = PdaSigner {
         seeds: vec![
             SmartWalletAuthenticator::PREFIX_SEED.to_vec(),
@@ -45,6 +71,7 @@ pub fn create_smart_wallet(
         bump: ctx.bumps.smart_wallet_authenticator,
     };
 
+    // === Execute Rule Program CPI ===
     execute_cpi(
         &ctx.remaining_accounts,
         &rule_data,
@@ -52,48 +79,81 @@ pub fn create_smart_wallet(
         Some(signer),
     )?;
 
-    sequence_account.seq += 1;
+    if !is_pay_for_user {
+        // === Collect Creation Fee ===
+        let fee = ctx.accounts.config.create_smart_wallet_fee;
+        if fee > 0 {
+            // Ensure the smart wallet has sufficient balance after fee deduction
+            let smart_wallet_balance = ctx.accounts.smart_wallet.lamports();
+            let rent = Rent::get()?.minimum_balance(0);
 
-    transfer_sol_from_pda(
-        &ctx.accounts.smart_wallet,
-        &mut ctx.accounts.signer,
-        ctx.accounts.config.create_smart_wallet_fee,
+            require!(
+                smart_wallet_balance >= fee + rent,
+                LazorKitError::InsufficientBalanceForFee
+            );
+
+            transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.signer, fee)?;
+        }
+
+        // Emit fee collection event if fee was charged
+        if fee > 0 {
+            emit!(FeeCollected {
+                smart_wallet: ctx.accounts.smart_wallet.key(),
+                fee_type: "CREATE_WALLET".to_string(),
+                amount: fee,
+                recipient: ctx.accounts.signer.key(),
+                timestamp: Clock::get()?.unix_timestamp,
+            });
+        }
+    }
+
+    // === Emit Events ===
+    msg!("Smart wallet created: {}", ctx.accounts.smart_wallet.key());
+    msg!(
+        "Authenticator: {}",
+        ctx.accounts.smart_wallet_authenticator.key()
+    );
+    msg!("Wallet ID: {}", wallet_id);
+
+    // Emit wallet creation event
+    SmartWalletCreated::emit_event(
+        ctx.accounts.smart_wallet.key(),
+        ctx.accounts.smart_wallet_authenticator.key(),
+        wallet_id,
+        ctx.accounts.config.default_rule_program,
+        passkey_pubkey,
     )?;
 
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(passkey_pubkey: [u8; PASSKEY_SIZE])]
+#[instruction(passkey_pubkey: [u8; PASSKEY_SIZE], credential_id: Vec<u8>, rule_data: Vec<u8>, wallet_id: u64)]
 pub struct CreateSmartWallet<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
-    /// CHECK: This account is only used for its public key and seeds.
-    #[account(
-        mut,
-        seeds = [SmartWalletSeq::PREFIX_SEED],
-        bump,
-    )]
-    pub smart_wallet_seq: Account<'info, SmartWalletSeq>,
-
+    /// Whitelist of allowed rule programs
     #[account(
         seeds = [WhitelistRulePrograms::PREFIX_SEED],
         bump,
-        owner = ID
+        owner = ID,
+        constraint = whitelist_rule_programs.list.contains(&default_rule_program.key()) @ LazorKitError::RuleProgramNotWhitelisted
     )]
     pub whitelist_rule_programs: Account<'info, WhitelistRulePrograms>,
 
+    /// The smart wallet PDA being created with random ID
     #[account(
         init,
         payer = signer,
         space = 0,
-        seeds = [SMART_WALLET_SEED, smart_wallet_seq.seq.to_le_bytes().as_ref()],
+        seeds = [SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
         bump
     )]
     /// CHECK: This account is only used for its public key and seeds.
     pub smart_wallet: UncheckedAccount<'info>,
 
+    /// Smart wallet configuration data
     #[account(
         init,
         payer = signer,
@@ -103,6 +163,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
+    /// Smart wallet authenticator for the passkey
     #[account(
         init,
         payer = signer,
@@ -116,6 +177,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub smart_wallet_authenticator: Box<Account<'info, SmartWalletAuthenticator>>,
 
+    /// Program configuration
     #[account(
         seeds = [Config::PREFIX_SEED],
         bump,
@@ -123,10 +185,13 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub config: Box<Account<'info, Config>>,
 
+    /// Default rule program for the smart wallet
     #[account(
-        address = config.default_rule_program
+        address = config.default_rule_program,
+        executable,
+        constraint = default_rule_program.executable @ LazorKitError::ProgramNotExecutable
     )]
-    /// CHECK:
+    /// CHECK: Validated to be executable and in whitelist
     pub default_rule_program: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,

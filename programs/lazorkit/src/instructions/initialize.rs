@@ -1,26 +1,40 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{Config, SmartWalletSeq, WhitelistRulePrograms};
+use crate::{
+    error::LazorKitError,
+    state::{Config, WhitelistRulePrograms},
+};
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    // Check if the default rule program is executable
+    if !ctx.accounts.default_rule_program.executable {
+        return err!(LazorKitError::ProgramNotExecutable);
+    }
+
     let whitelist_rule_programs = &mut ctx.accounts.whitelist_rule_programs;
     whitelist_rule_programs.list = vec![ctx.accounts.default_rule_program.key()];
 
-    let smart_wallet_seq = &mut ctx.accounts.smart_wallet_seq;
-    smart_wallet_seq.seq = 0;
-
-    let config: &mut Box<Account<'_, Config>> = &mut ctx.accounts.config;
+    let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
     config.create_smart_wallet_fee = 0; // LAMPORTS
+    config.execute_fee = 0; // LAMPORTS
     config.default_rule_program = ctx.accounts.default_rule_program.key();
+    config.is_paused = false;
+    
+    msg!("LazorKit initialized successfully");
+    msg!("Authority: {}", config.authority);
+    msg!("Default rule program: {}", config.default_rule_program);
+    
     Ok(())
 }
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
+    /// The signer of the transaction, who will be the initial authority.
     #[account(mut)]
     pub signer: Signer<'info>,
 
+    /// The program's configuration account.
     #[account(
         init_if_needed,
         payer = signer,
@@ -30,6 +44,7 @@ pub struct Initialize<'info> {
     )]
     pub config: Box<Account<'info, Config>>,
 
+    /// The list of whitelisted rule programs that can be used with smart wallets.
     #[account(
         init_if_needed,
         payer = signer,
@@ -39,17 +54,10 @@ pub struct Initialize<'info> {
     )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + SmartWalletSeq::INIT_SPACE,
-        seeds = [SmartWalletSeq::PREFIX_SEED],
-        bump
-    )]
-    pub smart_wallet_seq: Box<Account<'info, SmartWalletSeq>>,
+    /// The default rule program to be used for new smart wallets.
+    /// CHECK: This is checked to be executable.
+    pub default_rule_program: AccountInfo<'info>,
 
-    /// CHECK:
-    pub default_rule_program: UncheckedAccount<'info>,
-
+    /// The system program.
     pub system_program: Program<'info, System>,
 }

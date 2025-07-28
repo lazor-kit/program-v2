@@ -1,4 +1,5 @@
 use crate::constants::SECP256R1_ID;
+use crate::state::Message;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
@@ -196,9 +197,16 @@ impl PasskeyExt for [u8; SECP_PUBKEY_SIZE as usize] {
 /// Transfer SOL from a PDA-owned account
 #[inline]
 pub fn transfer_sol_from_pda(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()> {
+    if amount == 0 {
+        return Ok(());
+    }
     // Ensure the 'from' account is owned by this program
     if *from.owner != ID {
         return Err(ProgramError::IllegalOwner.into());
+    }
+    let from_lamports = from.lamports();
+    if from_lamports < amount {
+        return err!(LazorKitError::InsufficientLamports);
     }
     // Debit from source account
     **from.try_borrow_mut_lamports()? -= amount;
@@ -271,10 +279,10 @@ pub fn verify_authorization(
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,
     last_nonce: u64,
-) -> Result<()> {
+) -> Result<Message> {
+    use crate::state::Message;
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-    use crate::state::Message;
 
     // 1) passkey & wallet checks --------------------------------------------------------------
     require!(
@@ -298,8 +306,8 @@ pub fn verify_authorization(
     // 4) parse the challenge from clientDataJSON ---------------------------------------------
     let json_str = core::str::from_utf8(client_data_json_raw)
         .map_err(|_| crate::error::LazorKitError::ClientDataInvalidUtf8)?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(json_str).map_err(|_| crate::error::LazorKitError::ClientDataJsonParseError)?;
+    let parsed: serde_json::Value = serde_json::from_str(json_str)
+        .map_err(|_| crate::error::LazorKitError::ClientDataJsonParseError)?;
     let challenge = parsed["challenge"]
         .as_str()
         .ok_or(crate::error::LazorKitError::ChallengeMissing)?;
@@ -321,13 +329,26 @@ pub fn verify_authorization(
     if msg.current_timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
         return Err(crate::error::LazorKitError::TimestampTooNew.into());
     }
-    require!(msg.nonce == last_nonce, crate::error::LazorKitError::NonceMismatch);
+    require!(
+        msg.nonce == last_nonce,
+        crate::error::LazorKitError::NonceMismatch
+    );
 
     // 6) finally verify the secp256r1 signature ----------------------------------------------
-    verify_secp256r1_instruction(
-        &secp_ix,
-        authenticator.passkey_pubkey,
-        message,
-        signature,
-    )
+    verify_secp256r1_instruction(&secp_ix, authenticator.passkey_pubkey, message, signature)?;
+
+    Ok(msg)
+}
+
+/// Helper: Split remaining accounts into `(rule_accounts, cpi_accounts)` using `split_index` coming from `Message`.
+pub fn split_remaining_accounts<'a>(
+    accounts: &'a [AccountInfo<'a>],
+    split_index: u16,
+) -> Result<(&'a [AccountInfo<'a>], &'a [AccountInfo<'a>])> {
+    let idx = split_index as usize;
+    require!(
+        idx <= accounts.len(),
+        crate::error::LazorKitError::AccountSliceOutOfBounds
+    );
+    Ok(accounts.split_at(idx))
 }

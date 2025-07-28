@@ -13,7 +13,7 @@ pub struct CheckRule<'info> {
     #[account(
         mut,
         owner = ID,
-        constraint = smart_wallet_authenticator.key() == rule.admin @ RuleError::UnAuthorize,
+        constraint = smart_wallet_authenticator.key() == rule.smart_wallet_authenticator @ RuleError::UnAuthorize,
     )]
     pub rule: Account<'info, Rule>,
 }

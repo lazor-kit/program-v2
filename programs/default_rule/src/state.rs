@@ -4,6 +4,5 @@ use anchor_lang::prelude::*;
 #[derive(Debug, InitSpace)]
 pub struct Rule {
     pub smart_wallet: Pubkey,
-    pub admin: Pubkey,
-    pub is_initialized: bool,
+    pub smart_wallet_authenticator: Pubkey,
 }

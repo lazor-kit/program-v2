@@ -6,8 +6,7 @@ pub fn init_rule(ctx: Context<InitRule>) -> Result<()> {
     let rule = &mut ctx.accounts.rule;
 
     rule.smart_wallet = ctx.accounts.smart_wallet.key();
-    rule.admin = ctx.accounts.smart_wallet_authenticator.key();
-    rule.is_initialized = true;
+    rule.smart_wallet_authenticator = ctx.accounts.smart_wallet_authenticator.key();
 
     Ok(())
 }
@@ -27,7 +26,7 @@ pub struct InitRule<'info> {
         init,
         payer = payer,
         space = 8 + Rule::INIT_SPACE,
-        seeds = [b"rule".as_ref(), smart_wallet.key().as_ref()],
+        seeds = [b"rule".as_ref(), smart_wallet_authenticator.key().as_ref()],
         bump,
     )]
     pub rule: Account<'info, Rule>,

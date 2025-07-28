@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs");
+declare_id!("CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE");
 
 mod error;
 mod instructions;
@@ -21,7 +21,7 @@ pub mod default_rule {
         instructions::check_rule(_ctx)
     }
 
-    pub fn destroy(ctx: Context<Destroy>) -> Result<()> {
-        instructions::destroy(ctx)
+    pub fn add_device(ctx: Context<AddDevice>) -> Result<()> {
+        instructions::add_device(ctx)
     }
 }

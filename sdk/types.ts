@@ -1,22 +1,21 @@
 import * as anchor from '@coral-xyz/anchor';
 
 import { Lazorkit } from '../target/types/lazorkit';
-import { TransferLimit } from '../target/types/transfer_limit';
 
-export type CpiData = anchor.IdlTypes<Lazorkit>['cpiData'];
-export type SmartWalletSeq = anchor.IdlTypes<Lazorkit>['smartWalletSeq'];
+// Account types
 export type SmartWalletConfig = anchor.IdlTypes<Lazorkit>['smartWalletConfig'];
 export type SmartWalletAuthenticator =
   anchor.IdlTypes<Lazorkit>['smartWalletAuthenticator'];
+export type Config = anchor.IdlTypes<Lazorkit>['config'];
+export type WhitelistRulePrograms = anchor.IdlTypes<Lazorkit>['whitelistRulePrograms'];
 
-export type SmartWallet = anchor.Idl;
+// Enum types
+export type UpdateConfigType = anchor.IdlTypes<Lazorkit>['updateConfigType'];
+export type ExecuteActionType = anchor.IdlTypes<Lazorkit>['action'];
 
+// Action constants
 export const ExecuteAction = {
-  ['ExecuteCpi']: { executeCpi: {} },
-  ['ChangeProgramRule']: { changeProgramRule: {} },
-  ['CheckAuthenticator']: { checkAuthenticator: {} },
-  ['CallRuleProgram']: { callRuleProgram: {} },
+  ExecuteTx: { executeTx: {} },
+  ChangeRuleProgram: { changeRuleProgram: {} },
+  CallRuleProgram: { callRuleProgram: {} },
 };
-
-// TransferLimitType
-export type InitRuleArgs = anchor.IdlTypes<TransferLimit>['initRuleArgs'];

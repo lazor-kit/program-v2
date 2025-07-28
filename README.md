@@ -17,11 +17,9 @@ This project implements a smart wallet system on Solana with the following key f
 ├── programs/
 │   ├── lazorkit/         # Main smart wallet program
 │   ├── default_rule/     # Default rule implementation
-│   └── transfer_limit/   # Transfer limit functionality
 ├── sdk/
 │   ├── lazor-kit.ts      # Main SDK implementation
 │   ├── default-rule-program.ts
-│   ├── transfer_limit.ts
 │   ├── utils.ts
 │   ├── types.ts
 │   └── constants.ts
@@ -59,9 +57,9 @@ anchor build
 
 ## Program IDs
 
-- LazorKit Program: `6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo`
-- Transfer Limit Program: `EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB`
-- Default Rule Program: `7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs`
+- LazorKit Program: `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W`
+- Transfer Limit Program: `34eqBPLfEvFGRNDbvpZLaa791J1e1zKMcFoVp19szLjY`
+- Default Rule Program: `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`
 
 ## Deployment
 
@@ -69,22 +67,16 @@ To deploy the programs and initialize the IDL:
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl init -f ./target/idl/lazorkit.json 6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo
-
-# Initialize IDL for Transfer Limit
-anchor idl init -f ./target/idl/transfer_limit.json EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB
+anchor idl init -f ./target/idl/lazorkit.json J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W
 
 # Initialize IDL for Default Rule
-anchor idl init -f ./target/idl/default_rule.json 7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs
+anchor idl init -f ./target/idl/default_rule.json CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE
 
 # Upgrade IDL for LazorKit
-anchor idl upgrade 6Jh4kA4rkZquv9XofKqgbyrRcTDF19uM5HL4xyh6gaSo -f ./target/idl/lazorkit.json
-
-# Upgrade IDL for Transfer Limit
-anchor idl upgrade EEVtLAZVcyzrEc4LLfk8WB749uAkLsScbCVrjtQv3yQB -f ./target/idl/transfer_limit.json
+anchor idl upgrade J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W -f ./target/idl/lazorkit.json
 
 # Upgrade IDL for Default Rule
-anchor idl upgrade 7H16pVKG2stkkhQ6H9LyXvnHLpXjfB7LLShGjXhYmEWs -f ./target/idl/default_rule.json
+anchor idl upgrade CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE -f ./target/idl/default_rule.json
 ```
 
 ## Testing
