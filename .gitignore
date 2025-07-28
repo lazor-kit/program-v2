@@ -6,5 +6,4 @@ node_modules
 test-ledger
 .yarn
 yarn.lock
-Cargo.lock
 .env
