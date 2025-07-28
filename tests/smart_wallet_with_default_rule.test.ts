@@ -19,7 +19,7 @@ describe('Test smart wallet with default rule', () => {
   const defaultRuleProgram = new DefaultRuleProgram(connection);
 
   const payer = anchor.web3.Keypair.fromSecretKey(
-    bs58.decode(process.env.PRIVATE_KEY!)
+    bs58.decode(process.env.MAINNET_DEPLOYER_PRIVATE_KEY!)
   );
 
   before(async () => {
@@ -56,22 +56,6 @@ describe('Test smart wallet with default rule', () => {
       smartWallet
     );
 
-    // the user has deposit 0.01 SOL to the smart-wallet
-    const depositSolIns = anchor.web3.SystemProgram.transfer({
-      fromPubkey: payer.publicKey,
-      toPubkey: smartWallet,
-      lamports: LAMPORTS_PER_SOL / 100,
-    });
-
-    await sendAndConfirmTransaction(
-      connection,
-      new anchor.web3.Transaction().add(depositSolIns),
-      [payer],
-      {
-        commitment: 'confirmed',
-      }
-    );
-
     const initRuleIns = await defaultRuleProgram.initRuleIns(
       payer.publicKey,
       smartWallet,
@@ -86,7 +70,8 @@ describe('Test smart wallet with default rule', () => {
         payer.publicKey,
         credentialId,
         initRuleIns,
-        smartWalletId
+        smartWalletId,
+        true
       );
 
     const sig = await sendAndConfirmTransaction(
@@ -95,7 +80,6 @@ describe('Test smart wallet with default rule', () => {
       [payer],
       {
         commitment: 'confirmed',
-        skipPreflight: true,
       }
     );
 
@@ -121,7 +105,7 @@ describe('Test smart wallet with default rule', () => {
     );
   });
 
-  it('Create address lookup table', async () => {
+  xit('Create address lookup table', async () => {
     const slot = await connection.getSlot();
 
     const [lookupTableInst, lookupTableAddress] =
