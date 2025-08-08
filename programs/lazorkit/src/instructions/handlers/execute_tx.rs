@@ -73,7 +73,7 @@ pub fn handle<'c: 'info, 'info>(
     
     msg!("Rule check passed");
 
-    // 6. Execute main CPI or transfer lamports
+    // 6. Execute main CPI or transfer lamports (inline data)
     if msg.cpi_data.get(0..4) == Some(&SOL_TRANSFER_DISCRIMINATOR)
         && ctx.accounts.cpi_program.key() == anchor_lang::solana_program::system_program::ID
     {
@@ -150,14 +150,9 @@ pub fn handle<'c: 'info, 'info>(
         
         msg!("Executing CPI to program: {}", ctx.accounts.cpi_program.key());
         
-        execute_cpi(
-            cpi_accounts,
-            &msg.cpi_data,
-            &ctx.accounts.cpi_program,
-            Some(wallet_signer),
-        )?;
+        execute_cpi(cpi_accounts, &msg.cpi_data, &ctx.accounts.cpi_program, Some(wallet_signer))?;
     }
-    
+
     msg!("Transaction executed successfully");
 
     Ok(())

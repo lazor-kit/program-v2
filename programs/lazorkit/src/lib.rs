@@ -64,4 +64,14 @@ pub mod lazorkit {
     pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
         instructions::add_whitelist_rule_program(ctx)
     }
+
+    /// Commit a CPI after verifying auth and rule. Stores data and constraints.
+    pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
+        instructions::commit_cpi(ctx, args)
+    }
+
+    /// Execute a previously committed CPI (no passkey verification here).
+    pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedArgs) -> Result<()> {
+        instructions::execute_committed(ctx, args)
+    }
 }

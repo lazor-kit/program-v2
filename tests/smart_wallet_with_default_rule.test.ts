@@ -19,7 +19,7 @@ describe('Test smart wallet with default rule', () => {
   const defaultRuleProgram = new DefaultRuleProgram(connection);
 
   const payer = anchor.web3.Keypair.fromSecretKey(
-    bs58.decode(process.env.MAINNET_DEPLOYER_PRIVATE_KEY!)
+    bs58.decode(process.env.PRIVATE_KEY!)
   );
 
   before(async () => {
@@ -41,7 +41,7 @@ describe('Test smart wallet with default rule', () => {
     }
   });
 
-  it('Initialize successfully', async () => {
+  it('Init smart wallet with default rule successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -103,6 +103,74 @@ describe('Test smart wallet with default rule', () => {
     expect(smartWalletAuthenticatorData.smartWallet.toString()).to.be.equal(
       smartWallet.toString()
     );
+  });
+
+  it('Store blob successfully', async () => {
+    const privateKey = ECDSA.generateKey();
+
+    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+
+    const pubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+
+    const smartWalletId = lazorkitProgram.generateWalletId();
+    const smartWallet = lazorkitProgram.smartWallet(smartWalletId);
+
+    const [smartWalletAuthenticator] = lazorkitProgram.smartWalletAuthenticator(
+      pubkey,
+      smartWallet
+    );
+
+    const initRuleIns = await defaultRuleProgram.initRuleIns(
+      payer.publicKey,
+      smartWallet,
+      smartWalletAuthenticator
+    );
+
+    const credentialId = base64.encode(Buffer.from('testing something')); // random string
+
+    const { transaction: createSmartWalletTxn } =
+      await lazorkitProgram.createSmartWalletTxn(
+        pubkey,
+        payer.publicKey,
+        credentialId,
+        initRuleIns,
+        smartWalletId,
+        true
+      );
+
+    const sig = await sendAndConfirmTransaction(
+      connection,
+      createSmartWalletTxn,
+      [payer],
+      {
+        commitment: 'confirmed',
+      }
+    );
+
+    console.log('Create smart-wallet: ', sig);
+
+    // store blob
+
+    const data = Buffer.from('testing something');
+
+    const { transaction: storeBlobTxn } = await lazorkitProgram.storeCpiBlobTxn(
+      payer.publicKey,
+      smartWallet,
+      lazorkitProgram.programId,
+      data,
+      0
+    );
+
+    const sig2 = await sendAndConfirmTransaction(
+      connection,
+      storeBlobTxn,
+      [payer],
+      {
+        commitment: 'confirmed',
+      }
+    );
+
+    console.log('Store blob: ', sig2);
   });
 
   xit('Create address lookup table', async () => {

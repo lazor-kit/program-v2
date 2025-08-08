@@ -11,6 +11,7 @@ export const WHITELIST_RULE_PROGRAMS_SEED = Buffer.from(
 );
 export const CONFIG_SEED = Buffer.from('config');
 export const AUTHORITY_SEED = Buffer.from('authority');
+export const CPI_COMMIT_SEED = Buffer.from('cpi_commit');
 
 // RULE PROGRAM SEEDS
 export const RULE_DATA_SEED = Buffer.from('rule_data');

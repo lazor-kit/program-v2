@@ -268,4 +268,6 @@ pub struct Execute<'info> {
     /// by the `CallRuleProgram` action. It is passed as an UncheckedAccount
     /// and created via CPI if needed.
     pub new_smart_wallet_authenticator: Option<UncheckedAccount<'info>>,
+
+    // No blob in this path
 }

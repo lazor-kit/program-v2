@@ -66,6 +66,22 @@ pub mod validation {
         Ok(())
     }
 
+    /// Validate CPI data when a blob hash may be present. If `has_hash` is true,
+    /// inline cpi_data can be empty; otherwise, it must be non-empty.
+    pub fn validate_cpi_data_or_hash(cpi_data: &[u8], has_hash: bool) -> Result<()> {
+        require!(
+            cpi_data.len() <= MAX_CPI_DATA_SIZE,
+            LazorKitError::CpiDataTooLarge
+        );
+        if !has_hash {
+            require!(
+                !cpi_data.is_empty(),
+                LazorKitError::CpiDataMissing
+            );
+        }
+        Ok(())
+    }
+
     /// Validate remaining accounts count
     pub fn validate_remaining_accounts(accounts: &[AccountInfo]) -> Result<()> {
         require!(

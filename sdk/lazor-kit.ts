@@ -1,5 +1,4 @@
 import * as anchor from '@coral-xyz/anchor';
-import * as web3 from '@solana/web3.js';
 import IDL from '../target/idl/lazorkit.json';
 import * as bs58 from 'bs58';
 import { Lazorkit } from '../target/types/lazorkit';
@@ -31,7 +30,7 @@ export class LazorKitProgram {
   // Caches for PDAs
   private _config?: anchor.web3.PublicKey;
   private _whitelistRulePrograms?: anchor.web3.PublicKey;
-  private _lookupTableAccount?: web3.AddressLookupTableAccount;
+  private _lookupTableAccount?: anchor.web3.AddressLookupTableAccount;
 
   readonly defaultRuleProgram: DefaultRuleProgram;
 
@@ -69,7 +68,7 @@ export class LazorKitProgram {
   /**
    * Get or fetch the address lookup table account
    */
-  async getLookupTableAccount(): Promise<web3.AddressLookupTableAccount | null> {
+  async getLookupTableAccount(): Promise<anchor.web3.AddressLookupTableAccount | null> {
     if (!this._lookupTableAccount) {
       try {
         const response = await this.connection.getAddressLookupTable(
@@ -213,21 +212,21 @@ export class LazorKitProgram {
 
   // Helper method to create versioned transactions
   private async createVersionedTransaction(
-    instructions: web3.TransactionInstruction[],
+    instructions: anchor.web3.TransactionInstruction[],
     payer: anchor.web3.PublicKey
-  ): Promise<web3.VersionedTransaction> {
+  ): Promise<anchor.web3.VersionedTransaction> {
     const lookupTableAccount = await this.getLookupTableAccount();
     const { blockhash } = await this.connection.getLatestBlockhash();
 
     // Create v0 compatible transaction message
-    const messageV0 = new web3.TransactionMessage({
+    const messageV0 = new anchor.web3.TransactionMessage({
       payerKey: payer,
       recentBlockhash: blockhash,
       instructions,
     }).compileToV0Message(lookupTableAccount ? [lookupTableAccount] : []);
 
     // Create v0 transaction from the v0 message
-    return new web3.VersionedTransaction(messageV0);
+    return new anchor.web3.VersionedTransaction(messageV0);
   }
 
   // txn methods
@@ -342,7 +341,7 @@ export class LazorKitProgram {
     ruleIns: anchor.web3.TransactionInstruction | null = null,
     maxRetries: number = 3
   ): Promise<{
-    transaction: web3.Transaction;
+    transaction: anchor.web3.Transaction;
     walletId: bigint;
     smartWallet: anchor.web3.PublicKey;
   }> {
@@ -394,7 +393,7 @@ export class LazorKitProgram {
     action: types.ExecuteActionType = types.ExecuteAction.ExecuteTx,
     newPasskey: number[] | null = null,
     verifyInstructionIndex: number = 0
-  ): Promise<web3.VersionedTransaction> {
+  ): Promise<anchor.web3.VersionedTransaction> {
     const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
       passkeyPubkey,
       smartWallet
@@ -480,6 +479,8 @@ export class LazorKitProgram {
     );
   }
 
+  // Old blob helpers removed; using commit/executeCommitted below
+
   /**
    * Query the chain for the smart-wallet associated with a passkey.
    */
@@ -521,7 +522,6 @@ export class LazorKitProgram {
   async getMessage(
     smartWalletString: string,
     ruleIns: anchor.web3.TransactionInstruction | null = null,
-    smartWalletAuthenticatorString: string,
     cpiInstruction: anchor.web3.TransactionInstruction,
     executeAction: types.ExecuteActionType
   ): Promise<Buffer> {
@@ -550,6 +550,7 @@ export class LazorKitProgram {
     // - current_timestamp (i64): 8 bytes (unix seconds)
     // - split_index (u16): 2 bytes
     // - rule_data (Option<Vec<u8>>): 1 byte (Some/None) + 4 bytes length + data bytes (if Some)
+    // - cpi_data_hash (Option<[u8;32]>): 1 byte tag (0=None,1=Some + 32 bytes)
     // - cpi_data (Vec<u8>): 4 bytes length + data bytes
 
     const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -557,8 +558,9 @@ export class LazorKitProgram {
     // Calculate buffer size based on whether rule_data is provided
     const ruleDataLength = ruleInstruction ? ruleInstruction.data.length : 0;
     const ruleDataSize = ruleInstruction ? 5 + ruleDataLength : 1; // 1 byte for Option + 4 bytes length + data (if Some)
+    // None(cpi_data_hash): only 1 byte tag
     const buffer = Buffer.alloc(
-      18 + ruleDataSize + 4 + cpiInstruction.data.length
+      18 + ruleDataSize + 1 + 4 + cpiInstruction.data.length
     );
 
     // Write nonce as little-endian u64 (bytes 0-7)
@@ -584,13 +586,159 @@ export class LazorKitProgram {
       buffer.writeUInt8(0, 18);
     }
 
+    // Write cpi_data_hash as None (no blob) -> 1 byte 0
+    const afterHashOffset = 18 + ruleDataSize;
+    buffer.writeUInt8(0, afterHashOffset); // None
+
     // Write cpi_data length as little-endian u32
-    const cpiDataOffset = 18 + ruleDataSize;
+    const cpiDataOffset = afterHashOffset + 1;
     buffer.writeUInt32LE(cpiInstruction.data.length, cpiDataOffset);
 
     // Write cpi_data bytes
     cpiInstruction.data.copy(buffer, cpiDataOffset + 4);
 
     return buffer;
+  }
+
+  /** Build Message buffer with a blob hash instead of inline cpi_data */
+  async getMessageWithBlob(): Promise<Buffer> {
+    throw new Error('Deprecated: use commitCpiTxn/executeCommittedTxn instead');
+  }
+
+  // === New commit/executeCommitted API ===
+
+  private computeAccountsHash(
+    cpiProgram: anchor.web3.PublicKey,
+    accountMetas: anchor.web3.AccountMeta[]
+  ): Uint8Array {
+    const h = sha256.create();
+    h.update(cpiProgram.toBytes());
+    for (const m of accountMetas) {
+      h.update(m.pubkey.toBytes());
+      h.update(Uint8Array.from([m.isWritable ? 1 : 0, m.isSigner ? 1 : 0]));
+    }
+    return new Uint8Array(h.arrayBuffer());
+  }
+
+  commitPda(ownerWallet: anchor.web3.PublicKey, dataHash: Uint8Array) {
+    return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        constants.CPI_COMMIT_SEED,
+        ownerWallet.toBuffer(),
+        Buffer.from(dataHash),
+      ],
+      this.programId
+    )[0];
+  }
+
+  async commitCpiTxn(
+    passkeyPubkey: number[],
+    clientDataJsonRaw: Buffer,
+    authenticatorDataRaw: Buffer,
+    signature: Buffer,
+    payer: anchor.web3.PublicKey,
+    smartWallet: anchor.web3.PublicKey,
+    cpiProgram: anchor.web3.PublicKey,
+    cpiIns: anchor.web3.TransactionInstruction,
+    ruleIns: anchor.web3.TransactionInstruction | undefined,
+    expiresAt: number,
+    verifyInstructionIndex: number = 0
+  ): Promise<anchor.web3.Transaction> {
+    const [smartWalletAuthenticator] = this.smartWalletAuthenticator(
+      passkeyPubkey,
+      smartWallet
+    );
+    const smartWalletConfig = this.smartWalletConfig(smartWallet);
+
+    let ruleInstruction: anchor.web3.TransactionInstruction | null = null;
+
+    if (!ruleIns) {
+      ruleInstruction = await this.defaultRuleProgram.checkRuleIns(
+        smartWalletAuthenticator
+      );
+    } else {
+      ruleInstruction = ruleIns;
+    }
+
+    const ruleMetas = instructionToAccountMetas(ruleInstruction, payer);
+    const cpiMetas = instructionToAccountMetas(cpiIns, payer);
+    const remainingAccounts = [...ruleMetas, ...cpiMetas];
+    const accountsHash = this.computeAccountsHash(cpiProgram, cpiMetas);
+    const dataHash = new Uint8Array(sha256.arrayBuffer(cpiIns.data));
+    const cpiCommit = this.commitPda(smartWallet, dataHash);
+
+    const message = Buffer.concat([
+      authenticatorDataRaw,
+      Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
+    ]);
+
+    const verifySignatureIx = createSecp256r1Instruction(
+      message,
+      Buffer.from(passkeyPubkey),
+      signature
+    );
+
+    const ix = await this.program.methods
+      .commitCpi({
+        passkeyPubkey,
+        signature,
+        clientDataJsonRaw,
+        authenticatorDataRaw,
+        verifyInstructionIndex,
+        splitIndex: ruleMetas.length,
+        ruleData: ruleIns ? ruleIns.data : null,
+        cpiProgram,
+        cpiAccountsHash: Array.from(accountsHash),
+        cpiDataHash: Array.from(dataHash),
+        expiresAt: new anchor.BN(expiresAt),
+      } as any)
+      .accountsPartial({
+        payer,
+        config: this.config,
+        smartWallet,
+        smartWalletConfig,
+        smartWalletAuthenticator,
+        whitelistRulePrograms: this.whitelistRulePrograms,
+        authenticatorProgram: (
+          await this.getSmartWalletConfigData(smartWallet)
+        ).ruleProgram,
+        cpiCommit,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction();
+
+    const tx = new anchor.web3.Transaction().add(verifySignatureIx).add(ix);
+    tx.feePayer = payer;
+    tx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+    return tx;
+  }
+
+  async executeCommittedTxn(
+    payer: anchor.web3.PublicKey,
+    smartWallet: anchor.web3.PublicKey,
+    cpiProgram: anchor.web3.PublicKey,
+    cpiIns: anchor.web3.TransactionInstruction
+  ): Promise<anchor.web3.VersionedTransaction> {
+    const dataHash = new Uint8Array(sha256.arrayBuffer(cpiIns.data));
+    const cpiCommit = this.commitPda(smartWallet, dataHash);
+    const metas = instructionToAccountMetas(cpiIns, payer);
+
+    const ix = await this.program.methods
+      .executeCommitted({ cpiData: cpiIns.data } as any)
+      .accountsPartial({
+        payer,
+        config: this.config,
+        smartWallet,
+        smartWalletConfig: this.smartWalletConfig(smartWallet),
+        cpiProgram,
+        cpiCommit,
+        commitRefund: payer,
+      })
+      .remainingAccounts(metas)
+      .instruction();
+
+    return this.createVersionedTransaction([ix], payer);
   }
 }
