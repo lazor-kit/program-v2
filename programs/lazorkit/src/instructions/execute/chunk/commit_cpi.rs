@@ -1,40 +1,23 @@
 use anchor_lang::prelude::*;
 
+use crate::instructions::CommitArgs;
 use crate::security::validation;
 use crate::state::{
-    Config, CpiCommit, SmartWalletAuthenticator, SmartWalletConfig, WhitelistRulePrograms,
+    Config, CpiCommit, ExecuteMessage, SmartWalletAuthenticator, SmartWalletConfig,
+    WhitelistRulePrograms,
 };
 use crate::utils::{execute_cpi, get_pda_signer, sighash, verify_authorization, PasskeyExt};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CommitArgs {
-    pub passkey_pubkey: [u8; 33],
-    pub signature: Vec<u8>,
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub split_index: u16,
-    pub rule_data: Option<Vec<u8>>,
-    pub cpi_program: Pubkey,
-    pub cpi_accounts_hash: [u8; 32],
-    pub cpi_data_hash: [u8; 32],
-    pub expires_at: i64,
-}
+use anchor_lang::solana_program::hash::{hash, Hasher};
 
 pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
-    // Validate
+    // 0. Validate
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    if let Some(ref rule_data) = args.rule_data {
-        validation::validate_rule_data(rule_data)?;
-    }
-    // No CPI bytes stored in commit mode
-
-    // Program not paused
+    validation::validate_rule_data(&args.rule_data)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
-    // Authorization
-    let msg = verify_authorization(
+    // 1. Authorization -> typed ExecuteMessage
+    let msg: ExecuteMessage = verify_authorization::<ExecuteMessage>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.smart_wallet_authenticator,
         ctx.accounts.smart_wallet.key(),
@@ -46,51 +29,71 @@ pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
         ctx.accounts.smart_wallet_config.last_nonce,
     )?;
 
-    // Optionally rule-check now (binds policy at commit time)
-    if let Some(ref rule_data) = args.rule_data {
-        // First part of remaining accounts are for the rule program
-        let split = msg.split_index as usize;
-        require!(
-            split <= ctx.remaining_accounts.len(),
-            LazorKitError::InvalidSplitIndex
-        );
-        let rule_accounts = &ctx.remaining_accounts[..split];
-        // Ensure rule program matches config and whitelist
-        validation::validate_program_executable(&ctx.accounts.authenticator_program)?;
-        require!(
-            ctx.accounts.authenticator_program.key()
-                == ctx.accounts.smart_wallet_config.rule_program,
-            LazorKitError::InvalidProgramAddress
-        );
-        crate::utils::check_whitelist(
-            &ctx.accounts.whitelist_rule_programs,
-            &ctx.accounts.authenticator_program.key(),
-        )?;
+    // 2. In commit mode, all remaining accounts are for rule checking
+    let rule_accounts = &ctx.remaining_accounts[..];
 
-        let rule_signer = get_pda_signer(
-            &args.passkey_pubkey,
-            ctx.accounts.smart_wallet.key(),
-            ctx.accounts.smart_wallet_authenticator.bump,
-        );
-        // Ensure discriminator is check_rule
-        require!(
-            rule_data.get(0..8) == Some(&sighash("global", "check_rule")),
-            LazorKitError::InvalidCheckRuleDiscriminator
-        );
-        execute_cpi(
-            rule_accounts,
-            rule_data,
-            &ctx.accounts.authenticator_program,
-            Some(rule_signer),
-        )?;
+    // 3. Optional rule-check now (bind policy & validate hashes)
+    // Ensure rule program matches config and whitelist
+    validation::validate_program_executable(&ctx.accounts.authenticator_program)?;
+    require!(
+        ctx.accounts.authenticator_program.key() == ctx.accounts.smart_wallet_config.rule_program,
+        LazorKitError::InvalidProgramAddress
+    );
+    crate::utils::check_whitelist(
+        &ctx.accounts.whitelist_rule_programs,
+        &ctx.accounts.authenticator_program.key(),
+    )?;
+
+    // Compare rule_data hash with message
+    require!(
+        hash(&args.rule_data).to_bytes() == msg.rule_data_hash,
+        LazorKitError::InvalidInstructionData
+    );
+    // Compare rule_accounts hash with message
+    let mut rh = Hasher::default();
+    rh.hash(ctx.accounts.authenticator_program.key.as_ref());
+    for a in rule_accounts.iter() {
+        rh.hash(a.key.as_ref());
+        rh.hash(&[a.is_writable as u8, a.is_signer as u8]);
     }
+    require!(
+        rh.result().to_bytes() == msg.rule_accounts_hash,
+        LazorKitError::InvalidAccountData
+    );
 
-    // Write commit
+    // Execute rule check
+    let rule_signer = get_pda_signer(
+        &args.passkey_pubkey,
+        ctx.accounts.smart_wallet.key(),
+        ctx.accounts.smart_wallet_authenticator.bump,
+    );
+    require!(
+        args.rule_data.get(0..8) == Some(&sighash("global", "check_rule")),
+        LazorKitError::InvalidCheckRuleDiscriminator
+    );
+    execute_cpi(
+        rule_accounts,
+        &args.rule_data,
+        &ctx.accounts.authenticator_program,
+        Some(rule_signer),
+    )?;
+
+    // 4. Validate CPI accounts hash using provided cpi program pubkey and message
+    let mut ch = Hasher::default();
+    ch.hash(args.cpi_program.as_ref());
+    // no CPI accounts are supplied during commit
+    require!(
+        ch.result().to_bytes() == msg.cpi_accounts_hash,
+        LazorKitError::InvalidAccountData
+    );
+    // 4.1 No inline cpi bytes in commit path; rely on signed message hash only
+
+    // 5. Write commit using hashes from message
     let commit = &mut ctx.accounts.cpi_commit;
     commit.owner_wallet = ctx.accounts.smart_wallet.key();
     commit.target_program = args.cpi_program;
-    commit.data_hash = args.cpi_data_hash;
-    commit.accounts_hash = args.cpi_accounts_hash;
+    commit.data_hash = msg.cpi_data_hash;
+    commit.accounts_hash = msg.cpi_accounts_hash;
     commit.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;
     commit.expires_at = args.expires_at;
     commit.rent_refund_to = ctx.accounts.payer.key();
@@ -157,7 +160,7 @@ pub struct CommitCpi<'info> {
         init,
         payer = payer,
         space = 8 + CpiCommit::INIT_SPACE,
-        seeds = [CpiCommit::PREFIX_SEED, smart_wallet.key().as_ref(), &args.cpi_data_hash],
+        seeds = [CpiCommit::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_config.last_nonce.to_le_bytes()],
         bump,
         owner = ID,
     )]

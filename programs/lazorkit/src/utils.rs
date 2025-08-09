@@ -1,5 +1,5 @@
 use crate::constants::SECP256R1_ID;
-use crate::state::Message;
+use crate::state::{CallRuleMessage, ChangeRuleMessage, ExecuteMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
@@ -260,16 +260,9 @@ pub fn check_whitelist(
     Ok(())
 }
 
-/// Maximum allowed clock drift when validating the signed `Message`.
-pub const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
-
-/// Unified helper used by all instruction handlers to verify
-/// 1. passkey matches the authenticator
-/// 2. authenticator belongs to the smart-wallet
-/// 3. secp256r1 signature & message integrity
-/// 4. timestamp & nonce constraints
-#[allow(clippy::too_many_arguments)]
-pub fn verify_authorization(
+/// Same as `verify_authorization` but deserializes the challenge payload into the
+/// caller-provided type `T`.
+pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     ix_sysvar: &AccountInfo,
     authenticator: &crate::state::SmartWalletAuthenticator,
     smart_wallet_key: Pubkey,
@@ -279,12 +272,11 @@ pub fn verify_authorization(
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,
     last_nonce: u64,
-) -> Result<Message> {
-    use crate::state::Message;
+) -> Result<M> {
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
-    // 1) passkey & wallet checks --------------------------------------------------------------
+    // 1) passkey & wallet checks
     require!(
         authenticator.passkey_pubkey == passkey_pubkey,
         crate::error::LazorKitError::PasskeyMismatch
@@ -294,7 +286,7 @@ pub fn verify_authorization(
         crate::error::LazorKitError::SmartWalletMismatch
     );
 
-    // 2) locate the secp256r1 verify instruction ----------------------------------------------
+    // 2) locate the secp256r1 verify instruction
     let secp_ix = load_instruction_at_checked(verify_instruction_index as usize, ix_sysvar)?;
 
     // 3) reconstruct signed message (authenticatorData || SHA256(clientDataJSON))
@@ -303,7 +295,7 @@ pub fn verify_authorization(
     message.extend_from_slice(authenticator_data_raw);
     message.extend_from_slice(client_hash.as_ref());
 
-    // 4) parse the challenge from clientDataJSON ---------------------------------------------
+    // 4) parse the challenge from clientDataJSON
     let json_str = core::str::from_utf8(client_data_json_raw)
         .map_err(|_| crate::error::LazorKitError::ClientDataInvalidUtf8)?;
     let parsed: serde_json::Value = serde_json::from_str(json_str)
@@ -312,32 +304,52 @@ pub fn verify_authorization(
         .as_str()
         .ok_or(crate::error::LazorKitError::ChallengeMissing)?;
 
-    // strip surrounding quotes, whitespace, slashes
     let challenge_clean = challenge.trim_matches(|c| c == '"' || c == '\'' || c == '/' || c == ' ');
     let challenge_bytes = URL_SAFE_NO_PAD
         .decode(challenge_clean)
         .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
 
-    let msg = Message::try_from_slice(&challenge_bytes)
-        .map_err(|_| crate::error::LazorKitError::ChallengeDeserializationError)?;
-
-    // 5) timestamp / nonce policy -------------------------------------------------------------
-    let now = Clock::get()?.unix_timestamp;
-    if msg.current_timestamp < now.saturating_sub(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(crate::error::LazorKitError::TimestampTooOld.into());
-    }
-    if msg.current_timestamp > now.saturating_add(MAX_TIMESTAMP_DRIFT_SECONDS) {
-        return Err(crate::error::LazorKitError::TimestampTooNew.into());
-    }
-    require!(
-        msg.nonce == last_nonce,
-        crate::error::LazorKitError::NonceMismatch
-    );
-
-    // 6) finally verify the secp256r1 signature ----------------------------------------------
     verify_secp256r1_instruction(&secp_ix, authenticator.passkey_pubkey, message, signature)?;
+    // Verify header and return the typed message
+    M::verify(challenge_bytes.clone(), last_nonce)?;
+    let t: M = AnchorDeserialize::deserialize(&mut &challenge_bytes[..])
+        .map_err(|_| crate::error::LazorKitError::ChallengeDeserializationError)?;
+    Ok(t)
+}
 
-    Ok(msg)
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct HeaderView {
+    pub nonce: u64,
+    pub current_timestamp: i64,
+}
+
+pub trait HasHeader {
+    fn header(&self) -> HeaderView;
+}
+
+impl HasHeader for ExecuteMessage {
+    fn header(&self) -> HeaderView {
+        HeaderView {
+            nonce: self.nonce,
+            current_timestamp: self.current_timestamp,
+        }
+    }
+}
+impl HasHeader for CallRuleMessage {
+    fn header(&self) -> HeaderView {
+        HeaderView {
+            nonce: self.nonce,
+            current_timestamp: self.current_timestamp,
+        }
+    }
+}
+impl HasHeader for ChangeRuleMessage {
+    fn header(&self) -> HeaderView {
+        HeaderView {
+            nonce: self.nonce,
+            current_timestamp: self.current_timestamp,
+        }
+    }
 }
 
 /// Helper: Split remaining accounts into `(rule_accounts, cpi_accounts)` using `split_index` coming from `Message`.

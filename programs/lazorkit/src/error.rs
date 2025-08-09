@@ -168,10 +168,6 @@ pub enum LazorKitError {
     InvalidMessageFormat,
     #[msg("Message size exceeds limit")]
     MessageSizeExceedsLimit,
-    #[msg("Invalid action type")]
-    InvalidActionType,
-    #[msg("Action not supported")]
-    ActionNotSupported,
     #[msg("Invalid split index")]
     InvalidSplitIndex,
     #[msg("CPI execution failed")]

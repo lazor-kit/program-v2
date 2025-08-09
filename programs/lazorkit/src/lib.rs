@@ -52,26 +52,42 @@ pub mod lazorkit {
         )
     }
 
-    /// Unified execute entrypoint covering all smart-wallet actions
-    pub fn execute<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
-        args: ExecuteArgs,
-    ) -> Result<()> {
-        instructions::execute(ctx, args)
-    }
-
     /// Add a program to the whitelist of rule programs
     pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
         instructions::add_whitelist_rule_program(ctx)
     }
 
+    pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) -> Result<()> {
+        instructions::change_rule_direct(ctx, args)
+    }
+
+    pub fn call_rule_direct<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CallRuleDirect<'info>>,
+        args: CallRuleArgs,
+    ) -> Result<()> {
+        instructions::call_rule_direct(ctx, args)
+    }
+
+    pub fn execute_txn_direct<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ExecuteTxn<'info>>,
+        args: ExecuteTxnArgs,
+    ) -> Result<()> {
+        instructions::execute_txn_direct(ctx, args)
+    }
+
     /// Commit a CPI after verifying auth and rule. Stores data and constraints.
-    pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
+    pub fn commit_cpi<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CommitCpi<'info>>,
+        args: CommitArgs,
+    ) -> Result<()> {
         instructions::commit_cpi(ctx, args)
     }
 
     /// Execute a previously committed CPI (no passkey verification here).
-    pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedArgs) -> Result<()> {
+    pub fn execute_committed(
+        ctx: Context<ExecuteCommitted>,
+        args: ExecuteCommittedArgs,
+    ) -> Result<()> {
         instructions::execute_committed(ctx, args)
     }
 }

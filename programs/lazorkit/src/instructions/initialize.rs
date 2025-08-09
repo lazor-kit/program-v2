@@ -20,11 +20,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     config.execute_fee = 0; // LAMPORTS
     config.default_rule_program = ctx.accounts.default_rule_program.key();
     config.is_paused = false;
-    
-    msg!("LazorKit initialized successfully");
-    msg!("Authority: {}", config.authority);
-    msg!("Default rule program: {}", config.default_rule_program);
-    
+
     Ok(())
 }
 
@@ -56,7 +52,7 @@ pub struct Initialize<'info> {
 
     /// The default rule program to be used for new smart wallets.
     /// CHECK: This is checked to be executable.
-    pub default_rule_program: AccountInfo<'info>,
+    pub default_rule_program: UncheckedAccount<'info>,
 
     /// The system program.
     pub system_program: Program<'info, System>,

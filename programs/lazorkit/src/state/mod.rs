@@ -1,5 +1,5 @@
 mod config;
-mod message;
+pub mod message;
 mod cpi_commit;
 mod smart_wallet_authenticator;
 mod smart_wallet_config;

@@ -16,7 +16,6 @@ pub struct SmartWalletCreated {
 pub struct TransactionExecuted {
     pub smart_wallet: Pubkey,
     pub authenticator: Pubkey,
-    pub action: String,
     pub nonce: u64,
     pub rule_program: Pubkey,
     pub cpi_program: Pubkey,
@@ -147,7 +146,6 @@ impl TransactionExecuted {
     pub fn emit_event(
         smart_wallet: Pubkey,
         authenticator: Pubkey,
-        action: &str,
         nonce: u64,
         rule_program: Pubkey,
         cpi_program: Pubkey,
@@ -156,7 +154,6 @@ impl TransactionExecuted {
         emit!(Self {
             smart_wallet,
             authenticator,
-            action: action.to_string(),
             nonce,
             rule_program,
             cpi_program,
