@@ -246,11 +246,23 @@ pub struct ExecuteTxn<'info> {
 
     #[account(owner = crate::ID)]
     pub smart_wallet_authenticator: Box<Account<'info, crate::state::SmartWalletAuthenticator>>,
+    #[account(
+        seeds = [crate::state::WhitelistRulePrograms::PREFIX_SEED],
+        bump,
+        owner = crate::ID
+    )]
     pub whitelist_rule_programs: Box<Account<'info, crate::state::WhitelistRulePrograms>>,
-    /// CHECK
+    /// CHECK: must be executable (rule program)
+    #[account(executable)]
     pub authenticator_program: UncheckedAccount<'info>,
-    /// CHECK
+    /// CHECK: must be executable (target program)
+    #[account(executable)]
     pub cpi_program: UncheckedAccount<'info>,
+    #[account(
+        seeds = [crate::state::Config::PREFIX_SEED],
+        bump,
+        owner = crate::ID
+    )]
     pub config: Box<Account<'info, crate::state::Config>>,
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]

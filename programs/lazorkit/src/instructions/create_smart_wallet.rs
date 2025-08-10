@@ -18,6 +18,8 @@ pub fn create_smart_wallet(
     wallet_id: u64, // Random ID provided by client,
     is_pay_for_user: bool,
 ) -> Result<()> {
+    // Program must not be paused
+    require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     // === Input Validation ===
     validation::validate_credential_id(&credential_id)?;
     validation::validate_rule_data(&rule_data)?;

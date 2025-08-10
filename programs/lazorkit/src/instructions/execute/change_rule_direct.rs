@@ -184,6 +184,11 @@ pub struct ChangeRuleDirect<'info> {
     /// CHECK
     pub new_rule_program: UncheckedAccount<'info>,
 
+    #[account(
+        seeds = [WhitelistRulePrograms::PREFIX_SEED],
+        bump,
+        owner = ID
+    )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
     /// CHECK

@@ -32,7 +32,7 @@ pub struct Initialize<'info> {
 
     /// The program's configuration account.
     #[account(
-        init_if_needed,
+        init,
         payer = signer,
         space = 8 + Config::INIT_SPACE,
         seeds = [Config::PREFIX_SEED],
@@ -42,7 +42,7 @@ pub struct Initialize<'info> {
 
     /// The list of whitelisted rule programs that can be used with smart wallets.
     #[account(
-        init_if_needed,
+        init,
         payer = signer,
         space = 8 + WhitelistRulePrograms::INIT_SPACE,
         seeds = [WhitelistRulePrograms::PREFIX_SEED],

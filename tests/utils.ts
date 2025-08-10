@@ -2,8 +2,8 @@ import {
   createMint,
   getOrCreateAssociatedTokenAccount,
   mintTo,
-} from '@solana/spl-token';
-import { Connection, Keypair, PublicKey, Signer } from '@solana/web3.js';
+} from "@solana/spl-token";
+import { Connection, Keypair, PublicKey, Signer } from "@solana/web3.js";
 
 export const fundAccountSOL = async (
   connection: Connection,
@@ -16,7 +16,7 @@ export const fundAccountSOL = async (
 };
 
 export const getTxDetails = async (connection: Connection, sig) => {
-  const latestBlockHash = await connection.getLatestBlockhash('processed');
+  const latestBlockHash = await connection.getLatestBlockhash("processed");
 
   await connection.confirmTransaction(
     {
@@ -24,12 +24,12 @@ export const getTxDetails = async (connection: Connection, sig) => {
       lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
       signature: sig,
     },
-    'confirmed'
+    "confirmed"
   );
 
   return await connection.getTransaction(sig, {
     maxSupportedTransactionVersion: 0,
-    commitment: 'confirmed',
+    commitment: "confirmed",
   });
 };
 

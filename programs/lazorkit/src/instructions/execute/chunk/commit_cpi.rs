@@ -148,11 +148,16 @@ pub struct CommitCpi<'info> {
     )]
     pub smart_wallet_authenticator: Box<Account<'info, SmartWalletAuthenticator>>,
 
-    #[account(seeds = [WhitelistRulePrograms::PREFIX_SEED], bump, owner = ID)]
+    #[account(
+        seeds = [WhitelistRulePrograms::PREFIX_SEED],
+        bump,
+        owner = ID
+    )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
     /// Rule program for optional policy enforcement at commit time
     /// CHECK: validated via executable + whitelist
+    #[account(executable)]
     pub authenticator_program: UncheckedAccount<'info>,
 
     /// New commit account (rent payer: payer)

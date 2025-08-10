@@ -143,8 +143,14 @@ pub struct CallRuleDirect<'info> {
     pub smart_wallet_authenticator: Box<Account<'info, SmartWalletAuthenticator>>,
 
     /// CHECK: executable rule program
+    #[account(executable)]
     pub rule_program: UncheckedAccount<'info>,
 
+    #[account(
+        seeds = [WhitelistRulePrograms::PREFIX_SEED],
+        bump,
+        owner = ID
+    )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
     /// Optional new authenticator to initialize when requested in message
