@@ -24,15 +24,15 @@ import { buildSecp256r1VerifyIx } from '../webauthn/secp256r1';
 import { instructionToAccountMetas } from '../utils';
 import { sha256 } from 'js-sha256';
 import * as types from '../types';
-import DefaultRuleIdl from '../../target/idl/default_rule.json';
-import { DefaultRule } from '../../target/types/default_rule';
 import { randomBytes } from 'crypto';
+import { DefaultRuleClient } from './defaultRule';
+import * as bs58 from 'bs58';
 
 export class LazorkitClient {
   readonly connection: Connection;
   readonly program: Program<Lazorkit>;
   readonly programId: PublicKey;
-  readonly defaultRuleProgram: Program<DefaultRule>;
+  readonly defaultRuleProgram: DefaultRuleClient;
 
   constructor(connection: Connection) {
     this.connection = connection;
@@ -40,12 +40,7 @@ export class LazorkitClient {
     this.program = new Program<Lazorkit>(LazorkitIdl as Lazorkit, {
       connection: connection,
     });
-    this.defaultRuleProgram = new Program<DefaultRule>(
-      DefaultRuleIdl as DefaultRule,
-      {
-        connection: connection,
-      }
-    );
+    this.defaultRuleProgram = new DefaultRuleClient(connection);
     this.programId = this.program.programId;
   }
 
@@ -93,19 +88,47 @@ export class LazorkitClient {
       smartWalletAuthenticator
     );
   }
+  async getSmartWalletByPasskey(passkeyPubkey: number[]): Promise<{
+    smartWallet: PublicKey | null;
+    smartWalletAuthenticator: PublicKey | null;
+  }> {
+    const discriminator = LazorkitIdl.accounts.find(
+      (a: any) => a.name === 'SmartWalletAuthenticator'
+    )!.discriminator;
+
+    const accounts = await this.connection.getProgramAccounts(this.programId, {
+      dataSlice: {
+        offset: 8,
+        length: 33,
+      },
+      filters: [
+        { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
+        { memcmp: { offset: 8, bytes: bs58.encode(passkeyPubkey) } },
+      ],
+    });
+
+    if (accounts.length === 0) {
+      return { smartWalletAuthenticator: null, smartWallet: null };
+    }
+
+    const smartWalletAuthenticatorData =
+      await this.getSmartWalletAuthenticatorData(accounts[0].pubkey);
+
+    return {
+      smartWalletAuthenticator: accounts[0].pubkey,
+      smartWallet: smartWalletAuthenticatorData.smartWallet,
+    };
+  }
 
   // Builders (TransactionInstruction)
-  async buildInitializeIx(
-    payer: PublicKey,
-    defaultRuleProgram: PublicKey
-  ): Promise<TransactionInstruction> {
+  async buildInitializeIx(payer: PublicKey): Promise<TransactionInstruction> {
     return await this.program.methods
       .initialize()
       .accountsPartial({
         signer: payer,
         config: this.configPda(),
         whitelistRulePrograms: this.whitelistRuleProgramsPda(),
-        defaultRuleProgram,
+        defaultRuleProgram: this.defaultRuleProgram.programId,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
@@ -113,21 +136,18 @@ export class LazorkitClient {
 
   async buildCreateSmartWalletIx(
     payer: PublicKey,
-    args: types.CreatwSmartWalletArgs,
-    ruleInstruction: TransactionInstruction
+    smartWallet: PublicKey,
+    smartWalletAuthenticator: PublicKey,
+    ruleInstruction: TransactionInstruction,
+    args: types.CreatwSmartWalletArgs
   ): Promise<TransactionInstruction> {
-    const smartWallet = this.smartWalletPda(args.walletId);
-
     return await this.program.methods
       .createSmartWallet(args)
       .accountsPartial({
         signer: payer,
         smartWallet,
         smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        smartWalletAuthenticator: this.smartWalletAuthenticatorPda(
-          smartWallet,
-          args.passkeyPubkey
-        ),
+        smartWalletAuthenticator,
         config: this.configPda(),
         defaultRuleProgram: this.defaultRuleProgram.programId,
         systemProgram: SystemProgram.programId,
@@ -215,6 +235,23 @@ export class LazorkitClient {
     destroyRuleInstruction: TransactionInstruction,
     initRuleInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
+    const remaining: AccountMeta[] = [];
+
+    if (args.newAuthenticator) {
+      const newSmartWalletAuthenticator = this.smartWalletAuthenticatorPda(
+        smartWallet,
+        args.newAuthenticator.passkeyPubkey
+      );
+      remaining.push({
+        pubkey: newSmartWalletAuthenticator,
+        isWritable: true,
+        isSigner: false,
+      });
+    }
+
+    remaining.push(...instructionToAccountMetas(destroyRuleInstruction, payer));
+    remaining.push(...instructionToAccountMetas(initRuleInstruction, payer));
+
     return await this.program.methods
       .changeRuleDirect(args)
       .accountsPartial({
@@ -232,10 +269,7 @@ export class LazorkitClient {
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([
-        ...instructionToAccountMetas(destroyRuleInstruction, payer),
-        ...instructionToAccountMetas(initRuleInstruction, payer),
-      ])
+      .remainingAccounts(remaining)
       .instruction();
   }
 
@@ -292,37 +326,48 @@ export class LazorkitClient {
   async executeTxnDirectTx(params: {
     payer: PublicKey;
     smartWallet: PublicKey;
-    passkey33: Uint8Array;
-    signature64: Uint8Array;
-    clientDataJsonRaw: Uint8Array;
-    authenticatorDataRaw: Uint8Array;
-    ruleInstruction: TransactionInstruction;
+    passkeyPubkey: number[];
+    signature64: String;
+    clientDataJsonRaw64: String;
+    authenticatorDataRaw64: String;
+    ruleInstruction: TransactionInstruction | null;
     cpiInstruction: TransactionInstruction;
-    ruleProgram?: PublicKey;
   }): Promise<VersionedTransaction> {
+    const authenticatorDataRaw = Buffer.from(
+      params.authenticatorDataRaw64,
+      'base64'
+    );
+    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
     const verifyIx = buildSecp256r1VerifyIx(
       Buffer.concat([
-        Buffer.from(params.authenticatorDataRaw),
-        Buffer.from(sha256.hex(params.clientDataJsonRaw), 'hex'),
+        authenticatorDataRaw,
+        Buffer.from(sha256.hex(clientDataJsonRaw), 'hex'),
       ]),
-      Buffer.from(params.passkey33),
+      Buffer.from(params.passkeyPubkey),
       Buffer.from(params.signature64)
     );
+
+    let ruleInstruction = await this.defaultRuleProgram.buildCheckRuleIx(
+      this.smartWalletAuthenticatorPda(params.smartWallet, params.passkeyPubkey)
+    );
+    if (params.ruleInstruction) {
+      ruleInstruction = ruleInstruction;
+    }
 
     const execIx = await this.buildExecuteTxnDirectIx(
       params.payer,
       params.smartWallet,
       {
-        passkeyPubkey: Array.from(params.passkey33),
-        signature: Buffer.from(params.signature64),
-        clientDataJsonRaw: Buffer.from(params.clientDataJsonRaw),
-        authenticatorDataRaw: Buffer.from(params.authenticatorDataRaw),
+        passkeyPubkey: params.passkeyPubkey,
+        signature: Buffer.from(params.signature64, 'base64'),
+        clientDataJsonRaw,
+        authenticatorDataRaw,
         verifyInstructionIndex: 0,
-        ruleData: params.ruleInstruction.data,
+        ruleData: ruleInstruction.data,
         cpiData: params.cpiInstruction.data,
-        splitIndex: params.ruleInstruction.keys.length,
+        splitIndex: ruleInstruction.keys.length,
       },
-      params.ruleInstruction,
+      ruleInstruction,
       params.cpiInstruction
     );
     return this.buildV0Tx(params.payer, [verifyIx, execIx]);
@@ -331,36 +376,43 @@ export class LazorkitClient {
   async callRuleDirectTx(params: {
     payer: PublicKey;
     smartWallet: PublicKey;
-    passkey33: Uint8Array;
-    signature64: Uint8Array;
-    clientDataJsonRaw: Uint8Array;
-    authenticatorDataRaw: Uint8Array;
+    passkeyPubkey: number[];
+    signature64: String;
+    clientDataJsonRaw64: String;
+    authenticatorDataRaw64: String;
     ruleProgram: PublicKey;
     ruleInstruction: TransactionInstruction;
     newAuthenticator?: {
-      passkey33: Uint8Array;
+      passkeyPubkey: number[];
       credentialIdBase64: string;
     }; // optional
   }): Promise<VersionedTransaction> {
+    const authenticatorDataRaw = Buffer.from(
+      params.authenticatorDataRaw64,
+      'base64'
+    );
+    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
+
     const verifyIx = buildSecp256r1VerifyIx(
       Buffer.concat([
-        Buffer.from(params.authenticatorDataRaw),
-        Buffer.from(sha256.hex(params.clientDataJsonRaw), 'hex'),
+        authenticatorDataRaw,
+        Buffer.from(sha256.hex(clientDataJsonRaw), 'hex'),
       ]),
-      Buffer.from(params.passkey33),
+      Buffer.from(params.passkeyPubkey),
       Buffer.from(params.signature64)
     );
+
     const ix = await this.buildCallRuleDirectIx(
       params.payer,
       params.smartWallet,
       {
-        passkeyPubkey: Array.from(params.passkey33),
-        signature: Buffer.from(params.signature64),
-        clientDataJsonRaw: Buffer.from(params.clientDataJsonRaw),
-        authenticatorDataRaw: Buffer.from(params.authenticatorDataRaw),
+        passkeyPubkey: params.passkeyPubkey,
+        signature: Buffer.from(params.signature64, 'base64'),
+        clientDataJsonRaw: clientDataJsonRaw,
+        authenticatorDataRaw: authenticatorDataRaw,
         newAuthenticator: params.newAuthenticator
           ? {
-              passkeyPubkey: Array.from(params.newAuthenticator.passkey33),
+              passkeyPubkey: Array.from(params.newAuthenticator.passkeyPubkey),
               credentialId: Buffer.from(
                 params.newAuthenticator.credentialIdBase64,
                 'base64'
@@ -380,23 +432,29 @@ export class LazorkitClient {
   async changeRuleDirectTx(params: {
     payer: PublicKey;
     smartWallet: PublicKey;
-    passkey33: Uint8Array;
-    signature64: Uint8Array;
-    clientDataJsonRaw: Uint8Array;
-    authenticatorDataRaw: Uint8Array;
+    passkeyPubkey: number[];
+    signature64: String;
+    clientDataJsonRaw64: String;
+    authenticatorDataRaw64: String;
     destroyRuleInstruction: TransactionInstruction;
     initRuleInstruction: TransactionInstruction;
     newAuthenticator?: {
-      passkey33: Uint8Array;
+      passkeyPubkey: number[];
       credentialIdBase64: string;
     }; // optional
   }): Promise<VersionedTransaction> {
+    const authenticatorDataRaw = Buffer.from(
+      params.authenticatorDataRaw64,
+      'base64'
+    );
+    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
+
     const verifyIx = buildSecp256r1VerifyIx(
       Buffer.concat([
-        Buffer.from(params.authenticatorDataRaw),
-        Buffer.from(sha256.hex(params.clientDataJsonRaw), 'hex'),
+        authenticatorDataRaw,
+        Buffer.from(sha256.hex(clientDataJsonRaw), 'hex'),
       ]),
-      Buffer.from(params.passkey33),
+      Buffer.from(params.passkeyPubkey),
       Buffer.from(params.signature64)
     );
 
@@ -404,10 +462,10 @@ export class LazorkitClient {
       params.payer,
       params.smartWallet,
       {
-        passkeyPubkey: Array.from(params.passkey33),
-        signature: Buffer.from(params.signature64),
-        clientDataJsonRaw: Buffer.from(params.clientDataJsonRaw),
-        authenticatorDataRaw: Buffer.from(params.authenticatorDataRaw),
+        passkeyPubkey: params.passkeyPubkey,
+        signature: Buffer.from(params.signature64, 'base64'),
+        clientDataJsonRaw,
+        authenticatorDataRaw,
         verifyInstructionIndex: 0,
         destroyRuleData: params.destroyRuleInstruction.data,
         initRuleData: params.initRuleInstruction.data,
@@ -416,7 +474,7 @@ export class LazorkitClient {
           params.destroyRuleInstruction.keys.length,
         newAuthenticator: params.newAuthenticator
           ? {
-              passkeyPubkey: Array.from(params.newAuthenticator.passkey33),
+              passkeyPubkey: Array.from(params.newAuthenticator.passkeyPubkey),
               credentialId: Buffer.from(
                 params.newAuthenticator.credentialIdBase64,
                 'base64'
@@ -433,35 +491,48 @@ export class LazorkitClient {
   async commitCpiTx(params: {
     payer: PublicKey;
     smartWallet: PublicKey;
-    passkey33: Uint8Array;
-    signature64: Uint8Array;
-    clientDataJsonRaw: Uint8Array;
-    authenticatorDataRaw: Uint8Array;
-    ruleInstruction: TransactionInstruction;
-    cpiProgram: PublicKey;
+    passkeyPubkey: number[];
+    signature64: String;
+    clientDataJsonRaw64: String;
+    authenticatorDataRaw64: String;
+    ruleInstruction?: TransactionInstruction;
     expiresAt: number;
   }) {
+    const authenticatorDataRaw = Buffer.from(
+      params.authenticatorDataRaw64,
+      'base64'
+    );
+    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
+
     const verifyIx = buildSecp256r1VerifyIx(
       Buffer.concat([
-        Buffer.from(params.authenticatorDataRaw),
-        Buffer.from(sha256.hex(params.clientDataJsonRaw), 'hex'),
+        authenticatorDataRaw,
+        Buffer.from(sha256.hex(clientDataJsonRaw), 'hex'),
       ]),
-      Buffer.from(params.passkey33),
+      Buffer.from(params.passkeyPubkey),
       Buffer.from(params.signature64)
     );
+
+    let ruleInstruction = await this.defaultRuleProgram.buildCheckRuleIx(
+      this.smartWalletAuthenticatorPda(params.smartWallet, params.passkeyPubkey)
+    );
+    if (params.ruleInstruction) {
+      ruleInstruction = ruleInstruction;
+    }
+
     const ix = await this.buildCommitCpiIx(
       params.payer,
       params.smartWallet,
       {
-        passkeyPubkey: Array.from(params.passkey33),
-        signature: Buffer.from(params.signature64),
-        clientDataJsonRaw: Buffer.from(params.clientDataJsonRaw),
-        authenticatorDataRaw: Buffer.from(params.authenticatorDataRaw),
+        passkeyPubkey: params.passkeyPubkey,
+        signature: Buffer.from(params.signature64, 'base64'),
+        clientDataJsonRaw: clientDataJsonRaw,
+        authenticatorDataRaw: authenticatorDataRaw,
         expiresAt: new BN(params.expiresAt),
-        ruleData: params.ruleInstruction.data,
+        ruleData: ruleInstruction.data,
         verifyInstructionIndex: 0,
       },
-      params.ruleInstruction
+      ruleInstruction
     );
     const tx = new Transaction().add(verifyIx).add(ix);
     tx.feePayer = params.payer;
@@ -484,40 +555,57 @@ export class LazorkitClient {
   }
 
   // Legacy-compat APIs for simpler DX
-  async initializeTxn(payer: PublicKey, defaultRuleProgram: PublicKey) {
-    const ix = await this.buildInitializeIx(payer, defaultRuleProgram);
+  async initializeTxn(payer: PublicKey) {
+    const ix = await this.buildInitializeIx(payer);
     return new Transaction().add(ix);
   }
 
   async createSmartWalletTx(params: {
     payer: PublicKey;
-    passkey33: Uint8Array;
+    passkeyPubkey: number[];
     credentialIdBase64: string;
-    ruleInstruction: TransactionInstruction;
-    isPayForUser?: boolean;
-    defaultRuleProgram: PublicKey;
+    ruleInstruction: TransactionInstruction | null;
+    isPayForUser: boolean;
     smartWalletId?: BN;
   }) {
     let smartWalletId: BN = this.generateWalletId();
     if (params.smartWalletId) {
       smartWalletId = params.smartWalletId;
     }
+    const smartWallet = this.smartWalletPda(smartWalletId);
+    const smartWalletAuthenticator = this.smartWalletAuthenticatorPda(
+      smartWallet,
+      params.passkeyPubkey
+    );
+
+    let ruleInstruction = await this.defaultRuleProgram.buildInitRuleIx(
+      params.payer,
+      smartWallet,
+      smartWalletAuthenticator
+    );
+
+    if (params.ruleInstruction) {
+      ruleInstruction = params.ruleInstruction;
+    }
+
     const args = {
-      passkeyPubkey: Array.from(params.passkey33),
+      passkeyPubkey: params.passkeyPubkey,
       credentialId: Buffer.from(params.credentialIdBase64, 'base64'),
-      ruleData: params.ruleInstruction.data,
+      ruleData: ruleInstruction.data,
       walletId: smartWalletId,
       isPayForUser: params.isPayForUser,
     };
+
     const ix = await this.buildCreateSmartWalletIx(
       params.payer,
-      args,
-      params.ruleInstruction
+      smartWallet,
+      smartWalletAuthenticator,
+      ruleInstruction,
+      args
     );
     const tx = new Transaction().add(ix);
     tx.feePayer = params.payer;
     tx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
-    const smartWallet = this.smartWalletPda(smartWalletId);
     return {
       transaction: tx,
       smartWalletId: smartWalletId,

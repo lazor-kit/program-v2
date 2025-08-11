@@ -1,5 +1,4 @@
 import * as anchor from '@coral-xyz/anchor';
-
 import { Lazorkit } from '../target/types/lazorkit';
 
 // Account types
