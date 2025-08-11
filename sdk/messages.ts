@@ -1,52 +1,52 @@
-import * as anchor from "@coral-xyz/anchor";
-import { sha256 } from "js-sha256";
-import { instructionToAccountMetas } from "./utils";
+import * as anchor from '@coral-xyz/anchor';
+import { sha256 } from 'js-sha256';
+import { instructionToAccountMetas } from './utils';
 
 const coder: anchor.BorshCoder = (() => {
   const idl: any = {
-    version: "0.1.0",
-    name: "lazorkit_msgs",
+    version: '0.1.0',
+    name: 'lazorkit_msgs',
     instructions: [],
     accounts: [],
     types: [
       {
-        name: "ExecuteMessage",
+        name: 'ExecuteMessage',
         type: {
-          kind: "struct",
+          kind: 'struct',
           fields: [
-            { name: "nonce", type: "u64" },
-            { name: "currentTimestamp", type: "i64" },
-            { name: "ruleDataHash", type: { array: ["u8", 32] } },
-            { name: "ruleAccountsHash", type: { array: ["u8", 32] } },
-            { name: "cpiDataHash", type: { array: ["u8", 32] } },
-            { name: "cpiAccountsHash", type: { array: ["u8", 32] } },
+            { name: 'nonce', type: 'u64' },
+            { name: 'currentTimestamp', type: 'i64' },
+            { name: 'ruleDataHash', type: { array: ['u8', 32] } },
+            { name: 'ruleAccountsHash', type: { array: ['u8', 32] } },
+            { name: 'cpiDataHash', type: { array: ['u8', 32] } },
+            { name: 'cpiAccountsHash', type: { array: ['u8', 32] } },
           ],
         },
       },
       {
-        name: "CallRuleMessage",
+        name: 'CallRuleMessage',
         type: {
-          kind: "struct",
+          kind: 'struct',
           fields: [
-            { name: "nonce", type: "u64" },
-            { name: "currentTimestamp", type: "i64" },
-            { name: "ruleDataHash", type: { array: ["u8", 32] } },
-            { name: "ruleAccountsHash", type: { array: ["u8", 32] } },
-            { name: "newPasskey", type: { option: { array: ["u8", 33] } } },
+            { name: 'nonce', type: 'u64' },
+            { name: 'currentTimestamp', type: 'i64' },
+            { name: 'ruleDataHash', type: { array: ['u8', 32] } },
+            { name: 'ruleAccountsHash', type: { array: ['u8', 32] } },
+            { name: 'newPasskey', type: { option: { array: ['u8', 33] } } },
           ],
         },
       },
       {
-        name: "ChangeRuleMessage",
+        name: 'ChangeRuleMessage',
         type: {
-          kind: "struct",
+          kind: 'struct',
           fields: [
-            { name: "nonce", type: "u64" },
-            { name: "currentTimestamp", type: "i64" },
-            { name: "oldRuleDataHash", type: { array: ["u8", 32] } },
-            { name: "oldRuleAccountsHash", type: { array: ["u8", 32] } },
-            { name: "newRuleDataHash", type: { array: ["u8", 32] } },
-            { name: "newRuleAccountsHash", type: { array: ["u8", 32] } },
+            { name: 'nonce', type: 'u64' },
+            { name: 'currentTimestamp', type: 'i64' },
+            { name: 'oldRuleDataHash', type: { array: ['u8', 32] } },
+            { name: 'oldRuleAccountsHash', type: { array: ['u8', 32] } },
+            { name: 'newRuleDataHash', type: { array: ['u8', 32] } },
+            { name: 'newRuleAccountsHash', type: { array: ['u8', 32] } },
           ],
         },
       },
@@ -83,7 +83,7 @@ export function buildExecuteMessage(
   const cpiAccountsHash = computeAccountsHash(cpiIns.programId, cpiMetas);
   const cpiDataHash = new Uint8Array(sha256.arrayBuffer(cpiIns.data));
 
-  const encoded = coder.types.encode("ExecuteMessage", {
+  const encoded = coder.types.encode('ExecuteMessage', {
     nonce,
     currentTimestamp: now,
     ruleDataHash: Array.from(ruleDataHash),
@@ -106,7 +106,7 @@ export function buildCallRuleMessage(
   const ruleAccountsHash = computeAccountsHash(ruleProgram, ruleMetas);
   const ruleDataHash = new Uint8Array(sha256.arrayBuffer(ruleIns.data));
 
-  const encoded = coder.types.encode("CallRuleMessage", {
+  const encoded = coder.types.encode('CallRuleMessage', {
     nonce,
     currentTimestamp: now,
     ruleDataHash: Array.from(ruleDataHash),
@@ -136,7 +136,7 @@ export function buildChangeRuleMessage(
   const newAccountsHash = computeAccountsHash(newRuleProgram, newMetas);
   const newDataHash = new Uint8Array(sha256.arrayBuffer(initRuleIns.data));
 
-  const encoded = coder.types.encode("ChangeRuleMessage", {
+  const encoded = coder.types.encode('ChangeRuleMessage', {
     nonce,
     currentTimestamp: now,
     oldRuleDataHash: Array.from(oldDataHash),

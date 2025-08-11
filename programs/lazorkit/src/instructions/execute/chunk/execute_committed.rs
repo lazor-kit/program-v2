@@ -7,13 +7,7 @@ use crate::state::{Config, CpiCommit, SmartWalletConfig};
 use crate::utils::{execute_cpi, transfer_sol_from_pda, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ExecuteCommittedArgs {
-    /// Full CPI instruction data submitted at execution time
-    pub cpi_data: Vec<u8>,
-}
-
-pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedArgs) -> Result<()> {
+pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> Result<()> {
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
     if let Err(_) = validation::validate_remaining_accounts(&ctx.remaining_accounts) {
@@ -29,9 +23,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedA
     }
 
     // Bind wallet and target program
-    if commit.owner_wallet != ctx.accounts.smart_wallet.key()
-        || commit.target_program != ctx.accounts.cpi_program.key()
-    {
+    if commit.owner_wallet != ctx.accounts.smart_wallet.key() {
         return Ok(());
     }
 
@@ -53,12 +45,12 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedA
     }
 
     // Verify data_hash bound with authorized nonce to prevent cross-commit reuse
-    let data_hash = anchor_lang::solana_program::hash::hash(&args.cpi_data).to_bytes();
+    let data_hash = anchor_lang::solana_program::hash::hash(&cpi_data).to_bytes();
     if data_hash != commit.data_hash {
         return Ok(());
     }
 
-    if args.cpi_data.get(0..4) == Some(&SOL_TRANSFER_DISCRIMINATOR)
+    if cpi_data.get(0..4) == Some(&SOL_TRANSFER_DISCRIMINATOR)
         && ctx.accounts.cpi_program.key() == anchor_lang::solana_program::system_program::ID
     {
         // === Native SOL Transfer ===
@@ -68,10 +60,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedA
         );
 
         // Extract and validate amount
-        let amount_bytes = args
-            .cpi_data
-            .get(4..12)
-            .ok_or(LazorKitError::InvalidCpiData)?;
+        let amount_bytes = cpi_data.get(4..12).ok_or(LazorKitError::InvalidCpiData)?;
         let amount = u64::from_le_bytes(
             amount_bytes
                 .try_into()
@@ -141,7 +130,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, args: ExecuteCommittedA
 
         execute_cpi(
             ctx.remaining_accounts,
-            &args.cpi_data,
+            &cpi_data,
             &ctx.accounts.cpi_program,
             Some(wallet_signer),
         )?;

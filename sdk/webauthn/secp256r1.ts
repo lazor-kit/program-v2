@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import * as anchor from '@coral-xyz/anchor';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 
 const SIGNATURE_OFFSETS_SERIALIZED_SIZE = 14;
 const SIGNATURE_OFFSETS_START = 2;
@@ -9,7 +9,7 @@ const COMPRESSED_PUBKEY_SERIALIZED_SIZE = 33;
 const FIELD_SIZE = 32;
 
 export const SECP256R1_PROGRAM_ID = new PublicKey(
-  "Secp256r1SigVerify1111111111111111111111111"
+  'Secp256r1SigVerify1111111111111111111111111'
 );
 
 const ORDER = new Uint8Array([
@@ -81,7 +81,7 @@ export function buildSecp256r1VerifyIx(
     compressedPubkey33.length !== COMPRESSED_PUBKEY_SERIALIZED_SIZE ||
     sig.length !== SIGNATURE_SERIALIZED_SIZE
   ) {
-    throw new Error("Invalid secp256r1 key/signature length");
+    throw new Error('Invalid secp256r1 key/signature length');
   }
 
   const totalSize =

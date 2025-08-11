@@ -9,7 +9,10 @@ use crate::utils::{check_whitelist, execute_cpi, get_pda_signer, sighash, verify
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) -> Result<()> {
+pub fn change_rule_direct<'c: 'info, 'info>(
+    ctx: Context<'_, '_, 'c, 'info, ChangeRuleDirect<'info>>,
+    args: ChangeRuleArgs,
+) -> Result<()> {
     // 0. Validate args and global state
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
@@ -29,18 +32,9 @@ pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) 
         ctx.accounts.smart_wallet_config.rule_program == ctx.accounts.old_rule_program.key(),
         LazorKitError::InvalidProgramAddress
     );
-    // Ensure provided args program ids match the passed accounts
-    require!(
-        args.old_rule_program == ctx.accounts.old_rule_program.key(),
-        LazorKitError::InvalidProgramAddress
-    );
-    require!(
-        args.new_rule_program == ctx.accounts.new_rule_program.key(),
-        LazorKitError::InvalidProgramAddress
-    );
     // Ensure different programs
     require!(
-        args.old_rule_program != args.new_rule_program,
+        ctx.accounts.old_rule_program.key() != ctx.accounts.new_rule_program.key(),
         LazorKitError::RuleProgramsIdentical
     );
     validation::validate_rule_data(&args.destroy_rule_data)?;
@@ -68,7 +62,7 @@ pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) 
 
     // Hash checks
     let mut h1 = Hasher::default();
-    h1.hash(args.old_rule_program.as_ref());
+    h1.hash(ctx.accounts.old_rule_program.key().as_ref());
     for a in destroy_accounts.iter() {
         h1.hash(a.key.as_ref());
         h1.hash(&[a.is_writable as u8, a.is_signer as u8]);
@@ -79,7 +73,7 @@ pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) 
     );
 
     let mut h2 = Hasher::default();
-    h2.hash(args.new_rule_program.as_ref());
+    h2.hash(ctx.accounts.new_rule_program.key().as_ref());
     for a in init_accounts.iter() {
         h2.hash(a.key.as_ref());
         h2.hash(&[a.is_writable as u8, a.is_signer as u8]);
@@ -119,12 +113,40 @@ pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) 
     // enforce default rule transition if desired
     let default_rule = ctx.accounts.config.default_rule_program;
     require!(
-        args.old_rule_program == default_rule || args.new_rule_program == default_rule,
+        ctx.accounts.old_rule_program.key() == default_rule
+            || ctx.accounts.new_rule_program.key() == default_rule,
         LazorKitError::NoDefaultRuleProgram
     );
 
     // update wallet config
-    ctx.accounts.smart_wallet_config.rule_program = args.new_rule_program;
+    ctx.accounts.smart_wallet_config.rule_program = ctx.accounts.new_rule_program.key();
+
+    // Optionally create new authenticator if requested
+    if let Some(new_authentcator) = args.new_authenticator {
+        require!(
+            new_authentcator.passkey_pubkey[0] == 0x02
+                || new_authentcator.passkey_pubkey[0] == 0x03,
+            LazorKitError::InvalidPasskeyFormat
+        );
+        // Get the new authenticator account from remaining accounts
+        let new_auth = ctx
+            .remaining_accounts
+            .first()
+            .ok_or(LazorKitError::InvalidRemainingAccounts)?;
+
+        require!(
+            new_auth.data_is_empty(),
+            LazorKitError::AccountAlreadyInitialized
+        );
+        crate::state::SmartWalletAuthenticator::init(
+            new_auth,
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.smart_wallet.key(),
+            new_authentcator.passkey_pubkey,
+            new_authentcator.credential_id,
+        )?;
+    }
 
     // destroy and init
     execute_cpi(
@@ -133,6 +155,7 @@ pub fn change_rule_direct(ctx: Context<ChangeRuleDirect>, args: ChangeRuleArgs) 
         &ctx.accounts.old_rule_program,
         Some(rule_signer.clone()),
     )?;
+
     execute_cpi(
         init_accounts,
         &args.init_rule_data,

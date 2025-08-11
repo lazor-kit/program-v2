@@ -49,10 +49,14 @@ pub fn call_rule_direct<'c: 'info, 'info>(
     );
 
     // Hash rule accounts (skip optional new authenticator at index 0)
-    let start_idx = if msg.new_passkey.is_some() { 1 } else { 0 };
+    let start_idx = if args.new_authenticator.is_some() {
+        1
+    } else {
+        0
+    };
     let rule_accs = &ctx.remaining_accounts[start_idx..];
     let mut hasher = Hasher::default();
-    hasher.hash(args.rule_program.as_ref());
+    hasher.hash(ctx.accounts.rule_program.key().as_ref());
     for acc in rule_accs.iter() {
         hasher.hash(acc.key.as_ref());
         hasher.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
@@ -70,9 +74,10 @@ pub fn call_rule_direct<'c: 'info, 'info>(
     );
 
     // Optionally create new authenticator if requested
-    if let Some(new_pk) = msg.new_passkey {
+    if let Some(new_authentcator) = args.new_authenticator {
         require!(
-            new_pk[0] == 0x02 || new_pk[0] == 0x03,
+            new_authentcator.passkey_pubkey[0] == 0x02
+                || new_authentcator.passkey_pubkey[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
         // Get the new authenticator account from remaining accounts
@@ -90,8 +95,8 @@ pub fn call_rule_direct<'c: 'info, 'info>(
             ctx.accounts.payer.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
             ctx.accounts.smart_wallet.key(),
-            new_pk,
-            Vec::new(),
+            new_authentcator.passkey_pubkey,
+            new_authentcator.credential_id,
         )?;
     }
 

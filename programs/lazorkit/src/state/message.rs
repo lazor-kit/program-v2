@@ -6,7 +6,6 @@ pub trait Message {
     fn verify(challenge_bytes: Vec<u8>, last_nonce: u64) -> Result<()>;
 }
 
-
 #[derive(Default, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct ExecuteMessage {
     pub nonce: u64,
@@ -23,7 +22,6 @@ pub struct CallRuleMessage {
     pub current_timestamp: i64,
     pub rule_data_hash: [u8; 32],
     pub rule_accounts_hash: [u8; 32],
-    pub new_passkey: Option<[u8; 33]>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Default, Clone)]
@@ -58,7 +56,6 @@ macro_rules! impl_message_verify {
         }
     };
 }
-
 
 impl_message_verify!(ExecuteMessage);
 impl_message_verify!(CallRuleMessage);

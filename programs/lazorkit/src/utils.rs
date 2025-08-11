@@ -1,4 +1,4 @@
-use crate::constants::SECP256R1_ID;
+use crate::constants::{PASSKEY_SIZE, SECP256R1_ID};
 use crate::state::{CallRuleMessage, ChangeRuleMessage, ExecuteMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
@@ -237,7 +237,7 @@ pub fn get_account_slice<'a>(
 }
 
 /// Helper: Create a PDA signer struct
-pub fn get_pda_signer(passkey: &[u8; 33], wallet: Pubkey, bump: u8) -> PdaSigner {
+pub fn get_pda_signer(passkey: &[u8; PASSKEY_SIZE], wallet: Pubkey, bump: u8) -> PdaSigner {
     PdaSigner {
         seeds: vec![
             crate::state::SmartWalletAuthenticator::PREFIX_SEED.to_vec(),
@@ -266,7 +266,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     ix_sysvar: &AccountInfo,
     authenticator: &crate::state::SmartWalletAuthenticator,
     smart_wallet_key: Pubkey,
-    passkey_pubkey: [u8; 33],
+    passkey_pubkey: [u8; PASSKEY_SIZE],
     signature: Vec<u8>,
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],

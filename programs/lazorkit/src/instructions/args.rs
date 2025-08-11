@@ -1,4 +1,4 @@
-use crate::error::LazorKitError;
+use crate::{constants::PASSKEY_SIZE, error::LazorKitError};
 use anchor_lang::prelude::*;
 
 pub trait Args {
@@ -6,8 +6,17 @@ pub trait Args {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct CreatwSmartWalletArgs {
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+    pub credential_id: Vec<u8>,
+    pub rule_data: Vec<u8>,
+    pub wallet_id: u64, // Random ID provided by client,
+    pub is_pay_for_user: bool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct ExecuteTxnArgs {
-    pub passkey_pubkey: [u8; 33],
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -19,41 +28,44 @@ pub struct ExecuteTxnArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct ChangeRuleArgs {
-    pub passkey_pubkey: [u8; 33],
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub split_index: u16,
-    pub old_rule_program: Pubkey,
     pub destroy_rule_data: Vec<u8>,
-    pub new_rule_program: Pubkey,
     pub init_rule_data: Vec<u8>,
-    pub create_new_authenticator: Option<[u8; 33]>,
+    pub new_authenticator: Option<NewAuthenticatorArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CallRuleArgs {
-    pub passkey_pubkey: [u8; 33],
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
-    pub rule_program: Pubkey,
     pub rule_data: Vec<u8>,
-    pub create_new_authenticator: Option<[u8; 33]>,
+    pub new_authenticator: Option<NewAuthenticatorArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CommitArgs {
-    pub passkey_pubkey: [u8; 33],
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub rule_data: Vec<u8>,
-    pub cpi_program: Pubkey,
     pub expires_at: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct NewAuthenticatorArgs {
+    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+    #[max_len(256)]
+    pub credential_id: Vec<u8>,
 }
 
 macro_rules! impl_args_validate {

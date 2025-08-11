@@ -78,20 +78,9 @@ pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
         Some(rule_signer),
     )?;
 
-    // 4. Validate CPI accounts hash using provided cpi program pubkey and message
-    let mut ch = Hasher::default();
-    ch.hash(args.cpi_program.as_ref());
-    // no CPI accounts are supplied during commit
-    require!(
-        ch.result().to_bytes() == msg.cpi_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
-    // 4.1 No inline cpi bytes in commit path; rely on signed message hash only
-
     // 5. Write commit using hashes from message
     let commit = &mut ctx.accounts.cpi_commit;
     commit.owner_wallet = ctx.accounts.smart_wallet.key();
-    commit.target_program = args.cpi_program;
     commit.data_hash = msg.cpi_data_hash;
     commit.accounts_hash = msg.cpi_accounts_hash;
     commit.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;

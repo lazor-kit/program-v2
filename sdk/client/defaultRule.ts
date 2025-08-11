@@ -1,36 +1,29 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from '@coral-xyz/anchor';
 import {
   Connection,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
-} from "@solana/web3.js";
-import DefaultRuleIdl from "../../target/idl/default_rule.json";
-import { DefaultRule } from "../../target/types/default_rule";
-import { deriveRulePda } from "../pda/defaultRule";
-import { decodeAnchorError } from "../errors";
-
-export type DefaultRuleClientOptions = {
-  connection: Connection;
-  programId?: PublicKey;
-};
+} from '@solana/web3.js';
+import DefaultRuleIdl from '../../target/idl/default_rule.json';
+import { DefaultRule } from '../../target/types/default_rule';
+import { deriveRulePda } from '../pda/defaultRule';
 
 export class DefaultRuleClient {
   readonly connection: Connection;
   readonly program: anchor.Program<DefaultRule>;
   readonly programId: PublicKey;
 
-  constructor(opts: DefaultRuleClientOptions) {
-    this.connection = opts.connection;
-    const programDefault = new anchor.Program(DefaultRuleIdl as anchor.Idl, {
-      connection: opts.connection,
-    }) as unknown as anchor.Program<DefaultRule>;
-    this.programId = opts.programId ?? programDefault.programId;
-    this.program = new (anchor as any).Program(
-      DefaultRuleIdl as anchor.Idl,
-      this.programId,
-      { connection: opts.connection }
-    ) as anchor.Program<DefaultRule>;
+  constructor(connection: Connection) {
+    this.connection = connection;
+
+    this.program = new anchor.Program<DefaultRule>(
+      DefaultRuleIdl as DefaultRule,
+      {
+        connection: connection,
+      }
+    );
+    this.programId = this.program.programId;
   }
 
   rulePda(smartWalletAuthenticator: PublicKey): PublicKey {
@@ -42,36 +35,28 @@ export class DefaultRuleClient {
     smartWallet: PublicKey,
     smartWalletAuthenticator: PublicKey
   ): Promise<TransactionInstruction> {
-    try {
-      return await this.program.methods
-        .initRule()
-        .accountsPartial({
-          payer,
-          smartWallet,
-          smartWalletAuthenticator,
-          rule: this.rulePda(smartWalletAuthenticator),
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction();
-    } catch (e) {
-      throw decodeAnchorError(e);
-    }
+    return await this.program.methods
+      .initRule()
+      .accountsPartial({
+        payer,
+        smartWallet,
+        smartWalletAuthenticator,
+        rule: this.rulePda(smartWalletAuthenticator),
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
   }
 
   async buildCheckRuleIx(
     smartWalletAuthenticator: PublicKey
   ): Promise<TransactionInstruction> {
-    try {
-      return await this.program.methods
-        .checkRule()
-        .accountsPartial({
-          rule: this.rulePda(smartWalletAuthenticator),
-          smartWalletAuthenticator,
-        })
-        .instruction();
-    } catch (e) {
-      throw decodeAnchorError(e);
-    }
+    return await this.program.methods
+      .checkRule()
+      .accountsPartial({
+        rule: this.rulePda(smartWalletAuthenticator),
+        smartWalletAuthenticator,
+      })
+      .instruction();
   }
 
   async buildAddDeviceIx(
@@ -79,20 +64,16 @@ export class DefaultRuleClient {
     smartWalletAuthenticator: PublicKey,
     newSmartWalletAuthenticator: PublicKey
   ): Promise<TransactionInstruction> {
-    try {
-      return await this.program.methods
-        .addDevice()
-        .accountsPartial({
-          payer,
-          smartWalletAuthenticator,
-          newSmartWalletAuthenticator,
-          rule: this.rulePda(smartWalletAuthenticator),
-          newRule: this.rulePda(newSmartWalletAuthenticator),
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction();
-    } catch (e) {
-      throw decodeAnchorError(e);
-    }
+    return await this.program.methods
+      .addDevice()
+      .accountsPartial({
+        payer,
+        smartWalletAuthenticator,
+        newSmartWalletAuthenticator,
+        rule: this.rulePda(smartWalletAuthenticator),
+        newRule: this.rulePda(newSmartWalletAuthenticator),
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
   }
 }

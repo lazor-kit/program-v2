@@ -8,8 +8,6 @@ use anchor_lang::prelude::*;
 pub struct CpiCommit {
     /// Smart wallet that authorized this commit
     pub owner_wallet: Pubkey,
-    /// Target program id for the CPI
-    pub target_program: Pubkey,
     /// sha256 of CPI instruction data
     pub data_hash: [u8; 32],
     /// sha256 over ordered remaining account metas plus `target_program`
