@@ -1,12 +1,7 @@
 import * as anchor from '@coral-xyz/anchor';
-import {
-  Connection,
-  PublicKey,
-  SystemProgram,
-  TransactionInstruction,
-} from '@solana/web3.js';
-import DefaultRuleIdl from '../../target/idl/default_rule.json';
-import { DefaultRule } from '../../target/types/default_rule';
+import { Connection, PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import DefaultRuleIdl from '../anchor/idl/default_rule.json';
+import { DefaultRule } from '../anchor/types/default_rule';
 import { deriveRulePda } from '../pda/defaultRule';
 
 export class DefaultRuleClient {
@@ -17,12 +12,9 @@ export class DefaultRuleClient {
   constructor(connection: Connection) {
     this.connection = connection;
 
-    this.program = new anchor.Program<DefaultRule>(
-      DefaultRuleIdl as DefaultRule,
-      {
-        connection: connection,
-      }
-    );
+    this.program = new anchor.Program<DefaultRule>(DefaultRuleIdl as DefaultRule, {
+      connection: connection,
+    });
     this.programId = this.program.programId;
   }
 
@@ -47,9 +39,7 @@ export class DefaultRuleClient {
       .instruction();
   }
 
-  async buildCheckRuleIx(
-    smartWalletAuthenticator: PublicKey
-  ): Promise<TransactionInstruction> {
+  async buildCheckRuleIx(smartWalletAuthenticator: PublicKey): Promise<TransactionInstruction> {
     return await this.program.methods
       .checkRule()
       .accountsPartial({

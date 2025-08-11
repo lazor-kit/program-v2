@@ -1,0 +1,2895 @@
+{
+  "address": "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W",
+  "metadata": {
+    "name": "lazorkit",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "docs": [
+    "The Lazor Kit program provides smart wallet functionality with passkey authentication"
+  ],
+  "instructions": [
+    {
+      "name": "add_whitelist_rule_program",
+      "docs": [
+        "Add a program to the whitelist of rule programs"
+      ],
+      "discriminator": [
+        133,
+        37,
+        74,
+        189,
+        59,
+        238,
+        188,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "call_rule_direct",
+      "discriminator": [
+        97,
+        234,
+        75,
+        197,
+        171,
+        164,
+        239,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_authenticator"
+        },
+        {
+          "name": "rule_program"
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_smart_wallet_authenticator",
+          "docs": [
+            "Optional new authenticator to initialize when requested in message"
+          ],
+          "optional": true
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CallRuleArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "change_rule_direct",
+      "discriminator": [
+        117,
+        33,
+        70,
+        46,
+        48,
+        232,
+        110,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_authenticator"
+        },
+        {
+          "name": "old_rule_program",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "new_rule_program",
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "docs": [
+            "CHECK"
+          ],
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ChangeRuleArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "commit_cpi",
+      "discriminator": [
+        74,
+        89,
+        187,
+        45,
+        241,
+        147,
+        133,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_authenticator",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  101,
+                  110,
+                  116,
+                  105,
+                  99,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_pubkey.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authenticator_program",
+          "docs": [
+            "Rule program for optional policy enforcement at commit time"
+          ]
+        },
+        {
+          "name": "cpi_commit",
+          "docs": [
+            "New commit account (rent payer: payer)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  112,
+                  105,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.last_nonce",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CommitArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_smart_wallet",
+      "docs": [
+        "Create a new smart wallet with passkey authentication"
+      ],
+      "discriminator": [
+        129,
+        39,
+        235,
+        18,
+        132,
+        68,
+        203,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "docs": [
+            "Whitelist of allowed rule programs"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "docs": [
+            "The smart wallet PDA being created with random ID"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.wallet_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "docs": [
+            "Smart wallet configuration data"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_authenticator",
+          "docs": [
+            "Smart wallet authenticator for the passkey"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  101,
+                  110,
+                  116,
+                  105,
+                  99,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_pubkey.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "docs": [
+            "Program configuration"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "default_rule_program",
+          "docs": [
+            "Default rule program for the smart wallet"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CreatwSmartWalletArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execute_committed",
+      "discriminator": [
+        183,
+        133,
+        244,
+        196,
+        134,
+        40,
+        191,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cpi_program"
+        },
+        {
+          "name": "cpi_commit",
+          "docs": [
+            "Commit to execute. Closed on success to refund rent."
+          ],
+          "writable": true
+        },
+        {
+          "name": "commit_refund",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "cpi_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "execute_txn_direct",
+      "discriminator": [
+        121,
+        40,
+        165,
+        106,
+        50,
+        95,
+        121,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_authenticator"
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authenticator_program"
+        },
+        {
+          "name": "cpi_program"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ExecuteTxnArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the program by creating the sequence tracker"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "The signer of the transaction, who will be the initial authority."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The program's configuration account."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "whitelist_rule_programs",
+          "docs": [
+            "The list of whitelisted rule programs that can be used with smart wallets."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  104,
+                  105,
+                  116,
+                  101,
+                  108,
+                  105,
+                  115,
+                  116,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "default_rule_program",
+          "docs": [
+            "The default rule program to be used for new smart wallets."
+          ]
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "The system program."
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Update the program configuration"
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The current authority of the program."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The program's configuration account."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "param",
+          "type": {
+            "defined": {
+              "name": "UpdateConfigType"
+            }
+          }
+        },
+        {
+          "name": "value",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "CpiCommit",
+      "discriminator": [
+        50,
+        161,
+        109,
+        178,
+        148,
+        116,
+        95,
+        160
+      ]
+    },
+    {
+      "name": "SmartWalletAuthenticator",
+      "discriminator": [
+        126,
+        36,
+        85,
+        166,
+        77,
+        139,
+        221,
+        129
+      ]
+    },
+    {
+      "name": "SmartWalletConfig",
+      "discriminator": [
+        138,
+        211,
+        3,
+        80,
+        65,
+        100,
+        207,
+        142
+      ]
+    },
+    {
+      "name": "WhitelistRulePrograms",
+      "discriminator": [
+        234,
+        147,
+        45,
+        188,
+        65,
+        212,
+        154,
+        241
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AuthenticatorAdded",
+      "discriminator": [
+        213,
+        87,
+        171,
+        174,
+        101,
+        129,
+        32,
+        44
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
+      "name": "ErrorEvent",
+      "discriminator": [
+        163,
+        35,
+        212,
+        206,
+        66,
+        104,
+        234,
+        251
+      ]
+    },
+    {
+      "name": "FeeCollected",
+      "discriminator": [
+        12,
+        28,
+        17,
+        248,
+        244,
+        36,
+        8,
+        73
+      ]
+    },
+    {
+      "name": "ProgramInitialized",
+      "discriminator": [
+        43,
+        70,
+        110,
+        241,
+        199,
+        218,
+        221,
+        245
+      ]
+    },
+    {
+      "name": "ProgramPausedStateChanged",
+      "discriminator": [
+        148,
+        9,
+        117,
+        157,
+        18,
+        25,
+        122,
+        32
+      ]
+    },
+    {
+      "name": "RuleProgramChanged",
+      "discriminator": [
+        116,
+        110,
+        184,
+        140,
+        118,
+        243,
+        237,
+        111
+      ]
+    },
+    {
+      "name": "SecurityEvent",
+      "discriminator": [
+        16,
+        175,
+        241,
+        170,
+        85,
+        9,
+        201,
+        100
+      ]
+    },
+    {
+      "name": "SmartWalletCreated",
+      "discriminator": [
+        145,
+        37,
+        118,
+        21,
+        58,
+        251,
+        56,
+        128
+      ]
+    },
+    {
+      "name": "SolTransfer",
+      "discriminator": [
+        0,
+        186,
+        79,
+        129,
+        194,
+        76,
+        94,
+        9
+      ]
+    },
+    {
+      "name": "TransactionExecuted",
+      "discriminator": [
+        211,
+        227,
+        168,
+        14,
+        32,
+        111,
+        189,
+        210
+      ]
+    },
+    {
+      "name": "WhitelistRuleProgramAdded",
+      "discriminator": [
+        219,
+        72,
+        34,
+        198,
+        65,
+        224,
+        225,
+        103
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "PasskeyMismatch",
+      "msg": "Passkey public key mismatch with stored authenticator"
+    },
+    {
+      "code": 6001,
+      "name": "SmartWalletMismatch",
+      "msg": "Smart wallet address mismatch with authenticator"
+    },
+    {
+      "code": 6002,
+      "name": "AuthenticatorNotFound",
+      "msg": "Smart wallet authenticator account not found or invalid"
+    },
+    {
+      "code": 6003,
+      "name": "Secp256r1InvalidLength",
+      "msg": "Secp256r1 instruction has invalid data length"
+    },
+    {
+      "code": 6004,
+      "name": "Secp256r1HeaderMismatch",
+      "msg": "Secp256r1 instruction header validation failed"
+    },
+    {
+      "code": 6005,
+      "name": "Secp256r1DataMismatch",
+      "msg": "Secp256r1 signature data validation failed"
+    },
+    {
+      "code": 6006,
+      "name": "Secp256r1InstructionNotFound",
+      "msg": "Secp256r1 instruction not found at specified index"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidSignature",
+      "msg": "Invalid signature provided for passkey verification"
+    },
+    {
+      "code": 6008,
+      "name": "ClientDataInvalidUtf8",
+      "msg": "Client data JSON is not valid UTF-8"
+    },
+    {
+      "code": 6009,
+      "name": "ClientDataJsonParseError",
+      "msg": "Client data JSON parsing failed"
+    },
+    {
+      "code": 6010,
+      "name": "ChallengeMissing",
+      "msg": "Challenge field missing from client data JSON"
+    },
+    {
+      "code": 6011,
+      "name": "ChallengeBase64DecodeError",
+      "msg": "Challenge base64 decoding failed"
+    },
+    {
+      "code": 6012,
+      "name": "ChallengeDeserializationError",
+      "msg": "Challenge message deserialization failed"
+    },
+    {
+      "code": 6013,
+      "name": "TimestampTooOld",
+      "msg": "Message timestamp is too far in the past"
+    },
+    {
+      "code": 6014,
+      "name": "TimestampTooNew",
+      "msg": "Message timestamp is too far in the future"
+    },
+    {
+      "code": 6015,
+      "name": "NonceMismatch",
+      "msg": "Nonce mismatch: expected different value"
+    },
+    {
+      "code": 6016,
+      "name": "NonceOverflow",
+      "msg": "Nonce overflow: cannot increment further"
+    },
+    {
+      "code": 6017,
+      "name": "RuleProgramNotWhitelisted",
+      "msg": "Rule program not found in whitelist"
+    },
+    {
+      "code": 6018,
+      "name": "WhitelistFull",
+      "msg": "The whitelist of rule programs is full."
+    },
+    {
+      "code": 6019,
+      "name": "RuleDataRequired",
+      "msg": "Rule data is required but not provided"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidCheckRuleDiscriminator",
+      "msg": "Invalid instruction discriminator for check_rule"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidDestroyDiscriminator",
+      "msg": "Invalid instruction discriminator for destroy"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidInitRuleDiscriminator",
+      "msg": "Invalid instruction discriminator for init_rule"
+    },
+    {
+      "code": 6023,
+      "name": "RuleProgramsIdentical",
+      "msg": "Old and new rule programs are identical"
+    },
+    {
+      "code": 6024,
+      "name": "NoDefaultRuleProgram",
+      "msg": "Neither old nor new rule program is the default"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidRemainingAccounts",
+      "msg": "Invalid remaining accounts"
+    },
+    {
+      "code": 6026,
+      "name": "CpiDataMissing",
+      "msg": "CPI data is required but not provided"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidCpiData",
+      "msg": "CPI data is invalid or malformed"
+    },
+    {
+      "code": 6028,
+      "name": "InsufficientRuleAccounts",
+      "msg": "Insufficient remaining accounts for rule instruction"
+    },
+    {
+      "code": 6029,
+      "name": "InsufficientCpiAccounts",
+      "msg": "Insufficient remaining accounts for CPI instruction"
+    },
+    {
+      "code": 6030,
+      "name": "AccountSliceOutOfBounds",
+      "msg": "Account slice index out of bounds"
+    },
+    {
+      "code": 6031,
+      "name": "SolTransferInsufficientAccounts",
+      "msg": "SOL transfer requires at least 2 remaining accounts"
+    },
+    {
+      "code": 6032,
+      "name": "NewAuthenticatorMissing",
+      "msg": "New authenticator account is required but not provided"
+    },
+    {
+      "code": 6033,
+      "name": "NewAuthenticatorPasskeyMissing",
+      "msg": "New authenticator passkey is required but not provided"
+    },
+    {
+      "code": 6034,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports for requested transfer"
+    },
+    {
+      "code": 6035,
+      "name": "TransferAmountOverflow",
+      "msg": "Transfer amount would cause arithmetic overflow"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidBumpSeed",
+      "msg": "Invalid bump seed for PDA derivation"
+    },
+    {
+      "code": 6037,
+      "name": "InvalidAccountOwner",
+      "msg": "Account owner verification failed"
+    },
+    {
+      "code": 6038,
+      "name": "InvalidAccountDiscriminator",
+      "msg": "Account discriminator mismatch"
+    },
+    {
+      "code": 6039,
+      "name": "InvalidProgramId",
+      "msg": "Invalid program ID"
+    },
+    {
+      "code": 6040,
+      "name": "ProgramNotExecutable",
+      "msg": "Program not executable"
+    },
+    {
+      "code": 6041,
+      "name": "SmartWalletAuthenticatorAlreadyInitialized",
+      "msg": "Smart wallet authenticator already initialized"
+    },
+    {
+      "code": 6042,
+      "name": "CredentialIdTooLarge",
+      "msg": "Credential ID exceeds maximum allowed size"
+    },
+    {
+      "code": 6043,
+      "name": "CredentialIdEmpty",
+      "msg": "Credential ID cannot be empty"
+    },
+    {
+      "code": 6044,
+      "name": "RuleDataTooLarge",
+      "msg": "Rule data exceeds maximum allowed size"
+    },
+    {
+      "code": 6045,
+      "name": "CpiDataTooLarge",
+      "msg": "CPI data exceeds maximum allowed size"
+    },
+    {
+      "code": 6046,
+      "name": "TooManyRemainingAccounts",
+      "msg": "Too many remaining accounts provided"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidPDADerivation",
+      "msg": "Invalid PDA derivation"
+    },
+    {
+      "code": 6048,
+      "name": "TransactionTooOld",
+      "msg": "Transaction is too old"
+    },
+    {
+      "code": 6049,
+      "name": "RateLimitExceeded",
+      "msg": "Rate limit exceeded"
+    },
+    {
+      "code": 6050,
+      "name": "InvalidAccountData",
+      "msg": "Invalid account data"
+    },
+    {
+      "code": 6051,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access attempt"
+    },
+    {
+      "code": 6052,
+      "name": "ProgramPaused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6053,
+      "name": "InvalidInstructionData",
+      "msg": "Invalid instruction data"
+    },
+    {
+      "code": 6054,
+      "name": "AccountAlreadyInitialized",
+      "msg": "Account already initialized"
+    },
+    {
+      "code": 6055,
+      "name": "AccountNotInitialized",
+      "msg": "Account not initialized"
+    },
+    {
+      "code": 6056,
+      "name": "InvalidAccountState",
+      "msg": "Invalid account state"
+    },
+    {
+      "code": 6057,
+      "name": "IntegerOverflow",
+      "msg": "Operation would cause integer overflow"
+    },
+    {
+      "code": 6058,
+      "name": "IntegerUnderflow",
+      "msg": "Operation would cause integer underflow"
+    },
+    {
+      "code": 6059,
+      "name": "InvalidFeeAmount",
+      "msg": "Invalid fee amount"
+    },
+    {
+      "code": 6060,
+      "name": "InsufficientBalanceForFee",
+      "msg": "Insufficient balance for fee"
+    },
+    {
+      "code": 6061,
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority"
+    },
+    {
+      "code": 6062,
+      "name": "AuthorityMismatch",
+      "msg": "Authority mismatch"
+    },
+    {
+      "code": 6063,
+      "name": "InvalidSequenceNumber",
+      "msg": "Invalid sequence number"
+    },
+    {
+      "code": 6064,
+      "name": "DuplicateTransaction",
+      "msg": "Duplicate transaction detected"
+    },
+    {
+      "code": 6065,
+      "name": "InvalidTransactionOrdering",
+      "msg": "Invalid transaction ordering"
+    },
+    {
+      "code": 6066,
+      "name": "MaxWalletLimitReached",
+      "msg": "Maximum wallet limit reached"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidWalletConfiguration",
+      "msg": "Invalid wallet configuration"
+    },
+    {
+      "code": 6068,
+      "name": "WalletNotFound",
+      "msg": "Wallet not found"
+    },
+    {
+      "code": 6069,
+      "name": "InvalidPasskeyFormat",
+      "msg": "Invalid passkey format"
+    },
+    {
+      "code": 6070,
+      "name": "PasskeyAlreadyRegistered",
+      "msg": "Passkey already registered"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidMessageFormat",
+      "msg": "Invalid message format"
+    },
+    {
+      "code": 6072,
+      "name": "MessageSizeExceedsLimit",
+      "msg": "Message size exceeds limit"
+    },
+    {
+      "code": 6073,
+      "name": "InvalidSplitIndex",
+      "msg": "Invalid split index"
+    },
+    {
+      "code": 6074,
+      "name": "CpiExecutionFailed",
+      "msg": "CPI execution failed"
+    },
+    {
+      "code": 6075,
+      "name": "InvalidProgramAddress",
+      "msg": "Invalid program address"
+    },
+    {
+      "code": 6076,
+      "name": "WhitelistOperationFailed",
+      "msg": "Whitelist operation failed"
+    },
+    {
+      "code": 6077,
+      "name": "InvalidWhitelistState",
+      "msg": "Invalid whitelist state"
+    },
+    {
+      "code": 6078,
+      "name": "EmergencyShutdown",
+      "msg": "Emergency shutdown activated"
+    },
+    {
+      "code": 6079,
+      "name": "RecoveryModeRequired",
+      "msg": "Recovery mode required"
+    },
+    {
+      "code": 6080,
+      "name": "InvalidRecoveryAttempt",
+      "msg": "Invalid recovery attempt"
+    },
+    {
+      "code": 6081,
+      "name": "AuditLogFull",
+      "msg": "Audit log full"
+    },
+    {
+      "code": 6082,
+      "name": "InvalidAuditEntry",
+      "msg": "Invalid audit entry"
+    },
+    {
+      "code": 6083,
+      "name": "ReentrancyDetected",
+      "msg": "Reentrancy detected"
+    },
+    {
+      "code": 6084,
+      "name": "InvalidCallDepth",
+      "msg": "Invalid call depth"
+    },
+    {
+      "code": 6085,
+      "name": "StackOverflowProtection",
+      "msg": "Stack overflow protection triggered"
+    },
+    {
+      "code": 6086,
+      "name": "MemoryLimitExceeded",
+      "msg": "Memory limit exceeded"
+    },
+    {
+      "code": 6087,
+      "name": "ComputationLimitExceeded",
+      "msg": "Computation limit exceeded"
+    },
+    {
+      "code": 6088,
+      "name": "InvalidRentExemption",
+      "msg": "Invalid rent exemption"
+    },
+    {
+      "code": 6089,
+      "name": "AccountClosureFailed",
+      "msg": "Account closure failed"
+    },
+    {
+      "code": 6090,
+      "name": "InvalidAccountClosure",
+      "msg": "Invalid account closure"
+    },
+    {
+      "code": 6091,
+      "name": "RefundFailed",
+      "msg": "Refund failed"
+    },
+    {
+      "code": 6092,
+      "name": "InvalidRefundAmount",
+      "msg": "Invalid refund amount"
+    }
+  ],
+  "types": [
+    {
+      "name": "AuthenticatorAdded",
+      "docs": [
+        "Event emitted when a new authenticator is added"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_authenticator",
+            "type": "pubkey"
+          },
+          {
+            "name": "passkey_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CallRuleArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "new_authenticator",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "NewAuthenticatorArgs"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChangeRuleArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "split_index",
+            "type": "u16"
+          },
+          {
+            "name": "destroy_rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "init_rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "new_authenticator",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "NewAuthenticatorArgs"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommitArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "create_smart_wallet_fee",
+            "type": "u64"
+          },
+          {
+            "name": "execute_fee",
+            "type": "u64"
+          },
+          {
+            "name": "default_rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_paused",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "docs": [
+        "Event emitted when program configuration is updated"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "update_type",
+            "type": "string"
+          },
+          {
+            "name": "old_value",
+            "type": "string"
+          },
+          {
+            "name": "new_value",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CpiCommit",
+      "docs": [
+        "Commit record for a future CPI execution.",
+        "Created after full passkey + rule verification. Contains all bindings",
+        "necessary to perform the CPI later without re-verification."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner_wallet",
+            "docs": [
+              "Smart wallet that authorized this commit"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "data_hash",
+            "docs": [
+              "sha256 of CPI instruction data"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts_hash",
+            "docs": [
+              "sha256 over ordered remaining account metas plus `target_program`"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authorized_nonce",
+            "docs": [
+              "The nonce that was authorized at commit time (bound into data hash)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix expiration timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "rent_refund_to",
+            "docs": [
+              "Where to refund rent when closing the commit"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreatwSmartWalletArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credential_id",
+            "type": "bytes"
+          },
+          {
+            "name": "rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "wallet_id",
+            "type": "u64"
+          },
+          {
+            "name": "is_pay_for_user",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ErrorEvent",
+      "docs": [
+        "Event emitted for errors that are caught and handled"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "error_code",
+            "type": "string"
+          },
+          {
+            "name": "error_message",
+            "type": "string"
+          },
+          {
+            "name": "action_attempted",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecuteTxnArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "split_index",
+            "type": "u16"
+          },
+          {
+            "name": "rule_data",
+            "type": "bytes"
+          },
+          {
+            "name": "cpi_data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeCollected",
+      "docs": [
+        "Event emitted when a fee is collected"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_type",
+            "type": "string"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NewAuthenticatorArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credential_id",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramInitialized",
+      "docs": [
+        "Event emitted when program is initialized"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramPausedStateChanged",
+      "docs": [
+        "Event emitted when program is paused/unpaused"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_paused",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RuleProgramChanged",
+      "docs": [
+        "Event emitted when a rule program is changed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityEvent",
+      "docs": [
+        "Event emitted for security-related events"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_type",
+            "type": "string"
+          },
+          {
+            "name": "smart_wallet",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "details",
+            "type": "string"
+          },
+          {
+            "name": "severity",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SmartWalletAuthenticator",
+      "docs": [
+        "Account that stores authentication data for a smart wallet"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "docs": [
+              "The public key of the passkey that can authorize transactions"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "smart_wallet",
+            "docs": [
+              "The smart wallet this authenticator belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "credential_id",
+            "docs": [
+              "The credential ID this authenticator belongs to"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SmartWalletConfig",
+      "docs": [
+        "Data account for a smart wallet"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "docs": [
+              "Unique identifier for this smart wallet"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rule_program",
+            "docs": [
+              "Optional rule program that governs this wallet's operations"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "last_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SmartWalletCreated",
+      "docs": [
+        "Event emitted when a new smart wallet is created"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authenticator",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence_id",
+            "type": "u64"
+          },
+          {
+            "name": "rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "passkey_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolTransfer",
+      "docs": [
+        "Event emitted when a SOL transfer occurs"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransactionExecuted",
+      "docs": [
+        "Event emitted when a transaction is executed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authenticator",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "cpi_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "success",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateConfigType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CreateWalletFee"
+          },
+          {
+            "name": "ExecuteFee"
+          },
+          {
+            "name": "DefaultRuleProgram"
+          },
+          {
+            "name": "Admin"
+          },
+          {
+            "name": "PauseProgram"
+          },
+          {
+            "name": "UnpauseProgram"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WhitelistRuleProgramAdded",
+      "docs": [
+        "Event emitted when a whitelist rule program is added"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "rule_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WhitelistRulePrograms",
+      "docs": [
+        "Account that stores whitelisted rule program addresses"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "list",
+            "docs": [
+              "List of whitelisted program addresses"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

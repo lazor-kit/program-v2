@@ -6,3 +6,4 @@ if (typeof globalThis.structuredClone !== 'function') {
 // Main SDK exports
 export { LazorkitClient } from './client/lazorkit';
 export { DefaultRuleClient } from './client/defaultRule';
+export * from './types';

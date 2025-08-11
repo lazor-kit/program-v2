@@ -32,7 +32,6 @@ const coder: anchor.BorshCoder = (() => {
             { name: 'currentTimestamp', type: 'i64' },
             { name: 'ruleDataHash', type: { array: ['u8', 32] } },
             { name: 'ruleAccountsHash', type: { array: ['u8', 32] } },
-            { name: 'newPasskey', type: { option: { array: ['u8', 33] } } },
           ],
         },
       },
@@ -98,12 +97,10 @@ export function buildCallRuleMessage(
   payer: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
-  ruleProgram: anchor.web3.PublicKey,
-  ruleIns: anchor.web3.TransactionInstruction,
-  newPasskey?: Uint8Array | number[] | Buffer | null
+  ruleIns: anchor.web3.TransactionInstruction
 ): Buffer {
   const ruleMetas = instructionToAccountMetas(ruleIns, payer);
-  const ruleAccountsHash = computeAccountsHash(ruleProgram, ruleMetas);
+  const ruleAccountsHash = computeAccountsHash(ruleIns.programId, ruleMetas);
   const ruleDataHash = new Uint8Array(sha256.arrayBuffer(ruleIns.data));
 
   const encoded = coder.types.encode('CallRuleMessage', {
@@ -111,10 +108,6 @@ export function buildCallRuleMessage(
     currentTimestamp: now,
     ruleDataHash: Array.from(ruleDataHash),
     ruleAccountsHash: Array.from(ruleAccountsHash),
-    newPasskey:
-      newPasskey && (newPasskey as any).length
-        ? Array.from(new Uint8Array(newPasskey as any))
-        : null,
   });
   return Buffer.from(encoded);
 }
@@ -123,17 +116,15 @@ export function buildChangeRuleMessage(
   payer: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
-  oldRuleProgram: anchor.web3.PublicKey,
   destroyRuleIns: anchor.web3.TransactionInstruction,
-  newRuleProgram: anchor.web3.PublicKey,
   initRuleIns: anchor.web3.TransactionInstruction
 ): Buffer {
   const oldMetas = instructionToAccountMetas(destroyRuleIns, payer);
-  const oldAccountsHash = computeAccountsHash(oldRuleProgram, oldMetas);
+  const oldAccountsHash = computeAccountsHash(destroyRuleIns.programId, oldMetas);
   const oldDataHash = new Uint8Array(sha256.arrayBuffer(destroyRuleIns.data));
 
   const newMetas = instructionToAccountMetas(initRuleIns, payer);
-  const newAccountsHash = computeAccountsHash(newRuleProgram, newMetas);
+  const newAccountsHash = computeAccountsHash(initRuleIns.programId, newMetas);
   const newDataHash = new Uint8Array(sha256.arrayBuffer(initRuleIns.data));
 
   const encoded = coder.types.encode('ChangeRuleMessage', {

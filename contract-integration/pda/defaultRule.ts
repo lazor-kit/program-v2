@@ -1,6 +1,7 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey } from '@solana/web3.js';
+import { Buffer } from 'buffer';
 
-export const RULE_SEED = Buffer.from("rule");
+export const RULE_SEED = Buffer.from('rule');
 
 export function deriveRulePda(
   programId: PublicKey,
