@@ -4,8 +4,7 @@ import { expect } from 'chai';
 import { LAMPORTS_PER_SOL, sendAndConfirmTransaction } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import { base64, bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import { LazorKitProgram } from '../sdk/lazor-kit';
-import { DefaultRuleProgram } from '../sdk/default-rule-program';
+import { LazorkitClient, DefaultRuleClient } from '../contract-integration';
 dotenv.config();
 
 describe('Test smart wallet with default rule', () => {
@@ -14,19 +13,17 @@ describe('Test smart wallet with default rule', () => {
     'confirmed'
   );
 
-  const lazorkitProgram = new LazorKitProgram(connection);
-
-  const defaultRuleProgram = new DefaultRuleProgram(connection);
+  const lazorkitProgram = new LazorkitClient(connection);
 
   const payer = anchor.web3.Keypair.fromSecretKey(
-    bs58.decode(process.env.MAINNET_DEPLOYER_PRIVATE_KEY!)
+    bs58.decode(process.env.PRIVATE_KEY!)
   );
 
   before(async () => {
     // airdrop some SOL to the payer
 
     const programConfig = await connection.getAccountInfo(
-      lazorkitProgram.config
+      lazorkitProgram.configPda()
     );
 
     if (programConfig === null) {
@@ -41,38 +38,30 @@ describe('Test smart wallet with default rule', () => {
     }
   });
 
-  it('Initialize successfully', async () => {
+  it('Init smart wallet with default rule successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const pubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
 
     const smartWalletId = lazorkitProgram.generateWalletId();
-    const smartWallet = lazorkitProgram.smartWallet(smartWalletId);
+    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
 
-    const [smartWalletAuthenticator] = lazorkitProgram.smartWalletAuthenticator(
-      pubkey,
-      smartWallet
-    );
-
-    const initRuleIns = await defaultRuleProgram.initRuleIns(
-      payer.publicKey,
-      smartWallet,
-      smartWalletAuthenticator
-    );
+    const smartWalletAuthenticator =
+      lazorkitProgram.smartWalletAuthenticatorPda(smartWallet, passkeyPubkey);
 
     const credentialId = base64.encode(Buffer.from('testing something')); // random string
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTxn(
-        pubkey,
-        payer.publicKey,
-        credentialId,
-        initRuleIns,
+      await lazorkitProgram.createSmartWalletTx({
+        payer: payer.publicKey,
+        passkeyPubkey,
+        credentialIdBase64: credentialId,
+        ruleInstruction: null,
+        isPayForUser: true,
         smartWalletId,
-        true
-      );
+      });
 
     const sig = await sendAndConfirmTransaction(
       connection,
@@ -98,7 +87,7 @@ describe('Test smart wallet with default rule', () => {
       );
 
     expect(smartWalletAuthenticatorData.passkeyPubkey.toString()).to.be.equal(
-      pubkey.toString()
+      passkeyPubkey.toString()
     );
     expect(smartWalletAuthenticatorData.smartWallet.toString()).to.be.equal(
       smartWallet.toString()
@@ -130,8 +119,8 @@ describe('Test smart wallet with default rule', () => {
         authority: payer.publicKey,
         lookupTable: lookupTableAddress,
         addresses: [
-          lazorkitProgram.config,
-          lazorkitProgram.whitelistRulePrograms,
+          lazorkitProgram.configPda(),
+          lazorkitProgram.whitelistRuleProgramsPda(),
           lazorkitProgram.defaultRuleProgram.programId,
           anchor.web3.SystemProgram.programId,
           anchor.web3.SYSVAR_RENT_PUBKEY,

@@ -1,9 +1,14 @@
 [toolchain]
 package_manager = "yarn"
+anchor_version = "0.31.0"
 
 [features]
 resolution = true
 skip-lint = false
+
+[programs.mainnet]
+lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [programs.devnet]
 lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
@@ -17,8 +22,8 @@ default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://rpc.shyft.to?api_key=gaxCgX8-zR24VN60"
-wallet = "~/.config/solana/mainnet_deployer.json"
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"

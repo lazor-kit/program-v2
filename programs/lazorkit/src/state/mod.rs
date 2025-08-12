@@ -1,5 +1,6 @@
 mod config;
-mod message;
+pub mod message;
+mod cpi_commit;
 mod smart_wallet_authenticator;
 mod smart_wallet_config;
 // mod smart_wallet_seq;  // No longer needed - using random IDs instead
@@ -8,6 +9,7 @@ mod writer;
 
 pub use config::*;
 pub use message::*;
+pub use cpi_commit::*;
 pub use smart_wallet_authenticator::*;
 pub use smart_wallet_config::*;
 // pub use smart_wallet_seq::*;  // No longer needed - using random IDs instead

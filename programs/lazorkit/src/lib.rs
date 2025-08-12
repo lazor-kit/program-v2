@@ -8,7 +8,6 @@ pub mod security;
 pub mod state;
 pub mod utils;
 
-use constants::PASSKEY_SIZE;
 use instructions::*;
 use state::*;
 
@@ -36,32 +35,45 @@ pub mod lazorkit {
     /// Create a new smart wallet with passkey authentication
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
-        passkey_pubkey: [u8; PASSKEY_SIZE],
-        credential_id: Vec<u8>,
-        rule_data: Vec<u8>,
-        wallet_id: u64,
-        is_pay_for_user: bool,
+        args: CreatwSmartWalletArgs,
     ) -> Result<()> {
-        instructions::create_smart_wallet(
-            ctx,
-            passkey_pubkey,
-            credential_id,
-            rule_data,
-            wallet_id,
-            is_pay_for_user,
-        )
-    }
-
-    /// Unified execute entrypoint covering all smart-wallet actions
-    pub fn execute<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
-        args: ExecuteArgs,
-    ) -> Result<()> {
-        instructions::execute(ctx, args)
+        instructions::create_smart_wallet(ctx, args)
     }
 
     /// Add a program to the whitelist of rule programs
     pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
         instructions::add_whitelist_rule_program(ctx)
+    }
+
+    pub fn change_rule_direct<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ChangeRuleDirect<'info>>,
+        args: ChangeRuleArgs,
+    ) -> Result<()> {
+        instructions::change_rule_direct(ctx, args)
+    }
+
+    pub fn call_rule_direct<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CallRuleDirect<'info>>,
+        args: CallRuleArgs,
+    ) -> Result<()> {
+        instructions::call_rule_direct(ctx, args)
+    }
+
+    pub fn execute_txn_direct<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ExecuteTxn<'info>>,
+        args: ExecuteTxnArgs,
+    ) -> Result<()> {
+        instructions::execute_txn_direct(ctx, args)
+    }
+
+    pub fn commit_cpi<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CommitCpi<'info>>,
+        args: CommitArgs,
+    ) -> Result<()> {
+        instructions::commit_cpi(ctx, args)
+    }
+
+    pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> Result<()> {
+        instructions::execute_committed(ctx, cpi_data)
     }
 }

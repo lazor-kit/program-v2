@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::constants::PASSKEY_SIZE;
+
 /// Event emitted when a new smart wallet is created
 #[event]
 pub struct SmartWalletCreated {
@@ -16,7 +18,6 @@ pub struct SmartWalletCreated {
 pub struct TransactionExecuted {
     pub smart_wallet: Pubkey,
     pub authenticator: Pubkey,
-    pub action: String,
     pub nonce: u64,
     pub rule_program: Pubkey,
     pub cpi_program: Pubkey,
@@ -126,7 +127,7 @@ impl SmartWalletCreated {
         authenticator: Pubkey,
         sequence_id: u64,
         rule_program: Pubkey,
-        passkey_pubkey: [u8; 33],
+        passkey_pubkey: [u8; PASSKEY_SIZE],
     ) -> Result<()> {
         let mut passkey_hash = [0u8; 32];
         passkey_hash.copy_from_slice(&anchor_lang::solana_program::hash::hash(&passkey_pubkey).to_bytes()[..32]);
@@ -147,7 +148,6 @@ impl TransactionExecuted {
     pub fn emit_event(
         smart_wallet: Pubkey,
         authenticator: Pubkey,
-        action: &str,
         nonce: u64,
         rule_program: Pubkey,
         cpi_program: Pubkey,
@@ -156,7 +156,6 @@ impl TransactionExecuted {
         emit!(Self {
             smart_wallet,
             authenticator,
-            action: action.to_string(),
             nonce,
             rule_program,
             cpi_program,

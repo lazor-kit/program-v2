@@ -1,0 +1,272 @@
+{
+  "address": "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE",
+  "metadata": {
+    "name": "default_rule",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_device",
+      "discriminator": [
+        21,
+        27,
+        66,
+        42,
+        18,
+        30,
+        14,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smart_wallet_authenticator",
+          "signer": true
+        },
+        {
+          "name": "new_smart_wallet_authenticator"
+        },
+        {
+          "name": "rule",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_authenticator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_rule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "new_smart_wallet_authenticator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lazorkit",
+          "address": "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "check_rule",
+      "discriminator": [
+        215,
+        90,
+        220,
+        175,
+        191,
+        212,
+        144,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "smart_wallet_authenticator",
+          "signer": true
+        },
+        {
+          "name": "rule",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_rule",
+      "discriminator": [
+        129,
+        224,
+        96,
+        169,
+        247,
+        125,
+        74,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smart_wallet"
+        },
+        {
+          "name": "smart_wallet_authenticator",
+          "docs": [
+            "CHECK"
+          ],
+          "signer": true
+        },
+        {
+          "name": "rule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_authenticator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lazorkit",
+          "address": "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Rule",
+      "discriminator": [
+        82,
+        10,
+        53,
+        40,
+        250,
+        61,
+        143,
+        130
+      ]
+    },
+    {
+      "name": "SmartWalletAuthenticator",
+      "discriminator": [
+        126,
+        36,
+        85,
+        166,
+        77,
+        139,
+        221,
+        129
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidPasskey"
+    },
+    {
+      "code": 6001,
+      "name": "UnAuthorize"
+    }
+  ],
+  "types": [
+    {
+      "name": "Rule",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "smart_wallet_authenticator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SmartWalletAuthenticator",
+      "docs": [
+        "Account that stores authentication data for a smart wallet"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "docs": [
+              "The public key of the passkey that can authorize transactions"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "smart_wallet",
+            "docs": [
+              "The smart wallet this authenticator belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "credential_id",
+            "docs": [
+              "The credential ID this authenticator belongs to"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
