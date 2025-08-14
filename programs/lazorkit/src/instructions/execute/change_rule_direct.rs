@@ -65,7 +65,7 @@ pub fn change_rule_direct<'c: 'info, 'info>(
     h1.hash(ctx.accounts.old_rule_program.key().as_ref());
     for a in destroy_accounts.iter() {
         h1.hash(a.key.as_ref());
-        h1.hash(&[a.is_writable as u8, a.is_signer as u8]);
+        h1.hash(&[a.is_signer as u8]);
     }
     require!(
         h1.result().to_bytes() == msg.old_rule_accounts_hash,
@@ -76,7 +76,7 @@ pub fn change_rule_direct<'c: 'info, 'info>(
     h2.hash(ctx.accounts.new_rule_program.key().as_ref());
     for a in init_accounts.iter() {
         h2.hash(a.key.as_ref());
-        h2.hash(&[a.is_writable as u8, a.is_signer as u8]);
+        h2.hash(&[a.is_signer as u8]);
     }
     require!(
         h2.result().to_bytes() == msg.new_rule_accounts_hash,

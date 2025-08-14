@@ -1,4 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
+import { Buffer } from 'buffer';
 
 // LAZOR.KIT PROGRAM - PDA Seeds
 export const SMART_WALLET_SEED = Buffer.from('smart_wallet');

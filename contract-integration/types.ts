@@ -26,7 +26,7 @@ export enum SmartWalletAction {
 
 export type ArgsByAction = {
   [SmartWalletAction.ExecuteTx]: {
-    ruleInstruction?: anchor.web3.TransactionInstruction;
+    ruleInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstruction: anchor.web3.TransactionInstruction;
   };
   [SmartWalletAction.CallRule]: {

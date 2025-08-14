@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::{hash, Hasher};
 
 use crate::constants::SOL_TRANSFER_DISCRIMINATOR;
 use crate::error::LazorKitError;
@@ -8,9 +9,11 @@ use crate::utils::{execute_cpi, transfer_sol_from_pda, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 
 pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> Result<()> {
+    let cpi_accounts = &ctx.remaining_accounts[..];
+
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
-    if let Err(_) = validation::validate_remaining_accounts(&ctx.remaining_accounts) {
+    if let Err(_) = validation::validate_remaining_accounts(&cpi_accounts) {
         return Ok(()); // graceful no-op; account will still be closed below
     }
 
@@ -19,34 +22,37 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
     // Expiry and usage
     let now = Clock::get()?.unix_timestamp;
     if commit.expires_at < now {
+        msg!("Transaction expired");
         return Ok(());
     }
 
     // Bind wallet and target program
     if commit.owner_wallet != ctx.accounts.smart_wallet.key() {
+        msg!("The commit owner not match with smart-wallet");
         return Ok(());
     }
 
     // Validate program is executable only (no whitelist/rule checks here)
     if !ctx.accounts.cpi_program.executable {
-        return Ok(());
-    }
-
-    // Compute accounts hash from remaining accounts and compare
-    let mut hasher = anchor_lang::solana_program::hash::Hasher::default();
-    hasher.hash(ctx.accounts.cpi_program.key.as_ref());
-    for acc in ctx.remaining_accounts.iter() {
-        hasher.hash(acc.key.as_ref());
-        hasher.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
-    }
-    let computed = hasher.result().to_bytes();
-    if computed != commit.accounts_hash {
+        msg!("Cpi program must executable");
         return Ok(());
     }
 
     // Verify data_hash bound with authorized nonce to prevent cross-commit reuse
-    let data_hash = anchor_lang::solana_program::hash::hash(&cpi_data).to_bytes();
+    let data_hash = hash(&cpi_data).to_bytes();
     if data_hash != commit.data_hash {
+        msg!("Cpi data not match");
+        return Ok(());
+    }
+
+    let mut ch = Hasher::default();
+    ch.hash(ctx.accounts.cpi_program.key.as_ref());
+    for acc in cpi_accounts.iter() {
+        ch.hash(acc.key.as_ref());
+        ch.hash(&[acc.is_signer as u8]);
+    }
+    if ch.result().to_bytes() != commit.accounts_hash {
+        msg!("Cpi accounts not match");
         return Ok(());
     }
 
@@ -55,7 +61,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
     {
         // === Native SOL Transfer ===
         require!(
-            ctx.remaining_accounts.len() >= 2,
+            cpi_accounts.len() >= 2,
             LazorKitError::SolTransferInsufficientAccounts
         );
 
@@ -71,7 +77,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         validation::validate_lamport_amount(amount)?;
 
         // Ensure destination is valid
-        let destination_account = &ctx.remaining_accounts[1];
+        let destination_account = &cpi_accounts[1];
         require!(
             destination_account.key() != ctx.accounts.smart_wallet.key(),
             LazorKitError::InvalidAccountData
@@ -110,7 +116,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
 
         // Ensure sufficient accounts for CPI
         require!(
-            !ctx.remaining_accounts.is_empty(),
+            !cpi_accounts.is_empty(),
             LazorKitError::InsufficientCpiAccounts
         );
 
@@ -129,7 +135,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         );
 
         execute_cpi(
-            ctx.remaining_accounts,
+            cpi_accounts,
             &cpi_data,
             &ctx.accounts.cpi_program,
             Some(wallet_signer),

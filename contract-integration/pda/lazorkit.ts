@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
+import { Buffer } from 'buffer';
 // Mirror on-chain seeds
 export const CONFIG_SEED = Buffer.from('config');
 export const WHITELIST_RULE_PROGRAMS_SEED = Buffer.from('whitelist_rule_programs');

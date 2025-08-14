@@ -59,7 +59,7 @@ pub fn call_rule_direct<'c: 'info, 'info>(
     hasher.hash(ctx.accounts.rule_program.key().as_ref());
     for acc in rule_accs.iter() {
         hasher.hash(acc.key.as_ref());
-        hasher.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
+        hasher.hash(&[acc.is_signer as u8]);
     }
     require!(
         hasher.result().to_bytes() == msg.rule_accounts_hash,

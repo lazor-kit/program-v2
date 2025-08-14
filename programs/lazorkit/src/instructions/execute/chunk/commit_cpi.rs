@@ -54,7 +54,7 @@ pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
     rh.hash(ctx.accounts.authenticator_program.key.as_ref());
     for a in rule_accounts.iter() {
         rh.hash(a.key.as_ref());
-        rh.hash(&[a.is_writable as u8, a.is_signer as u8]);
+        rh.hash(&[a.is_signer as u8]);
     }
     require!(
         rh.result().to_bytes() == msg.rule_accounts_hash,

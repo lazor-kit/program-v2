@@ -89,7 +89,7 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
     rh.hash(rule_program_info.key.as_ref());
     for acc in rule_accounts.iter() {
         rh.hash(acc.key.as_ref());
-        rh.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
+        rh.hash(&[acc.is_signer as u8]);
     }
     require!(
         rh.result().to_bytes() == msg.rule_accounts_hash,
@@ -121,7 +121,7 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
     ch.hash(ctx.accounts.cpi_program.key.as_ref());
     for acc in cpi_accounts.iter() {
         ch.hash(acc.key.as_ref());
-        ch.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
+        ch.hash(&[acc.is_signer as u8]);
     }
     require!(
         ch.result().to_bytes() == msg.cpi_accounts_hash,
