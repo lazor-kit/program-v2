@@ -241,13 +241,6 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "newSmartWalletAuthenticator",
-          "docs": [
-            "Optional new authenticator to initialize when requested in message"
-          ],
-          "optional": true
-        },
-        {
           "name": "ixSysvar",
           "address": "Sysvar1nstructions1111111111111111111111111"
         },

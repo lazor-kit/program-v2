@@ -235,13 +235,6 @@
           }
         },
         {
-          "name": "new_smart_wallet_authenticator",
-          "docs": [
-            "Optional new authenticator to initialize when requested in message"
-          ],
-          "optional": true
-        },
-        {
           "name": "ix_sysvar",
           "address": "Sysvar1nstructions1111111111111111111111111"
         },

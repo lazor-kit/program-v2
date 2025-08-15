@@ -31,12 +31,18 @@ export type ArgsByAction = {
   };
   [SmartWalletAction.CallRule]: {
     ruleInstruction: anchor.web3.TransactionInstruction;
-    newPasskey: number[];
+    newAuthenticator: {
+      passkeyPubkey: number[];
+      credentialIdBase64: string;
+    } | null;
   };
   [SmartWalletAction.ChangeRule]: {
     destroyRuleIns: anchor.web3.TransactionInstruction;
     initRuleIns: anchor.web3.TransactionInstruction;
-    newPasskey: number[];
+    newAuthenticator: {
+      passkeyPubkey: number[];
+      credentialIdBase64: string;
+    } | null;
   };
 };
 

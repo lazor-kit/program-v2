@@ -130,7 +130,7 @@ pub fn create_smart_wallet(
 }
 
 #[derive(Accounts)]
-#[instruction(args: CreatwSmartWalletArgs,)]
+#[instruction(args: CreatwSmartWalletArgs)]
 pub struct CreateSmartWallet<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,

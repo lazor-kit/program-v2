@@ -2,6 +2,7 @@ import * as anchor from '@coral-xyz/anchor';
 import { sha256 } from 'js-sha256';
 import { instructionToAccountMetas } from './utils';
 import { Buffer } from 'buffer';
+
 const coder: anchor.BorshCoder = (() => {
   const idl: any = {
     version: '0.1.0',
@@ -120,10 +121,7 @@ export function buildChangeRuleMessage(
   initRuleIns: anchor.web3.TransactionInstruction
 ): Buffer {
   const oldMetas = instructionToAccountMetas(destroyRuleIns, payer);
-  const oldAccountsHash = computeAccountsHash(
-    destroyRuleIns.programId,
-    oldMetas
-  );
+  const oldAccountsHash = computeAccountsHash(destroyRuleIns.programId, oldMetas);
   const oldDataHash = new Uint8Array(sha256.arrayBuffer(destroyRuleIns.data));
 
   const newMetas = instructionToAccountMetas(initRuleIns, payer);

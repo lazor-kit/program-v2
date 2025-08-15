@@ -58,7 +58,14 @@ pub fn change_rule_direct<'c: 'info, 'info>(
         split <= ctx.remaining_accounts.len(),
         LazorKitError::AccountSliceOutOfBounds
     );
-    let (destroy_accounts, init_accounts) = ctx.remaining_accounts.split_at(split);
+
+    // If new authenticator is provided, adjust the account slices
+    let (destroy_accounts, init_accounts) = if args.new_authenticator.is_some() {
+        let (destroy, init) = ctx.remaining_accounts[1..].split_at(split);
+        (destroy, init)
+    } else {
+        ctx.remaining_accounts.split_at(split)
+    };
 
     // Hash checks
     let mut h1 = Hasher::default();

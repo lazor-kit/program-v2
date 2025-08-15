@@ -158,9 +158,6 @@ pub struct CallRuleDirect<'info> {
     )]
     pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
 
-    /// Optional new authenticator to initialize when requested in message
-    pub new_smart_wallet_authenticator: Option<UncheckedAccount<'info>>,
-
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
