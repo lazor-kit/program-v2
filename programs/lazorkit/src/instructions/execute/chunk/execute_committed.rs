@@ -142,6 +142,14 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         )?;
     }
 
+    // Advance nonce
+    ctx.accounts.smart_wallet_config.last_nonce = ctx
+        .accounts
+        .smart_wallet_config
+        .last_nonce
+        .checked_add(1)
+        .ok_or(LazorKitError::NonceOverflow)?;
+
     Ok(())
 }
 

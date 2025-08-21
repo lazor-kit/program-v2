@@ -87,14 +87,6 @@ pub fn commit_cpi(ctx: Context<CommitCpi>, args: CommitArgs) -> Result<()> {
     commit.expires_at = args.expires_at;
     commit.rent_refund_to = ctx.accounts.payer.key();
 
-    // Advance nonce
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
-        .accounts
-        .smart_wallet_config
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
-
     Ok(())
 }
 
@@ -151,7 +143,7 @@ pub struct CommitCpi<'info> {
 
     /// New commit account (rent payer: payer)
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         space = 8 + CpiCommit::INIT_SPACE,
         seeds = [CpiCommit::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_config.last_nonce.to_le_bytes()],
