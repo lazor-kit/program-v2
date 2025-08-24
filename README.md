@@ -194,7 +194,7 @@ const updateTx = await lazorkitClient.updatePolicyWithAuth({
   },
   destroyPolicyInstruction: destroyInstruction,
   initPolicyInstruction: initInstruction,
-  newDevice: {
+  newWalletDevice: {
     passkeyPubkey: [/* 33 bytes */],
     credentialIdBase64: 'base64-credential',
   },
@@ -211,7 +211,7 @@ const invokeTx = await lazorkitClient.invokePolicyWithAuth({
     authenticatorDataRaw64: 'base64-auth-data',
   },
   policyInstruction: policyInstruction,
-  newDevice: null,
+  newWalletDevice: null,
 });
 ```
 

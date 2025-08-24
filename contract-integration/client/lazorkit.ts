@@ -543,11 +543,11 @@ export class LazorkitClient {
       params.smartWallet,
       {
         ...signatureArgs,
-        newAuthenticator: params.newDevice
+        newAuthenticator: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(
-                params.newDevice.credentialIdBase64,
+                params.newWalletDevice.credentialIdBase64,
                 'base64'
               ),
             }
@@ -591,13 +591,13 @@ export class LazorkitClient {
         destroyPolicyData: params.destroyPolicyInstruction.data,
         initPolicyData: params.initPolicyInstruction.data,
         splitIndex:
-          (params.newDevice ? 1 : 0) +
+          (params.newWalletDevice ? 1 : 0) +
           params.destroyPolicyInstruction.keys.length,
-        newAuthenticator: params.newDevice
+        newAuthenticator: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(
-                params.newDevice.credentialIdBase64,
+                params.newWalletDevice.credentialIdBase64,
                 'base64'
               ),
             }

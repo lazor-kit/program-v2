@@ -109,7 +109,7 @@ export interface InvokePolicyParams {
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
   policyInstruction: anchor.web3.TransactionInstruction;
-  newDevice?: NewPasskeyDevice | null;
+  newWalletDevice?: NewPasskeyDevice | null;
 }
 
 export interface UpdatePolicyParams {
@@ -118,7 +118,7 @@ export interface UpdatePolicyParams {
   passkeySignature: PasskeySignature;
   destroyPolicyInstruction: anchor.web3.TransactionInstruction;
   initPolicyInstruction: anchor.web3.TransactionInstruction;
-  newDevice?: NewPasskeyDevice | null;
+  newWalletDevice?: NewPasskeyDevice | null;
 }
 
 export interface CreateTransactionSessionParams {
