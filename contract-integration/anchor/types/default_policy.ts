@@ -103,7 +103,7 @@ export type DefaultPolicy = {
         },
         {
           name: 'walletDevice';
-          docs: ['CHECK'];
+          writable: true;
           signer: true;
         },
         {

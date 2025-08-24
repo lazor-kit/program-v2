@@ -19,11 +19,12 @@ pub struct InitPolicy<'info> {
     /// CHECK:
     pub smart_wallet: UncheckedAccount<'info>,
 
-    /// CHECK
-    pub wallet_device: Signer<'info>,
+    /// CHECK:
+    #[account(mut, signer)]
+    pub wallet_device: UncheckedAccount<'info>,
 
     #[account(
-        init_if_needed,
+        init,
         payer = payer,
         space = 8 + Policy::INIT_SPACE,
         seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
