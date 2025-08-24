@@ -21,7 +21,8 @@
           "signer": true
         },
         {
-          "name": "new_wallet_device"
+          "name": "new_wallet_device",
+          "writable": true
         },
         {
           "name": "policy",
@@ -74,7 +75,8 @@
           "signer": true
         },
         {
-          "name": "smart_wallet"
+          "name": "smart_wallet",
+          "writable": true
         },
         {
           "name": "policy",

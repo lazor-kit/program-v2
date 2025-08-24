@@ -23,6 +23,7 @@ pub struct AddDevice<'info> {
     pub wallet_device: Account<'info, WalletDevice>,
 
     /// CHECK:
+    #[account(mut)]
     pub new_wallet_device: UncheckedAccount<'info>,
 
     #[account(
