@@ -6,16 +6,16 @@ use anchor_lang::{
     system_program::{create_account, CreateAccount},
 };
 
-/// Account that stores a device (passkey) for authentication to a smart wallet
+/// Account that stores a wallet_device (passkey) used to authenticate to a smart wallet
 #[account]
 #[derive(Debug, InitSpace)]
 pub struct WalletDevice {
-    /// The public key of the passkey that can authorize transactions
+    /// The public key of the passkey for this wallet_device that can authorize transactions
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
-    /// The smart wallet this authenticator belongs to
+    /// The smart wallet this wallet_device belongs to
     pub smart_wallet: Pubkey,
 
-    /// The credential ID this authenticator belongs to
+    /// The credential ID this wallet_device belongs to
     #[max_len(256)]
     pub credential_id: Vec<u8>,
 

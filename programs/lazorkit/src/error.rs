@@ -79,9 +79,9 @@ pub enum LazorKitError {
     #[msg("SOL transfer requires at least 2 remaining accounts")]
     SolTransferInsufficientAccounts,
     #[msg("New authenticator account is required but not provided")]
-    NewAuthenticatorMissing,
+    NewWalletDeviceMissing,
     #[msg("New authenticator passkey is required but not provided")]
-    NewAuthenticatorPasskeyMissing,
+    NewWalletDevicePasskeyMissing,
 
     // === Financial Errors ===
     #[msg("Insufficient lamports for requested transfer")]

@@ -176,7 +176,7 @@ export type DefaultPolicy = {
     {
       name: 'walletDevice';
       docs: [
-        'Account that stores a device (passkey) for authentication to a smart wallet'
+        'Account that stores a wallet_device (passkey) used to authenticate to a smart wallet'
       ];
       type: {
         kind: 'struct';
@@ -184,7 +184,7 @@ export type DefaultPolicy = {
           {
             name: 'passkeyPubkey';
             docs: [
-              'The public key of the passkey that can authorize transactions'
+              'The public key of the passkey for this wallet_device that can authorize transactions'
             ];
             type: {
               array: ['u8', 33];
@@ -192,12 +192,12 @@ export type DefaultPolicy = {
           },
           {
             name: 'smartWallet';
-            docs: ['The smart wallet this authenticator belongs to'];
+            docs: ['The smart wallet this wallet_device belongs to'];
             type: 'pubkey';
           },
           {
             name: 'credentialId';
-            docs: ['The credential ID this authenticator belongs to'];
+            docs: ['The credential ID this wallet_device belongs to'];
             type: 'bytes';
           },
           {

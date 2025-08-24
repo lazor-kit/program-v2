@@ -1025,12 +1025,12 @@
     },
     {
       "code": 6032,
-      "name": "NewAuthenticatorMissing",
+      "name": "NewWalletDeviceMissing",
       "msg": "New authenticator account is required but not provided"
     },
     {
       "code": 6033,
-      "name": "NewAuthenticatorPasskeyMissing",
+      "name": "NewWalletDevicePasskeyMissing",
       "msg": "New authenticator passkey is required but not provided"
     },
     {
@@ -1341,7 +1341,7 @@
             "type": "pubkey"
           },
           {
-            "name": "new_authenticator",
+            "name": "new_wallet_device",
             "type": "pubkey"
           },
           {
@@ -1620,11 +1620,11 @@
             "type": "bytes"
           },
           {
-            "name": "new_authenticator",
+            "name": "new_wallet_device",
             "type": {
               "option": {
                 "defined": {
-                  "name": "NewAuthenticatorArgs"
+                  "name": "NewWalletDeviceArgs"
                 }
               }
             }
@@ -1633,7 +1633,7 @@
       }
     },
     {
-      "name": "NewAuthenticatorArgs",
+      "name": "NewWalletDeviceArgs",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2043,11 +2043,11 @@
             "type": "bytes"
           },
           {
-            "name": "new_authenticator",
+            "name": "new_wallet_device",
             "type": {
               "option": {
                 "defined": {
-                  "name": "NewAuthenticatorArgs"
+                  "name": "NewWalletDeviceArgs"
                 }
               }
             }
@@ -2058,7 +2058,7 @@
     {
       "name": "WalletDevice",
       "docs": [
-        "Account that stores a device (passkey) for authentication to a smart wallet"
+        "Account that stores a wallet_device (passkey) used to authenticate to a smart wallet"
       ],
       "type": {
         "kind": "struct",
@@ -2066,7 +2066,7 @@
           {
             "name": "passkey_pubkey",
             "docs": [
-              "The public key of the passkey that can authorize transactions"
+              "The public key of the passkey for this wallet_device that can authorize transactions"
             ],
             "type": {
               "array": ["u8", 33]
@@ -2074,12 +2074,12 @@
           },
           {
             "name": "smart_wallet",
-            "docs": ["The smart wallet this authenticator belongs to"],
+            "docs": ["The smart wallet this wallet_device belongs to"],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["The credential ID this authenticator belongs to"],
+            "docs": ["The credential ID this wallet_device belongs to"],
             "type": "bytes"
           },
           {

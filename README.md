@@ -8,7 +8,7 @@ LazorKit is a sophisticated smart wallet system built on Solana that enables use
 
 - **Passkey Authentication**: Secure authentication using secp256r1 WebAuthn credentials
 - **Policy Engine System**: Customizable transaction policies with a default policy implementation
-- **Smart Wallet Management**: Create, configure, and manage smart wallets with multiple authenticators
+- **Smart Wallet Management**: Create, configure, and manage smart wallets with multiple wallet_devices
 - **Transaction Session Support**: Execute complex transactions with session-based state management
 - **Policy Registry Management**: Control which policy programs can be used
 
@@ -19,7 +19,9 @@ LazorKit is a sophisticated smart wallet system built on Solana that enables use
 The system consists of two main Solana programs:
 
 #### 1. LazorKit Program (`J6Big9w1VNeRZgDWH5qmNz2XFq5QeZbqC8caqSE5W`)
+
 The core smart wallet program that handles:
+
 - Smart wallet creation and initialization
 - Passkey authentication management
 - Policy program integration
@@ -27,6 +29,7 @@ The core smart wallet program that handles:
 - Configuration management
 
 **Key Instructions:**
+
 - `initialize` - Initialize the program
 - `create_smart_wallet` - Create a new smart wallet with passkey
 - `update_policy` - Update wallet policies directly
@@ -38,15 +41,18 @@ The core smart wallet program that handles:
 - `update_config` - Update program configuration
 
 #### 2. Default Policy Program (`CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`)
+
 A reference implementation of transaction policies that provides:
+
 - Policy initialization and validation
 - Device management for multi-device wallets
 - Transaction checking and approval logic
 
 **Key Instructions:**
+
 - `init_policy` - Initialize policy for a smart wallet
 - `check_policy` - Validate transaction against policies
-- `add_device` - Add new authenticator device
+- `add_device` - Add new wallet_device
 
 ### Contract Integration SDK
 
@@ -80,17 +86,20 @@ contract-integration/
 ### Setup
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd wallet-management-contract
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Build the programs:
+
 ```bash
 anchor build
 ```
@@ -152,10 +161,12 @@ import { BN } from '@coral-xyz/anchor';
 const walletId = lazorkitClient.generateWalletId();
 
 // Create smart wallet with passkey
-const { transaction, smartWalletId, smartWallet } = 
+const { transaction, smartWalletId, smartWallet } =
   await lazorkitClient.createSmartWalletTransaction({
     payer: payer.publicKey,
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     credentialIdBase64: 'base64-credential',
     isPayForUser: true,
   });
@@ -169,7 +180,9 @@ const transaction = await lazorkitClient.executeTransactionWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -187,7 +200,9 @@ const updateTx = await lazorkitClient.updatePolicyWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -195,7 +210,9 @@ const updateTx = await lazorkitClient.updatePolicyWithAuth({
   destroyPolicyInstruction: destroyInstruction,
   initPolicyInstruction: initInstruction,
   newWalletDevice: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     credentialIdBase64: 'base64-credential',
   },
 });
@@ -205,7 +222,9 @@ const invokeTx = await lazorkitClient.invokePolicyWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -223,7 +242,9 @@ const sessionTx = await lazorkitClient.createTransactionSessionWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -272,6 +293,7 @@ anchor test
 ```
 
 The test suite includes:
+
 - Smart wallet creation and initialization
 - Default policy implementation
 - Transaction execution
@@ -281,16 +303,19 @@ The test suite includes:
 ## Key Features
 
 ### Security
+
 - **Passkey Authentication**: Uses secp256r1 WebAuthn for secure authentication
-- **Multi-Device Support**: Add multiple authenticator devices to a single wallet
+- **Multi-Device Support**: Add multiple wallet_devices to a single wallet
 - **Policy-Based Validation**: Customizable transaction validation policies
 
 ### Flexibility
+
 - **Custom Policy Programs**: Implement your own policy programs or use the default
 - **Session Support**: Execute complex multi-step transactions with session management
 - **Policy Registry Management**: Control which policy programs can be used
 
 ### Developer Experience
+
 - **TypeScript SDK**: Full TypeScript support with generated types
 - **Anchor Integration**: Built with Anchor framework for easy development
 - **Comprehensive Testing**: Extensive test coverage
@@ -298,14 +323,15 @@ The test suite includes:
 
 ## Program IDs
 
-| Program | Devnet | Mainnet |
-|---------|--------|---------|
-| LazorKit | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` |
+| Program        | Devnet                                         | Mainnet                                        |
+| -------------- | ---------------------------------------------- | ---------------------------------------------- |
+| LazorKit       | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` |
 | Default Policy | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` |
 
 ## Address Lookup Table
 
 The system uses an address lookup table to optimize transaction size:
+
 - **Address**: `7Pr3DG7tRPAjVb44gqbxTj1KstikAuVZY7YmXdotVjLA`
 
 ## Recent Updates
@@ -320,6 +346,7 @@ The SDK has been completely refactored with:
 - **Cleaner Architecture**: Modular design with authentication, transaction building, and message utilities
 
 #### Key Changes:
+
 - `executeTxnDirectTx` → `executeTransactionWithAuth`
 - `callRuleDirectTx` → `invokePolicyWithAuth`
 - `changeRuleDirectTx` → `updatePolicyWithAuth`

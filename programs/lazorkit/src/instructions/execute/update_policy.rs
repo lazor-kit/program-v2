@@ -58,7 +58,7 @@ pub fn update_policy<'c: 'info, 'info>(
     );
 
     // If new authenticator is provided, adjust the account slices
-    let (destroy_accounts, init_accounts) = if args.new_authenticator.is_some() {
+    let (destroy_accounts, init_accounts) = if args.new_wallet_device.is_some() {
         let (destroy, init) = ctx.remaining_accounts[1..].split_at(split);
         (destroy, init)
     } else {
@@ -129,29 +129,29 @@ pub fn update_policy<'c: 'info, 'info>(
     ctx.accounts.smart_wallet_data.policy_program = ctx.accounts.new_policy_program.key();
 
     // Optionally create new authenticator if requested
-    if let Some(new_authentcator) = args.new_authenticator {
+    if let Some(new_wallet_device) = args.new_wallet_device {
         require!(
-            new_authentcator.passkey_pubkey[0] == 0x02
-                || new_authentcator.passkey_pubkey[0] == 0x03,
+            new_wallet_device.passkey_pubkey[0] == 0x02
+                || new_wallet_device.passkey_pubkey[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
         // Get the new authenticator account from remaining accounts
-        let new_auth = ctx
+        let new_device = ctx
             .remaining_accounts
             .first()
             .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
         require!(
-            new_auth.data_is_empty(),
+            new_device.data_is_empty(),
             LazorKitError::AccountAlreadyInitialized
         );
         crate::state::WalletDevice::init(
-            new_auth,
+            new_device,
             ctx.accounts.payer.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
             ctx.accounts.smart_wallet.key(),
-            new_authentcator.passkey_pubkey,
-            new_authentcator.credential_id,
+            new_wallet_device.passkey_pubkey,
+            new_wallet_device.credential_id,
         )?;
     }
 

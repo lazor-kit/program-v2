@@ -287,7 +287,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     // 2) locate the secp256r1 verify instruction
     let secp_ix = load_instruction_at_checked(verify_instruction_index as usize, ix_sysvar)?;
 
-    // 3) reconstruct signed message (authenticatorData || SHA256(clientDataJSON))
+    // 3) reconstruct signed message (wallet_device authenticatorData || SHA256(clientDataJSON))
     let client_hash = hash(client_data_json_raw);
     let mut message = Vec::with_capacity(authenticator_data_raw.len() + client_hash.as_ref().len());
     message.extend_from_slice(authenticator_data_raw);

@@ -36,7 +36,7 @@ pub struct UpdatePolicyArgs {
     pub split_index: u16,
     pub destroy_policy_data: Vec<u8>,
     pub init_policy_data: Vec<u8>,
-    pub new_authenticator: Option<NewAuthenticatorArgs>,
+    pub new_wallet_device: Option<NewWalletDeviceArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -47,7 +47,7 @@ pub struct InvokePolicyArgs {
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
-    pub new_authenticator: Option<NewAuthenticatorArgs>,
+    pub new_wallet_device: Option<NewWalletDeviceArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -62,7 +62,7 @@ pub struct CreateSessionArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
-pub struct NewAuthenticatorArgs {
+pub struct NewWalletDeviceArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     #[max_len(256)]
     pub credential_id: Vec<u8>,

@@ -279,10 +279,10 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
-    if (args.newAuthenticator) {
+    if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newAuthenticator.passkeyPubkey
+        args.newWalletDevice.passkeyPubkey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -322,10 +322,10 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
-    if (args.newAuthenticator) {
+    if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newAuthenticator.passkeyPubkey
+        args.newWalletDevice.passkeyPubkey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -543,7 +543,7 @@ export class LazorkitClient {
       params.smartWallet,
       {
         ...signatureArgs,
-        newAuthenticator: params.newWalletDevice
+        newWalletDevice: params.newWalletDevice
           ? {
               passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(
@@ -593,7 +593,7 @@ export class LazorkitClient {
         splitIndex:
           (params.newWalletDevice ? 1 : 0) +
           params.destroyPolicyInstruction.keys.length,
-        newAuthenticator: params.newWalletDevice
+        newWalletDevice: params.newWalletDevice
           ? {
               passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(

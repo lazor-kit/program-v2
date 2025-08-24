@@ -1319,12 +1319,12 @@ export type Lazorkit = {
     },
     {
       code: 6032;
-      name: 'newAuthenticatorMissing';
+      name: 'newWalletDeviceMissing';
       msg: 'New authenticator account is required but not provided';
     },
     {
       code: 6033;
-      name: 'newAuthenticatorPasskeyMissing';
+      name: 'newWalletDevicePasskeyMissing';
       msg: 'New authenticator passkey is required but not provided';
     },
     {
@@ -1635,7 +1635,7 @@ export type Lazorkit = {
             type: 'pubkey';
           },
           {
-            name: 'newAuthenticator';
+            name: 'newWalletDevice';
             type: 'pubkey';
           },
           {
@@ -1914,11 +1914,11 @@ export type Lazorkit = {
             type: 'bytes';
           },
           {
-            name: 'newAuthenticator';
+            name: 'newWalletDevice';
             type: {
               option: {
                 defined: {
-                  name: 'newAuthenticatorArgs';
+                  name: 'newWalletDeviceArgs';
                 };
               };
             };
@@ -1927,7 +1927,7 @@ export type Lazorkit = {
       };
     },
     {
-      name: 'newAuthenticatorArgs';
+      name: 'newWalletDeviceArgs';
       type: {
         kind: 'struct';
         fields: [
@@ -2337,11 +2337,11 @@ export type Lazorkit = {
             type: 'bytes';
           },
           {
-            name: 'newAuthenticator';
+            name: 'newWalletDevice';
             type: {
               option: {
                 defined: {
-                  name: 'newAuthenticatorArgs';
+                  name: 'newWalletDeviceArgs';
                 };
               };
             };
@@ -2352,7 +2352,7 @@ export type Lazorkit = {
     {
       name: 'walletDevice';
       docs: [
-        'Account that stores a device (passkey) for authentication to a smart wallet'
+        'Account that stores a wallet_device (passkey) used to authenticate to a smart wallet'
       ];
       type: {
         kind: 'struct';
@@ -2360,7 +2360,7 @@ export type Lazorkit = {
           {
             name: 'passkeyPubkey';
             docs: [
-              'The public key of the passkey that can authorize transactions'
+              'The public key of the passkey for this wallet_device that can authorize transactions'
             ];
             type: {
               array: ['u8', 33];
@@ -2368,12 +2368,12 @@ export type Lazorkit = {
           },
           {
             name: 'smartWallet';
-            docs: ['The smart wallet this authenticator belongs to'];
+            docs: ['The smart wallet this wallet_device belongs to'];
             type: 'pubkey';
           },
           {
             name: 'credentialId';
-            docs: ['The credential ID this authenticator belongs to'];
+            docs: ['The credential ID this wallet_device belongs to'];
             type: 'bytes';
           },
           {
