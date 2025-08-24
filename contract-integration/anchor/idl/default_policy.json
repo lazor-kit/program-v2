@@ -75,8 +75,7 @@
           "signer": true
         },
         {
-          "name": "smart_wallet",
-          "writable": true
+          "name": "smart_wallet"
         },
         {
           "name": "policy",
@@ -99,7 +98,6 @@
         },
         {
           "name": "wallet_device",
-          "writable": true,
           "signer": true
         },
         {

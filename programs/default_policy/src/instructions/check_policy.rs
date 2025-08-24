@@ -10,7 +10,6 @@ pub fn check_policy(_ctx: Context<CheckPolicy>) -> Result<()> {
 pub struct CheckPolicy<'info> {
     pub wallet_device: Signer<'info>,
     /// CHECK: bound via constraint to policy.smart_wallet
-    #[account(mut)]
     pub smart_wallet: UncheckedAccount<'info>,
 
     #[account(

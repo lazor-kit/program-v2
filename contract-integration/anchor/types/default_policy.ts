@@ -82,7 +82,6 @@ export type DefaultPolicy = {
         },
         {
           name: 'smartWallet';
-          writable: true;
         },
         {
           name: 'policy';
@@ -105,7 +104,6 @@ export type DefaultPolicy = {
         },
         {
           name: 'walletDevice';
-          writable: true;
           signer: true;
         },
         {

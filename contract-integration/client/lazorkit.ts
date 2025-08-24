@@ -718,6 +718,7 @@ export class LazorkitClient {
 
         message = buildExecuteMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           policyInstruction,
@@ -733,6 +734,7 @@ export class LazorkitClient {
 
         message = buildInvokePolicyMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           policyInstruction
@@ -747,6 +749,7 @@ export class LazorkitClient {
 
         message = buildUpdatePolicyMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           destroyPolicyIns,

@@ -20,7 +20,7 @@ pub struct InitPolicy<'info> {
     pub smart_wallet: UncheckedAccount<'info>,
 
     /// CHECK:
-    #[account(mut, signer)]
+    #[account(signer)]
     pub wallet_device: UncheckedAccount<'info>,
 
     #[account(
