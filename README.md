@@ -1,16 +1,16 @@
 # LazorKit - Smart Wallet Management System
 
-A comprehensive Solana-based smart wallet management system that provides secure passkey authentication, customizable rule engines, and flexible transaction execution capabilities.
+A comprehensive Solana-based smart wallet management system that provides secure passkey authentication, customizable policy engines, and flexible transaction execution capabilities.
 
 ## Overview
 
 LazorKit is a sophisticated smart wallet system built on Solana that enables users to create and manage smart wallets with advanced security features:
 
 - **Passkey Authentication**: Secure authentication using secp256r1 WebAuthn credentials
-- **Rule Engine System**: Customizable transaction rules with a default rule implementation
+- **Policy Engine System**: Customizable transaction policies with a default policy implementation
 - **Smart Wallet Management**: Create, configure, and manage smart wallets with multiple authenticators
-- **CPI (Cross-Program Invocation) Support**: Execute complex transactions with committed state
-- **Whitelist Management**: Control which rule programs can be used
+- **Transaction Session Support**: Execute complex transactions with session-based state management
+- **Policy Registry Management**: Control which policy programs can be used
 
 ## Architecture
 
@@ -22,28 +22,30 @@ The system consists of two main Solana programs:
 The core smart wallet program that handles:
 - Smart wallet creation and initialization
 - Passkey authentication management
-- Rule program integration
-- Transaction execution and CPI handling
+- Policy program integration
+- Transaction execution and session handling
 - Configuration management
 
 **Key Instructions:**
 - `initialize` - Initialize the program
 - `create_smart_wallet` - Create a new smart wallet with passkey
-- `change_rule_direct` - Change wallet rules directly
-- `call_rule_direct` - Execute rule program calls
-- `execute_txn_direct` - Execute transactions directly
-- `commit_cpi` - Commit CPI state for complex transactions
-- `execute_committed` - Execute committed CPI transactions
+- `update_policy` - Update wallet policies directly
+- `invoke_policy` - Execute policy program calls
+- `execute_transaction` - Execute transactions directly
+- `create_transaction_session` - Create session for complex transactions
+- `execute_session_transaction` - Execute session-based transactions
+- `register_policy_program` - Add programs to the policy registry
+- `update_config` - Update program configuration
 
-#### 2. Default Rule Program (`CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`)
-A reference implementation of transaction rules that provides:
-- Rule initialization and validation
+#### 2. Default Policy Program (`CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`)
+A reference implementation of transaction policies that provides:
+- Policy initialization and validation
 - Device management for multi-device wallets
 - Transaction checking and approval logic
 
 **Key Instructions:**
-- `init_rule` - Initialize rule for a smart wallet
-- `check_rule` - Validate transaction against rules
+- `init_policy` - Initialize policy for a smart wallet
+- `check_policy` - Validate transaction against policies
 - `add_device` - Add new authenticator device
 
 ### Contract Integration SDK
@@ -52,18 +54,18 @@ The `contract-integration` folder provides a comprehensive TypeScript SDK for in
 
 ```
 contract-integration/
-├── client/
-│   ├── lazorkit.ts      # Main LazorKit client
-│   └── defaultRule.ts   # Default rule client
-├── anchor/
-│   ├── idl/            # Anchor IDL definitions
-│   └── types/          # Generated TypeScript types
-├── pda/                # PDA derivation utilities
-├── webauthn/           # WebAuthn/secp256r1 utilities
-├── messages.ts         # Message building utilities
-├── types.ts           # TypeScript type definitions
-├── constants.ts       # Program constants
-└── utils.ts           # Utility functions
+├── anchor/           # Generated Anchor types and IDL
+├── client/           # Main client classes
+├── pda/             # PDA derivation functions
+├── webauthn/        # WebAuthn/Passkey utilities
+├── auth.ts          # Authentication utilities
+├── transaction.ts   # Transaction building utilities
+├── utils.ts         # General utilities
+├── messages.ts      # Message building utilities
+├── constants.ts     # Program constants
+├── types.ts         # TypeScript type definitions
+├── index.ts         # Main exports
+└── README.md        # This file
 ```
 
 ## Installation
@@ -101,8 +103,8 @@ anchor build
 # Deploy LazorKit program
 anchor deploy --provider.cluster devnet
 
-# Deploy Default Rule program
-anchor deploy --provider.cluster devnet --program-name default_rule
+# Deploy Default Policy program
+anchor deploy --provider.cluster devnet --program-name default_policy
 ```
 
 ### Initialize IDL
@@ -111,8 +113,8 @@ anchor deploy --provider.cluster devnet --program-name default_rule
 # Initialize IDL for LazorKit
 anchor idl init -f ./target/idl/lazorkit.json J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W
 
-# Initialize IDL for Default Rule
-anchor idl init -f ./target/idl/default_rule.json CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE
+# Initialize IDL for Default Policy
+anchor idl init -f ./target/idl/default_policy.json CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE
 ```
 
 ## SDK Usage
@@ -120,7 +122,7 @@ anchor idl init -f ./target/idl/default_rule.json CNT2aEgxucQjmt5SRsA6hSGrt241Bv
 ### Basic Setup
 
 ```typescript
-import { LazorkitClient, DefaultRuleClient } from './contract-integration';
+import { LazorkitClient, DefaultPolicyClient } from './contract-integration';
 import { Connection } from '@solana/web3.js';
 
 // Initialize connection
@@ -128,7 +130,7 @@ const connection = new Connection('YOUR_RPC_URL');
 
 // Create clients
 const lazorkitClient = new LazorkitClient(connection);
-const defaultRuleClient = new DefaultRuleClient(connection);
+const defaultPolicyClient = new DefaultPolicyClient(connection);
 ```
 
 ### Creating a Smart Wallet
@@ -140,74 +142,114 @@ import { BN } from '@coral-xyz/anchor';
 const walletId = lazorkitClient.generateWalletId();
 
 // Create smart wallet with passkey
-const createWalletTxn = await lazorkitClient.createSmartWalletTxn(
-  passkeyPubkey,        // secp256r1 public key
-  initRuleInstruction,  // Default rule initialization
-  payer.publicKey
-);
+const { transaction, smartWalletId, smartWallet } = 
+  await lazorkitClient.createSmartWalletTransaction({
+    payer: payer.publicKey,
+    passkeyPubkey: [/* 33 bytes */],
+    credentialIdBase64: 'base64-credential',
+    isPayForUser: true,
+  });
 ```
 
 ### Executing Transactions
 
 ```typescript
-// Execute transaction directly
-const executeTxn = await lazorkitClient.executeTxnDirectTxn(
-  smartWallet,
-  passkeyPubkey,
-  signature,
-  transactionInstruction,
-  null // rule instruction (optional)
-);
-
-// Execute with rule validation
-const executeWithRule = await lazorkitClient.executeTxnDirectTxn(
-  smartWallet,
-  passkeyPubkey,
-  signature,
-  transactionInstruction,
-  ruleInstruction
-);
+// Execute transaction with authentication
+const transaction = await lazorkitClient.executeTransactionWithAuth({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  passkeySignature: {
+    passkeyPubkey: [/* 33 bytes */],
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  policyInstruction: null,
+  cpiInstruction: transferInstruction,
+});
 ```
 
-### Managing Rules
+### Managing Policies
 
 ```typescript
-// Change wallet rules
-const changeRuleTxn = await lazorkitClient.changeRuleDirectTxn(
-  smartWallet,
-  passkeyPubkey,
-  signature,
-  destroyRuleInstruction,
-  initRuleInstruction,
-  newPasskey
-);
+// Update wallet policies
+const updateTx = await lazorkitClient.updatePolicyWithAuth({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  passkeySignature: {
+    passkeyPubkey: [/* 33 bytes */],
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  destroyPolicyInstruction: destroyInstruction,
+  initPolicyInstruction: initInstruction,
+  newDevice: {
+    passkeyPubkey: [/* 33 bytes */],
+    credentialIdBase64: 'base64-credential',
+  },
+});
 
-// Call rule program
-const callRuleTxn = await lazorkitClient.callRuleDirectTxn(
-  smartWallet,
-  passkeyPubkey,
-  signature,
-  ruleInstruction,
-  newPasskey
-);
+// Invoke policy program
+const invokeTx = await lazorkitClient.invokePolicyWithAuth({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  passkeySignature: {
+    passkeyPubkey: [/* 33 bytes */],
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  policyInstruction: policyInstruction,
+  newDevice: null,
+});
 ```
 
-### CPI (Cross-Program Invocation)
+### Transaction Sessions
 
 ```typescript
-// Commit CPI state
-const commitTxn = await lazorkitClient.commitCpiTxn(
-  smartWallet,
-  passkeyPubkey,
-  signature,
-  cpiInstruction,
-  nonce
+// Create transaction session
+const sessionTx = await lazorkitClient.createTransactionSessionWithAuth({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  passkeySignature: {
+    passkeyPubkey: [/* 33 bytes */],
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  policyInstruction: null,
+  expiresAt: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+});
+
+// Execute session transaction (no authentication needed)
+const executeTx = await lazorkitClient.executeSessionTransaction({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  cpiInstruction: complexInstruction,
+});
+```
+
+### Using the Default Policy Client
+
+```typescript
+// Build policy initialization instruction
+const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx(
+  payer.publicKey,
+  smartWallet.publicKey,
+  walletDevice.publicKey
 );
 
-// Execute committed CPI
-const executeCommittedTxn = await lazorkitClient.executeCommittedTxn(
-  smartWallet,
-  cpiData
+// Build policy check instruction
+const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx(
+  walletDevice.publicKey
+);
+
+// Build add device instruction
+const addDeviceIx = await defaultPolicyClient.buildAddDeviceIx(
+  payer.publicKey,
+  walletDevice.publicKey,
+  newWalletDevice.publicKey
 );
 ```
 
@@ -221,39 +263,63 @@ anchor test
 
 The test suite includes:
 - Smart wallet creation and initialization
-- Default rule implementation
+- Default policy implementation
 - Transaction execution
-- Rule management
-- CPI functionality
+- Policy management
+- Session functionality
 
 ## Key Features
 
 ### Security
 - **Passkey Authentication**: Uses secp256r1 WebAuthn for secure authentication
 - **Multi-Device Support**: Add multiple authenticator devices to a single wallet
-- **Rule-Based Validation**: Customizable transaction validation rules
+- **Policy-Based Validation**: Customizable transaction validation policies
 
 ### Flexibility
-- **Custom Rule Programs**: Implement your own rule programs or use the default
-- **CPI Support**: Execute complex multi-step transactions
-- **Whitelist Management**: Control which rule programs can be used
+- **Custom Policy Programs**: Implement your own policy programs or use the default
+- **Session Support**: Execute complex multi-step transactions with session management
+- **Policy Registry Management**: Control which policy programs can be used
 
 ### Developer Experience
 - **TypeScript SDK**: Full TypeScript support with generated types
 - **Anchor Integration**: Built with Anchor framework for easy development
 - **Comprehensive Testing**: Extensive test coverage
+- **Clean API**: Well-organized, intuitive API with clear separation of concerns
 
 ## Program IDs
 
 | Program | Devnet | Mainnet |
 |---------|--------|---------|
 | LazorKit | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` |
-| Default Rule | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` |
+| Default Policy | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` |
 
 ## Address Lookup Table
 
 The system uses an address lookup table to optimize transaction size:
 - **Address**: `7Pr3DG7tRPAjVb44gqbxTj1KstikAuVZY7YmXdotVjLA`
+
+## Recent Updates
+
+### Refactored API (v2.0)
+
+The SDK has been completely refactored with:
+
+- **Better Naming**: More descriptive and consistent method names
+- **Improved Organization**: Clear separation of concerns with dedicated utility modules
+- **Enhanced Type Safety**: Comprehensive TypeScript interfaces and type definitions
+- **Cleaner Architecture**: Modular design with authentication, transaction building, and message utilities
+
+#### Key Changes:
+- `executeTxnDirectTx` → `executeTransactionWithAuth`
+- `callRuleDirectTx` → `invokePolicyWithAuth`
+- `changeRuleDirectTx` → `updatePolicyWithAuth`
+- `commitCpiTx` → `createTransactionSessionWithAuth`
+- `executeCommitedTx` → `executeSessionTransaction`
+- `MessageArgs` → `SmartWalletActionArgs`
+- `DefaultRuleClient` → `DefaultPolicyClient`
+- All "rule" terminology changed to "policy" for consistency
+
+See the [contract-integration README](./contract-integration/README.md) for detailed migration guide and examples.
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 
 #[error_code]
-pub enum RuleError {
+pub enum PolicyError {
     InvalidPasskey,
 
     UnAuthorize,

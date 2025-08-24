@@ -35,45 +35,48 @@ pub mod lazorkit {
     /// Create a new smart wallet with passkey authentication
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
-        args: CreatwSmartWalletArgs,
+        args: CreateSmartWalletArgs,
     ) -> Result<()> {
         instructions::create_smart_wallet(ctx, args)
     }
 
-    /// Add a program to the whitelist of rule programs
-    pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
-        instructions::add_whitelist_rule_program(ctx)
+    /// Add a program to the policy program registry
+    pub fn register_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
+        instructions::register_policy_program(ctx)
     }
 
-    pub fn change_rule_direct<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, ChangeRuleDirect<'info>>,
-        args: ChangeRuleArgs,
+    pub fn update_policy<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, UpdatePolicy<'info>>,
+        args: UpdatePolicyArgs,
     ) -> Result<()> {
-        instructions::change_rule_direct(ctx, args)
+        instructions::update_policy(ctx, args)
     }
 
-    pub fn call_rule_direct<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CallRuleDirect<'info>>,
-        args: CallRuleArgs,
+    pub fn invoke_policy<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, InvokePolicy<'info>>,
+        args: InvokePolicyArgs,
     ) -> Result<()> {
-        instructions::call_rule_direct(ctx, args)
+        instructions::invoke_policy(ctx, args)
     }
 
-    pub fn execute_txn_direct<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, ExecuteTxn<'info>>,
-        args: ExecuteTxnArgs,
+    pub fn execute_transaction<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ExecuteTransaction<'info>>,
+        args: ExecuteTransactionArgs,
     ) -> Result<()> {
-        instructions::execute_txn_direct(ctx, args)
+        instructions::execute_transaction(ctx, args)
     }
 
-    pub fn commit_cpi<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CommitCpi<'info>>,
-        args: CommitArgs,
+    pub fn create_transaction_session<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CreateTransactionSession<'info>>,
+        args: CreateSessionArgs,
     ) -> Result<()> {
-        instructions::commit_cpi(ctx, args)
+        instructions::create_transaction_session(ctx, args)
     }
 
-    pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> Result<()> {
-        instructions::execute_committed(ctx, cpi_data)
+    pub fn execute_session_transaction(
+        ctx: Context<ExecuteSessionTransaction>,
+        cpi_data: Vec<u8>,
+    ) -> Result<()> {
+        instructions::execute_session_transaction(ctx, cpi_data)
     }
 }

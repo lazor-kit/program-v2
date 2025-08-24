@@ -2,7 +2,6 @@ import { Program, BN } from '@coral-xyz/anchor';
 import {
   PublicKey,
   Transaction,
-  TransactionMessage,
   TransactionInstruction,
   Connection,
   SystemProgram,
@@ -14,24 +13,32 @@ import LazorkitIdl from '../anchor/idl/lazorkit.json';
 import { Lazorkit } from '../anchor/types/lazorkit';
 import {
   deriveConfigPda,
-  deriveWhitelistRuleProgramsPda,
+  derivePolicyProgramRegistryPda,
   deriveSmartWalletPda,
-  deriveSmartWalletConfigPda,
-  deriveSmartWalletAuthenticatorPda,
-  deriveCpiCommitPda,
+  deriveSmartWalletDataPda,
+  deriveWalletDevicePda,
+  deriveTransactionSessionPda,
 } from '../pda/lazorkit';
-import { buildSecp256r1VerifyIx } from '../webauthn/secp256r1';
 import { getRandomBytes, instructionToAccountMetas } from '../utils';
-import { sha256 } from 'js-sha256';
 import * as types from '../types';
-import { DefaultRuleClient } from './defaultRule';
+import { DefaultPolicyClient } from './defaultPolicy';
 import * as bs58 from 'bs58';
 import {
-  buildCallRuleMessage,
-  buildChangeRuleMessage,
+  buildInvokePolicyMessage,
+  buildUpdatePolicyMessage,
   buildExecuteMessage,
 } from '../messages';
 import { Buffer } from 'buffer';
+import {
+  buildPasskeyVerificationInstruction,
+  convertPasskeySignatureToInstructionArgs,
+} from '../auth';
+import {
+  buildVersionedTransaction,
+  buildLegacyTransaction,
+  combineInstructionsWithAuth,
+} from '../transaction';
+
 global.Buffer = Buffer;
 
 Buffer.prototype.subarray = function subarray(
@@ -43,72 +50,119 @@ Buffer.prototype.subarray = function subarray(
   return result;
 };
 
+/**
+ * Main client for interacting with the LazorKit smart wallet program
+ *
+ * This client provides both low-level instruction builders and high-level
+ * transaction builders for common smart wallet operations.
+ */
 export class LazorkitClient {
   readonly connection: Connection;
   readonly program: Program<Lazorkit>;
   readonly programId: PublicKey;
-  readonly defaultRuleProgram: DefaultRuleClient;
+  readonly defaultPolicyProgram: DefaultPolicyClient;
 
   constructor(connection: Connection) {
     this.connection = connection;
-
     this.program = new Program<Lazorkit>(LazorkitIdl as Lazorkit, {
       connection: connection,
     });
-    this.defaultRuleProgram = new DefaultRuleClient(connection);
+    this.defaultPolicyProgram = new DefaultPolicyClient(connection);
     this.programId = this.program.programId;
   }
 
-  // PDAs
+  // ============================================================================
+  // PDA Derivation Methods
+  // ============================================================================
+
+  /**
+   * Derives the program configuration PDA
+   */
   configPda(): PublicKey {
     return deriveConfigPda(this.programId);
   }
-  whitelistRuleProgramsPda(): PublicKey {
-    return deriveWhitelistRuleProgramsPda(this.programId);
+
+  /**
+   * Derives the policy program registry PDA
+   */
+  policyProgramRegistryPda(): PublicKey {
+    return derivePolicyProgramRegistryPda(this.programId);
   }
+
+  /**
+   * Derives a smart wallet PDA from wallet ID
+   */
   smartWalletPda(walletId: BN): PublicKey {
     return deriveSmartWalletPda(this.programId, walletId);
   }
-  smartWalletConfigPda(smartWallet: PublicKey): PublicKey {
-    return deriveSmartWalletConfigPda(this.programId, smartWallet);
-  }
-  smartWalletAuthenticatorPda(
-    smartWallet: PublicKey,
-    passkey: number[]
-  ): PublicKey {
-    return deriveSmartWalletAuthenticatorPda(
-      this.programId,
-      smartWallet,
-      passkey
-    )[0];
-  }
-  cpiCommitPda(smartWallet: PublicKey, lastNonce: BN): PublicKey {
-    return deriveCpiCommitPda(this.programId, smartWallet, lastNonce);
+
+  /**
+   * Derives the smart wallet data PDA for a given smart wallet
+   */
+  smartWalletDataPda(smartWallet: PublicKey): PublicKey {
+    return deriveSmartWalletDataPda(this.programId, smartWallet);
   }
 
-  // Convenience helpers
+  /**
+   * Derives a wallet device PDA for a given smart wallet and passkey
+   */
+  walletDevicePda(smartWallet: PublicKey, passkey: number[]): PublicKey {
+    return deriveWalletDevicePda(this.programId, smartWallet, passkey)[0];
+  }
+
+  /**
+   * Derives a transaction session PDA for a given smart wallet and nonce
+   */
+  transactionSessionPda(smartWallet: PublicKey, lastNonce: BN): PublicKey {
+    return deriveTransactionSessionPda(this.programId, smartWallet, lastNonce);
+  }
+
+  // ============================================================================
+  // Utility Methods
+  // ============================================================================
+
+  /**
+   * Generates a random wallet ID
+   */
   generateWalletId(): BN {
     return new BN(getRandomBytes(8), 'le');
   }
 
+  // ============================================================================
+  // Account Data Fetching Methods
+  // ============================================================================
+
+  /**
+   * Fetches program configuration data
+   */
   async getConfigData() {
     return await this.program.account.config.fetch(this.configPda());
   }
-  async getSmartWalletConfigData(smartWallet: PublicKey) {
-    const pda = this.smartWalletConfigPda(smartWallet);
-    return await this.program.account.smartWalletConfig.fetch(pda);
+
+  /**
+   * Fetches smart wallet data for a given smart wallet
+   */
+  async getSmartWalletData(smartWallet: PublicKey) {
+    const pda = this.smartWalletDataPda(smartWallet);
+    return await this.program.account.smartWallet.fetch(pda);
   }
-  async getSmartWalletAuthenticatorData(smartWalletAuthenticator: PublicKey) {
-    return await this.program.account.smartWalletAuthenticator.fetch(
-      smartWalletAuthenticator
-    );
+
+  /**
+   * Fetches wallet device data for a given device
+   */
+  async getWalletDeviceData(walletDevice: PublicKey) {
+    return await this.program.account.walletDevice.fetch(walletDevice);
   }
+
+  /**
+   * Finds a smart wallet by passkey public key
+   */
   async getSmartWalletByPasskey(passkeyPubkey: number[]): Promise<{
     smartWallet: PublicKey | null;
-    smartWalletAuthenticator: PublicKey | null;
+    walletDevice: PublicKey | null;
   }> {
     const discriminator = LazorkitIdl.accounts.find(
-      (a: any) => a.name === 'SmartWalletAuthenticator'
+      (a: any) => a.name === 'WalletDevice'
     )!.discriminator;
 
     const accounts = await this.connection.getProgramAccounts(this.programId, {
@@ -123,120 +177,132 @@ export class LazorkitClient {
     });
 
     if (accounts.length === 0) {
-      return { smartWalletAuthenticator: null, smartWallet: null };
+      return { walletDevice: null, smartWallet: null };
     }
 
-    const smartWalletAuthenticatorData =
-      await this.getSmartWalletAuthenticatorData(accounts[0].pubkey);
+    const walletDeviceData = await this.getWalletDeviceData(accounts[0].pubkey);
 
     return {
-      smartWalletAuthenticator: accounts[0].pubkey,
-      smartWallet: smartWalletAuthenticatorData.smartWallet,
+      walletDevice: accounts[0].pubkey,
+      smartWallet: walletDeviceData.smartWallet,
     };
   }
 
-  // Builders (TransactionInstruction)
-  async buildInitializeIx(payer: PublicKey): Promise<TransactionInstruction> {
+  // ============================================================================
+  // Low-Level Instruction Builders
+  // ============================================================================
+
+  /**
+   * Builds the initialize program instruction
+   */
+  async buildInitializeInstruction(
+    payer: PublicKey
+  ): Promise<TransactionInstruction> {
     return await this.program.methods
       .initialize()
       .accountsPartial({
         signer: payer,
         config: this.configPda(),
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
-        defaultRuleProgram: this.defaultRuleProgram.programId,
+        policyProgramRegistry: this.policyProgramRegistryPda(),
+        defaultPolicyProgram: this.defaultPolicyProgram.programId,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
   }
 
-  async buildCreateSmartWalletIx(
+  /**
+   * Builds the create smart wallet instruction
+   */
+  async buildCreateSmartWalletInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    smartWalletAuthenticator: PublicKey,
-    ruleInstruction: TransactionInstruction,
-    args: types.CreatwSmartWalletArgs
+    walletDevice: PublicKey,
+    policyInstruction: TransactionInstruction,
+    args: types.CreateSmartWalletArgs
   ): Promise<TransactionInstruction> {
     return await this.program.methods
       .createSmartWallet(args)
       .accountsPartial({
         signer: payer,
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
-        smartWalletAuthenticator,
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        policyProgramRegistry: this.policyProgramRegistryPda(),
+        walletDevice,
         config: this.configPda(),
-        defaultRuleProgram: this.defaultRuleProgram.programId,
+        defaultPolicyProgram: this.defaultPolicyProgram.programId,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([...instructionToAccountMetas(ruleInstruction, payer)])
+      .remainingAccounts([
+        ...instructionToAccountMetas(policyInstruction, payer),
+      ])
       .instruction();
   }
 
-  async buildExecuteTxnDirectIx(
+  /**
+   * Builds the execute transaction instruction
+   */
+  async buildExecuteTransactionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.ExecuteTxnArgs,
-    ruleInstruction: TransactionInstruction,
+    args: types.ExecuteTransactionArgs,
+    policyInstruction: TransactionInstruction,
     cpiInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .executeTxnDirect(args)
+      .executeTransaction(args)
       .accountsPartial({
         payer,
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        smartWalletAuthenticator: this.smartWalletAuthenticatorPda(
-          smartWallet,
-          args.passkeyPubkey
-        ),
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
-        authenticatorProgram: ruleInstruction.programId,
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        policyProgramRegistry: this.policyProgramRegistryPda(),
+        policyProgram: policyInstruction.programId,
         cpiProgram: cpiInstruction.programId,
         config: this.configPda(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
-        ...instructionToAccountMetas(ruleInstruction, payer),
+        ...instructionToAccountMetas(policyInstruction, payer),
         ...instructionToAccountMetas(cpiInstruction, payer),
       ])
       .instruction();
   }
 
-  async buildCallRuleDirectIx(
+  /**
+   * Builds the invoke policy instruction
+   */
+  async buildInvokePolicyInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.CallRuleArgs,
-    ruleInstruction: TransactionInstruction
+    args: types.InvokePolicyArgs,
+    policyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
     if (args.newAuthenticator) {
-      const newSmartWalletAuthenticator = this.smartWalletAuthenticatorPda(
+      const newWalletDevice = this.walletDevicePda(
         smartWallet,
         args.newAuthenticator.passkeyPubkey
       );
       remaining.push({
-        pubkey: newSmartWalletAuthenticator,
+        pubkey: newWalletDevice,
         isWritable: true,
         isSigner: false,
       });
     }
 
-    remaining.push(...instructionToAccountMetas(ruleInstruction, payer));
+    remaining.push(...instructionToAccountMetas(policyInstruction, payer));
 
     return await this.program.methods
-      .callRuleDirect(args)
+              .invokePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        smartWalletAuthenticator: this.smartWalletAuthenticatorPda(
-          smartWallet,
-          args.passkeyPubkey
-        ),
-        ruleProgram: ruleInstruction.programId,
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        policyProgram: policyInstruction.programId,
+        policyProgramRegistry: this.policyProgramRegistryPda(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
@@ -244,44 +310,46 @@ export class LazorkitClient {
       .instruction();
   }
 
-  async buildChangeRuleDirectIx(
+  /**
+   * Builds the update policy instruction
+   */
+  async buildUpdatePolicyInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.ChangeRuleArgs,
-    destroyRuleInstruction: TransactionInstruction,
-    initRuleInstruction: TransactionInstruction
+    args: types.UpdatePolicyArgs,
+    destroyPolicyInstruction: TransactionInstruction,
+    initPolicyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
     if (args.newAuthenticator) {
-      const newSmartWalletAuthenticator = this.smartWalletAuthenticatorPda(
+      const newWalletDevice = this.walletDevicePda(
         smartWallet,
         args.newAuthenticator.passkeyPubkey
       );
       remaining.push({
-        pubkey: newSmartWalletAuthenticator,
+        pubkey: newWalletDevice,
         isWritable: true,
         isSigner: false,
       });
     }
 
-    remaining.push(...instructionToAccountMetas(destroyRuleInstruction, payer));
-    remaining.push(...instructionToAccountMetas(initRuleInstruction, payer));
+    remaining.push(
+      ...instructionToAccountMetas(destroyPolicyInstruction, payer)
+    );
+    remaining.push(...instructionToAccountMetas(initPolicyInstruction, payer));
 
     return await this.program.methods
-      .changeRuleDirect(args)
+              .updatePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        smartWalletAuthenticator: this.smartWalletAuthenticatorPda(
-          smartWallet,
-          args.passkeyPubkey
-        ),
-        oldRuleProgram: destroyRuleInstruction.programId,
-        newRuleProgram: initRuleInstruction.programId,
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        oldPolicyProgram: destroyPolicyInstruction.programId,
+        newPolicyProgram: initPolicyInstruction.programId,
+        policyProgramRegistry: this.policyProgramRegistryPda(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
@@ -289,420 +357,396 @@ export class LazorkitClient {
       .instruction();
   }
 
-  async buildCommitCpiIx(
+  /**
+   * Builds the create transaction session instruction
+   */
+  async buildCreateTransactionSessionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.CommitArgs,
-    ruleInstruction: TransactionInstruction
+    args: types.CreateSessionArgs,
+    policyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .commitCpi(args)
+      .createTransactionSession(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
-        smartWalletAuthenticator: this.smartWalletAuthenticatorPda(
-          smartWallet,
-          args.passkeyPubkey
-        ),
-        whitelistRulePrograms: this.whitelistRuleProgramsPda(),
-        authenticatorProgram: ruleInstruction.programId,
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        policyProgramRegistry: this.policyProgramRegistryPda(),
+        policyProgram: policyInstruction.programId,
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([...instructionToAccountMetas(ruleInstruction, payer)])
+      .remainingAccounts([
+        ...instructionToAccountMetas(policyInstruction, payer),
+      ])
       .instruction();
   }
 
-  async buildExecuteCommittedIx(
+  /**
+   * Builds the execute session transaction instruction
+   */
+  async buildExecuteSessionTransactionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
     cpiInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
-    const cfg = await this.getSmartWalletConfigData(smartWallet);
-    const cpiCommit = this.cpiCommitPda(smartWallet, cfg.lastNonce);
+    const cfg = await this.getSmartWalletData(smartWallet);
+    const transactionSession = this.transactionSessionPda(
+      smartWallet,
+      cfg.lastNonce
+    );
 
     return await this.program.methods
-      .executeCommitted(cpiInstruction.data)
+      .executeSessionTransaction(cpiInstruction.data)
       .accountsPartial({
         payer,
         config: this.configPda(),
         smartWallet,
-        smartWalletConfig: this.smartWalletConfigPda(smartWallet),
+        smartWalletData: this.smartWalletDataPda(smartWallet),
         cpiProgram: cpiInstruction.programId,
-        cpiCommit,
-        commitRefund: payer,
+        transactionSession,
+        sessionRefund: payer,
       })
       .remainingAccounts([...instructionToAccountMetas(cpiInstruction, payer)])
       .instruction();
   }
 
-  // High-level: build transactions with Secp256r1 verify ix at index 0
-  async executeTxnDirectTx(params: {
-    payer: PublicKey;
+  // ============================================================================
+  // High-Level Transaction Builders (with Authentication)
+  // ============================================================================
+
+  /**
+   * Creates a smart wallet with passkey authentication
+   */
+  async createSmartWalletTransaction(
+    params: types.CreateSmartWalletParams
+  ): Promise<{
+    transaction: Transaction;
+    smartWalletId: BN;
     smartWallet: PublicKey;
-    passkeyPubkey: number[];
-    signature64: String;
-    clientDataJsonRaw64: String;
-    authenticatorDataRaw64: String;
-    ruleInstruction: TransactionInstruction | null;
-    cpiInstruction: TransactionInstruction;
-  }): Promise<VersionedTransaction> {
-    const authenticatorDataRaw = Buffer.from(
-      params.authenticatorDataRaw64,
-      'base64'
-    );
-    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
-    const verifyIx = buildSecp256r1VerifyIx(
-      Buffer.concat([
-        authenticatorDataRaw,
-        Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-      ]),
-      params.passkeyPubkey,
-      Buffer.from(params.signature64, 'base64')
-    );
-
-    let ruleInstruction = await this.defaultRuleProgram.buildCheckRuleIx(
-      this.smartWalletAuthenticatorPda(params.smartWallet, params.passkeyPubkey)
-    );
-    if (params.ruleInstruction) {
-      ruleInstruction = ruleInstruction;
-    }
-
-    const execIx = await this.buildExecuteTxnDirectIx(
-      params.payer,
-      params.smartWallet,
-      {
-        passkeyPubkey: params.passkeyPubkey,
-        signature: Buffer.from(params.signature64, 'base64'),
-        clientDataJsonRaw,
-        authenticatorDataRaw,
-        verifyInstructionIndex: 0,
-        ruleData: ruleInstruction.data,
-        cpiData: params.cpiInstruction.data,
-        splitIndex: ruleInstruction.keys.length,
-      },
-      ruleInstruction,
-      params.cpiInstruction
-    );
-    return this.buildV0Tx(params.payer, [verifyIx, execIx]);
-  }
-
-  async callRuleDirectTx(params: {
-    payer: PublicKey;
-    smartWallet: PublicKey;
-    passkeyPubkey: number[];
-    signature64: String;
-    clientDataJsonRaw64: String;
-    authenticatorDataRaw64: String;
-    ruleInstruction: TransactionInstruction;
-    newAuthenticator: {
-      passkeyPubkey: number[];
-      credentialIdBase64: string;
-    } | null;
-  }): Promise<VersionedTransaction> {
-    const authenticatorDataRaw = Buffer.from(
-      params.authenticatorDataRaw64,
-      'base64'
-    );
-    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
-
-    const verifyIx = buildSecp256r1VerifyIx(
-      Buffer.concat([
-        authenticatorDataRaw,
-        Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-      ]),
-      params.passkeyPubkey,
-      Buffer.from(params.signature64, 'base64')
-    );
-
-    const ix = await this.buildCallRuleDirectIx(
-      params.payer,
-      params.smartWallet,
-      {
-        passkeyPubkey: params.passkeyPubkey,
-        signature: Buffer.from(params.signature64, 'base64'),
-        clientDataJsonRaw: clientDataJsonRaw,
-        authenticatorDataRaw: authenticatorDataRaw,
-        newAuthenticator: params.newAuthenticator
-          ? {
-              passkeyPubkey: Array.from(params.newAuthenticator.passkeyPubkey),
-              credentialId: Buffer.from(
-                params.newAuthenticator.credentialIdBase64,
-                'base64'
-              ),
-            }
-          : null,
-        ruleData: params.ruleInstruction.data,
-        verifyInstructionIndex: 0,
-      },
-      params.ruleInstruction
-    );
-    return this.buildV0Tx(params.payer, [verifyIx, ix]);
-  }
-
-  async changeRuleDirectTx(params: {
-    payer: PublicKey;
-    smartWallet: PublicKey;
-    passkeyPubkey: number[];
-    signature64: String;
-    clientDataJsonRaw64: String;
-    authenticatorDataRaw64: String;
-    destroyRuleInstruction: TransactionInstruction;
-    initRuleInstruction: TransactionInstruction;
-    newAuthenticator: {
-      passkeyPubkey: number[];
-      credentialIdBase64: string;
-    } | null;
-  }): Promise<VersionedTransaction> {
-    const authenticatorDataRaw = Buffer.from(
-      params.authenticatorDataRaw64,
-      'base64'
-    );
-    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
-
-    const verifyIx = buildSecp256r1VerifyIx(
-      Buffer.concat([
-        authenticatorDataRaw,
-        Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-      ]),
-      params.passkeyPubkey,
-      Buffer.from(params.signature64, 'base64')
-    );
-
-    const ix = await this.buildChangeRuleDirectIx(
-      params.payer,
-      params.smartWallet,
-      {
-        passkeyPubkey: params.passkeyPubkey,
-        signature: Buffer.from(params.signature64, 'base64'),
-        clientDataJsonRaw,
-        authenticatorDataRaw,
-        verifyInstructionIndex: 0,
-        destroyRuleData: params.destroyRuleInstruction.data,
-        initRuleData: params.initRuleInstruction.data,
-        splitIndex:
-          (params.newAuthenticator ? 1 : 0) +
-          params.destroyRuleInstruction.keys.length,
-        newAuthenticator: params.newAuthenticator
-          ? {
-              passkeyPubkey: Array.from(params.newAuthenticator.passkeyPubkey),
-              credentialId: Buffer.from(
-                params.newAuthenticator.credentialIdBase64,
-                'base64'
-              ),
-            }
-          : null,
-      },
-      params.destroyRuleInstruction,
-      params.initRuleInstruction
-    );
-    return this.buildV0Tx(params.payer, [verifyIx, ix]);
-  }
-
-  async commitCpiTx(params: {
-    payer: PublicKey;
-    smartWallet: PublicKey;
-    passkeyPubkey: number[];
-    signature64: String;
-    clientDataJsonRaw64: String;
-    authenticatorDataRaw64: String;
-    ruleInstruction: TransactionInstruction | null;
-    expiresAt: number;
-  }) {
-    const authenticatorDataRaw = Buffer.from(
-      params.authenticatorDataRaw64,
-      'base64'
-    );
-    const clientDataJsonRaw = Buffer.from(params.clientDataJsonRaw64, 'base64');
-
-    const verifyIx = buildSecp256r1VerifyIx(
-      Buffer.concat([
-        authenticatorDataRaw,
-        Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-      ]),
-      params.passkeyPubkey,
-      Buffer.from(params.signature64, 'base64')
-    );
-
-    let ruleInstruction = await this.defaultRuleProgram.buildCheckRuleIx(
-      this.smartWalletAuthenticatorPda(params.smartWallet, params.passkeyPubkey)
-    );
-    if (params.ruleInstruction) {
-      ruleInstruction = ruleInstruction;
-    }
-
-    const ix = await this.buildCommitCpiIx(
-      params.payer,
-      params.smartWallet,
-      {
-        passkeyPubkey: params.passkeyPubkey,
-        signature: Buffer.from(params.signature64, 'base64'),
-        clientDataJsonRaw: clientDataJsonRaw,
-        authenticatorDataRaw: authenticatorDataRaw,
-        expiresAt: new BN(params.expiresAt),
-        ruleData: ruleInstruction.data,
-        verifyInstructionIndex: 0,
-      },
-      ruleInstruction
-    );
-    return this.buildV0Tx(params.payer, [verifyIx, ix]);
-  }
-
-  async executeCommitedTx(params: {
-    payer: PublicKey;
-    smartWallet: PublicKey;
-    cpiInstruction: TransactionInstruction;
-  }): Promise<VersionedTransaction> {
-    const ix = await this.buildExecuteCommittedIx(
-      params.payer,
-      params.smartWallet,
-      params.cpiInstruction
-    );
-
-    return this.buildV0Tx(params.payer, [ix]);
-  }
-
-  // Convenience: VersionedTransaction v0
-  async buildV0Tx(
-    payer: PublicKey,
-    ixs: TransactionInstruction[]
-  ): Promise<VersionedTransaction> {
-    const { blockhash } = await this.connection.getLatestBlockhash();
-    const msg = new TransactionMessage({
-      payerKey: payer,
-      recentBlockhash: blockhash,
-      instructions: ixs,
-    }).compileToV0Message();
-    return new VersionedTransaction(msg);
-  }
-
-  // Legacy-compat APIs for simpler DX
-  async initializeTxn(payer: PublicKey) {
-    const ix = await this.buildInitializeIx(payer);
-    return new Transaction().add(ix);
-  }
-
-  async createSmartWalletTx(params: {
-    payer: PublicKey;
-    passkeyPubkey: number[];
-    credentialIdBase64: string;
-    ruleInstruction?: TransactionInstruction | null;
-    isPayForUser?: boolean;
-    smartWalletId?: BN;
-  }) {
-    let smartWalletId: BN = this.generateWalletId();
-    if (params.smartWalletId) {
-      smartWalletId = params.smartWalletId;
-    }
+  }> {
+    const smartWalletId = params.smartWalletId || this.generateWalletId();
     const smartWallet = this.smartWalletPda(smartWalletId);
-    const smartWalletAuthenticator = this.smartWalletAuthenticatorPda(
+    const walletDevice = this.walletDevicePda(
       smartWallet,
       params.passkeyPubkey
     );
 
-    let ruleInstruction = await this.defaultRuleProgram.buildInitRuleIx(
+    let policyInstruction = await this.defaultPolicyProgram.buildInitPolicyIx(
       params.payer,
       smartWallet,
-      smartWalletAuthenticator
+      walletDevice
     );
 
-    if (params.ruleInstruction) {
-      ruleInstruction = params.ruleInstruction;
+    if (params.policyInstruction) {
+      policyInstruction = params.policyInstruction;
     }
 
     const args = {
       passkeyPubkey: params.passkeyPubkey,
       credentialId: Buffer.from(params.credentialIdBase64, 'base64'),
-      ruleData: ruleInstruction.data,
+      policyData: policyInstruction.data,
       walletId: smartWalletId,
       isPayForUser: params.isPayForUser === true,
     };
 
-    const ix = await this.buildCreateSmartWalletIx(
+    const instruction = await this.buildCreateSmartWalletInstruction(
       params.payer,
       smartWallet,
-      smartWalletAuthenticator,
-      ruleInstruction,
+      walletDevice,
+      policyInstruction,
       args
     );
-    const tx = new Transaction().add(ix);
-    tx.feePayer = params.payer;
-    tx.recentBlockhash = (await this.connection.getLatestBlockhash()).blockhash;
+
+    const transaction = await buildLegacyTransaction(
+      this.connection,
+      params.payer,
+      [instruction]
+    );
+
     return {
-      transaction: tx,
-      smartWalletId: smartWalletId,
+      transaction,
+      smartWalletId,
       smartWallet,
     };
   }
 
-  async buildMessage(params: {
-    action: types.MessageArgs;
+  /**
+   * Executes a transaction with passkey authentication
+   */
+  async executeTransactionWithAuth(
+    params: types.ExecuteTransactionParams
+  ): Promise<VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
+      this.walletDevicePda(
+        params.smartWallet,
+        params.passkeySignature.passkeyPubkey
+      )
+    );
+
+    if (params.policyInstruction) {
+      policyInstruction = params.policyInstruction;
+    }
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const execInstruction = await this.buildExecuteTransactionInstruction(
+      params.payer,
+      params.smartWallet,
+      {
+        ...signatureArgs,
+        verifyInstructionIndex: 0,
+        policyData: policyInstruction.data,
+        cpiData: params.cpiInstruction.data,
+        splitIndex: policyInstruction.keys.length,
+      },
+      policyInstruction,
+      params.cpiInstruction
+    );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      execInstruction,
+    ]);
+    return buildVersionedTransaction(
+      this.connection,
+      params.payer,
+      instructions
+    );
+  }
+
+  /**
+   * Invokes a policy with passkey authentication
+   */
+  async invokePolicyWithAuth(
+    params: types.InvokePolicyParams
+  ): Promise<VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const invokeInstruction = await this.buildInvokePolicyInstruction(
+      params.payer,
+      params.smartWallet,
+      {
+        ...signatureArgs,
+        newAuthenticator: params.newDevice
+          ? {
+              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              credentialId: Buffer.from(
+                params.newDevice.credentialIdBase64,
+                'base64'
+              ),
+            }
+          : null,
+        policyData: params.policyInstruction.data,
+        verifyInstructionIndex: 0,
+      },
+      params.policyInstruction
+    );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      invokeInstruction,
+    ]);
+    return buildVersionedTransaction(
+      this.connection,
+      params.payer,
+      instructions
+    );
+  }
+
+  /**
+   * Updates a policy with passkey authentication
+   */
+  async updatePolicyWithAuth(
+    params: types.UpdatePolicyParams
+  ): Promise<VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const updateInstruction = await this.buildUpdatePolicyInstruction(
+      params.payer,
+      params.smartWallet,
+      {
+        ...signatureArgs,
+        verifyInstructionIndex: 0,
+        destroyPolicyData: params.destroyPolicyInstruction.data,
+        initPolicyData: params.initPolicyInstruction.data,
+        splitIndex:
+          (params.newDevice ? 1 : 0) +
+          params.destroyPolicyInstruction.keys.length,
+        newAuthenticator: params.newDevice
+          ? {
+              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              credentialId: Buffer.from(
+                params.newDevice.credentialIdBase64,
+                'base64'
+              ),
+            }
+          : null,
+      },
+      params.destroyPolicyInstruction,
+      params.initPolicyInstruction
+    );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      updateInstruction,
+    ]);
+    return buildVersionedTransaction(
+      this.connection,
+      params.payer,
+      instructions
+    );
+  }
+
+  /**
+   * Creates a transaction session with passkey authentication
+   */
+  async createTransactionSessionWithAuth(
+    params: types.CreateTransactionSessionParams
+  ): Promise<VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
+      this.walletDevicePda(
+        params.smartWallet,
+        params.passkeySignature.passkeyPubkey
+      )
+    );
+
+    if (params.policyInstruction) {
+      policyInstruction = params.policyInstruction;
+    }
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const sessionInstruction =
+      await this.buildCreateTransactionSessionInstruction(
+        params.payer,
+        params.smartWallet,
+        {
+          ...signatureArgs,
+          expiresAt: new BN(params.expiresAt),
+          policyData: policyInstruction.data,
+          verifyInstructionIndex: 0,
+        },
+        policyInstruction
+      );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      sessionInstruction,
+    ]);
+    return buildVersionedTransaction(
+      this.connection,
+      params.payer,
+      instructions
+    );
+  }
+
+  /**
+   * Executes a session transaction (no authentication needed)
+   */
+  async executeSessionTransaction(
+    params: types.ExecuteSessionTransactionParams
+  ): Promise<VersionedTransaction> {
+    const instruction = await this.buildExecuteSessionTransactionInstruction(
+      params.payer,
+      params.smartWallet,
+      params.cpiInstruction
+    );
+
+    return buildVersionedTransaction(this.connection, params.payer, [
+      instruction,
+    ]);
+  }
+
+  // ============================================================================
+  // Message Building Methods
+  // ============================================================================
+
+  /**
+   * Builds an authorization message for a smart wallet action
+   */
+  async buildAuthorizationMessage(params: {
+    action: types.SmartWalletActionArgs;
     payer: PublicKey;
     smartWallet: PublicKey;
     passkeyPubkey: number[];
   }): Promise<Buffer> {
     let message: Buffer;
-
     const { action, payer, smartWallet, passkeyPubkey } = params;
 
     switch (action.type) {
-      case types.SmartWalletAction.ExecuteTx: {
-        const { ruleInstruction: ruleIns, cpiInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteTx];
+      case types.SmartWalletAction.ExecuteTransaction: {
+        const { policyInstruction: policyIns, cpiInstruction } =
+          action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteTransaction];
 
-        let ruleInstruction = await this.defaultRuleProgram.buildCheckRuleIx(
-          this.smartWalletAuthenticatorPda(smartWallet, passkeyPubkey)
+        let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
+          this.walletDevicePda(smartWallet, passkeyPubkey)
         );
 
-        if (ruleIns) {
-          ruleInstruction = ruleIns;
+        if (policyIns) {
+          policyInstruction = policyIns;
         }
 
-        const smartWalletConfigData = await this.getSmartWalletConfigData(
-          smartWallet
-        );
+        const smartWalletData = await this.getSmartWalletData(smartWallet);
 
         message = buildExecuteMessage(
           payer,
-          smartWalletConfigData.lastNonce,
+          smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
-          ruleInstruction,
+          policyInstruction,
           cpiInstruction
         );
         break;
       }
-      case types.SmartWalletAction.CallRule: {
-        const { ruleInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.CallRule];
+      case types.SmartWalletAction.InvokePolicy: {
+        const { policyInstruction } =
+          action.args as types.ArgsByAction[types.SmartWalletAction.InvokePolicy];
 
-        const smartWalletConfigData = await this.getSmartWalletConfigData(
-          smartWallet
-        );
+        const smartWalletData = await this.getSmartWalletData(smartWallet);
 
-        message = buildCallRuleMessage(
+        message = buildInvokePolicyMessage(
           payer,
-          smartWalletConfigData.lastNonce,
+          smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
-          ruleInstruction
+          policyInstruction
         );
         break;
       }
-      case types.SmartWalletAction.ChangeRule: {
-        const { initRuleIns, destroyRuleIns } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.ChangeRule];
+      case types.SmartWalletAction.UpdatePolicy: {
+        const { initPolicyIns, destroyPolicyIns } =
+          action.args as types.ArgsByAction[types.SmartWalletAction.UpdatePolicy];
 
-        const smartWalletConfigData = await this.getSmartWalletConfigData(
-          smartWallet
-        );
+        const smartWalletData = await this.getSmartWalletData(smartWallet);
 
-        message = buildChangeRuleMessage(
+        message = buildUpdatePolicyMessage(
           payer,
-          smartWalletConfigData.lastNonce,
+          smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
-          destroyRuleIns,
-          initRuleIns
+          destroyPolicyIns,
+          initPolicyIns
         );
         break;
       }
@@ -712,5 +756,42 @@ export class LazorkitClient {
     }
 
     return message;
+  }
+
+  // ============================================================================
+  // Legacy Compatibility Methods (Deprecated)
+  // ============================================================================
+
+  /**
+   * @deprecated Use createSmartWalletTransaction instead
+   */
+  async createSmartWalletTx(params: {
+    payer: PublicKey;
+    passkeyPubkey: number[];
+    credentialIdBase64: string;
+    policyInstruction?: TransactionInstruction | null;
+    isPayForUser?: boolean;
+    smartWalletId?: BN;
+  }) {
+    return this.createSmartWalletTransaction({
+      payer: params.payer,
+      passkeyPubkey: params.passkeyPubkey,
+      credentialIdBase64: params.credentialIdBase64,
+      policyInstruction: params.policyInstruction,
+      isPayForUser: params.isPayForUser,
+      smartWalletId: params.smartWalletId,
+    });
+  }
+
+  /**
+   * @deprecated Use buildAuthorizationMessage instead
+   */
+  async buildMessage(params: {
+    action: types.SmartWalletActionArgs;
+    payer: PublicKey;
+    smartWallet: PublicKey;
+    passkeyPubkey: number[];
+  }): Promise<Buffer> {
+    return this.buildAuthorizationMessage(params);
   }
 }

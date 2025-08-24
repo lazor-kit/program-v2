@@ -1,9 +1,9 @@
-mod call_rule_direct;
-mod change_rule_direct;
+mod invoke_policy;
+mod update_policy;
 mod chunk;
-mod execute_txn_direct;
+mod execute_transaction;
 
-pub use call_rule_direct::*;
-pub use change_rule_direct::*;
+pub use invoke_policy::*;
+pub use update_policy::*;
 pub use chunk::*;
-pub use execute_txn_direct::*;
+pub use execute_transaction::*;

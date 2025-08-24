@@ -3,17 +3,17 @@ import { Buffer } from 'buffer';
 
 // LAZOR.KIT PROGRAM - PDA Seeds
 export const SMART_WALLET_SEED = Buffer.from('smart_wallet');
-export const SMART_WALLET_CONFIG_SEED = Buffer.from('smart_wallet_config');
-export const SMART_WALLET_AUTHENTICATOR_SEED = Buffer.from('smart_wallet_authenticator');
-export const WHITELIST_RULE_PROGRAMS_SEED = Buffer.from('whitelist_rule_programs');
+export const SMART_WALLET_DATA_SEED = Buffer.from('smart_wallet_data');
+export const WALLET_DEVICE_SEED = Buffer.from('wallet_device');
+export const POLICY_PROGRAM_REGISTRY_SEED = Buffer.from('policy_registry');
 export const CONFIG_SEED = Buffer.from('config');
 export const AUTHORITY_SEED = Buffer.from('authority');
-export const CPI_COMMIT_SEED = Buffer.from('cpi_commit');
+export const TRANSACTION_SESSION_SEED = Buffer.from('transaction_session');
 
-// RULE PROGRAM SEEDS
-export const RULE_DATA_SEED = Buffer.from('rule_data');
+// POLICY PROGRAM SEEDS
+export const POLICY_DATA_SEED = Buffer.from('policy_data');
 export const MEMBER_SEED = Buffer.from('member');
-export const RULE_SEED = Buffer.from('rule');
+export const POLICY_SEED = Buffer.from('policy');
 
 // ADDRESS LOOKUP TABLE for Versioned Transactions (v0)
 // This lookup table contains frequently used program IDs and accounts

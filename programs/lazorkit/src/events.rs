@@ -8,7 +8,7 @@ pub struct SmartWalletCreated {
     pub smart_wallet: Pubkey,
     pub authenticator: Pubkey,
     pub sequence_id: u64,
-    pub rule_program: Pubkey,
+    pub policy_program: Pubkey,
     pub passkey_hash: [u8; 32],
     pub timestamp: i64,
 }
@@ -19,18 +19,18 @@ pub struct TransactionExecuted {
     pub smart_wallet: Pubkey,
     pub authenticator: Pubkey,
     pub nonce: u64,
-    pub rule_program: Pubkey,
+    pub policy_program: Pubkey,
     pub cpi_program: Pubkey,
     pub success: bool,
     pub timestamp: i64,
 }
 
-/// Event emitted when a rule program is changed
+/// Event emitted when a policy program is changed
 #[event]
-pub struct RuleProgramChanged {
+pub struct PolicyProgramChanged {
     pub smart_wallet: Pubkey,
-    pub old_rule_program: Pubkey,
-    pub new_rule_program: Pubkey,
+    pub old_policy_program: Pubkey,
+    pub new_policy_program: Pubkey,
     pub nonce: u64,
     pub timestamp: i64,
 }
@@ -59,7 +59,7 @@ pub struct ConfigUpdated {
 #[event]
 pub struct ProgramInitialized {
     pub authority: Pubkey,
-    pub default_rule_program: Pubkey,
+    pub default_policy_program: Pubkey,
     pub timestamp: i64,
 }
 
@@ -81,11 +81,11 @@ pub struct ProgramPausedStateChanged {
     pub timestamp: i64,
 }
 
-/// Event emitted when a whitelist rule program is added
+/// Event emitted when a policy program is added to registry
 #[event]
-pub struct WhitelistRuleProgramAdded {
+pub struct PolicyProgramRegistered {
     pub authority: Pubkey,
-    pub rule_program: Pubkey,
+    pub policy_program: Pubkey,
     pub timestamp: i64,
 }
 
@@ -126,17 +126,19 @@ impl SmartWalletCreated {
         smart_wallet: Pubkey,
         authenticator: Pubkey,
         sequence_id: u64,
-        rule_program: Pubkey,
+        policy_program: Pubkey,
         passkey_pubkey: [u8; PASSKEY_SIZE],
     ) -> Result<()> {
         let mut passkey_hash = [0u8; 32];
-        passkey_hash.copy_from_slice(&anchor_lang::solana_program::hash::hash(&passkey_pubkey).to_bytes()[..32]);
-        
+        passkey_hash.copy_from_slice(
+            &anchor_lang::solana_program::hash::hash(&passkey_pubkey).to_bytes()[..32],
+        );
+
         emit!(Self {
             smart_wallet,
             authenticator,
             sequence_id,
-            rule_program,
+            policy_program,
             passkey_hash,
             timestamp: Clock::get()?.unix_timestamp,
         });
@@ -149,7 +151,7 @@ impl TransactionExecuted {
         smart_wallet: Pubkey,
         authenticator: Pubkey,
         nonce: u64,
-        rule_program: Pubkey,
+        policy_program: Pubkey,
         cpi_program: Pubkey,
         success: bool,
     ) -> Result<()> {
@@ -157,7 +159,7 @@ impl TransactionExecuted {
             smart_wallet,
             authenticator,
             nonce,
-            rule_program,
+            policy_program,
             cpi_program,
             success,
             timestamp: Clock::get()?.unix_timestamp,
@@ -181,7 +183,7 @@ impl SecurityEvent {
         });
         Ok(())
     }
-    
+
     pub fn emit_critical(
         smart_wallet: Option<Pubkey>,
         event_type: &str,
@@ -196,4 +198,4 @@ impl SecurityEvent {
         });
         Ok(())
     }
-} 
+}

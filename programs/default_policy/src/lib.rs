@@ -9,16 +9,16 @@ mod state;
 use instructions::*;
 
 #[program]
-pub mod default_rule {
+pub mod default_policy {
 
     use super::*;
 
-    pub fn init_rule(ctx: Context<InitRule>) -> Result<()> {
-        instructions::init_rule(ctx)
+    pub fn init_policy(ctx: Context<InitPolicy>) -> Result<()> {
+        instructions::init_policy(ctx)
     }
 
-    pub fn check_rule(_ctx: Context<CheckRule>) -> Result<()> {
-        instructions::check_rule(_ctx)
+    pub fn check_policy(_ctx: Context<CheckPolicy>) -> Result<()> {
+        instructions::check_policy(_ctx)
     }
 
     pub fn add_device(ctx: Context<AddDevice>) -> Result<()> {

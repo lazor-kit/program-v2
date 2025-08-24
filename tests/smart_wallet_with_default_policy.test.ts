@@ -1,13 +1,13 @@
 import * as anchor from '@coral-xyz/anchor';
 import ECDSA from 'ecdsa-secp256r1';
 import { expect } from 'chai';
-import { LAMPORTS_PER_SOL, sendAndConfirmTransaction } from '@solana/web3.js';
+import { sendAndConfirmTransaction, Transaction } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import { base64, bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import { LazorkitClient, DefaultRuleClient } from '../contract-integration';
+import { LazorkitClient } from '../contract-integration';
 dotenv.config();
 
-describe('Test smart wallet with default rule', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -27,7 +27,10 @@ describe('Test smart wallet with default rule', () => {
     );
 
     if (programConfig === null) {
-      const txn = await lazorkitProgram.initializeTxn(payer.publicKey);
+      const ix = await lazorkitProgram.buildInitializeInstruction(
+        payer.publicKey
+      );
+      const txn = new Transaction().add(ix);
 
       const sig = await sendAndConfirmTransaction(connection, txn, [payer], {
         commitment: 'confirmed',
@@ -38,7 +41,7 @@ describe('Test smart wallet with default rule', () => {
     }
   });
 
-  it('Init smart wallet with default rule successfully', async () => {
+  it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -48,17 +51,19 @@ describe('Test smart wallet with default rule', () => {
     const smartWalletId = lazorkitProgram.generateWalletId();
     const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
 
-    const smartWalletAuthenticator =
-      lazorkitProgram.smartWalletAuthenticatorPda(smartWallet, passkeyPubkey);
+    const walletDevice = lazorkitProgram.walletDevicePda(
+      smartWallet,
+      passkeyPubkey
+    );
 
     const credentialId = base64.encode(Buffer.from('testing something')); // random string
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTx({
+      await lazorkitProgram.createSmartWalletTransaction({
         payer: payer.publicKey,
         passkeyPubkey,
         credentialIdBase64: credentialId,
-        ruleInstruction: null,
+        policyInstruction: null,
         isPayForUser: true,
         smartWalletId,
       });
@@ -74,22 +79,20 @@ describe('Test smart wallet with default rule', () => {
 
     console.log('Create smart-wallet: ', sig);
 
-    const smartWalletConfigData =
-      await lazorkitProgram.getSmartWalletConfigData(smartWallet);
-
-    expect(smartWalletConfigData.id.toString()).to.be.equal(
-      smartWalletId.toString()
+    const smartWalletData = await lazorkitProgram.getSmartWalletData(
+      smartWallet
     );
 
-    const smartWalletAuthenticatorData =
-      await lazorkitProgram.getSmartWalletAuthenticatorData(
-        smartWalletAuthenticator
-      );
+    expect(smartWalletData.id.toString()).to.be.equal(smartWalletId.toString());
 
-    expect(smartWalletAuthenticatorData.passkeyPubkey.toString()).to.be.equal(
+    const walletDeviceData = await lazorkitProgram.getWalletDeviceData(
+      walletDevice
+    );
+
+    expect(walletDeviceData.passkeyPubkey.toString()).to.be.equal(
       passkeyPubkey.toString()
     );
-    expect(smartWalletAuthenticatorData.smartWallet.toString()).to.be.equal(
+    expect(walletDeviceData.smartWallet.toString()).to.be.equal(
       smartWallet.toString()
     );
   });
@@ -120,8 +123,8 @@ describe('Test smart wallet with default rule', () => {
         lookupTable: lookupTableAddress,
         addresses: [
           lazorkitProgram.configPda(),
-          lazorkitProgram.whitelistRuleProgramsPda(),
-          lazorkitProgram.defaultRuleProgram.programId,
+          lazorkitProgram.policyProgramRegistryPda(),
+          lazorkitProgram.defaultPolicyProgram.programId,
           anchor.web3.SystemProgram.programId,
           anchor.web3.SYSVAR_RENT_PUBKEY,
           anchor.web3.SYSVAR_CLOCK_PUBKEY,
