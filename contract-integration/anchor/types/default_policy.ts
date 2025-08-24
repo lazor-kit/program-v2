@@ -80,6 +80,9 @@ export type DefaultPolicy = {
           signer: true;
         },
         {
+          name: 'smartWallet';
+        },
+        {
           name: 'policy';
           writable: true;
         }
@@ -145,10 +148,12 @@ export type DefaultPolicy = {
     {
       code: 6000;
       name: 'invalidPasskey';
+      msg: 'Invalid passkey format';
     },
     {
       code: 6001;
       name: 'unAuthorize';
+      msg: 'Unauthorized to access smart wallet';
     }
   ];
   types: [

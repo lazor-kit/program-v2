@@ -128,6 +128,13 @@ impl Args for CreateSessionArgs {
             !self.policy_data.is_empty(),
             LazorKitError::InvalidInstructionData
         );
+        // Validate expires_at within 30s window of now
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            self.expires_at >= now
+                && self.expires_at <= now + crate::security::MAX_SESSION_TTL_SECONDS,
+            LazorKitError::TransactionTooOld
+        );
         Ok(())
     }
 }

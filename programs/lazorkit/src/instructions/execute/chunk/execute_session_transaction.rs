@@ -16,8 +16,9 @@ pub fn execute_session_transaction(
 
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
-    if let Err(_) = validation::validate_remaining_accounts(&cpi_accounts) {
-        return Ok(()); // graceful no-op; account will still be closed below
+    if validation::validate_remaining_accounts(&cpi_accounts).is_err() {
+        msg!("Invalid remaining accounts; closing session with refund due to graceful flag");
+        return Ok(());
     }
 
     let session = &mut ctx.accounts.transaction_session;
@@ -32,6 +33,21 @@ pub fn execute_session_transaction(
     // Bind wallet and target program
     if session.owner_wallet != ctx.accounts.smart_wallet.key() {
         msg!("The session owner does not match with smart wallet");
+        return Ok(());
+    }
+
+    // Validate the transaction_session PDA derived from (wallet, authorized_nonce)
+    let expected_session = Pubkey::find_program_address(
+        &[
+            TransactionSession::PREFIX_SEED,
+            ctx.accounts.smart_wallet.key.as_ref(),
+            &session.authorized_nonce.to_le_bytes(),
+        ],
+        &crate::ID,
+    )
+    .0;
+    if expected_session != session.key() {
+        msg!("Invalid transaction session PDA");
         return Ok(());
     }
 
@@ -53,6 +69,7 @@ pub fn execute_session_transaction(
     for acc in cpi_accounts.iter() {
         ch.hash(acc.key.as_ref());
         ch.hash(&[acc.is_signer as u8]);
+        ch.hash(&[acc.is_writable as u8]);
     }
     if ch.result().to_bytes() != session.accounts_hash {
         msg!("Transaction accounts do not match session");
@@ -137,22 +154,18 @@ pub fn execute_session_transaction(
             ctx.accounts.cpi_program.key()
         );
 
-        execute_cpi(
+        let exec_res = execute_cpi(
             cpi_accounts,
             &cpi_data,
             &ctx.accounts.cpi_program,
             Some(wallet_signer),
-        )?;
+            &[ctx.accounts.payer.key()],
+        );
+        if exec_res.is_err() {
+            msg!("CPI failed; closing session with refund due to graceful flag");
+            return Ok(());
+        }
     }
-
-    // Advance nonce
-    ctx.accounts.smart_wallet_data.last_nonce = ctx
-        .accounts
-        .smart_wallet_data
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
-
     Ok(())
 }
 
@@ -185,7 +198,7 @@ pub struct ExecuteSessionTransaction<'info> {
     pub cpi_program: UncheckedAccount<'info>,
 
     /// Transaction session to execute. Closed on success to refund rent.
-    #[account(mut, close = session_refund)]
+    #[account(mut, close = session_refund, owner = ID)]
     pub transaction_session: Account<'info, TransactionSession>,
 
     /// CHECK: rent refund destination (stored in session)

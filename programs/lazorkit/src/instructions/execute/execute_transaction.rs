@@ -90,6 +90,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
     for acc in policy_accounts.iter() {
         rh.hash(acc.key.as_ref());
         rh.hash(&[acc.is_signer as u8]);
+        rh.hash(&[acc.is_writable as u8]);
     }
     require!(
         rh.result().to_bytes() == msg.policy_accounts_hash,
@@ -107,6 +108,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
         policy_data,
         policy_program_info,
         Some(policy_signer),
+        &[],
     )?;
 
     msg!("Policy check passed");
@@ -122,6 +124,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
     for acc in cpi_accounts.iter() {
         ch.hash(acc.key.as_ref());
         ch.hash(&[acc.is_signer as u8]);
+        ch.hash(&[acc.is_writable as u8]);
     }
     require!(
         ch.result().to_bytes() == msg.cpi_accounts_hash,
@@ -208,6 +211,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
             &args.cpi_data,
             &ctx.accounts.cpi_program,
             Some(wallet_signer),
+            &[ctx.accounts.payer.key()],
         )?;
     }
 

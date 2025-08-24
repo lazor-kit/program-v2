@@ -26,7 +26,7 @@ pub struct AddDevice<'info> {
     pub new_wallet_device: UncheckedAccount<'info>,
 
     #[account(
-        seeds = [b"policy".as_ref(), wallet_device.key().as_ref()],
+        seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
         bump,
         owner = ID,
         constraint = policy.wallet_device == wallet_device.key(),
@@ -37,7 +37,7 @@ pub struct AddDevice<'info> {
         init,
         payer = payer,
         space = 8 + Policy::INIT_SPACE,
-        seeds = [b"policy".as_ref(), new_wallet_device.key().as_ref()],
+        seeds = [Policy::PREFIX_SEED, new_wallet_device.key().as_ref()],
         bump,
     )]
     pub new_policy: Account<'info, Policy>,

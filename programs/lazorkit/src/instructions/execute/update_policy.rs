@@ -71,6 +71,7 @@ pub fn update_policy<'c: 'info, 'info>(
     for a in destroy_accounts.iter() {
         h1.hash(a.key.as_ref());
         h1.hash(&[a.is_signer as u8]);
+        h1.hash(&[a.is_writable as u8]);
     }
     require!(
         h1.result().to_bytes() == msg.old_policy_accounts_hash,
@@ -82,6 +83,7 @@ pub fn update_policy<'c: 'info, 'info>(
     for a in init_accounts.iter() {
         h2.hash(a.key.as_ref());
         h2.hash(&[a.is_signer as u8]);
+        h2.hash(&[a.is_writable as u8]);
     }
     require!(
         h2.result().to_bytes() == msg.new_policy_accounts_hash,
@@ -159,6 +161,7 @@ pub fn update_policy<'c: 'info, 'info>(
         &args.destroy_policy_data,
         &ctx.accounts.old_policy_program,
         Some(policy_signer.clone()),
+        &[],
     )?;
 
     execute_cpi(
@@ -166,6 +169,7 @@ pub fn update_policy<'c: 'info, 'info>(
         &args.init_policy_data,
         &ctx.accounts.new_policy_program,
         Some(policy_signer),
+        &[ctx.accounts.payer.key()],
     )?;
 
     // bump nonce

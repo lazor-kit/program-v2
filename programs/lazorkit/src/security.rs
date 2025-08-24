@@ -22,6 +22,9 @@ pub const MIN_RENT_EXEMPT_BUFFER: u64 = 1_000_000; // 0.001 SOL
 /// Maximum transaction age in seconds
 pub const MAX_TRANSACTION_AGE: i64 = 300; // 5 minutes
 
+/// Maximum allowed session TTL in seconds
+pub const MAX_SESSION_TTL_SECONDS: i64 = 30; // 30 seconds
+
 /// Rate limiting parameters
 pub const MAX_TRANSACTIONS_PER_BLOCK: u8 = 5;
 pub const RATE_LIMIT_WINDOW_BLOCKS: u64 = 10;
@@ -42,13 +45,13 @@ pub mod validation {
     }
 
     /// Validate policy data size
-pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
-    require!(
-        policy_data.len() <= MAX_POLICY_DATA_SIZE,
-        LazorKitError::PolicyDataTooLarge
-    );
-    Ok(())
-}
+    pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
+        require!(
+            policy_data.len() <= MAX_POLICY_DATA_SIZE,
+            LazorKitError::PolicyDataTooLarge
+        );
+        Ok(())
+    }
 
     /// Validate CPI data
     pub fn validate_cpi_data(cpi_data: &[u8]) -> Result<()> {
@@ -95,6 +98,8 @@ pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
     /// Validate program is executable
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
         require!(program.executable, LazorKitError::ProgramNotExecutable);
+
+        require!(program.key() != crate::ID, LazorKitError::ReentrancyDetected);
         Ok(())
     }
 

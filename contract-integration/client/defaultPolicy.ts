@@ -48,12 +48,14 @@ export class DefaultPolicyClient {
   }
 
   async buildCheckPolicyIx(
-    walletDevice: PublicKey
+    walletDevice: PublicKey,
+    smartWallet: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
       .checkPolicy()
       .accountsPartial({
         policy: this.policyPda(walletDevice),
+        smartWallet,
         walletDevice,
       })
       .instruction();

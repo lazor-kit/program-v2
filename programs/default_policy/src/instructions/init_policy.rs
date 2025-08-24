@@ -23,10 +23,10 @@ pub struct InitPolicy<'info> {
     pub wallet_device: Signer<'info>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         space = 8 + Policy::INIT_SPACE,
-        seeds = [b"policy".as_ref(), wallet_device.key().as_ref()],
+        seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
         bump,
     )]
     pub policy: Account<'info, Policy>,

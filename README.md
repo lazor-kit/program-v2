@@ -117,6 +117,16 @@ anchor idl init -f ./target/idl/lazorkit.json J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZb
 anchor idl init -f ./target/idl/default_policy.json CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE
 ```
 
+### Upgrade IDL
+
+```bash
+# Initialize IDL for LazorKit
+anchor idl upgrade J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W -f ./target/idl/lazorkit.json
+
+# Initialize IDL for Default Policy
+anchor idl upgrade CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE -f ./target/idl/default_policy.json
+```
+
 ## SDK Usage
 
 ### Basic Setup

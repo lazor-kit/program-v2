@@ -12,24 +12,50 @@
   "instructions": [
     {
       "name": "create_smart_wallet",
-      "docs": ["Create a new smart wallet with passkey authentication"],
-      "discriminator": [129, 39, 235, 18, 132, 68, 203, 19],
+      "docs": [
+        "Create a new smart wallet with passkey authentication"
+      ],
+      "discriminator": [
+        129,
+        39,
+        235,
+        18,
+        132,
+        68,
+        203,
+        19
+      ],
       "accounts": [
         {
-          "name": "signer",
+          "name": "payer",
           "writable": true,
           "signer": true
         },
         {
           "name": "policy_program_registry",
-          "docs": ["Policy program registry"],
+          "docs": [
+            "Policy program registry"
+          ],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -37,14 +63,27 @@
         },
         {
           "name": "smart_wallet",
-          "docs": ["The smart wallet PDA being created with random ID"],
+          "docs": [
+            "The smart wallet PDA being created with random ID"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -56,15 +95,32 @@
         },
         {
           "name": "smart_wallet_data",
-          "docs": ["Smart wallet data"],
+          "docs": [
+            "Smart wallet data"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -76,14 +132,28 @@
         },
         {
           "name": "wallet_device",
-          "docs": ["Wallet device for the passkey"],
+          "docs": [
+            "Wallet device for the passkey"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -99,19 +169,30 @@
         },
         {
           "name": "config",
-          "docs": ["Program configuration"],
+          "docs": [
+            "Program configuration"
+          ],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
         },
         {
           "name": "default_policy_program",
-          "docs": ["Default policy program for the smart wallet"]
+          "docs": [
+            "Default policy program for the smart wallet"
+          ]
         },
         {
           "name": "system_program",
@@ -131,7 +212,16 @@
     },
     {
       "name": "create_transaction_session",
-      "discriminator": [63, 173, 215, 71, 47, 219, 207, 197],
+      "discriminator": [
+        63,
+        173,
+        215,
+        71,
+        47,
+        219,
+        207,
+        197
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -144,7 +234,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -157,7 +254,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -176,8 +284,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -194,7 +317,19 @@
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -215,8 +350,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -230,15 +378,34 @@
         },
         {
           "name": "transaction_session",
-          "docs": ["New transaction session account (rent payer: payer)"],
+          "docs": [
+            "New transaction session account (rent payer: payer)"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
-                  101, 115, 115, 105, 111, 110
+                  116,
+                  114,
+                  97,
+                  110,
+                  115,
+                  97,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
                 ]
               },
               {
@@ -275,7 +442,16 @@
     },
     {
       "name": "execute_session_transaction",
-      "discriminator": [38, 182, 163, 196, 170, 170, 115, 226],
+      "discriminator": [
+        38,
+        182,
+        163,
+        196,
+        170,
+        170,
+        115,
+        226
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -288,7 +464,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -301,7 +484,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -320,8 +514,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -355,7 +564,16 @@
     },
     {
       "name": "execute_transaction",
-      "discriminator": [231, 173, 49, 91, 235, 24, 68, 19],
+      "discriminator": [
+        231,
+        173,
+        49,
+        91,
+        235,
+        24,
+        68,
+        19
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -370,7 +588,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -389,8 +618,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -410,8 +654,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -429,7 +686,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -452,8 +716,19 @@
     },
     {
       "name": "initialize",
-      "docs": ["Initialize the program by creating the sequence tracker"],
-      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "docs": [
+        "Initialize the program by creating the sequence tracker"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
       "accounts": [
         {
           "name": "signer",
@@ -465,13 +740,22 @@
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -487,8 +771,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -502,7 +799,9 @@
         },
         {
           "name": "system_program",
-          "docs": ["The system program."],
+          "docs": [
+            "The system program."
+          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -510,7 +809,16 @@
     },
     {
       "name": "invoke_policy",
-      "discriminator": [233, 117, 13, 198, 43, 169, 77, 87],
+      "discriminator": [
+        233,
+        117,
+        13,
+        198,
+        43,
+        169,
+        77,
+        87
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -523,7 +831,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -536,7 +851,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -555,8 +881,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -579,8 +920,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -608,14 +962,27 @@
     },
     {
       "name": "register_policy_program",
-      "docs": ["Add a program to the policy program registry"],
-      "discriminator": [15, 54, 85, 112, 89, 180, 121, 13],
+      "docs": [
+        "Add a program to the policy program registry"
+      ],
+      "discriminator": [
+        15,
+        54,
+        85,
+        112,
+        89,
+        180,
+        121,
+        13
+      ],
       "accounts": [
         {
           "name": "authority",
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
@@ -623,7 +990,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -636,8 +1010,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -648,25 +1035,49 @@
     },
     {
       "name": "update_config",
-      "docs": ["Update the program configuration"],
-      "discriminator": [29, 158, 252, 191, 10, 83, 219, 99],
+      "docs": [
+        "Update the program configuration"
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
       "accounts": [
         {
           "name": "authority",
-          "docs": ["The current authority of the program."],
+          "docs": [
+            "The current authority of the program."
+          ],
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -689,7 +1100,16 @@
     },
     {
       "name": "update_policy",
-      "discriminator": [212, 245, 246, 7, 163, 151, 18, 57],
+      "discriminator": [
+        212,
+        245,
+        246,
+        7,
+        163,
+        151,
+        18,
+        57
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -702,7 +1122,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -715,7 +1142,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -734,8 +1172,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -761,8 +1214,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -770,7 +1236,9 @@
         },
         {
           "name": "ix_sysvar",
-          "docs": ["CHECK"],
+          "docs": [
+            "CHECK"
+          ],
           "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
@@ -793,73 +1261,226 @@
   "accounts": [
     {
       "name": "Config",
-      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
     },
     {
       "name": "PolicyProgramRegistry",
-      "discriminator": [158, 67, 114, 157, 27, 153, 86, 72]
+      "discriminator": [
+        158,
+        67,
+        114,
+        157,
+        27,
+        153,
+        86,
+        72
+      ]
     },
     {
       "name": "SmartWallet",
-      "discriminator": [67, 59, 220, 179, 41, 10, 60, 177]
+      "discriminator": [
+        67,
+        59,
+        220,
+        179,
+        41,
+        10,
+        60,
+        177
+      ]
     },
     {
       "name": "TransactionSession",
-      "discriminator": [169, 116, 227, 43, 10, 34, 251, 2]
+      "discriminator": [
+        169,
+        116,
+        227,
+        43,
+        10,
+        34,
+        251,
+        2
+      ]
     },
     {
       "name": "WalletDevice",
-      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
+      ]
     }
   ],
   "events": [
     {
       "name": "AuthenticatorAdded",
-      "discriminator": [213, 87, 171, 174, 101, 129, 32, 44]
+      "discriminator": [
+        213,
+        87,
+        171,
+        174,
+        101,
+        129,
+        32,
+        44
+      ]
     },
     {
       "name": "ConfigUpdated",
-      "discriminator": [40, 241, 230, 122, 11, 19, 198, 194]
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
     },
     {
       "name": "ErrorEvent",
-      "discriminator": [163, 35, 212, 206, 66, 104, 234, 251]
+      "discriminator": [
+        163,
+        35,
+        212,
+        206,
+        66,
+        104,
+        234,
+        251
+      ]
     },
     {
       "name": "FeeCollected",
-      "discriminator": [12, 28, 17, 248, 244, 36, 8, 73]
+      "discriminator": [
+        12,
+        28,
+        17,
+        248,
+        244,
+        36,
+        8,
+        73
+      ]
     },
     {
       "name": "PolicyProgramChanged",
-      "discriminator": [235, 88, 111, 162, 87, 195, 1, 141]
+      "discriminator": [
+        235,
+        88,
+        111,
+        162,
+        87,
+        195,
+        1,
+        141
+      ]
     },
     {
       "name": "PolicyProgramRegistered",
-      "discriminator": [204, 39, 171, 246, 52, 45, 103, 117]
+      "discriminator": [
+        204,
+        39,
+        171,
+        246,
+        52,
+        45,
+        103,
+        117
+      ]
     },
     {
       "name": "ProgramInitialized",
-      "discriminator": [43, 70, 110, 241, 199, 218, 221, 245]
+      "discriminator": [
+        43,
+        70,
+        110,
+        241,
+        199,
+        218,
+        221,
+        245
+      ]
     },
     {
       "name": "ProgramPausedStateChanged",
-      "discriminator": [148, 9, 117, 157, 18, 25, 122, 32]
+      "discriminator": [
+        148,
+        9,
+        117,
+        157,
+        18,
+        25,
+        122,
+        32
+      ]
     },
     {
       "name": "SecurityEvent",
-      "discriminator": [16, 175, 241, 170, 85, 9, 201, 100]
+      "discriminator": [
+        16,
+        175,
+        241,
+        170,
+        85,
+        9,
+        201,
+        100
+      ]
     },
     {
       "name": "SmartWalletCreated",
-      "discriminator": [145, 37, 118, 21, 58, 251, 56, 128]
+      "discriminator": [
+        145,
+        37,
+        118,
+        21,
+        58,
+        251,
+        56,
+        128
+      ]
     },
     {
       "name": "SolTransfer",
-      "discriminator": [0, 186, 79, 129, 194, 76, 94, 9]
+      "discriminator": [
+        0,
+        186,
+        79,
+        129,
+        194,
+        76,
+        94,
+        9
+      ]
     },
     {
       "name": "TransactionExecuted",
-      "discriminator": [211, 227, 168, 14, 32, 111, 189, 210]
+      "discriminator": [
+        211,
+        227,
+        168,
+        14,
+        32,
+        111,
+        189,
+        210
+      ]
     }
   ],
   "errors": [
@@ -1332,7 +1953,9 @@
   "types": [
     {
       "name": "AuthenticatorAdded",
-      "docs": ["Event emitted when a new authenticator is added"],
+      "docs": [
+        "Event emitted when a new authenticator is added"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1347,7 +1970,10 @@
           {
             "name": "passkey_hash",
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1391,7 +2017,9 @@
     },
     {
       "name": "ConfigUpdated",
-      "docs": ["Event emitted when program configuration is updated"],
+      "docs": [
+        "Event emitted when program configuration is updated"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1426,7 +2054,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1464,7 +2095,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1488,7 +2122,9 @@
     },
     {
       "name": "ErrorEvent",
-      "docs": ["Event emitted for errors that are caught and handled"],
+      "docs": [
+        "Event emitted for errors that are caught and handled"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1525,7 +2161,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1561,7 +2200,9 @@
     },
     {
       "name": "FeeCollected",
-      "docs": ["Event emitted when a fee is collected"],
+      "docs": [
+        "Event emitted when a fee is collected"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1596,7 +2237,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1640,7 +2284,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1652,7 +2299,9 @@
     },
     {
       "name": "PolicyProgramChanged",
-      "docs": ["Event emitted when a policy program is changed"],
+      "docs": [
+        "Event emitted when a policy program is changed"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1681,7 +2330,9 @@
     },
     {
       "name": "PolicyProgramRegistered",
-      "docs": ["Event emitted when a policy program is added to registry"],
+      "docs": [
+        "Event emitted when a policy program is added to registry"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1710,14 +2361,18 @@
         "fields": [
           {
             "name": "programs",
-            "docs": ["List of registered policy program addresses"],
+            "docs": [
+              "List of registered policy program addresses"
+            ],
             "type": {
               "vec": "pubkey"
             }
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
           }
         ]
@@ -1725,7 +2380,9 @@
     },
     {
       "name": "ProgramInitialized",
-      "docs": ["Event emitted when program is initialized"],
+      "docs": [
+        "Event emitted when program is initialized"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1746,7 +2403,9 @@
     },
     {
       "name": "ProgramPausedStateChanged",
-      "docs": ["Event emitted when program is paused/unpaused"],
+      "docs": [
+        "Event emitted when program is paused/unpaused"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1767,7 +2426,9 @@
     },
     {
       "name": "SecurityEvent",
-      "docs": ["Event emitted for security-related events"],
+      "docs": [
+        "Event emitted for security-related events"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1798,28 +2459,38 @@
     },
     {
       "name": "SmartWallet",
-      "docs": ["Data account for a smart wallet"],
+      "docs": [
+        "Data account for a smart wallet"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "id",
-            "docs": ["Unique identifier for this smart wallet"],
+            "docs": [
+              "Unique identifier for this smart wallet"
+            ],
             "type": "u64"
           },
           {
             "name": "policy_program",
-            "docs": ["Policy program that governs this wallet's operations"],
+            "docs": [
+              "Policy program that governs this wallet's operations"
+            ],
             "type": "pubkey"
           },
           {
             "name": "last_nonce",
-            "docs": ["Last nonce used for message verification"],
+            "docs": [
+              "Last nonce used for message verification"
+            ],
             "type": "u64"
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
           }
         ]
@@ -1827,7 +2498,9 @@
     },
     {
       "name": "SmartWalletCreated",
-      "docs": ["Event emitted when a new smart wallet is created"],
+      "docs": [
+        "Event emitted when a new smart wallet is created"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1850,7 +2523,10 @@
           {
             "name": "passkey_hash",
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1862,7 +2538,9 @@
     },
     {
       "name": "SolTransfer",
-      "docs": ["Event emitted when a SOL transfer occurs"],
+      "docs": [
+        "Event emitted when a SOL transfer occurs"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1891,7 +2569,9 @@
     },
     {
       "name": "TransactionExecuted",
-      "docs": ["Event emitted when a transaction is executed"],
+      "docs": [
+        "Event emitted when a transaction is executed"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1938,14 +2618,21 @@
         "fields": [
           {
             "name": "owner_wallet",
-            "docs": ["Smart wallet that authorized this session"],
+            "docs": [
+              "Smart wallet that authorized this session"
+            ],
             "type": "pubkey"
           },
           {
             "name": "data_hash",
-            "docs": ["sha256 of transaction instruction data"],
+            "docs": [
+              "sha256 of transaction instruction data"
+            ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1954,7 +2641,10 @@
               "sha256 over ordered remaining account metas plus target program"
             ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1966,12 +2656,16 @@
           },
           {
             "name": "expires_at",
-            "docs": ["Unix expiration timestamp"],
+            "docs": [
+              "Unix expiration timestamp"
+            ],
             "type": "i64"
           },
           {
             "name": "rent_refund_to",
-            "docs": ["Where to refund rent when closing the session"],
+            "docs": [
+              "Where to refund rent when closing the session"
+            ],
             "type": "pubkey"
           }
         ]
@@ -2011,7 +2705,10 @@
           {
             "name": "passkey_pubkey",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -2069,22 +2766,31 @@
               "The public key of the passkey that can authorize transactions"
             ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "smart_wallet",
-            "docs": ["The smart wallet this authenticator belongs to"],
+            "docs": [
+              "The smart wallet this authenticator belongs to"
+            ],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["The credential ID this authenticator belongs to"],
+            "docs": [
+              "The credential ID this authenticator belongs to"
+            ],
             "type": "bytes"
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
           }
         ]

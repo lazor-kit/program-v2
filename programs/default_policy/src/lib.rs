@@ -17,8 +17,8 @@ pub mod default_policy {
         instructions::init_policy(ctx)
     }
 
-    pub fn check_policy(_ctx: Context<CheckPolicy>) -> Result<()> {
-        instructions::check_policy(_ctx)
+    pub fn check_policy(ctx: Context<CheckPolicy>) -> Result<()> {
+        instructions::check_policy(ctx)
     }
 
     pub fn add_device(ctx: Context<AddDevice>) -> Result<()> {

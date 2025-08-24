@@ -58,6 +58,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     for acc in policy_accs.iter() {
         hasher.hash(acc.key.as_ref());
         hasher.hash(&[acc.is_signer as u8]);
+        hasher.hash(&[acc.is_writable as u8]);
     }
     require!(
         hasher.result().to_bytes() == msg.policy_accounts_hash,
@@ -104,6 +105,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
         &args.policy_data,
         &ctx.accounts.policy_program,
         Some(policy_signer),
+        &[ctx.accounts.payer.key()],
     )?;
 
     // increment nonce

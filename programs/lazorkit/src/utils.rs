@@ -49,10 +49,11 @@ pub fn execute_cpi(
     data: &[u8],
     program: &AccountInfo,
     signer: Option<PdaSigner>,
+    allowed_signers: &[Pubkey],
 ) -> Result<()> {
     // Allocate a single Vec<u8> for the instruction – unavoidable because the SDK expects owned
     // data.  This keeps the allocation inside the helper and eliminates clones at the call-site.
-    let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer);
+    let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer, allowed_signers);
 
     match signer {
         Some(s) => {
@@ -73,6 +74,7 @@ fn create_cpi_instruction(
     data: Vec<u8>,
     program: &AccountInfo,
     pda_signer: &Option<PdaSigner>,
+    allowed_signers: &[Pubkey],
 ) -> Instruction {
     let pda_pubkey = pda_signer.as_ref().map(|pda| {
         let seed_slices: Vec<&[u8]> = pda.seeds.iter().map(|s| s.as_slice()).collect();
@@ -84,15 +86,11 @@ fn create_cpi_instruction(
         accounts: accounts
             .iter()
             .map(|acc| {
-                let is_signer = if let Some(pda_key) = pda_pubkey {
-                    acc.is_signer || *acc.key == pda_key
-                } else {
-                    acc.is_signer
-                };
-
+                let is_pda_signer = pda_pubkey.map_or(false, |pda_key| *acc.key == pda_key);
+                let is_allowed_outer = allowed_signers.iter().any(|k| k == acc.key);
                 AccountMeta {
                     pubkey: *acc.key,
-                    is_signer,
+                    is_signer: is_pda_signer || is_allowed_outer,
                     is_writable: acc.is_writable,
                 }
             })

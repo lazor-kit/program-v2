@@ -223,7 +223,7 @@ export class LazorkitClient {
     return await this.program.methods
       .createSmartWallet(args)
       .accountsPartial({
-        signer: payer,
+        payer,
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         policyProgramRegistry: this.policyProgramRegistryPda(),
@@ -294,7 +294,7 @@ export class LazorkitClient {
     remaining.push(...instructionToAccountMetas(policyInstruction, payer));
 
     return await this.program.methods
-              .invokePolicy(args)
+      .invokePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
@@ -340,7 +340,7 @@ export class LazorkitClient {
     remaining.push(...instructionToAccountMetas(initPolicyInstruction, payer));
 
     return await this.program.methods
-              .updatePolicy(args)
+      .updatePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
@@ -488,7 +488,8 @@ export class LazorkitClient {
       this.walletDevicePda(
         params.smartWallet,
         params.passkeySignature.passkeyPubkey
-      )
+      ),
+      params.smartWallet
     );
 
     if (params.policyInstruction) {
@@ -630,7 +631,8 @@ export class LazorkitClient {
       this.walletDevicePda(
         params.smartWallet,
         params.passkeySignature.passkeyPubkey
-      )
+      ),
+      params.smartWallet
     );
 
     if (params.policyInstruction) {
@@ -702,9 +704,11 @@ export class LazorkitClient {
         const { policyInstruction: policyIns, cpiInstruction } =
           action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteTransaction];
 
-        let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
-          this.walletDevicePda(smartWallet, passkeyPubkey)
-        );
+        let policyInstruction =
+          await this.defaultPolicyProgram.buildCheckPolicyIx(
+            this.walletDevicePda(smartWallet, passkeyPubkey),
+            params.smartWallet
+          );
 
         if (policyIns) {
           policyInstruction = policyIns;
