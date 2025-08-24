@@ -8,15 +8,15 @@ skip-lint = false
 
 [programs.mainnet]
 lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [programs.devnet]
 lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [programs.localnet]
 lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_rule = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 
 [registry]
 url = "https://api.apr.dev"

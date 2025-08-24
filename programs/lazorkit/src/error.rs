@@ -45,23 +45,23 @@ pub enum LazorKitError {
     #[msg("Nonce overflow: cannot increment further")]
     NonceOverflow,
 
-    // === Rule Program Errors ===
-    #[msg("Rule program not found in whitelist")]
-    RuleProgramNotWhitelisted,
-    #[msg("The whitelist of rule programs is full.")]
+    // === Policy Program Errors ===
+    #[msg("Policy program not found in registry")]
+    PolicyProgramNotRegistered,
+    #[msg("The policy program registry is full.")]
     WhitelistFull,
-    #[msg("Rule data is required but not provided")]
-    RuleDataRequired,
-    #[msg("Invalid instruction discriminator for check_rule")]
-    InvalidCheckRuleDiscriminator,
+    #[msg("Policy data is required but not provided")]
+    PolicyDataRequired,
+    #[msg("Invalid instruction discriminator for check_policy")]
+    InvalidCheckPolicyDiscriminator,
     #[msg("Invalid instruction discriminator for destroy")]
     InvalidDestroyDiscriminator,
-    #[msg("Invalid instruction discriminator for init_rule")]
-    InvalidInitRuleDiscriminator,
-    #[msg("Old and new rule programs are identical")]
-    RuleProgramsIdentical,
-    #[msg("Neither old nor new rule program is the default")]
-    NoDefaultRuleProgram,
+    #[msg("Invalid instruction discriminator for init_policy")]
+    InvalidInitPolicyDiscriminator,
+    #[msg("Old and new policy programs are identical")]
+    PolicyProgramsIdentical,
+    #[msg("Neither old nor new policy program is the default")]
+    NoDefaultPolicyProgram,
 
     // === Account & CPI Errors ===
     #[msg("Invalid remaining accounts")]
@@ -70,8 +70,8 @@ pub enum LazorKitError {
     CpiDataMissing,
     #[msg("CPI data is invalid or malformed")]
     InvalidCpiData,
-    #[msg("Insufficient remaining accounts for rule instruction")]
-    InsufficientRuleAccounts,
+    #[msg("Insufficient remaining accounts for policy instruction")]
+    InsufficientPolicyAccounts,
     #[msg("Insufficient remaining accounts for CPI instruction")]
     InsufficientCpiAccounts,
     #[msg("Account slice index out of bounds")]
@@ -102,16 +102,16 @@ pub enum LazorKitError {
     InvalidProgramId,
     #[msg("Program not executable")]
     ProgramNotExecutable,
-    #[msg("Smart wallet authenticator already initialized")]
-    SmartWalletAuthenticatorAlreadyInitialized,
+    #[msg("Wallet device already initialized")]
+    WalletDeviceAlreadyInitialized,
 
     // === Security Errors ===
     #[msg("Credential ID exceeds maximum allowed size")]
     CredentialIdTooLarge,
     #[msg("Credential ID cannot be empty")]
     CredentialIdEmpty,
-    #[msg("Rule data exceeds maximum allowed size")]
-    RuleDataTooLarge,
+    #[msg("Policy data exceeds maximum allowed size")]
+    PolicyDataTooLarge,
     #[msg("CPI data exceeds maximum allowed size")]
     CpiDataTooLarge,
     #[msg("Too many remaining accounts provided")]

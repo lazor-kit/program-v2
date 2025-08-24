@@ -1,12 +1,12 @@
 [package]
-name = "default_rule"
+name = "default_policy"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "default_rule"
+name = "default_policy"
 
 [features]
 default = []

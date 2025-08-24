@@ -7,8 +7,8 @@ use crate::error::LazorKitError;
 /// Maximum allowed size for credential ID to prevent DoS
 pub const MAX_CREDENTIAL_ID_SIZE: usize = 256;
 
-/// Maximum allowed size for rule data
-pub const MAX_RULE_DATA_SIZE: usize = 1024;
+/// Maximum allowed size for policy data
+pub const MAX_POLICY_DATA_SIZE: usize = 1024;
 
 /// Maximum allowed size for CPI data
 pub const MAX_CPI_DATA_SIZE: usize = 1024;
@@ -37,21 +37,18 @@ pub mod validation {
             credential_id.len() <= MAX_CREDENTIAL_ID_SIZE,
             LazorKitError::CredentialIdTooLarge
         );
-        require!(
-            !credential_id.is_empty(),
-            LazorKitError::CredentialIdEmpty
-        );
+        require!(!credential_id.is_empty(), LazorKitError::CredentialIdEmpty);
         Ok(())
     }
 
-    /// Validate rule data size
-    pub fn validate_rule_data(rule_data: &[u8]) -> Result<()> {
-        require!(
-            rule_data.len() <= MAX_RULE_DATA_SIZE,
-            LazorKitError::RuleDataTooLarge
-        );
-        Ok(())
-    }
+    /// Validate policy data size
+pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
+    require!(
+        policy_data.len() <= MAX_POLICY_DATA_SIZE,
+        LazorKitError::PolicyDataTooLarge
+    );
+    Ok(())
+}
 
     /// Validate CPI data
     pub fn validate_cpi_data(cpi_data: &[u8]) -> Result<()> {
@@ -59,10 +56,7 @@ pub mod validation {
             cpi_data.len() <= MAX_CPI_DATA_SIZE,
             LazorKitError::CpiDataTooLarge
         );
-        require!(
-            !cpi_data.is_empty(),
-            LazorKitError::CpiDataMissing
-        );
+        require!(!cpi_data.is_empty(), LazorKitError::CpiDataMissing);
         Ok(())
     }
 
@@ -74,10 +68,7 @@ pub mod validation {
             LazorKitError::CpiDataTooLarge
         );
         if !has_hash {
-            require!(
-                !cpi_data.is_empty(),
-                LazorKitError::CpiDataMissing
-            );
+            require!(!cpi_data.is_empty(), LazorKitError::CpiDataMissing);
         }
         Ok(())
     }
@@ -103,10 +94,7 @@ pub mod validation {
 
     /// Validate program is executable
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
-        require!(
-            program.executable,
-            LazorKitError::ProgramNotExecutable
-        );
+        require!(program.executable, LazorKitError::ProgramNotExecutable);
         Ok(())
     }
 
@@ -131,10 +119,7 @@ pub mod validation {
             account.key() == expected_key,
             LazorKitError::InvalidPDADerivation
         );
-        require!(
-            bump == expected_bump,
-            LazorKitError::InvalidBumpSeed
-        );
+        require!(bump == expected_bump, LazorKitError::InvalidBumpSeed);
         Ok(())
     }
 
@@ -160,7 +145,7 @@ impl RateLimiter {
         last_reset_slot: u64,
     ) -> Result<(bool, u8, u64)> {
         let slots_elapsed = current_slot.saturating_sub(last_reset_slot);
-        
+
         if slots_elapsed >= RATE_LIMIT_WINDOW_BLOCKS {
             // Reset window
             Ok((true, 1, current_slot))
@@ -172,4 +157,4 @@ impl RateLimiter {
             Err(LazorKitError::RateLimitExceeded.into())
         }
     }
-} 
+}

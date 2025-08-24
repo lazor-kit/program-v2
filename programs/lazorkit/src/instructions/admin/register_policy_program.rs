@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{Config, WhitelistRulePrograms},
+    state::{Config, PolicyProgramRegistry},
 };
 
-pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Result<()> {
+pub fn register_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
     let program_info = ctx
         .remaining_accounts
         .first()
@@ -15,27 +15,27 @@ pub fn add_whitelist_rule_program(ctx: Context<AddWhitelistRuleProgram>) -> Resu
         return err!(LazorKitError::ProgramNotExecutable);
     }
 
-    let whitelist = &mut ctx.accounts.whitelist_rule_programs;
+    let registry = &mut ctx.accounts.policy_program_registry;
     let program_id = program_info.key();
 
-    if whitelist.list.contains(&program_id) {
+    if registry.programs.contains(&program_id) {
         // The program is already in the whitelist, so we can just return Ok.
         // Or we can return an error, e.g., ProgramAlreadyWhitelisted.
         // For an "upsert" or "add" operation, returning Ok is idempotent and often preferred.
         return Ok(());
     }
 
-    if whitelist.list.len() >= whitelist.list.capacity() {
+    if registry.programs.len() >= registry.programs.capacity() {
         return err!(LazorKitError::WhitelistFull);
     }
 
-    whitelist.list.push(program_id);
+    registry.programs.push(program_id);
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct AddWhitelistRuleProgram<'info> {
+pub struct RegisterPolicyProgram<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
@@ -48,8 +48,8 @@ pub struct AddWhitelistRuleProgram<'info> {
 
     #[account(
         mut,
-        seeds = [WhitelistRulePrograms::PREFIX_SEED],
+        seeds = [PolicyProgramRegistry::PREFIX_SEED],
         bump,
     )]
-    pub whitelist_rule_programs: Account<'info, WhitelistRulePrograms>,
+    pub policy_program_registry: Account<'info, PolicyProgramRegistry>,
 }

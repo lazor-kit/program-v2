@@ -25,21 +25,21 @@ pub fn update_config(
             config.execute_fee = value;
             msg!("Updated execute_fee to: {}", value);
         }
-        UpdateConfigType::DefaultRuleProgram => {
-            let new_default_rule_program_info = ctx
+        UpdateConfigType::DefaultPolicyProgram => {
+            let new_default_policy_program_info = ctx
                 .remaining_accounts
                 .first()
                 .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
-            // Check if the new default rule program is executable
-            if !new_default_rule_program_info.executable {
+            // Check if the new default policy program is executable
+            if !new_default_policy_program_info.executable {
                 return err!(LazorKitError::ProgramNotExecutable);
             }
 
-            config.default_rule_program = new_default_rule_program_info.key();
+            config.default_policy_program = new_default_policy_program_info.key();
             msg!(
-                "Updated default_rule_program to: {}",
-                new_default_rule_program_info.key()
+                "Updated default_policy_program to: {}",
+                new_default_policy_program_info.key()
             );
         }
         UpdateConfigType::Admin => {

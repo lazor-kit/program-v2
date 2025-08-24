@@ -1,14 +1,14 @@
 import { PublicKey } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 
-export const RULE_SEED = Buffer.from('rule');
+export const POLICY_SEED = Buffer.from('policy');
 
-export function deriveRulePda(
+export function derivePolicyPda(
   programId: PublicKey,
-  smartWalletAuthenticator: PublicKey
+  walletDevice: PublicKey
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [RULE_SEED, smartWalletAuthenticator.toBuffer()],
+    [POLICY_SEED, walletDevice.toBuffer()],
     programId
   )[0];
 }

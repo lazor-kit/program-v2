@@ -1,5 +1,5 @@
-mod add_whitelist_rule_program;
+mod register_policy_program;
 mod update_config;
 
-pub use add_whitelist_rule_program::*;
+pub use register_policy_program::*;
 pub use update_config::*;

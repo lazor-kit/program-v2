@@ -6,58 +6,58 @@ pub trait Args {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CreatwSmartWalletArgs {
+pub struct CreateSmartWalletArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub credential_id: Vec<u8>,
-    pub rule_data: Vec<u8>,
+    pub policy_data: Vec<u8>,
     pub wallet_id: u64, // Random ID provided by client,
     pub is_pay_for_user: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ExecuteTxnArgs {
+pub struct ExecuteTransactionArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub split_index: u16,
-    pub rule_data: Vec<u8>,
+    pub policy_data: Vec<u8>,
     pub cpi_data: Vec<u8>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ChangeRuleArgs {
+pub struct UpdatePolicyArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub split_index: u16,
-    pub destroy_rule_data: Vec<u8>,
-    pub init_rule_data: Vec<u8>,
+    pub destroy_policy_data: Vec<u8>,
+    pub init_policy_data: Vec<u8>,
     pub new_authenticator: Option<NewAuthenticatorArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CallRuleArgs {
+pub struct InvokePolicyArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
-    pub rule_data: Vec<u8>,
+    pub policy_data: Vec<u8>,
     pub new_authenticator: Option<NewAuthenticatorArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CommitArgs {
+pub struct CreateSessionArgs {
     pub passkey_pubkey: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
-    pub rule_data: Vec<u8>,
+    pub policy_data: Vec<u8>,
     pub expires_at: i64,
 }
 
@@ -103,7 +103,7 @@ macro_rules! impl_args_validate {
     };
 }
 
-impl Args for CommitArgs {
+impl Args for CreateSessionArgs {
     fn validate(&self) -> Result<()> {
         // Common passkey/signature/client/auth checks
         require!(
@@ -123,15 +123,15 @@ impl Args for CommitArgs {
             self.verify_instruction_index < 255,
             LazorKitError::InvalidInstructionData
         );
-        // Split index bounds check left to runtime with account len; ensure rule_data present
+        // Split index bounds check left to runtime with account len; ensure policy_data present
         require!(
-            !self.rule_data.is_empty(),
+            !self.policy_data.is_empty(),
             LazorKitError::InvalidInstructionData
         );
         Ok(())
     }
 }
 
-impl_args_validate!(ExecuteTxnArgs);
-impl_args_validate!(ChangeRuleArgs);
-impl_args_validate!(CallRuleArgs);
+impl_args_validate!(ExecuteTransactionArgs);
+impl_args_validate!(UpdatePolicyArgs);
+impl_args_validate!(InvokePolicyArgs);

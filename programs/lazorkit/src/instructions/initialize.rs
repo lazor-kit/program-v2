@@ -2,23 +2,23 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{Config, WhitelistRulePrograms},
+    state::{Config, PolicyProgramRegistry},
 };
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-    // Check if the default rule program is executable
-    if !ctx.accounts.default_rule_program.executable {
+    // Check if the default policy program is executable
+    if !ctx.accounts.default_policy_program.executable {
         return err!(LazorKitError::ProgramNotExecutable);
     }
 
-    let whitelist_rule_programs = &mut ctx.accounts.whitelist_rule_programs;
-    whitelist_rule_programs.list = vec![ctx.accounts.default_rule_program.key()];
+    let policy_program_registry = &mut ctx.accounts.policy_program_registry;
+    policy_program_registry.programs = vec![ctx.accounts.default_policy_program.key()];
 
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
     config.create_smart_wallet_fee = 0; // LAMPORTS
     config.execute_fee = 0; // LAMPORTS
-    config.default_rule_program = ctx.accounts.default_rule_program.key();
+    config.default_policy_program = ctx.accounts.default_policy_program.key();
     config.is_paused = false;
 
     Ok(())
@@ -40,19 +40,19 @@ pub struct Initialize<'info> {
     )]
     pub config: Box<Account<'info, Config>>,
 
-    /// The list of whitelisted rule programs that can be used with smart wallets.
+    /// The registry of policy programs that can be used with smart wallets.
     #[account(
         init,
         payer = signer,
-        space = 8 + WhitelistRulePrograms::INIT_SPACE,
-        seeds = [WhitelistRulePrograms::PREFIX_SEED],
+        space = 8 + PolicyProgramRegistry::INIT_SPACE,
+        seeds = [PolicyProgramRegistry::PREFIX_SEED],
         bump
     )]
-    pub whitelist_rule_programs: Box<Account<'info, WhitelistRulePrograms>>,
+    pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
-    /// The default rule program to be used for new smart wallets.
+    /// The default policy program to be used for new smart wallets.
     /// CHECK: This is checked to be executable.
-    pub default_rule_program: UncheckedAccount<'info>,
+    pub default_policy_program: UncheckedAccount<'info>,
 
     /// The system program.
     pub system_program: Program<'info, System>,

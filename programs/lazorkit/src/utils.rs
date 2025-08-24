@@ -1,5 +1,5 @@
 use crate::constants::{PASSKEY_SIZE, SECP256R1_ID};
-use crate::state::{CallRuleMessage, ChangeRuleMessage, ExecuteMessage};
+use crate::state::{ExecuteMessage, InvokePolicyMessage, UpdatePolicyMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
@@ -240,7 +240,7 @@ pub fn get_account_slice<'a>(
 pub fn get_pda_signer(passkey: &[u8; PASSKEY_SIZE], wallet: Pubkey, bump: u8) -> PdaSigner {
     PdaSigner {
         seeds: vec![
-            crate::state::SmartWalletAuthenticator::PREFIX_SEED.to_vec(),
+            crate::state::WalletDevice::PREFIX_SEED.to_vec(),
             wallet.to_bytes().to_vec(),
             passkey.to_hashed_bytes(wallet).to_vec(),
         ],
@@ -250,12 +250,12 @@ pub fn get_pda_signer(passkey: &[u8; PASSKEY_SIZE], wallet: Pubkey, bump: u8) ->
 
 /// Helper: Check if a program is in the whitelist
 pub fn check_whitelist(
-    whitelist: &crate::state::WhitelistRulePrograms,
+    registry: &crate::state::PolicyProgramRegistry,
     program: &Pubkey,
 ) -> Result<()> {
     require!(
-        whitelist.list.contains(program),
-        crate::error::LazorKitError::RuleProgramNotWhitelisted
+        registry.programs.contains(program),
+        crate::error::LazorKitError::PolicyProgramNotRegistered
     );
     Ok(())
 }
@@ -264,7 +264,7 @@ pub fn check_whitelist(
 /// caller-provided type `T`.
 pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     ix_sysvar: &AccountInfo,
-    authenticator: &crate::state::SmartWalletAuthenticator,
+    device: &crate::state::WalletDevice,
     smart_wallet_key: Pubkey,
     passkey_pubkey: [u8; PASSKEY_SIZE],
     signature: Vec<u8>,
@@ -278,11 +278,11 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
 
     // 1) passkey & wallet checks
     require!(
-        authenticator.passkey_pubkey == passkey_pubkey,
+        device.passkey_pubkey == passkey_pubkey,
         crate::error::LazorKitError::PasskeyMismatch
     );
     require!(
-        authenticator.smart_wallet == smart_wallet_key,
+        device.smart_wallet == smart_wallet_key,
         crate::error::LazorKitError::SmartWalletMismatch
     );
 
@@ -309,7 +309,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
         .decode(challenge_clean)
         .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
 
-    verify_secp256r1_instruction(&secp_ix, authenticator.passkey_pubkey, message, signature)?;
+    verify_secp256r1_instruction(&secp_ix, device.passkey_pubkey, message, signature)?;
     // Verify header and return the typed message
     M::verify(challenge_bytes.clone(), last_nonce)?;
     let t: M = AnchorDeserialize::deserialize(&mut &challenge_bytes[..])
@@ -335,7 +335,7 @@ impl HasHeader for ExecuteMessage {
         }
     }
 }
-impl HasHeader for CallRuleMessage {
+impl HasHeader for InvokePolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -343,7 +343,7 @@ impl HasHeader for CallRuleMessage {
         }
     }
 }
-impl HasHeader for ChangeRuleMessage {
+impl HasHeader for UpdatePolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -352,7 +352,7 @@ impl HasHeader for ChangeRuleMessage {
     }
 }
 
-/// Helper: Split remaining accounts into `(rule_accounts, cpi_accounts)` using `split_index` coming from `Message`.
+/// Helper: Split remaining accounts into `(policy_accounts, cpi_accounts)` using `split_index` coming from `Message`.
 pub fn split_remaining_accounts<'a>(
     accounts: &'a [AccountInfo<'a>],
     split_index: u16,

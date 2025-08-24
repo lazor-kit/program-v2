@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{Args as _, ExecuteTxnArgs};
+use crate::instructions::{Args as _, ExecuteTransactionArgs};
 use crate::security::validation;
 use crate::state::ExecuteMessage;
 use crate::utils::{
@@ -13,9 +13,9 @@ use crate::{
 };
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn execute_txn_direct<'c: 'info, 'info>(
-    ctx: Context<'_, '_, 'c, 'info, ExecuteTxn<'info>>,
-    args: ExecuteTxnArgs,
+pub fn execute_transaction<'c: 'info, 'info>(
+    ctx: Context<'_, '_, 'c, 'info, ExecuteTransaction<'info>>,
+    args: ExecuteTransactionArgs,
 ) -> Result<()> {
     // 0. Validate args and global state
     args.validate()?;
@@ -25,91 +25,91 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
     // 0.1 Verify authorization and parse typed message
     let msg: ExecuteMessage = verify_authorization(
         &ctx.accounts.ix_sysvar,
-        &ctx.accounts.smart_wallet_authenticator,
+        &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
         args.passkey_pubkey,
         args.signature.clone(),
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_config.last_nonce,
+        ctx.accounts.smart_wallet_data.last_nonce,
     )?;
 
-    // 1. Validate and check rule program
-    let rule_program_info = &ctx.accounts.authenticator_program;
+    // 1. Validate and check policy program
+    let policy_program_info = &ctx.accounts.policy_program;
 
-    // Ensure rule program is executable
-    validation::validate_program_executable(rule_program_info)?;
+    // Ensure policy program is executable
+    validation::validate_program_executable(policy_program_info)?;
 
-    // Verify rule program is whitelisted
+    // Verify policy program is registered
     check_whitelist(
-        &ctx.accounts.whitelist_rule_programs,
-        &rule_program_info.key(),
+        &ctx.accounts.policy_program_registry,
+        &policy_program_info.key(),
     )?;
 
-    // Ensure rule program matches wallet configuration
+    // Ensure policy program matches wallet configuration
     require!(
-        rule_program_info.key() == ctx.accounts.smart_wallet_config.rule_program,
+        policy_program_info.key() == ctx.accounts.smart_wallet_data.policy_program,
         LazorKitError::InvalidProgramAddress
     );
 
-    // 2. Prepare PDA signer for rule CPI
-    let rule_signer = get_pda_signer(
+    // 2. Prepare PDA signer for policy CPI
+    let policy_signer = get_pda_signer(
         &args.passkey_pubkey,
         ctx.accounts.smart_wallet.key(),
-        ctx.accounts.smart_wallet_authenticator.bump,
+        ctx.accounts.wallet_device.bump,
     );
 
     // 3. Split remaining accounts
-    let (rule_accounts, cpi_accounts) =
+    let (policy_accounts, cpi_accounts) =
         split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
 
     // Validate account counts
     require!(
-        !rule_accounts.is_empty(),
-        LazorKitError::InsufficientRuleAccounts
+        !policy_accounts.is_empty(),
+        LazorKitError::InsufficientPolicyAccounts
     );
 
-    // 4. Verify rule discriminator on provided rule_data
-    let rule_data = &args.rule_data;
+    // 4. Verify policy discriminator on provided policy_data
+    let policy_data = &args.policy_data;
     require!(
-        rule_data.get(0..8) == Some(&sighash("global", "check_rule")),
-        LazorKitError::InvalidCheckRuleDiscriminator
+        policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
+        LazorKitError::InvalidCheckPolicyDiscriminator
     );
 
-    // 4.1 Validate rule_data size and compare hash from message
-    validation::validate_rule_data(rule_data)?;
+    // 4.1 Validate policy_data size and compare hash from message
+    validation::validate_policy_data(policy_data)?;
     require!(
-        hash(rule_data).to_bytes() == msg.rule_data_hash,
+        hash(policy_data).to_bytes() == msg.policy_data_hash,
         LazorKitError::InvalidInstructionData
     );
 
-    // 4.2 Compare rule accounts hash against message
+    // 4.2 Compare policy accounts hash against message
     let mut rh = Hasher::default();
-    rh.hash(rule_program_info.key.as_ref());
-    for acc in rule_accounts.iter() {
+    rh.hash(policy_program_info.key.as_ref());
+    for acc in policy_accounts.iter() {
         rh.hash(acc.key.as_ref());
-        rh.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
+        rh.hash(&[acc.is_signer as u8]);
     }
     require!(
-        rh.result().to_bytes() == msg.rule_accounts_hash,
+        rh.result().to_bytes() == msg.policy_accounts_hash,
         LazorKitError::InvalidAccountData
     );
 
-    // 5. Execute rule CPI to check if the transaction is allowed
+    // 5. Execute policy CPI to check if the transaction is allowed
     msg!(
-        "Executing rule check for smart wallet: {}",
+        "Executing policy check for smart wallet: {}",
         ctx.accounts.smart_wallet.key()
     );
 
     execute_cpi(
-        rule_accounts,
-        rule_data,
-        rule_program_info,
-        Some(rule_signer),
+        policy_accounts,
+        policy_data,
+        policy_program_info,
+        Some(policy_signer),
     )?;
 
-    msg!("Rule check passed");
+    msg!("Policy check passed");
 
     // 6. Validate CPI payload and compare hashes
     validation::validate_cpi_data(&args.cpi_data)?;
@@ -121,7 +121,7 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
     ch.hash(ctx.accounts.cpi_program.key.as_ref());
     for acc in cpi_accounts.iter() {
         ch.hash(acc.key.as_ref());
-        ch.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
+        ch.hash(&[acc.is_signer as u8]);
     }
     require!(
         ch.result().to_bytes() == msg.cpi_accounts_hash,
@@ -194,9 +194,9 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
         let wallet_signer = PdaSigner {
             seeds: vec![
                 SMART_WALLET_SEED.to_vec(),
-                ctx.accounts.smart_wallet_config.id.to_le_bytes().to_vec(),
+                ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
             ],
-            bump: ctx.accounts.smart_wallet_config.bump,
+            bump: ctx.accounts.smart_wallet_data.bump,
         };
 
         msg!(
@@ -213,9 +213,9 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
 
     msg!("Transaction executed successfully");
     // 8. Increment nonce
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
+    ctx.accounts.smart_wallet_data.last_nonce = ctx
         .accounts
-        .smart_wallet_config
+        .smart_wallet_data
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
@@ -223,14 +223,14 @@ pub fn execute_txn_direct<'c: 'info, 'info>(
 }
 
 #[derive(Accounts)]
-pub struct ExecuteTxn<'info> {
+pub struct ExecuteTransaction<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_config.id.to_le_bytes().as_ref()],
-        bump = smart_wallet_config.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
+        bump = smart_wallet_data.bump,
         owner = crate::ID,
     )]
     /// CHECK: PDA verified by seeds
@@ -238,23 +238,23 @@ pub struct ExecuteTxn<'info> {
 
     #[account(
         mut,
-        seeds = [crate::state::SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [crate::state::SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,
     )]
-    pub smart_wallet_config: Box<Account<'info, crate::state::SmartWalletConfig>>,
+    pub smart_wallet_data: Box<Account<'info, crate::state::SmartWallet>>,
 
     #[account(owner = crate::ID)]
-    pub smart_wallet_authenticator: Box<Account<'info, crate::state::SmartWalletAuthenticator>>,
+    pub wallet_device: Box<Account<'info, crate::state::WalletDevice>>,
     #[account(
-        seeds = [crate::state::WhitelistRulePrograms::PREFIX_SEED],
+        seeds = [crate::state::PolicyProgramRegistry::PREFIX_SEED],
         bump,
         owner = crate::ID
     )]
-    pub whitelist_rule_programs: Box<Account<'info, crate::state::WhitelistRulePrograms>>,
-    /// CHECK: must be executable (rule program)
+    pub policy_program_registry: Box<Account<'info, crate::state::PolicyProgramRegistry>>,
+    /// CHECK: must be executable (policy program)
     #[account(executable)]
-    pub authenticator_program: UncheckedAccount<'info>,
+    pub policy_program: UncheckedAccount<'info>,
     /// CHECK: must be executable (target program)
     #[account(executable)]
     pub cpi_program: UncheckedAccount<'info>,

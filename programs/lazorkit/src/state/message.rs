@@ -10,28 +10,28 @@ pub trait Message {
 pub struct ExecuteMessage {
     pub nonce: u64,
     pub current_timestamp: i64,
-    pub rule_data_hash: [u8; 32],
-    pub rule_accounts_hash: [u8; 32],
+    pub policy_data_hash: [u8; 32],
+    pub policy_accounts_hash: [u8; 32],
     pub cpi_data_hash: [u8; 32],
     pub cpi_accounts_hash: [u8; 32],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Default, Clone)]
-pub struct CallRuleMessage {
+pub struct InvokePolicyMessage {
     pub nonce: u64,
     pub current_timestamp: i64,
-    pub rule_data_hash: [u8; 32],
-    pub rule_accounts_hash: [u8; 32],
+    pub policy_data_hash: [u8; 32],
+    pub policy_accounts_hash: [u8; 32],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Default, Clone)]
-pub struct ChangeRuleMessage {
+pub struct UpdatePolicyMessage {
     pub nonce: u64,
     pub current_timestamp: i64,
-    pub old_rule_data_hash: [u8; 32],
-    pub old_rule_accounts_hash: [u8; 32],
-    pub new_rule_data_hash: [u8; 32],
-    pub new_rule_accounts_hash: [u8; 32],
+    pub old_policy_data_hash: [u8; 32],
+    pub old_policy_accounts_hash: [u8; 32],
+    pub new_policy_data_hash: [u8; 32],
+    pub new_policy_accounts_hash: [u8; 32],
 }
 
 macro_rules! impl_message_verify {
@@ -58,5 +58,5 @@ macro_rules! impl_message_verify {
 }
 
 impl_message_verify!(ExecuteMessage);
-impl_message_verify!(CallRuleMessage);
-impl_message_verify!(ChangeRuleMessage);
+impl_message_verify!(InvokePolicyMessage);
+impl_message_verify!(UpdatePolicyMessage);

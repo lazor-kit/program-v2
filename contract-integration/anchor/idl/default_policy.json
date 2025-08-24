@@ -1,7 +1,7 @@
 {
   "address": "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE",
   "metadata": {
-    "name": "default_rule",
+    "name": "default_policy",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
@@ -9,16 +9,7 @@
   "instructions": [
     {
       "name": "add_device",
-      "discriminator": [
-        21,
-        27,
-        66,
-        42,
-        18,
-        30,
-        14,
-        18
-      ],
+      "discriminator": [21, 27, 66, 42, 18, 30, 14, 18],
       "accounts": [
         {
           "name": "payer",
@@ -26,49 +17,39 @@
           "signer": true
         },
         {
-          "name": "smart_wallet_authenticator",
+          "name": "wallet_device",
           "signer": true
         },
         {
-          "name": "new_smart_wallet_authenticator"
+          "name": "new_wallet_device"
         },
         {
-          "name": "rule",
+          "name": "policy",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  114,
-                  117,
-                  108,
-                  101
-                ]
+                "value": [112, 111, 108, 105, 99, 121]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_authenticator"
+                "path": "wallet_device"
               }
             ]
           }
         },
         {
-          "name": "new_rule",
+          "name": "new_policy",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  114,
-                  117,
-                  108,
-                  101
-                ]
+                "value": [112, 111, 108, 105, 99, 121]
               },
               {
                 "kind": "account",
-                "path": "new_smart_wallet_authenticator"
+                "path": "new_wallet_device"
               }
             ]
           }
@@ -85,41 +66,23 @@
       "args": []
     },
     {
-      "name": "check_rule",
-      "discriminator": [
-        215,
-        90,
-        220,
-        175,
-        191,
-        212,
-        144,
-        147
-      ],
+      "name": "check_policy",
+      "discriminator": [28, 88, 170, 179, 239, 136, 25, 35],
       "accounts": [
         {
-          "name": "smart_wallet_authenticator",
+          "name": "wallet_device",
           "signer": true
         },
         {
-          "name": "rule",
+          "name": "policy",
           "writable": true
         }
       ],
       "args": []
     },
     {
-      "name": "init_rule",
-      "discriminator": [
-        129,
-        224,
-        96,
-        169,
-        247,
-        125,
-        74,
-        118
-      ],
+      "name": "init_policy",
+      "discriminator": [45, 234, 110, 100, 209, 146, 191, 86],
       "accounts": [
         {
           "name": "payer",
@@ -130,29 +93,22 @@
           "name": "smart_wallet"
         },
         {
-          "name": "smart_wallet_authenticator",
-          "docs": [
-            "CHECK"
-          ],
+          "name": "wallet_device",
+          "docs": ["CHECK"],
           "signer": true
         },
         {
-          "name": "rule",
+          "name": "policy",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  114,
-                  117,
-                  108,
-                  101
-                ]
+                "value": [112, 111, 108, 105, 99, 121]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_authenticator"
+                "path": "wallet_device"
               }
             ]
           }
@@ -171,30 +127,12 @@
   ],
   "accounts": [
     {
-      "name": "Rule",
-      "discriminator": [
-        82,
-        10,
-        53,
-        40,
-        250,
-        61,
-        143,
-        130
-      ]
+      "name": "Policy",
+      "discriminator": [222, 135, 7, 163, 235, 177, 33, 68]
     },
     {
-      "name": "SmartWalletAuthenticator",
-      "discriminator": [
-        126,
-        36,
-        85,
-        166,
-        77,
-        139,
-        221,
-        129
-      ]
+      "name": "WalletDevice",
+      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
     }
   ],
   "errors": [
@@ -209,7 +147,7 @@
   ],
   "types": [
     {
-      "name": "Rule",
+      "name": "Policy",
       "type": {
         "kind": "struct",
         "fields": [
@@ -218,16 +156,16 @@
             "type": "pubkey"
           },
           {
-            "name": "smart_wallet_authenticator",
+            "name": "wallet_device",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "SmartWalletAuthenticator",
+      "name": "WalletDevice",
       "docs": [
-        "Account that stores authentication data for a smart wallet"
+        "Account that stores a device (passkey) for authentication to a smart wallet"
       ],
       "type": {
         "kind": "struct",
@@ -238,31 +176,22 @@
               "The public key of the passkey that can authorize transactions"
             ],
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
             "name": "smart_wallet",
-            "docs": [
-              "The smart wallet this authenticator belongs to"
-            ],
+            "docs": ["The smart wallet this authenticator belongs to"],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": [
-              "The credential ID this authenticator belongs to"
-            ],
+            "docs": ["The credential ID this authenticator belongs to"],
             "type": "bytes"
           },
           {
             "name": "bump",
-            "docs": [
-              "Bump seed for PDA derivation"
-            ],
+            "docs": ["Bump seed for PDA derivation"],
             "type": "u8"
           }
         ]

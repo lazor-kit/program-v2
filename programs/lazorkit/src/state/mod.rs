@@ -1,17 +1,17 @@
 mod config;
 pub mod message;
-mod cpi_commit;
-mod smart_wallet_authenticator;
-mod smart_wallet_config;
+mod transaction_session;
+mod wallet_device;
+mod smart_wallet;
 // mod smart_wallet_seq;  // No longer needed - using random IDs instead
-mod whitelist_rule_programs;
+mod policy_program_registry;
 mod writer;
 
 pub use config::*;
 pub use message::*;
-pub use cpi_commit::*;
-pub use smart_wallet_authenticator::*;
-pub use smart_wallet_config::*;
+pub use transaction_session::*;
+pub use wallet_device::*;
+pub use smart_wallet::*;
 // pub use smart_wallet_seq::*;  // No longer needed - using random IDs instead
-pub use whitelist_rule_programs::*;
+pub use policy_program_registry::*;
 pub use writer::*;

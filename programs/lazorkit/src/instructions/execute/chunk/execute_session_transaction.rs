@@ -1,52 +1,61 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::{hash, Hasher};
 
 use crate::constants::SOL_TRANSFER_DISCRIMINATOR;
 use crate::error::LazorKitError;
 use crate::security::validation;
-use crate::state::{Config, CpiCommit, SmartWalletConfig};
+use crate::state::{Config, SmartWallet, TransactionSession};
 use crate::utils::{execute_cpi, transfer_sol_from_pda, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 
-pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> Result<()> {
+pub fn execute_session_transaction(
+    ctx: Context<ExecuteSessionTransaction>,
+    cpi_data: Vec<u8>,
+) -> Result<()> {
+    let cpi_accounts = &ctx.remaining_accounts[..];
+
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
-    if let Err(_) = validation::validate_remaining_accounts(&ctx.remaining_accounts) {
+    if let Err(_) = validation::validate_remaining_accounts(&cpi_accounts) {
         return Ok(()); // graceful no-op; account will still be closed below
     }
 
-    let commit = &mut ctx.accounts.cpi_commit;
+    let session = &mut ctx.accounts.transaction_session;
 
     // Expiry and usage
     let now = Clock::get()?.unix_timestamp;
-    if commit.expires_at < now {
+    if session.expires_at < now {
+        msg!("Transaction session expired");
         return Ok(());
     }
 
     // Bind wallet and target program
-    if commit.owner_wallet != ctx.accounts.smart_wallet.key() {
+    if session.owner_wallet != ctx.accounts.smart_wallet.key() {
+        msg!("The session owner does not match with smart wallet");
         return Ok(());
     }
 
     // Validate program is executable only (no whitelist/rule checks here)
     if !ctx.accounts.cpi_program.executable {
+        msg!("Cpi program must executable");
         return Ok(());
     }
 
-    // Compute accounts hash from remaining accounts and compare
-    let mut hasher = anchor_lang::solana_program::hash::Hasher::default();
-    hasher.hash(ctx.accounts.cpi_program.key.as_ref());
-    for acc in ctx.remaining_accounts.iter() {
-        hasher.hash(acc.key.as_ref());
-        hasher.hash(&[acc.is_writable as u8, acc.is_signer as u8]);
-    }
-    let computed = hasher.result().to_bytes();
-    if computed != commit.accounts_hash {
+    // Verify data_hash bound with authorized nonce to prevent cross-session reuse
+    let data_hash = hash(&cpi_data).to_bytes();
+    if data_hash != session.data_hash {
+        msg!("Transaction data does not match session");
         return Ok(());
     }
 
-    // Verify data_hash bound with authorized nonce to prevent cross-commit reuse
-    let data_hash = anchor_lang::solana_program::hash::hash(&cpi_data).to_bytes();
-    if data_hash != commit.data_hash {
+    let mut ch = Hasher::default();
+    ch.hash(ctx.accounts.cpi_program.key.as_ref());
+    for acc in cpi_accounts.iter() {
+        ch.hash(acc.key.as_ref());
+        ch.hash(&[acc.is_signer as u8]);
+    }
+    if ch.result().to_bytes() != session.accounts_hash {
+        msg!("Transaction accounts do not match session");
         return Ok(());
     }
 
@@ -55,7 +64,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
     {
         // === Native SOL Transfer ===
         require!(
-            ctx.remaining_accounts.len() >= 2,
+            cpi_accounts.len() >= 2,
             LazorKitError::SolTransferInsufficientAccounts
         );
 
@@ -71,7 +80,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         validation::validate_lamport_amount(amount)?;
 
         // Ensure destination is valid
-        let destination_account = &ctx.remaining_accounts[1];
+        let destination_account = &cpi_accounts[1];
         require!(
             destination_account.key() != ctx.accounts.smart_wallet.key(),
             LazorKitError::InvalidAccountData
@@ -110,7 +119,7 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
 
         // Ensure sufficient accounts for CPI
         require!(
-            !ctx.remaining_accounts.is_empty(),
+            !cpi_accounts.is_empty(),
             LazorKitError::InsufficientCpiAccounts
         );
 
@@ -118,9 +127,9 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         let wallet_signer = PdaSigner {
             seeds: vec![
                 SMART_WALLET_SEED.to_vec(),
-                ctx.accounts.smart_wallet_config.id.to_le_bytes().to_vec(),
+                ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
             ],
-            bump: ctx.accounts.smart_wallet_config.bump,
+            bump: ctx.accounts.smart_wallet_data.bump,
         };
 
         msg!(
@@ -129,18 +138,26 @@ pub fn execute_committed(ctx: Context<ExecuteCommitted>, cpi_data: Vec<u8>) -> R
         );
 
         execute_cpi(
-            ctx.remaining_accounts,
+            cpi_accounts,
             &cpi_data,
             &ctx.accounts.cpi_program,
             Some(wallet_signer),
         )?;
     }
 
+    // Advance nonce
+    ctx.accounts.smart_wallet_data.last_nonce = ctx
+        .accounts
+        .smart_wallet_data
+        .last_nonce
+        .checked_add(1)
+        .ok_or(LazorKitError::NonceOverflow)?;
+
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct ExecuteCommitted<'info> {
+pub struct ExecuteSessionTransaction<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -149,8 +166,8 @@ pub struct ExecuteCommitted<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_config.id.to_le_bytes().as_ref()],
-        bump = smart_wallet_config.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
+        bump = smart_wallet_data.bump,
         owner = ID,
     )]
     /// CHECK: PDA verified
@@ -158,20 +175,20 @@ pub struct ExecuteCommitted<'info> {
 
     #[account(
         mut,
-        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
+    pub smart_wallet_data: Box<Account<'info, SmartWallet>>,
 
     /// CHECK: target CPI program
     pub cpi_program: UncheckedAccount<'info>,
 
-    /// Commit to execute. Closed on success to refund rent.
-    #[account(mut, close = commit_refund)]
-    pub cpi_commit: Account<'info, CpiCommit>,
+    /// Transaction session to execute. Closed on success to refund rent.
+    #[account(mut, close = session_refund)]
+    pub transaction_session: Account<'info, TransactionSession>,
 
-    /// CHECK: rent refund destination (stored in commit)
-    #[account(mut, address = cpi_commit.rent_refund_to)]
-    pub commit_refund: UncheckedAccount<'info>,
+    /// CHECK: rent refund destination (stored in session)
+    #[account(mut, address = transaction_session.rent_refund_to)]
+    pub session_refund: UncheckedAccount<'info>,
 }
