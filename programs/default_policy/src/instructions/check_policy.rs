@@ -15,8 +15,8 @@ pub struct CheckPolicy<'info> {
     #[account(
         mut,
         owner = ID,
-        constraint = wallet_device.key() == policy.wallet_device @ PolicyError::UnAuthorize,
-        constraint = policy.smart_wallet == smart_wallet.key() @ PolicyError::UnAuthorize,
+        constraint = wallet_device.key() == policy.wallet_device @ PolicyError::Unauthorized,
+        constraint = policy.smart_wallet == smart_wallet.key() @ PolicyError::Unauthorized,
     )]
     pub policy: Account<'info, Policy>,
 }

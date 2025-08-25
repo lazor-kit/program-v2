@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
 
-use crate::error::LazorKitError;
-
 // Security constants and validation utilities
 
 /// Maximum allowed size for credential ID to prevent DoS
@@ -99,7 +97,10 @@ pub mod validation {
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
         require!(program.executable, LazorKitError::ProgramNotExecutable);
 
-        require!(program.key() != crate::ID, LazorKitError::ReentrancyDetected);
+        require!(
+            program.key() != crate::ID,
+            LazorKitError::ReentrancyDetected
+        );
         Ok(())
     }
 

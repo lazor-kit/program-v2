@@ -53,7 +53,7 @@ pub fn execute_session_transaction(
 
     // Validate program is executable only (no whitelist/rule checks here)
     if !ctx.accounts.cpi_program.executable {
-        msg!("Cpi program must executable");
+        msg!("Cpi program must be executable");
         return Ok(());
     }
 

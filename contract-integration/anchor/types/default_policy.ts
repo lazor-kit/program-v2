@@ -152,7 +152,7 @@ export type DefaultPolicy = {
     },
     {
       code: 6001;
-      name: 'unAuthorize';
+      name: 'unauthorized';
       msg: 'Unauthorized to access smart wallet';
     }
   ];
