@@ -56,7 +56,7 @@ describe('Test smart wallet with default policy', () => {
       passkeyPubkey
     );
 
-    const credentialId = base64.encode(Buffer.from('testing something')); // random string
+    const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const { transaction: createSmartWalletTxn } =
       await lazorkitProgram.createSmartWalletTransaction({

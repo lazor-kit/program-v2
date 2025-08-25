@@ -39,7 +39,7 @@ pub struct PolicyProgramChanged {
 #[event]
 pub struct AuthenticatorAdded {
     pub smart_wallet: Pubkey,
-    pub new_authenticator: Pubkey,
+    pub new_wallet_device: Pubkey,
     pub passkey_hash: [u8; 32],
     pub added_by: Pubkey,
     pub timestamp: i64,

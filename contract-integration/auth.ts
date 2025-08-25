@@ -42,7 +42,13 @@ export function convertPasskeySignatureToInstructionArgs(
   return {
     passkeyPubkey: passkeySignature.passkeyPubkey,
     signature: Buffer.from(passkeySignature.signature64, 'base64'),
-    clientDataJsonRaw: Buffer.from(passkeySignature.clientDataJsonRaw64, 'base64'),
-    authenticatorDataRaw: Buffer.from(passkeySignature.authenticatorDataRaw64, 'base64'),
+    clientDataJsonRaw: Buffer.from(
+      passkeySignature.clientDataJsonRaw64,
+      'base64'
+    ),
+    authenticatorDataRaw: Buffer.from(
+      passkeySignature.authenticatorDataRaw64,
+      'base64'
+    ),
   };
 }

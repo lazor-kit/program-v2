@@ -20,8 +20,8 @@ export type ExecuteTransactionArgs =
 export type UpdatePolicyArgs = anchor.IdlTypes<Lazorkit>['updatePolicyArgs'];
 export type InvokePolicyArgs = anchor.IdlTypes<Lazorkit>['invokePolicyArgs'];
 export type CreateSessionArgs = anchor.IdlTypes<Lazorkit>['createSessionArgs'];
-export type NewAuthenticatorArgs =
-  anchor.IdlTypes<Lazorkit>['newAuthenticatorArgs'];
+export type NewWalletDeviceArgs =
+  anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
 
 // ============================================================================
 // Configuration Types
@@ -44,7 +44,7 @@ export type ArgsByAction = {
   };
   [SmartWalletAction.InvokePolicy]: {
     policyInstruction: anchor.web3.TransactionInstruction;
-    newAuthenticator: {
+    newWalletDevice: {
       passkeyPubkey: number[];
       credentialIdBase64: string;
     } | null;
@@ -52,7 +52,7 @@ export type ArgsByAction = {
   [SmartWalletAction.UpdatePolicy]: {
     destroyPolicyIns: anchor.web3.TransactionInstruction;
     initPolicyIns: anchor.web3.TransactionInstruction;
-    newAuthenticator: {
+    newWalletDevice: {
       passkeyPubkey: number[];
       credentialIdBase64: string;
     } | null;
@@ -64,7 +64,9 @@ export type ArgsByAction = {
  * Can be used for message building, SDK operations, or any other context
  * where you need to specify a smart wallet action with its arguments.
  */
-export type SmartWalletActionArgs<K extends SmartWalletAction = SmartWalletAction> = {
+export type SmartWalletActionArgs<
+  K extends SmartWalletAction = SmartWalletAction
+> = {
   type: K;
   args: ArgsByAction[K];
 };
@@ -109,7 +111,7 @@ export interface InvokePolicyParams {
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
   policyInstruction: anchor.web3.TransactionInstruction;
-  newDevice?: NewPasskeyDevice | null;
+  newWalletDevice?: NewPasskeyDevice | null;
 }
 
 export interface UpdatePolicyParams {
@@ -118,7 +120,7 @@ export interface UpdatePolicyParams {
   passkeySignature: PasskeySignature;
   destroyPolicyInstruction: anchor.web3.TransactionInstruction;
   initPolicyInstruction: anchor.web3.TransactionInstruction;
-  newDevice?: NewPasskeyDevice | null;
+  newWalletDevice?: NewPasskeyDevice | null;
 }
 
 export interface CreateTransactionSessionParams {

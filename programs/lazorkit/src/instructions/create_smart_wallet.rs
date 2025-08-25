@@ -28,18 +28,15 @@ pub fn create_smart_wallet(
         LazorKitError::InvalidPasskeyFormat
     );
 
-    // Validate wallet ID is not zero (reserved)
-    require!(args.wallet_id != 0, LazorKitError::InvalidSequenceNumber);
-
-    // Additional validation: ensure wallet ID is within reasonable bounds
+    // Validate wallet ID is not zero (reserved) and not too large
     require!(
-        args.wallet_id < u64::MAX,
+        args.wallet_id != 0 && args.wallet_id < u64::MAX,
         LazorKitError::InvalidSequenceNumber
     );
 
     // === Configuration ===
     let wallet_data = &mut ctx.accounts.smart_wallet_data;
-    let smart_wallet_authenticator = &mut ctx.accounts.wallet_device;
+    let wallet_device = &mut ctx.accounts.wallet_device;
 
     // Validate default policy program
     validation::validate_program_executable(&ctx.accounts.default_policy_program)?;
@@ -53,7 +50,7 @@ pub fn create_smart_wallet(
     });
 
     // === Initialize Wallet Device ===
-    smart_wallet_authenticator.set_inner(WalletDevice {
+    wallet_device.set_inner(WalletDevice {
         passkey_pubkey: args.passkey_pubkey,
         smart_wallet: ctx.accounts.smart_wallet.key(),
         credential_id: args.credential_id.clone(),
@@ -78,7 +75,8 @@ pub fn create_smart_wallet(
         &ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.default_policy_program,
-        Some(signer),
+        signer,
+        &[ctx.accounts.payer.key()],
     )?;
 
     if !args.is_pay_for_user {
@@ -94,16 +92,13 @@ pub fn create_smart_wallet(
                 LazorKitError::InsufficientBalanceForFee
             );
 
-            transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.signer, fee)?;
-        }
+            transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.payer, fee)?;
 
-        // Emit fee collection event if fee was charged
-        if fee > 0 {
             emit!(FeeCollected {
                 smart_wallet: ctx.accounts.smart_wallet.key(),
                 fee_type: "CREATE_WALLET".to_string(),
                 amount: fee,
-                recipient: ctx.accounts.signer.key(),
+                recipient: ctx.accounts.payer.key(),
                 timestamp: Clock::get()?.unix_timestamp,
             });
         }
@@ -130,7 +125,7 @@ pub fn create_smart_wallet(
 #[instruction(args: CreateSmartWalletArgs)]
 pub struct CreateSmartWallet<'info> {
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub payer: Signer<'info>,
 
     /// Policy program registry
     #[account(
@@ -144,7 +139,7 @@ pub struct CreateSmartWallet<'info> {
     /// The smart wallet PDA being created with random ID
     #[account(
         init,
-        payer = signer,
+        payer = payer,
         space = 0,
         seeds = [SMART_WALLET_SEED, args.wallet_id.to_le_bytes().as_ref()],
         bump
@@ -155,7 +150,7 @@ pub struct CreateSmartWallet<'info> {
     /// Smart wallet data
     #[account(
         init,
-        payer = signer,
+        payer = payer,
         space = 8 + SmartWallet::INIT_SPACE,
         seeds = [SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump
@@ -165,7 +160,7 @@ pub struct CreateSmartWallet<'info> {
     /// Wallet device for the passkey
     #[account(
         init,
-        payer = signer,
+        payer = payer,
         space = 8 + WalletDevice::INIT_SPACE,
         seeds = [
             WalletDevice::PREFIX_SEED,

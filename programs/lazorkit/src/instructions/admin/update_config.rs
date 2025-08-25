@@ -49,7 +49,7 @@ pub fn update_config(
                 .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
             // Cannot set admin to system program or this program
-            require!(
+        require!(
                 new_admin_info.key() != anchor_lang::system_program::ID
                     && new_admin_info.key() != crate::ID,
                 LazorKitError::InvalidAuthority

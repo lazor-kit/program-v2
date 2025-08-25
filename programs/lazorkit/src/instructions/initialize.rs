@@ -32,7 +32,7 @@ pub struct Initialize<'info> {
 
     /// The program's configuration account.
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = 8 + Config::INIT_SPACE,
         seeds = [Config::PREFIX_SEED],

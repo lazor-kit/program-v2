@@ -33,7 +33,9 @@ const client = new LazorkitClient(connection);
 const { transaction, smartWalletId, smartWallet } =
   await client.createSmartWalletTransaction({
     payer: payer.publicKey,
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     credentialIdBase64: 'base64-credential-id',
     isPayForUser: true,
   });
@@ -67,7 +69,9 @@ import { buildPasskeyVerificationInstruction } from './contract-integration';
 
 // Build verification instruction
 const authInstruction = buildPasskeyVerificationInstruction({
-  passkeyPubkey: [/* 33 bytes */],
+  passkeyPubkey: [
+    /* 33 bytes */
+  ],
   signature64: 'base64-signature',
   clientDataJsonRaw64: 'base64-client-data',
   authenticatorDataRaw64: 'base64-auth-data',
@@ -188,7 +192,9 @@ Helper methods for common operations:
 ```typescript
 await client.createSmartWalletTx({
   payer: payer.publicKey,
-  passkeyPubkey: [/* bytes */],
+  passkeyPubkey: [
+    /* bytes */
+  ],
   credentialIdBase64: 'base64',
   ruleInstruction: null,
 });
@@ -199,7 +205,9 @@ await client.createSmartWalletTx({
 ```typescript
 await client.createSmartWalletTransaction({
   payer: payer.publicKey,
-  passkeyPubkey: [/* bytes */],
+  passkeyPubkey: [
+    /* bytes */
+  ],
   credentialIdBase64: 'base64',
   policyInstruction: null,
 });
@@ -222,13 +230,16 @@ await client.createSmartWalletTransaction({
    - Consistent naming: `policyInstruction` instead of `ruleInstruction`
 
 3. **Return Types**: More consistent and informative
+
    - All high-level methods return `VersionedTransaction`
    - Legacy methods return `Transaction` for backward compatibility
 
 4. **Type Names**: More accurate and generic
+
    - `MessageArgs` → `SmartWalletActionArgs` (can be used anywhere, not just messages)
 
 5. **Client Names**: Updated for consistency
+
    - `DefaultRuleClient` → `DefaultPolicyClient`
 
 6. **Terminology**: All "rule" references changed to "policy"
@@ -247,7 +258,9 @@ it('should create smart wallet successfully', async () => {
   const { transaction, smartWalletId, smartWallet } =
     await client.createSmartWalletTransaction({
       payer: payer.publicKey,
-      passkeyPubkey: [/* test bytes */],
+      passkeyPubkey: [
+        /* test bytes */
+      ],
       credentialIdBase64: 'test-credential',
       isPayForUser: true,
     });
@@ -272,7 +285,9 @@ it('should create smart wallet successfully', async () => {
 const { transaction, smartWalletId, smartWallet } =
   await client.createSmartWalletTransaction({
     payer: payer.publicKey,
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     credentialIdBase64: 'base64-credential',
     isPayForUser: true,
   });
@@ -285,7 +300,9 @@ const transaction = await client.executeTransactionWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -302,7 +319,9 @@ const sessionTx = await client.createTransactionSessionWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [/* 33 bytes */],
+    passkeyPubkey: [
+      /* 33 bytes */
+    ],
     signature64: 'base64-signature',
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
@@ -325,7 +344,9 @@ const message = await client.buildAuthorizationMessage({
   },
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
-  passkeyPubkey: [/* 33 bytes */],
+  passkeyPubkey: [
+    /* 33 bytes */
+  ],
 });
 ```
 

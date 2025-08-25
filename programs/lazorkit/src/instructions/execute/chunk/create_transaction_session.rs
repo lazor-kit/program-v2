@@ -57,6 +57,7 @@ pub fn create_transaction_session(
     for a in policy_accounts.iter() {
         rh.hash(a.key.as_ref());
         rh.hash(&[a.is_signer as u8]);
+        rh.hash(&[a.is_writable as u8]);
     }
     require!(
         rh.result().to_bytes() == msg.policy_accounts_hash,
@@ -77,7 +78,8 @@ pub fn create_transaction_session(
         policy_accounts,
         &args.policy_data,
         &ctx.accounts.policy_program,
-        Some(policy_signer),
+        policy_signer,
+        &[],
     )?;
 
     // 5. Write session using hashes from message
@@ -88,14 +90,6 @@ pub fn create_transaction_session(
     session.authorized_nonce = ctx.accounts.smart_wallet_data.last_nonce;
     session.expires_at = args.expires_at;
     session.rent_refund_to = ctx.accounts.payer.key();
-
-    // 6. Increment nonce
-    ctx.accounts.smart_wallet_data.last_nonce = ctx
-        .accounts
-        .smart_wallet_data
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
 
     Ok(())
 }

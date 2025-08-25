@@ -223,7 +223,7 @@ export class LazorkitClient {
     return await this.program.methods
       .createSmartWallet(args)
       .accountsPartial({
-        signer: payer,
+        payer,
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         policyProgramRegistry: this.policyProgramRegistryPda(),
@@ -279,10 +279,10 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
-    if (args.newAuthenticator) {
+    if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newAuthenticator.passkeyPubkey
+        args.newWalletDevice.passkeyPubkey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -294,7 +294,7 @@ export class LazorkitClient {
     remaining.push(...instructionToAccountMetas(policyInstruction, payer));
 
     return await this.program.methods
-              .invokePolicy(args)
+      .invokePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
@@ -322,10 +322,10 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
 
-    if (args.newAuthenticator) {
+    if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newAuthenticator.passkeyPubkey
+        args.newWalletDevice.passkeyPubkey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -340,7 +340,7 @@ export class LazorkitClient {
     remaining.push(...instructionToAccountMetas(initPolicyInstruction, payer));
 
     return await this.program.methods
-              .updatePolicy(args)
+      .updatePolicy(args)
       .accountsPartial({
         payer,
         config: this.configPda(),
@@ -488,7 +488,8 @@ export class LazorkitClient {
       this.walletDevicePda(
         params.smartWallet,
         params.passkeySignature.passkeyPubkey
-      )
+      ),
+      params.smartWallet
     );
 
     if (params.policyInstruction) {
@@ -542,11 +543,11 @@ export class LazorkitClient {
       params.smartWallet,
       {
         ...signatureArgs,
-        newAuthenticator: params.newDevice
+        newWalletDevice: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(
-                params.newDevice.credentialIdBase64,
+                params.newWalletDevice.credentialIdBase64,
                 'base64'
               ),
             }
@@ -590,13 +591,13 @@ export class LazorkitClient {
         destroyPolicyData: params.destroyPolicyInstruction.data,
         initPolicyData: params.initPolicyInstruction.data,
         splitIndex:
-          (params.newDevice ? 1 : 0) +
+          (params.newWalletDevice ? 1 : 0) +
           params.destroyPolicyInstruction.keys.length,
-        newAuthenticator: params.newDevice
+        newWalletDevice: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newDevice.passkeyPubkey),
+              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
               credentialId: Buffer.from(
-                params.newDevice.credentialIdBase64,
+                params.newWalletDevice.credentialIdBase64,
                 'base64'
               ),
             }
@@ -630,7 +631,8 @@ export class LazorkitClient {
       this.walletDevicePda(
         params.smartWallet,
         params.passkeySignature.passkeyPubkey
-      )
+      ),
+      params.smartWallet
     );
 
     if (params.policyInstruction) {
@@ -702,9 +704,11 @@ export class LazorkitClient {
         const { policyInstruction: policyIns, cpiInstruction } =
           action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteTransaction];
 
-        let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
-          this.walletDevicePda(smartWallet, passkeyPubkey)
-        );
+        let policyInstruction =
+          await this.defaultPolicyProgram.buildCheckPolicyIx(
+            this.walletDevicePda(smartWallet, passkeyPubkey),
+            params.smartWallet
+          );
 
         if (policyIns) {
           policyInstruction = policyIns;
@@ -714,6 +718,7 @@ export class LazorkitClient {
 
         message = buildExecuteMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           policyInstruction,
@@ -729,6 +734,7 @@ export class LazorkitClient {
 
         message = buildInvokePolicyMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           policyInstruction
@@ -743,6 +749,7 @@ export class LazorkitClient {
 
         message = buildUpdatePolicyMessage(
           payer,
+          smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           destroyPolicyIns,

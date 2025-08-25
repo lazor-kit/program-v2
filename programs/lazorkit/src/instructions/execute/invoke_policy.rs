@@ -16,7 +16,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
-    // Policy program must be the configured one and registered
+// Policy program must be the configured one and registered
     require!(
         ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program,
         LazorKitError::InvalidProgramAddress
@@ -46,8 +46,8 @@ pub fn invoke_policy<'c: 'info, 'info>(
         LazorKitError::InvalidInstructionData
     );
 
-    // Hash policy accounts (skip optional new authenticator at index 0)
-    let start_idx = if args.new_authenticator.is_some() {
+    // Hash policy accounts (skip optional new wallet_device at index 0)
+    let start_idx = if args.new_wallet_device.is_some() {
         1
     } else {
         0
@@ -58,6 +58,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     for acc in policy_accs.iter() {
         hasher.hash(acc.key.as_ref());
         hasher.hash(&[acc.is_signer as u8]);
+        hasher.hash(&[acc.is_writable as u8]);
     }
     require!(
         hasher.result().to_bytes() == msg.policy_accounts_hash,
@@ -71,30 +72,30 @@ pub fn invoke_policy<'c: 'info, 'info>(
         ctx.accounts.wallet_device.bump,
     );
 
-    // Optionally create new authenticator if requested
-    if let Some(new_authentcator) = args.new_authenticator {
+    // Optionally create new wallet_device if requested
+    if let Some(new_wallet_device) = args.new_wallet_device {
         require!(
-            new_authentcator.passkey_pubkey[0] == 0x02
-                || new_authentcator.passkey_pubkey[0] == 0x03,
+            new_wallet_device.passkey_pubkey[0] == 0x02
+                || new_wallet_device.passkey_pubkey[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
-        // Get the new authenticator account from remaining accounts
-        let new_auth = ctx
+        // Get the new wallet_device account from remaining accounts
+        let new_device = ctx
             .remaining_accounts
             .first()
             .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
         require!(
-            new_auth.data_is_empty(),
+            new_device.data_is_empty(),
             LazorKitError::AccountAlreadyInitialized
         );
         crate::state::WalletDevice::init(
-            new_auth,
+            new_device,
             ctx.accounts.payer.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
             ctx.accounts.smart_wallet.key(),
-            new_authentcator.passkey_pubkey,
-            new_authentcator.credential_id,
+            new_wallet_device.passkey_pubkey,
+            new_wallet_device.credential_id,
         )?;
     }
 
@@ -103,7 +104,8 @@ pub fn invoke_policy<'c: 'info, 'info>(
         policy_accs,
         &args.policy_data,
         &ctx.accounts.policy_program,
-        Some(policy_signer),
+        policy_signer,
+        &[ctx.accounts.payer.key()],
     )?;
 
     // increment nonce
