@@ -75,7 +75,7 @@ pub fn create_smart_wallet(
         &ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.default_policy_program,
-        Some(signer),
+        signer,
         &[ctx.accounts.payer.key()],
     )?;
 

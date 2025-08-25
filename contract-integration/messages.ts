@@ -66,7 +66,9 @@ function computeAccountsHash(
     h.update(m.pubkey.toBytes());
     h.update(Uint8Array.from([m.isSigner ? 1 : 0]));
     h.update(
-      Uint8Array.from([m.pubkey == smartWallet || m.isWritable ? 1 : 0])
+      Uint8Array.from([
+        m.pubkey.toString() === smartWallet.toString() || m.isWritable ? 1 : 0,
+      ])
     );
   }
   return new Uint8Array(h.arrayBuffer());

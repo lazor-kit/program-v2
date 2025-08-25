@@ -125,8 +125,6 @@ pub fn update_policy<'c: 'info, 'info>(
         LazorKitError::NoDefaultPolicyProgram
     );
 
-    // update wallet config
-    ctx.accounts.smart_wallet_data.policy_program = ctx.accounts.new_policy_program.key();
 
     // Optionally create new authenticator if requested
     if let Some(new_wallet_device) = args.new_wallet_device {
@@ -160,7 +158,7 @@ pub fn update_policy<'c: 'info, 'info>(
         destroy_accounts,
         &args.destroy_policy_data,
         &ctx.accounts.old_policy_program,
-        Some(policy_signer.clone()),
+        policy_signer.clone(),
         &[],
     )?;
 
@@ -168,9 +166,12 @@ pub fn update_policy<'c: 'info, 'info>(
         init_accounts,
         &args.init_policy_data,
         &ctx.accounts.new_policy_program,
-        Some(policy_signer),
+        policy_signer,
         &[ctx.accounts.payer.key()],
     )?;
+
+    // After both CPIs succeed, update the policy program for the smart wallet
+    ctx.accounts.smart_wallet_data.policy_program = ctx.accounts.new_policy_program.key();
 
     // bump nonce
     ctx.accounts.smart_wallet_data.last_nonce = ctx
@@ -179,9 +180,6 @@ pub fn update_policy<'c: 'info, 'info>(
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
-
-    // Update the policy program for the smart wallet
-    ctx.accounts.smart_wallet_data.policy_program = ctx.accounts.new_policy_program.key();
 
     Ok(())
 }

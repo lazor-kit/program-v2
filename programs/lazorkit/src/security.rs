@@ -138,28 +138,3 @@ pub mod validation {
         Ok(())
     }
 }
-
-/// Rate limiting implementation
-pub struct RateLimiter;
-
-impl RateLimiter {
-    /// Check if transaction rate is within limits
-    pub fn check_rate_limit(
-        transaction_count: u8,
-        current_slot: u64,
-        last_reset_slot: u64,
-    ) -> Result<(bool, u8, u64)> {
-        let slots_elapsed = current_slot.saturating_sub(last_reset_slot);
-
-        if slots_elapsed >= RATE_LIMIT_WINDOW_BLOCKS {
-            // Reset window
-            Ok((true, 1, current_slot))
-        } else if transaction_count < MAX_TRANSACTIONS_PER_BLOCK {
-            // Within limit
-            Ok((true, transaction_count + 1, last_reset_slot))
-        } else {
-            // Rate limit exceeded
-            Err(LazorKitError::RateLimitExceeded.into())
-        }
-    }
-}

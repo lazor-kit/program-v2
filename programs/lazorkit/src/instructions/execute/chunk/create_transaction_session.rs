@@ -78,7 +78,7 @@ pub fn create_transaction_session(
         policy_accounts,
         &args.policy_data,
         &ctx.accounts.policy_program,
-        Some(policy_signer),
+        policy_signer,
         &[],
     )?;
 

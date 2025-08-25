@@ -16,7 +16,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
-    // Policy program must be the configured one and registered
+// Policy program must be the configured one and registered
     require!(
         ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program,
         LazorKitError::InvalidProgramAddress
@@ -104,7 +104,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
         policy_accs,
         &args.policy_data,
         &ctx.accounts.policy_program,
-        Some(policy_signer),
+        policy_signer,
         &[ctx.accounts.payer.key()],
     )?;
 

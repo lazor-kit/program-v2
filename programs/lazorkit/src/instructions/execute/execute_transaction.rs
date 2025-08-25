@@ -107,7 +107,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
         policy_accounts,
         policy_data,
         policy_program_info,
-        Some(policy_signer),
+        policy_signer,
         &[],
     )?;
 
@@ -210,7 +210,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
             cpi_accounts,
             &args.cpi_data,
             &ctx.accounts.cpi_program,
-            Some(wallet_signer),
+            wallet_signer,
             &[ctx.accounts.payer.key()],
         )?;
     }

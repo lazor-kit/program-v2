@@ -158,7 +158,7 @@ pub fn execute_session_transaction(
             cpi_accounts,
             &cpi_data,
             &ctx.accounts.cpi_program,
-            Some(wallet_signer),
+            wallet_signer,
             &[ctx.accounts.payer.key()],
         );
         if exec_res.is_err() {

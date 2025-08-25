@@ -3,7 +3,7 @@ use crate::state::{ExecuteMessage, InvokePolicyMessage, UpdatePolicyMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
-    program::{invoke, invoke_signed},
+    program::invoke_signed,
 };
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
@@ -48,24 +48,18 @@ pub fn execute_cpi(
     accounts: &[AccountInfo],
     data: &[u8],
     program: &AccountInfo,
-    signer: Option<PdaSigner>,
+    signer: PdaSigner,
     allowed_signers: &[Pubkey],
 ) -> Result<()> {
     // Allocate a single Vec<u8> for the instruction – unavoidable because the SDK expects owned
     // data.  This keeps the allocation inside the helper and eliminates clones at the call-site.
     let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer, allowed_signers);
 
-    match signer {
-        Some(s) => {
-            // Build seed slice **once** to avoid repeated heap allocations.
-            let mut seed_slices: Vec<&[u8]> = s.seeds.iter().map(|s| s.as_slice()).collect();
-            let bump_slice = [s.bump];
-            seed_slices.push(&bump_slice);
-            invoke_signed(&ix, accounts, &[&seed_slices])
-        }
-        None => invoke(&ix, accounts),
-    }
-    .map_err(Into::into)
+    // Build seed slice **once** to avoid repeated heap allocations.
+    let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
+    let bump_slice = [signer.bump];
+    seed_slices.push(&bump_slice);
+    invoke_signed(&ix, accounts, &[&seed_slices]).map_err(Into::into)
 }
 
 /// Create a CPI instruction with proper account meta configuration
@@ -73,20 +67,18 @@ fn create_cpi_instruction(
     accounts: &[AccountInfo],
     data: Vec<u8>,
     program: &AccountInfo,
-    pda_signer: &Option<PdaSigner>,
+    pda_signer: &PdaSigner,
     allowed_signers: &[Pubkey],
 ) -> Instruction {
-    let pda_pubkey = pda_signer.as_ref().map(|pda| {
-        let seed_slices: Vec<&[u8]> = pda.seeds.iter().map(|s| s.as_slice()).collect();
-        Pubkey::find_program_address(&seed_slices, &ID).0
-    });
+    let seed_slices: Vec<&[u8]> = pda_signer.seeds.iter().map(|s| s.as_slice()).collect();
+    let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
 
     Instruction {
         program_id: program.key(),
         accounts: accounts
             .iter()
             .map(|acc| {
-                let is_pda_signer = pda_pubkey.map_or(false, |pda_key| *acc.key == pda_key);
+                let is_pda_signer = *acc.key == pda_pubkey;
                 let is_allowed_outer = allowed_signers.iter().any(|k| k == acc.key);
                 AccountMeta {
                     pubkey: *acc.key,
