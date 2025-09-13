@@ -75,8 +75,19 @@ pub mod lazorkit {
 
     pub fn execute_session_transaction(
         ctx: Context<ExecuteSessionTransaction>,
-        cpi_data: Vec<u8>,
+        vec_cpi_data: Vec<Vec<u8>>,
+        split_index: Vec<u8>,
     ) -> Result<()> {
-        instructions::execute_session_transaction(ctx, cpi_data)
+        instructions::execute_session_transaction(ctx, vec_cpi_data, split_index)
+    }
+
+    /// Initialize a new vault
+    pub fn initialize_vault(ctx: Context<InitializeVault>, index: u8) -> Result<()> {
+        instructions::initialize_vault(ctx, index)
+    }
+
+    /// Withdraw SOL from vault
+    pub fn withdraw_vault(ctx: Context<WithdrawVault>, amount: u64) -> Result<()> {
+        instructions::withdraw_vault(ctx, amount)
     }
 }

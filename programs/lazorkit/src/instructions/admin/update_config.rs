@@ -19,11 +19,23 @@ pub fn update_config(
             config.create_smart_wallet_fee = value;
             msg!("Updated create_smart_wallet_fee to: {}", value);
         }
-        UpdateConfigType::ExecuteFee => {
+        UpdateConfigType::FeePayerFee => {
             // Validate fee is reasonable (max 0.1 SOL)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
-            config.execute_fee = value;
-            msg!("Updated execute_fee to: {}", value);
+            config.fee_payer_fee = value;
+            msg!("Updated fee_payer_fee to: {}", value);
+        }
+        UpdateConfigType::ReferralFee => {
+            // Validate fee is reasonable (max 0.1 SOL)
+            require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
+            config.referral_fee = value;
+            msg!("Updated referral_fee to: {}", value);
+        }
+        UpdateConfigType::LazorkitFee => {
+            // Validate fee is reasonable (max 0.1 SOL)
+            require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
+            config.lazorkit_fee = value;
+            msg!("Updated lazorkit_fee to: {}", value);
         }
         UpdateConfigType::DefaultPolicyProgram => {
             let new_default_policy_program_info = ctx

@@ -208,4 +208,18 @@ pub enum LazorKitError {
     RefundFailed,
     #[msg("Invalid refund amount")]
     InvalidRefundAmount,
+
+    // === Vault Errors ===
+    #[msg("All vault slots are full")]
+    AllVaultsFull,
+    #[msg("Vault not found for the specified mint")]
+    VaultNotFound,
+    #[msg("Insufficient balance in vault")]
+    InsufficientVaultBalance,
+    #[msg("Vault balance overflow")]
+    VaultOverflow,
+    #[msg("Invalid vault index")]
+    InvalidVaultIndex,
+    #[msg("Insufficient balance")]
+    InsufficientBalance,
 }

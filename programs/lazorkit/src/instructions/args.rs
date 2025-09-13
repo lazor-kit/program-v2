@@ -12,6 +12,8 @@ pub struct CreateSmartWalletArgs {
     pub policy_data: Vec<u8>,
     pub wallet_id: u64, // Random ID provided by client,
     pub is_pay_for_user: bool,
+    pub referral: Option<Pubkey>,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -24,6 +26,7 @@ pub struct ExecuteTransactionArgs {
     pub split_index: u16,
     pub policy_data: Vec<u8>,
     pub cpi_data: Vec<u8>,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -37,6 +40,7 @@ pub struct UpdatePolicyArgs {
     pub destroy_policy_data: Vec<u8>,
     pub init_policy_data: Vec<u8>,
     pub new_wallet_device: Option<NewWalletDeviceArgs>,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -48,6 +52,7 @@ pub struct InvokePolicyArgs {
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
     pub new_wallet_device: Option<NewWalletDeviceArgs>,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -59,6 +64,7 @@ pub struct CreateSessionArgs {
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
     pub expires_at: i64,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
@@ -96,6 +102,9 @@ macro_rules! impl_args_validate {
                     self.verify_instruction_index < 255,
                     LazorKitError::InvalidInstructionData
                 );
+
+                // Validate vault index
+                require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
 
                 Ok(())
             }
@@ -135,10 +144,46 @@ impl Args for CreateSessionArgs {
                 && self.expires_at <= now + crate::security::MAX_SESSION_TTL_SECONDS,
             LazorKitError::TransactionTooOld
         );
+        // Validate vault index
+        require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
         Ok(())
     }
 }
 
-impl_args_validate!(ExecuteTransactionArgs);
+// Only ExecuteTransactionArgs has vault_index, so we need separate validation
+impl Args for ExecuteTransactionArgs {
+    fn validate(&self) -> Result<()> {
+        // Validate passkey format
+        require!(
+            self.passkey_pubkey[0] == 0x02 || self.passkey_pubkey[0] == 0x03,
+            LazorKitError::InvalidPasskeyFormat
+        );
+
+        // Validate signature length (Secp256r1 signature should be 64 bytes)
+        require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
+
+        // Validate client data and authenticator data are not empty
+        require!(
+            !self.client_data_json_raw.is_empty(),
+            LazorKitError::InvalidInstructionData
+        );
+        require!(
+            !self.authenticator_data_raw.is_empty(),
+            LazorKitError::InvalidInstructionData
+        );
+
+        // Validate verify instruction index
+        require!(
+            self.verify_instruction_index < 255,
+            LazorKitError::InvalidInstructionData
+        );
+
+        // Validate vault index
+        require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
+
+        Ok(())
+    }
+}
+
 impl_args_validate!(UpdatePolicyArgs);
 impl_args_validate!(InvokePolicyArgs);
