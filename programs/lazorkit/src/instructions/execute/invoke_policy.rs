@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::instructions::{Args as _, InvokePolicyArgs};
 use crate::security::validation;
 use crate::state::{Config, InvokePolicyMessage, PolicyProgramRegistry, SmartWallet, WalletDevice};
-use crate::utils::{check_whitelist, execute_cpi, get_pda_signer, verify_authorization};
+use crate::utils::{check_whitelist, execute_cpi, get_wallet_device_signer, verify_authorization};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
@@ -16,7 +16,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
-// Policy program must be the configured one and registered
+    // Policy program must be the configured one and registered
     require!(
         ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program,
         LazorKitError::InvalidProgramAddress
@@ -66,7 +66,7 @@ pub fn invoke_policy<'c: 'info, 'info>(
     );
 
     // PDA signer for policy CPI
-    let policy_signer = get_pda_signer(
+    let policy_signer = get_wallet_device_signer(
         &args.passkey_pubkey,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
@@ -116,6 +116,35 @@ pub fn invoke_policy<'c: 'info, 'info>(
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
 
+    // Validate that the provided vault matches the vault index from args
+    crate::state::LazorKitVault::validate_vault_for_index(
+        &ctx.accounts.lazorkit_vault.key(),
+        args.vault_index,
+        &crate::ID,
+    )?;
+
+    // Create wallet signer for fee distribution
+    let wallet_signer = crate::utils::PdaSigner {
+        seeds: vec![
+            crate::constants::SMART_WALLET_SEED.to_vec(),
+            ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
+        ],
+        bump: ctx.accounts.smart_wallet_data.bump,
+        owner: anchor_lang::system_program::ID,
+    };
+
+    // Distribute fees to payer, referral, and lazorkit vault
+    crate::utils::distribute_fees(
+        &ctx.accounts.config,
+        &ctx.accounts.smart_wallet.to_account_info(),
+        &ctx.accounts.payer.to_account_info(),
+        &ctx.accounts.referral.to_account_info(),
+        &ctx.accounts.lazorkit_vault.to_account_info(),
+        &ctx.accounts.system_program,
+        wallet_signer,
+        msg.nonce,
+    )?;
+
     Ok(())
 }
 
@@ -131,10 +160,10 @@ pub struct InvokePolicy<'info> {
         mut,
         seeds = [crate::constants::SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = ID,
+        owner = system_program.key(),
     )]
     /// CHECK: smart wallet PDA verified by seeds
-    pub smart_wallet: UncheckedAccount<'info>,
+    pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
@@ -143,6 +172,15 @@ pub struct InvokePolicy<'info> {
         owner = ID,
     )]
     pub smart_wallet_data: Box<Account<'info, SmartWallet>>,
+
+    /// CHECK: referral account (matches smart_wallet_data.referral)
+    #[account(mut, address = smart_wallet_data.referral)]
+    pub referral: UncheckedAccount<'info>,
+
+    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
+    #[account(mut, owner = crate::ID)]
+    /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
+    pub lazorkit_vault: UncheckedAccount<'info>,
 
     #[account(owner = ID)]
     pub wallet_device: Box<Account<'info, WalletDevice>>,

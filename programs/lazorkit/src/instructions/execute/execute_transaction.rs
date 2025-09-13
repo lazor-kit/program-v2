@@ -4,13 +4,10 @@ use crate::instructions::{Args as _, ExecuteTransactionArgs};
 use crate::security::validation;
 use crate::state::ExecuteMessage;
 use crate::utils::{
-    check_whitelist, execute_cpi, get_pda_signer, sighash, split_remaining_accounts,
-    transfer_sol_from_pda, verify_authorization, PdaSigner,
+    check_whitelist, execute_cpi, get_wallet_device_signer, sighash, split_remaining_accounts,
+    verify_authorization, PdaSigner,
 };
-use crate::{
-    constants::{SMART_WALLET_SEED, SOL_TRANSFER_DISCRIMINATOR},
-    error::LazorKitError,
-};
+use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
 pub fn execute_transaction<'c: 'info, 'info>(
@@ -54,7 +51,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
     );
 
     // 2. Prepare PDA signer for policy CPI
-    let policy_signer = get_pda_signer(
+    let policy_signer = get_wallet_device_signer(
         &args.passkey_pubkey,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
@@ -131,91 +128,41 @@ pub fn execute_transaction<'c: 'info, 'info>(
         LazorKitError::InvalidAccountData
     );
 
-    // 7. Execute main CPI or transfer lamports
-    if args.cpi_data.get(0..4) == Some(&SOL_TRANSFER_DISCRIMINATOR)
-        && ctx.accounts.cpi_program.key() == anchor_lang::solana_program::system_program::ID
-    {
-        // === Native SOL Transfer ===
-        require!(
-            cpi_accounts.len() >= 2,
-            LazorKitError::SolTransferInsufficientAccounts
-        );
+    // === General CPI ===
+    validation::validate_program_executable(&ctx.accounts.cpi_program)?;
+    require!(
+        ctx.accounts.cpi_program.key() != crate::ID,
+        LazorKitError::ReentrancyDetected
+    );
+    require!(
+        !cpi_accounts.is_empty(),
+        LazorKitError::InsufficientCpiAccounts
+    );
 
-        // Extract and validate amount
-        let amount_bytes = args
-            .cpi_data
-            .get(4..12)
-            .ok_or(LazorKitError::InvalidCpiData)?;
-        let amount = u64::from_le_bytes(
-            amount_bytes
-                .try_into()
-                .map_err(|_| LazorKitError::InvalidCpiData)?,
-        );
+    // Create wallet signer
+    let wallet_signer = PdaSigner {
+        seeds: vec![
+            SMART_WALLET_SEED.to_vec(),
+            ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
+        ],
+        bump: ctx.accounts.smart_wallet_data.bump,
+        owner: anchor_lang::system_program::ID,
+    };
 
-        validation::validate_lamport_amount(amount)?;
-
-        // Ensure destination is valid
-        let destination_account = &cpi_accounts[1];
-        require!(
-            destination_account.key() != ctx.accounts.smart_wallet.key(),
-            LazorKitError::InvalidAccountData
-        );
-
-        // Check wallet has sufficient balance
-        let wallet_balance = ctx.accounts.smart_wallet.lamports();
-        let rent_exempt = Rent::get()?.minimum_balance(0);
-        let total_needed = amount
-            .checked_add(ctx.accounts.config.execute_fee)
-            .ok_or(LazorKitError::IntegerOverflow)?
-            .checked_add(rent_exempt)
-            .ok_or(LazorKitError::IntegerOverflow)?;
-
-        require!(
-            wallet_balance >= total_needed,
-            LazorKitError::InsufficientLamports
-        );
-
-        msg!(
-            "Transferring {} lamports to {}",
-            amount,
-            destination_account.key()
-        );
-        transfer_sol_from_pda(&ctx.accounts.smart_wallet, destination_account, amount)?;
-    } else {
-        // === General CPI ===
-        validation::validate_program_executable(&ctx.accounts.cpi_program)?;
-        require!(
-            ctx.accounts.cpi_program.key() != crate::ID,
-            LazorKitError::ReentrancyDetected
-        );
-        require!(
-            !cpi_accounts.is_empty(),
-            LazorKitError::InsufficientCpiAccounts
-        );
-
-        // Create wallet signer
-        let wallet_signer = PdaSigner {
-            seeds: vec![
-                SMART_WALLET_SEED.to_vec(),
-                ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
-            ],
-            bump: ctx.accounts.smart_wallet_data.bump,
-        };
-
-        msg!(
-            "Executing CPI to program: {}",
-            ctx.accounts.cpi_program.key()
-        );
-        execute_cpi(
-            cpi_accounts,
-            &args.cpi_data,
-            &ctx.accounts.cpi_program,
-            wallet_signer,
-            &[ctx.accounts.payer.key()],
-        )?;
-    }
+    msg!(
+        "Executing CPI to program: {}",
+        ctx.accounts.cpi_program.key()
+    );
+    execute_cpi(
+        cpi_accounts,
+        &args.cpi_data,
+        &ctx.accounts.cpi_program,
+        wallet_signer.clone(),
+        &[ctx.accounts.payer.key()],
+    )?;
 
     msg!("Transaction executed successfully");
+
     // 8. Increment nonce
     ctx.accounts.smart_wallet_data.last_nonce = ctx
         .accounts
@@ -223,6 +170,26 @@ pub fn execute_transaction<'c: 'info, 'info>(
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
+
+    // Validate that the provided vault matches the vault index from args
+    crate::state::LazorKitVault::validate_vault_for_index(
+        &ctx.accounts.lazorkit_vault.key(),
+        args.vault_index,
+        &crate::ID,
+    )?;
+
+    // Distribute fees to payer, referral, and lazorkit vault
+    crate::utils::distribute_fees(
+        &ctx.accounts.config,
+        &ctx.accounts.smart_wallet.to_account_info(),
+        &ctx.accounts.payer.to_account_info(),
+        &ctx.accounts.referral.to_account_info(),
+        &ctx.accounts.lazorkit_vault.to_account_info(),
+        &ctx.accounts.system_program,
+        wallet_signer,
+        msg.nonce,
+    )?;
+
     Ok(())
 }
 
@@ -235,10 +202,10 @@ pub struct ExecuteTransaction<'info> {
         mut,
         seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = crate::ID,
+        owner = system_program.key(),
     )]
     /// CHECK: PDA verified by seeds
-    pub smart_wallet: UncheckedAccount<'info>,
+    pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
@@ -247,6 +214,15 @@ pub struct ExecuteTransaction<'info> {
         owner = crate::ID,
     )]
     pub smart_wallet_data: Box<Account<'info, crate::state::SmartWallet>>,
+
+    /// CHECK: referral account (matches smart_wallet_data.referral)
+    #[account(mut, address = smart_wallet_data.referral)]
+    pub referral: UncheckedAccount<'info>,
+
+    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
+    #[account(mut, owner = crate::ID)]
+    /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
+    pub lazorkit_vault: UncheckedAccount<'info>,
 
     #[account(owner = crate::ID)]
     pub wallet_device: Box<Account<'info, crate::state::WalletDevice>>,
@@ -271,4 +247,6 @@ pub struct ExecuteTransaction<'info> {
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
 }

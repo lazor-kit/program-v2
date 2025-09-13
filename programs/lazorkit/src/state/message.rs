@@ -16,6 +16,16 @@ pub struct ExecuteMessage {
     pub cpi_accounts_hash: [u8; 32],
 }
 
+#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug)]
+pub struct ExecueSessionMessage {
+    pub nonce: u64,
+    pub current_timestamp: i64,
+    pub policy_data_hash: [u8; 32],
+    pub policy_accounts_hash: [u8; 32],
+    pub cpi_data_hash: [u8; 32],
+    pub cpi_accounts_hash: [u8; 32],
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Default, Clone)]
 pub struct InvokePolicyMessage {
     pub nonce: u64,
@@ -58,5 +68,6 @@ macro_rules! impl_message_verify {
 }
 
 impl_message_verify!(ExecuteMessage);
+impl_message_verify!(ExecueSessionMessage);
 impl_message_verify!(InvokePolicyMessage);
 impl_message_verify!(UpdatePolicyMessage);

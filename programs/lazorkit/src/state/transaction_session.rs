@@ -8,9 +8,9 @@ use anchor_lang::prelude::*;
 pub struct TransactionSession {
     /// Smart wallet that authorized this session
     pub owner_wallet: Pubkey,
-    /// sha256 of transaction instruction data
+    /// Combined sha256 hash of all transaction instruction data
     pub data_hash: [u8; 32],
-    /// sha256 over ordered remaining account metas plus target program
+    /// Combined sha256 hash over all ordered remaining account metas plus target programs
     pub accounts_hash: [u8; 32],
     /// The nonce that was authorized at session creation (bound into data hash)
     pub authorized_nonce: u64,
@@ -18,6 +18,8 @@ pub struct TransactionSession {
     pub expires_at: i64,
     /// Where to refund rent when closing the session
     pub rent_refund_to: Pubkey,
+    /// Vault index for fee collection
+    pub vault_index: u8,
 }
 
 impl TransactionSession {

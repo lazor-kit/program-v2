@@ -5,7 +5,9 @@ use anchor_lang::prelude::*;
 pub struct Config {
     pub authority: Pubkey,
     pub create_smart_wallet_fee: u64,
-    pub execute_fee: u64,
+    pub fee_payer_fee: u64,
+    pub referral_fee: u64,
+    pub lazorkit_fee: u64,
     pub default_policy_program: Pubkey,
     pub is_paused: bool,
 }
@@ -17,9 +19,11 @@ impl Config {
 #[derive(Debug, AnchorSerialize, AnchorDeserialize)]
 pub enum UpdateConfigType {
     CreateWalletFee = 0,
-    ExecuteFee = 1,
-    DefaultPolicyProgram = 2,
-    Admin = 3,
-    PauseProgram = 4,
-    UnpauseProgram = 5,
+    FeePayerFee = 1,
+    ReferralFee = 2,
+    LazorkitFee = 3,
+    DefaultPolicyProgram = 4,
+    Admin = 5,
+    PauseProgram = 6,
+    UnpauseProgram = 7,
 }

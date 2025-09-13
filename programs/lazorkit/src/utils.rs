@@ -1,10 +1,7 @@
 use crate::constants::{PASSKEY_SIZE, SECP256R1_ID};
 use crate::state::{ExecuteMessage, InvokePolicyMessage, UpdatePolicyMessage};
 use crate::{error::LazorKitError, ID};
-use anchor_lang::solana_program::{
-    instruction::Instruction,
-    program::invoke_signed,
-};
+use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 // Constants for Secp256r1 signature verification
@@ -26,6 +23,8 @@ pub struct PdaSigner {
     pub seeds: Vec<Vec<u8>>,
     /// The bump associated with the PDA.
     pub bump: u8,
+    /// The owner of the PDA.
+    pub owner: Pubkey,
 }
 
 /// Helper to check if a slice matches a pattern
@@ -71,7 +70,7 @@ fn create_cpi_instruction(
     allowed_signers: &[Pubkey],
 ) -> Instruction {
     let seed_slices: Vec<&[u8]> = pda_signer.seeds.iter().map(|s| s.as_slice()).collect();
-    let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
+    let pda_pubkey = Pubkey::find_program_address(&seed_slices, &pda_signer.owner).0;
 
     Instruction {
         program_id: program.key(),
@@ -184,27 +183,6 @@ impl PasskeyExt for [u8; SECP_PUBKEY_SIZE as usize] {
     }
 }
 
-/// Transfer SOL from a PDA-owned account
-#[inline]
-pub fn transfer_sol_from_pda(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()> {
-    if amount == 0 {
-        return Ok(());
-    }
-    // Ensure the 'from' account is owned by this program
-    if *from.owner != ID {
-        return Err(ProgramError::IllegalOwner.into());
-    }
-    let from_lamports = from.lamports();
-    if from_lamports < amount {
-        return err!(LazorKitError::InsufficientLamports);
-    }
-    // Debit from source account
-    **from.try_borrow_mut_lamports()? -= amount;
-    // Credit to destination account
-    **to.try_borrow_mut_lamports()? += amount;
-    Ok(())
-}
-
 /// Helper to get sighash for anchor instructions
 pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     let preimage = format!("{}:{}", namespace, name);
@@ -227,7 +205,11 @@ pub fn get_account_slice<'a>(
 }
 
 /// Helper: Create a PDA signer struct
-pub fn get_pda_signer(passkey: &[u8; PASSKEY_SIZE], wallet: Pubkey, bump: u8) -> PdaSigner {
+pub fn get_wallet_device_signer(
+    passkey: &[u8; PASSKEY_SIZE],
+    wallet: Pubkey,
+    bump: u8,
+) -> PdaSigner {
     PdaSigner {
         seeds: vec![
             crate::state::WalletDevice::PREFIX_SEED.to_vec(),
@@ -235,6 +217,7 @@ pub fn get_pda_signer(passkey: &[u8; PASSKEY_SIZE], wallet: Pubkey, bump: u8) ->
             passkey.to_hashed_bytes(wallet).to_vec(),
         ],
         bump,
+        owner: ID,
     }
 }
 
@@ -353,4 +336,161 @@ pub fn split_remaining_accounts<'a>(
         crate::error::LazorKitError::AccountSliceOutOfBounds
     );
     Ok(accounts.split_at(idx))
+}
+
+
+/// Distribute fees to payer, referral, and lazorkit vault (empty PDA)
+pub fn distribute_fees<'info>(
+    config: &crate::state::Config,
+    smart_wallet: &AccountInfo<'info>,
+    payer: &AccountInfo<'info>,
+    referral: &AccountInfo<'info>,
+    lazorkit_vault: &AccountInfo<'info>,
+    system_program: &Program<'info, System>,
+    wallet_signer: PdaSigner,
+    _nonce: u64,
+) -> Result<()> {
+    use anchor_lang::solana_program::system_instruction;
+
+    // 1. Fee to payer (reimburse transaction fees)
+    if config.fee_payer_fee > 0 {
+        let transfer_to_payer = system_instruction::transfer(
+            &smart_wallet.key(),
+            &payer.key(),
+            config.fee_payer_fee,
+        );
+
+        execute_cpi(
+            &[
+                smart_wallet.clone(),
+                payer.clone(),
+            ],
+            &transfer_to_payer.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        )?;
+
+        msg!("Paid {} lamports to fee payer", config.fee_payer_fee);
+    }
+
+    // 2. Fee to referral
+    if config.referral_fee > 0 {
+        let transfer_to_referral = system_instruction::transfer(
+            &smart_wallet.key(),
+            &referral.key(),
+            config.referral_fee,
+        );
+
+        execute_cpi(
+            &[
+                smart_wallet.clone(),
+                referral.clone(),
+            ],
+            &transfer_to_referral.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        )?;
+
+        msg!("Paid {} lamports to referral", config.referral_fee);
+    }
+
+    // 3. Fee to lazorkit vault (empty PDA)
+    if config.lazorkit_fee > 0 {
+        let transfer_to_vault = system_instruction::transfer(
+            &smart_wallet.key(),
+            &lazorkit_vault.key(),
+            config.lazorkit_fee,
+        );
+
+        execute_cpi(
+            &[
+                smart_wallet.clone(),
+                lazorkit_vault.clone(),
+            ],
+            &transfer_to_vault.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        )?;
+
+        msg!("Paid {} lamports to LazorKit vault", config.lazorkit_fee);
+    }
+
+    Ok(())
+}
+
+/// Distribute fees with graceful error handling (for session transactions)
+pub fn distribute_fees_graceful<'info>(
+    config: &crate::state::Config,
+    smart_wallet: &AccountInfo<'info>,
+    payer: &AccountInfo<'info>,
+    referral: &AccountInfo<'info>,
+    lazorkit_vault: &AccountInfo<'info>,
+    system_program: &Program<'info, System>,
+    wallet_signer: PdaSigner,
+    _nonce: u64,
+) {
+    use anchor_lang::solana_program::system_instruction;
+
+    // 1. Fee to payer (reimburse transaction fees)
+    if config.fee_payer_fee > 0 {
+        let transfer_to_payer = system_instruction::transfer(
+            &smart_wallet.key(),
+            &payer.key(),
+            config.fee_payer_fee,
+        );
+
+        let _ = execute_cpi(
+            &[
+                smart_wallet.clone(),
+                payer.clone(),
+            ],
+            &transfer_to_payer.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        );
+    }
+
+    // 2. Fee to referral
+    if config.referral_fee > 0 {
+        let transfer_to_referral = system_instruction::transfer(
+            &smart_wallet.key(),
+            &referral.key(),
+            config.referral_fee,
+        );
+
+        let _ = execute_cpi(
+            &[
+                smart_wallet.clone(),
+                referral.clone(),
+            ],
+            &transfer_to_referral.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        );
+    }
+
+    // 3. Fee to lazorkit vault (empty PDA)
+    if config.lazorkit_fee > 0 {
+        let transfer_to_vault = system_instruction::transfer(
+            &smart_wallet.key(),
+            &lazorkit_vault.key(),
+            config.lazorkit_fee,
+        );
+
+        let _ = execute_cpi(
+            &[
+                smart_wallet.clone(),
+                lazorkit_vault.clone(),
+            ],
+            &transfer_to_vault.data,
+            system_program,
+            wallet_signer.clone(),
+            &[],
+        );
+    }
 }

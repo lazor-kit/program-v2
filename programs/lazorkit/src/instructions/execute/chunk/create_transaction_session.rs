@@ -3,9 +3,12 @@ use anchor_lang::prelude::*;
 use crate::instructions::CreateSessionArgs;
 use crate::security::validation;
 use crate::state::{
-    Config, ExecuteMessage, PolicyProgramRegistry, SmartWallet, TransactionSession, WalletDevice,
+    Config, ExecueSessionMessage, PolicyProgramRegistry, SmartWallet, TransactionSession,
+    WalletDevice,
 };
-use crate::utils::{execute_cpi, get_pda_signer, sighash, verify_authorization, PasskeyExt};
+use crate::utils::{
+    execute_cpi, get_wallet_device_signer, sighash, verify_authorization, PasskeyExt,
+};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
@@ -19,7 +22,7 @@ pub fn create_transaction_session(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
     // 1. Authorization -> typed ExecuteMessage
-    let msg: ExecuteMessage = verify_authorization::<ExecuteMessage>(
+    let msg: ExecueSessionMessage = verify_authorization::<ExecueSessionMessage>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -65,7 +68,7 @@ pub fn create_transaction_session(
     );
 
     // Execute policy check
-    let policy_signer = get_pda_signer(
+    let policy_signer = get_wallet_device_signer(
         &args.passkey_pubkey,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
@@ -90,6 +93,7 @@ pub fn create_transaction_session(
     session.authorized_nonce = ctx.accounts.smart_wallet_data.last_nonce;
     session.expires_at = args.expires_at;
     session.rent_refund_to = ctx.accounts.payer.key();
+    session.vault_index = args.vault_index;
 
     Ok(())
 }
@@ -107,10 +111,10 @@ pub struct CreateTransactionSession<'info> {
         mut,
         seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = ID,
+        owner = system_program.key(),
     )]
     /// CHECK: PDA verified
-    pub smart_wallet: UncheckedAccount<'info>,
+    pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,

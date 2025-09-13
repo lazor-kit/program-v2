@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::system_instruction};
 
 use crate::{
     constants::SMART_WALLET_SEED,
@@ -7,7 +7,7 @@ use crate::{
     instructions::CreateSmartWalletArgs,
     security::validation,
     state::{Config, PolicyProgramRegistry, SmartWallet, WalletDevice},
-    utils::{execute_cpi, transfer_sol_from_pda, PasskeyExt, PdaSigner},
+    utils::{execute_cpi, PasskeyExt, PdaSigner},
     ID,
 };
 
@@ -47,6 +47,7 @@ pub fn create_smart_wallet(
         id: args.wallet_id,
         last_nonce: 0,
         bump: ctx.bumps.smart_wallet,
+        referral: args.referral.unwrap_or(ctx.accounts.payer.key()),
     });
 
     // === Initialize Wallet Device ===
@@ -68,6 +69,7 @@ pub fn create_smart_wallet(
                 .to_vec(),
         ],
         bump: ctx.bumps.wallet_device,
+        owner: ctx.accounts.system_program.key(),
     };
 
     // === Execute Policy Program CPI ===
@@ -75,7 +77,7 @@ pub fn create_smart_wallet(
         &ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.default_policy_program,
-        signer,
+        signer.clone(),
         &[ctx.accounts.payer.key()],
     )?;
 
@@ -92,7 +94,22 @@ pub fn create_smart_wallet(
                 LazorKitError::InsufficientBalanceForFee
             );
 
-            transfer_sol_from_pda(&ctx.accounts.smart_wallet, &ctx.accounts.payer, fee)?;
+            let transfer = system_instruction::transfer(
+                &ctx.accounts.smart_wallet.key(),
+                &ctx.accounts.payer.key(),
+                fee,
+            );
+
+            execute_cpi(
+                &[
+                    ctx.accounts.smart_wallet.to_account_info(),
+                    ctx.accounts.payer.to_account_info(),
+                ],
+                &transfer.data,
+                &ctx.accounts.system_program,
+                signer.clone(),
+                &[],
+            )?;
 
             emit!(FeeCollected {
                 smart_wallet: ctx.accounts.smart_wallet.key(),
@@ -138,14 +155,12 @@ pub struct CreateSmartWallet<'info> {
 
     /// The smart wallet PDA being created with random ID
     #[account(
-        init,
-        payer = payer,
-        space = 0,
+        mut,
         seeds = [SMART_WALLET_SEED, args.wallet_id.to_le_bytes().as_ref()],
-        bump
+        bump,
     )]
     /// CHECK: This account is only used for its public key and seeds.
-    pub smart_wallet: UncheckedAccount<'info>,
+    pub smart_wallet: SystemAccount<'info>,
 
     /// Smart wallet data
     #[account(

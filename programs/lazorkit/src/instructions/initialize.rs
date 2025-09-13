@@ -16,8 +16,9 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
 
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
-    config.create_smart_wallet_fee = 0; // LAMPORTS
-    config.execute_fee = 0; // LAMPORTS
+    config.fee_payer_fee = 30000; // LAMPORTS
+    config.referral_fee = 10000; // LAMPORTS
+    config.lazorkit_fee = 10000; // LAMPORTS
     config.default_policy_program = ctx.accounts.default_policy_program.key();
     config.is_paused = false;
 

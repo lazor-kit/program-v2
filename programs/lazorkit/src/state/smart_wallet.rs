@@ -6,6 +6,8 @@ use anchor_lang::prelude::*;
 pub struct SmartWallet {
     /// Unique identifier for this smart wallet
     pub id: u64,
+    /// Referral address that governs this wallet's operations
+    pub referral: Pubkey,
     /// Policy program that governs this wallet's operations
     pub policy_program: Pubkey,
     /// Last nonce used for message verification
