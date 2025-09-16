@@ -154,26 +154,16 @@ pub fn execute_deferred_transaction(
         }
     }
 
+    crate::utils::distribute_fees(
+        &ctx.accounts.config,
+        &ctx.accounts.smart_wallet.to_account_info(),
+        &ctx.accounts.payer.to_account_info(),
+        &ctx.accounts.referral.to_account_info(),
+        &ctx.accounts.lazorkit_vault.to_account_info(),
+        &ctx.accounts.system_program,
+        wallet_signer,
+    )?;
 
-    // Validate that the provided vault matches the vault index from the session
-    let vault_validation = crate::state::LazorKitVault::validate_vault_for_index(
-        &ctx.accounts.lazorkit_vault.key(),
-        session.vault_index,
-        &crate::ID,
-    );
-
-    // Distribute fees gracefully (don't fail if fees can't be paid or vault validation fails)
-    if vault_validation.is_ok() {
-        crate::utils::distribute_fees(
-            &ctx.accounts.config,
-            &ctx.accounts.smart_wallet.to_account_info(),
-            &ctx.accounts.payer.to_account_info(),
-            &ctx.accounts.referral.to_account_info(),
-            &ctx.accounts.lazorkit_vault.to_account_info(),
-            &ctx.accounts.system_program,
-            wallet_signer,
-        )?;
-    }
 
     msg!("Successfully executed deferred transaction");
     Ok(())

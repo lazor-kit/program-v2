@@ -25,3 +25,16 @@ export function getRandomBytes(len: number): Uint8Array {
     throw new Error('No CSPRNG available');
   }
 }
+
+/**
+ * Safely gets a vault index, handling the case where 0 is a valid value
+ * @param vaultIndex - The vault index to check (can be 0)
+ * @param generateDefault - Function to generate a default vault index
+ * @returns The vault index or the generated default
+ */
+export function getVaultIndex(
+  vaultIndex: number | undefined,
+  generateDefault: () => number
+): number {
+  return vaultIndex !== undefined ? vaultIndex : generateDefault();
+}
