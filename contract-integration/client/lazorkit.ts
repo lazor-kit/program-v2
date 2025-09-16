@@ -176,7 +176,7 @@ export class LazorkitClient {
     let currentIndex = 0;
 
     for (let i = 0; i < instructions.length - 1; i++) {
-      currentIndex += instructions[i].keys.length;
+      currentIndex += instructions[i].keys.length + 1; // +1 because the first account is the program_id
       splitIndex.push(currentIndex);
     }
 
@@ -464,7 +464,7 @@ export class LazorkitClient {
 
     // Prepare CPI data and split indices
     const instructionDataList = cpiInstructions.map((ix) =>
-      Array.from(ix.data)
+      Buffer.from(Array.from(ix.data))
     );
     const splitIndex = this.calculateSplitIndex(cpiInstructions);
 
@@ -480,7 +480,7 @@ export class LazorkitClient {
 
     return await this.program.methods
       .executeDeferredTransaction(
-        instructionDataList.map((data) => Buffer.from(data)),
+        instructionDataList,
         Buffer.from(splitIndex),
         vaultIndex
       )

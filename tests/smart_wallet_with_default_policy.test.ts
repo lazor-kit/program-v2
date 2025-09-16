@@ -111,7 +111,7 @@ describe('Test smart wallet with default policy', () => {
     );
   });
 
-  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
+  it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -197,7 +197,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  xit('Execute deferred transaction with transfer token from smart wallet', async () => {
+  it('Execute deferred transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -441,7 +441,7 @@ describe('Test smart wallet with default policy', () => {
       await lazorkitProgram.createExecuteDeferredTransactionTransaction({
         payer: payer.publicKey,
         smartWallet: smartWallet,
-        cpiInstructions: [transferTokenIns],
+        cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
       });
 
     executeDeferredTransactionTxn.sign([payer]);

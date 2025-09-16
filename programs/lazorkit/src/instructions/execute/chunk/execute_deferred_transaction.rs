@@ -51,6 +51,7 @@ pub fn execute_deferred_transaction(
     let serialized_cpi_data = instruction_data_list
         .try_to_vec()
         .map_err(|_| LazorKitError::InvalidInstructionData)?;
+
     let data_hash = hash(&serialized_cpi_data).to_bytes();
     if data_hash != session.instruction_data_hash {
         msg!("Failed validation: instruction data hash mismatch. computed: {:?}, session: {:?}", data_hash, session.instruction_data_hash);
@@ -78,7 +79,6 @@ pub fn execute_deferred_transaction(
         LazorKitError::AccountSliceOutOfBounds
     );
     account_ranges.push((start, cpi_accounts.len()));
-
 
     // Verify entire accounts vector hash matches session
     let mut all_accounts_hasher = Hasher::default();

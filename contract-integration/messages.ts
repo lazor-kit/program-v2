@@ -106,37 +106,45 @@ function computeAllInsAccountsHash(
   metas: anchor.web3.AccountMeta[],
   smartWallet: anchor.web3.PublicKey
 ): Uint8Array {
-  // Keep original order but merge duplicate accounts
-  const seenAccounts = new Map<string, anchor.web3.AccountMeta>();
-  const mergedMetas: anchor.web3.AccountMeta[] = [];
+  // Keep all elements and order, but update properties for same pubkey
+  const processedMetas: anchor.web3.AccountMeta[] = [];
+  const pubkeyProperties = new Map<
+    string,
+    { isSigner: boolean; isWritable: boolean }
+  >();
 
+  // First pass: collect all properties for each pubkey
   for (const meta of metas) {
     const key = meta.pubkey.toString();
 
-    if (seenAccounts.has(key)) {
-      // Account already exists, merge properties but keep original position
-      const existing = seenAccounts.get(key)!;
-      const merged: anchor.web3.AccountMeta = {
-        pubkey: meta.pubkey,
-        isSigner: existing.isSigner || meta.isSigner, // OR for isSigner
-        isWritable: existing.isWritable || meta.isWritable, // OR for isWritable
-      };
-      seenAccounts.set(key, merged);
-
-      // Update the existing entry in the array
-      const index = mergedMetas.findIndex((m) => m.pubkey.toString() === key);
-      if (index !== -1) {
-        mergedMetas[index] = merged;
-      }
+    if (pubkeyProperties.has(key)) {
+      const existing = pubkeyProperties.get(key)!;
+      pubkeyProperties.set(key, {
+        isSigner: existing.isSigner || meta.isSigner,
+        isWritable: existing.isWritable || meta.isWritable,
+      });
     } else {
-      // New account, add as is
-      seenAccounts.set(key, meta);
-      mergedMetas.push(meta);
+      pubkeyProperties.set(key, {
+        isSigner: meta.isSigner,
+        isWritable: meta.isWritable,
+      });
     }
   }
 
+  // Second pass: create processed metas with updated properties
+  for (const meta of metas) {
+    const key = meta.pubkey.toString();
+    const properties = pubkeyProperties.get(key)!;
+
+    processedMetas.push({
+      pubkey: meta.pubkey,
+      isSigner: properties.isSigner,
+      isWritable: properties.isWritable,
+    });
+  }
+
   const h = sha256.create();
-  for (const m of mergedMetas) {
+  for (const m of processedMetas) {
     h.update(m.pubkey.toBytes());
     h.update(Uint8Array.from([m.isSigner ? 1 : 0]));
     h.update(
@@ -282,7 +290,6 @@ export function buildCreateSessionMessage(
     );
   }
 
-  // Combine all CPI instruction data and hash it (match Rust Borsh serialization)
   const outerLength = Buffer.alloc(4);
   outerLength.writeUInt32LE(cpiInstructions.length, 0);
 
@@ -294,6 +301,7 @@ export function buildCreateSessionMessage(
   });
 
   const serializedCpiData = Buffer.concat([outerLength, ...innerArrays]);
+
   const cpiDataHash = new Uint8Array(sha256.arrayBuffer(serializedCpiData));
 
   const allMetas = cpiInstructions.flatMap((ix) => [
