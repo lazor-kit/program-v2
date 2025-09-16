@@ -21,7 +21,11 @@ import {
   deriveEphemeralAuthorizationPda,
   deriveLazorkitVaultPda,
 } from '../pda/lazorkit';
-import { getRandomBytes, instructionToAccountMetas } from '../utils';
+import {
+  getRandomBytes,
+  instructionToAccountMetas,
+  getVaultIndex,
+} from '../utils';
 import * as types from '../types';
 import { DefaultPolicyClient } from './defaultPolicy';
 import * as bs58 from 'bs58';
@@ -209,6 +213,15 @@ export class LazorkitClient {
    */
   async getWalletDeviceData(walletDevice: PublicKey) {
     return await this.program.account.walletDevice.fetch(walletDevice);
+  }
+
+  /**
+   * Fetches transaction session data for a given transaction session
+   */
+  async getTransactionSessionData(transactionSession: PublicKey) {
+    return await this.program.account.transactionSession.fetch(
+      transactionSession
+    );
   }
 
   /**
@@ -453,14 +466,17 @@ export class LazorkitClient {
   async buildExecuteDeferredTransactionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    cpiInstructions: TransactionInstruction[],
-    vaultIndex: number
+    cpiInstructions: TransactionInstruction[]
   ): Promise<TransactionInstruction> {
     const cfg = await this.getSmartWalletData(smartWallet);
     const transactionSession = this.transactionSessionPda(
       smartWallet,
       cfg.lastNonce
     );
+
+    const vaultIndex = await this.getTransactionSessionData(
+      transactionSession
+    ).then((d) => d.vaultIndex);
 
     // Prepare CPI data and split indices
     const instructionDataList = cpiInstructions.map((ix) =>
@@ -637,7 +653,9 @@ export class LazorkitClient {
       walletId: smartWalletId,
       amount: params.amount,
       referralAddress: params.referral_address || null,
-      vaultIndex: params.vaultIndex || this.generateVaultIndex(),
+      vaultIndex: getVaultIndex(params.vaultIndex, () =>
+        this.generateVaultIndex()
+      ),
     };
 
     const instruction = await this.buildCreateSmartWalletInstruction(
@@ -702,7 +720,10 @@ export class LazorkitClient {
         splitIndex: policyInstruction.keys.length,
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
-        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
+        vaultIndex:
+          params.vaultIndex !== undefined
+            ? params.vaultIndex
+            : this.generateVaultIndex(),
       },
       policyInstruction,
       params.cpiInstruction
@@ -750,7 +771,9 @@ export class LazorkitClient {
           : null,
         policyData: params.policyInstruction.data,
         verifyInstructionIndex: 0,
-        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
+        vaultIndex: getVaultIndex(params.vaultIndex, () =>
+          this.generateVaultIndex()
+        ),
       },
       params.policyInstruction
     );
@@ -801,7 +824,9 @@ export class LazorkitClient {
               ),
             }
           : null,
-        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
+        vaultIndex: getVaultIndex(params.vaultIndex, () =>
+          this.generateVaultIndex()
+        ),
       },
       params.destroyPolicyInstruction,
       params.initPolicyInstruction
@@ -858,7 +883,9 @@ export class LazorkitClient {
           expiresAt: new BN(params.expiresAt),
           policyData: policyInstruction.data,
           verifyInstructionIndex: 0,
-          vaultIndex: params.vaultIndex || this.generateVaultIndex(),
+          vaultIndex: getVaultIndex(params.vaultIndex, () =>
+            this.generateVaultIndex()
+          ),
         },
         policyInstruction
       );
@@ -877,16 +904,12 @@ export class LazorkitClient {
    * Executes a deferred transaction (no authentication needed)
    */
   async createExecuteDeferredTransactionTransaction(
-    params: types.ExecuteDeferredTransactionParams,
-    vaultIndex?: number
+    params: types.ExecuteDeferredTransactionParams
   ): Promise<VersionedTransaction> {
-    const vaultIdx = vaultIndex || this.generateVaultIndex();
-
     const instruction = await this.buildExecuteDeferredTransactionInstruction(
       params.payer,
       params.smartWallet,
-      params.cpiInstructions,
-      vaultIdx
+      params.cpiInstructions
     );
 
     return buildVersionedTransaction(this.connection, params.payer, [
