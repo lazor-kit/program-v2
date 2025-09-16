@@ -1,9 +1,11 @@
-mod invoke_policy;
-mod update_policy;
+mod invoke_wallet_policy;
+mod update_wallet_policy;
 mod chunk;
-mod execute_transaction;
+mod execute_direct_transaction;
+mod ephemeral;
 
-pub use invoke_policy::*;
-pub use update_policy::*;
+pub use invoke_wallet_policy::*;
+pub use update_wallet_policy::*;
 pub use chunk::*;
-pub use execute_transaction::*;
+pub use execute_direct_transaction::*;
+pub use ephemeral::*;

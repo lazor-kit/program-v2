@@ -11,9 +11,20 @@
   ],
   "instructions": [
     {
-      "name": "create_smart_wallet",
-      "docs": ["Create a new smart wallet with passkey authentication"],
-      "discriminator": [129, 39, 235, 18, 132, 68, 203, 19],
+      "name": "authorize_ephemeral_execution",
+      "docs": [
+        "Authorize ephemeral execution for temporary program access"
+      ],
+      "discriminator": [
+        220,
+        152,
+        90,
+        147,
+        146,
+        90,
+        72,
+        115
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -21,15 +32,18 @@
           "signer": true
         },
         {
-          "name": "policy_program_registry",
-          "docs": ["Policy program registry"],
+          "name": "config",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               }
             ]
@@ -37,34 +51,59 @@
         },
         {
           "name": "smart_wallet",
-          "docs": ["The smart wallet PDA being created with random ID"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
-                "kind": "arg",
-                "path": "args.wallet_id"
+                "kind": "account",
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
               }
             ]
           }
         },
         {
           "name": "smart_wallet_data",
-          "docs": ["Smart wallet data"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -76,14 +115,24 @@
         },
         {
           "name": "wallet_device",
-          "docs": ["Wallet device for the passkey"],
-          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -92,26 +141,491 @@
               },
               {
                 "kind": "arg",
-                "path": "args.passkey_pubkey.to_hashed_bytes(smart_wallet"
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_authorization",
+          "docs": [
+            "New ephemeral authorization account (rent payer: payer)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  104,
+                  101,
+                  109,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  122,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.ephemeral_public_key"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "AuthorizeEphemeralExecutionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_deferred_execution",
+      "discriminator": [
+        78,
+        46,
+        57,
+        47,
+        157,
+        183,
+        68,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_data",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy_program_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy_program",
+          "docs": [
+            "Policy program for optional policy enforcement at session creation"
+          ]
+        },
+        {
+          "name": "transaction_session",
+          "docs": [
+            "New transaction session account (rent payer: payer)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  110,
+                  115,
+                  97,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_data.last_nonce",
+                "account": "SmartWalletData"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CreateDeferredExecutionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_smart_wallet",
+      "docs": [
+        "Create a new smart wallet with passkey authentication"
+      ],
+      "discriminator": [
+        129,
+        39,
+        235,
+        18,
+        132,
+        68,
+        203,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "policy_program_registry",
+          "docs": [
+            "Policy program registry"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "docs": [
+            "The smart wallet address PDA being created with random ID"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.wallet_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_data",
+          "docs": [
+            "Smart wallet data"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device",
+          "docs": [
+            "Wallet device for the passkey"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
               }
             ]
           }
         },
         {
           "name": "config",
-          "docs": ["Program configuration"],
+          "docs": [
+            "Program configuration"
+          ],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
         },
         {
           "name": "default_policy_program",
-          "docs": ["Default policy program for the smart wallet"]
+          "docs": [
+            "Default policy program for the smart wallet"
+          ]
         },
         {
           "name": "system_program",
@@ -130,8 +644,17 @@
       ]
     },
     {
-      "name": "create_transaction_session",
-      "discriminator": [63, 173, 215, 71, 47, 219, 207, 197],
+      "name": "execute_deferred_transaction",
+      "discriminator": [
+        165,
+        130,
+        174,
+        92,
+        162,
+        205,
+        131,
+        241
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -144,7 +667,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -157,13 +687,24 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.id",
-                "account": "SmartWallet"
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
               }
             ]
           }
@@ -176,8 +717,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -188,13 +744,73 @@
           }
         },
         {
-          "name": "wallet_device",
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "transaction_session",
+          "docs": [
+            "Transaction session to execute. Closed on success to refund rent."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  110,
+                  115,
+                  97,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
                 ]
               },
               {
@@ -202,11 +818,161 @@
                 "path": "smart_wallet"
               },
               {
-                "kind": "arg",
-                "path": "args.passkey_pubkey.to_hashed_bytes(smart_wallet"
+                "kind": "account",
+                "path": "transaction_session.authorized_nonce",
+                "account": "TransactionSession"
               }
             ]
           }
+        },
+        {
+          "name": "session_refund",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "instruction_data_list",
+          "type": {
+            "vec": "bytes"
+          }
+        },
+        {
+          "name": "split_index",
+          "type": "bytes"
+        },
+        {
+          "name": "vault_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "execute_direct_transaction",
+      "discriminator": [
+        133,
+        33,
+        175,
+        46,
+        56,
+        92,
+        169,
+        220
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_data",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device"
         },
         {
           "name": "policy_program_registry",
@@ -215,40 +981,46 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
           }
         },
         {
-          "name": "policy_program",
-          "docs": [
-            "Policy program for optional policy enforcement at session creation"
-          ]
+          "name": "policy_program"
         },
         {
-          "name": "transaction_session",
-          "docs": ["New transaction session account (rent payer: payer)"],
-          "writable": true,
+          "name": "cpi_program"
+        },
+        {
+          "name": "config",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
-                  101, 115, 115, 105, 111, 110
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet_data.last_nonce",
-                "account": "SmartWallet"
               }
             ]
           }
@@ -267,19 +1039,41 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "CreateSessionArgs"
+              "name": "ExecuteDirectTransactionArgs"
             }
           }
         }
       ]
     },
     {
-      "name": "execute_session_transaction",
-      "discriminator": [38, 182, 163, 196, 170, 170, 115, 226],
+      "name": "execute_ephemeral_authorization",
+      "docs": [
+        "Execute transactions using ephemeral authorization"
+      ],
+      "discriminator": [
+        34,
+        195,
+        199,
+        141,
+        192,
+        147,
+        156,
+        14
+      ],
       "accounts": [
         {
-          "name": "payer",
+          "name": "fee_payer",
+          "docs": [
+            "Fee payer for the transaction (stored in authorization)"
+          ],
           "writable": true,
+          "signer": true
+        },
+        {
+          "name": "ephemeral_signer",
+          "docs": [
+            "Ephemeral key that can sign transactions (must be signer)"
+          ],
           "signer": true
         },
         {
@@ -288,7 +1082,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -301,13 +1102,24 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.id",
-                "account": "SmartWallet"
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
               }
             ]
           }
@@ -320,8 +1132,23 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
@@ -332,128 +1159,91 @@
           }
         },
         {
-          "name": "cpi_program"
+          "name": "referral",
+          "writable": true
         },
         {
-          "name": "transaction_session",
+          "name": "lazorkit_vault",
           "docs": [
-            "Transaction session to execute. Closed on success to refund rent."
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ephemeral_authorization",
+          "docs": [
+            "Ephemeral authorization to execute. Closed on success to refund rent."
           ],
           "writable": true
         },
         {
-          "name": "session_refund",
+          "name": "authorization_refund",
           "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "cpi_data",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "execute_transaction",
-      "discriminator": [231, 173, 49, 91, 235, 24, 68, 19],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet_data.id",
-                "account": "SmartWallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet_data",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "wallet_device"
-        },
-        {
-          "name": "policy_program_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "policy_program"
-        },
-        {
-          "name": "cpi_program"
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
-              }
-            ]
-          }
-        },
-        {
-          "name": "ix_sysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
+          "name": "instruction_data_list",
           "type": {
-            "defined": {
-              "name": "ExecuteTransactionArgs"
-            }
+            "vec": "bytes"
           }
+        },
+        {
+          "name": "split_index",
+          "type": "bytes"
+        },
+        {
+          "name": "vault_index",
+          "type": "u8"
         }
       ]
     },
     {
-      "name": "initialize",
-      "docs": ["Initialize the program by creating the sequence tracker"],
-      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "name": "initialize_program",
+      "docs": [
+        "Initialize the program by creating the sequence tracker"
+      ],
+      "discriminator": [
+        176,
+        107,
+        205,
+        168,
+        24,
+        157,
+        175,
+        103
+      ],
       "accounts": [
         {
           "name": "signer",
@@ -465,13 +1255,22 @@
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -487,8 +1286,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -502,15 +1314,26 @@
         },
         {
           "name": "system_program",
-          "docs": ["The system program."],
+          "docs": [
+            "The system program."
+          ],
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "invoke_policy",
-      "discriminator": [233, 117, 13, 198, 43, 169, 77, 87],
+      "name": "invoke_wallet_policy",
+      "discriminator": [
+        86,
+        172,
+        240,
+        211,
+        83,
+        157,
+        165,
+        98
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -523,7 +1346,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -536,13 +1366,24 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.id",
-                "account": "SmartWallet"
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
               }
             ]
           }
@@ -555,13 +1396,66 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
                 "kind": "account",
                 "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
               }
             ]
           }
@@ -579,8 +1473,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -600,22 +1507,144 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "InvokePolicyArgs"
+              "name": "InvokeWalletPolicyArgs"
             }
           }
         }
       ]
     },
     {
+      "name": "manage_vault",
+      "docs": [
+        "Withdraw SOL from vault"
+      ],
+      "discriminator": [
+        165,
+        7,
+        106,
+        242,
+        73,
+        193,
+        195,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The current authority of the program."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The program's configuration account."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Individual vault PDA (empty account that holds SOL)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "register_policy_program",
-      "docs": ["Add a program to the policy program registry"],
-      "discriminator": [15, 54, 85, 112, 89, 180, 121, 13],
+      "docs": [
+        "Add a program to the policy program registry"
+      ],
+      "discriminator": [
+        15,
+        54,
+        85,
+        112,
+        89,
+        180,
+        121,
+        13
+      ],
       "accounts": [
         {
           "name": "authority",
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
@@ -623,7 +1652,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -636,8 +1672,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -647,26 +1696,50 @@
       "args": []
     },
     {
-      "name": "update_config",
-      "docs": ["Update the program configuration"],
-      "discriminator": [29, 158, 252, 191, 10, 83, 219, 99],
+      "name": "update_program_config",
+      "docs": [
+        "Update the program configuration"
+      ],
+      "discriminator": [
+        214,
+        3,
+        187,
+        98,
+        170,
+        106,
+        33,
+        45
+      ],
       "accounts": [
         {
           "name": "authority",
-          "docs": ["The current authority of the program."],
+          "docs": [
+            "The current authority of the program."
+          ],
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -677,7 +1750,7 @@
           "name": "param",
           "type": {
             "defined": {
-              "name": "UpdateConfigType"
+              "name": "ConfigUpdateType"
             }
           }
         },
@@ -688,8 +1761,17 @@
       ]
     },
     {
-      "name": "update_policy",
-      "discriminator": [212, 245, 246, 7, 163, 151, 18, 57],
+      "name": "update_wallet_policy",
+      "discriminator": [
+        90,
+        225,
+        16,
+        40,
+        95,
+        80,
+        20,
+        107
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -702,7 +1784,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -715,13 +1804,24 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.id",
-                "account": "SmartWallet"
+                "path": "smart_wallet_data.wallet_id",
+                "account": "SmartWalletData"
               }
             ]
           }
@@ -734,13 +1834,66 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
                 ]
               },
               {
                 "kind": "account",
                 "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
               }
             ]
           }
@@ -761,8 +1914,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -770,7 +1936,9 @@
         },
         {
           "name": "ix_sysvar",
-          "docs": ["CHECK"],
+          "docs": [
+            "CHECK"
+          ],
           "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
@@ -783,7 +1951,7 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "UpdatePolicyArgs"
+              "name": "UpdateWalletPolicyArgs"
             }
           }
         }
@@ -792,74 +1960,82 @@
   ],
   "accounts": [
     {
-      "name": "Config",
-      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+      "name": "EphemeralAuthorization",
+      "discriminator": [
+        159,
+        254,
+        58,
+        207,
+        22,
+        91,
+        56,
+        255
+      ]
     },
     {
       "name": "PolicyProgramRegistry",
-      "discriminator": [158, 67, 114, 157, 27, 153, 86, 72]
+      "discriminator": [
+        158,
+        67,
+        114,
+        157,
+        27,
+        153,
+        86,
+        72
+      ]
     },
     {
-      "name": "SmartWallet",
-      "discriminator": [67, 59, 220, 179, 41, 10, 60, 177]
+      "name": "ProgramConfig",
+      "discriminator": [
+        196,
+        210,
+        90,
+        231,
+        144,
+        149,
+        140,
+        63
+      ]
+    },
+    {
+      "name": "SmartWalletData",
+      "discriminator": [
+        124,
+        86,
+        202,
+        243,
+        63,
+        150,
+        66,
+        22
+      ]
     },
     {
       "name": "TransactionSession",
-      "discriminator": [169, 116, 227, 43, 10, 34, 251, 2]
+      "discriminator": [
+        169,
+        116,
+        227,
+        43,
+        10,
+        34,
+        251,
+        2
+      ]
     },
     {
       "name": "WalletDevice",
-      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
-    }
-  ],
-  "events": [
-    {
-      "name": "AuthenticatorAdded",
-      "discriminator": [213, 87, 171, 174, 101, 129, 32, 44]
-    },
-    {
-      "name": "ConfigUpdated",
-      "discriminator": [40, 241, 230, 122, 11, 19, 198, 194]
-    },
-    {
-      "name": "ErrorEvent",
-      "discriminator": [163, 35, 212, 206, 66, 104, 234, 251]
-    },
-    {
-      "name": "FeeCollected",
-      "discriminator": [12, 28, 17, 248, 244, 36, 8, 73]
-    },
-    {
-      "name": "PolicyProgramChanged",
-      "discriminator": [235, 88, 111, 162, 87, 195, 1, 141]
-    },
-    {
-      "name": "PolicyProgramRegistered",
-      "discriminator": [204, 39, 171, 246, 52, 45, 103, 117]
-    },
-    {
-      "name": "ProgramInitialized",
-      "discriminator": [43, 70, 110, 241, 199, 218, 221, 245]
-    },
-    {
-      "name": "ProgramPausedStateChanged",
-      "discriminator": [148, 9, 117, 157, 18, 25, 122, 32]
-    },
-    {
-      "name": "SecurityEvent",
-      "discriminator": [16, 175, 241, 170, 85, 9, 201, 100]
-    },
-    {
-      "name": "SmartWalletCreated",
-      "discriminator": [145, 37, 118, 21, 58, 251, 56, 128]
-    },
-    {
-      "name": "SolTransfer",
-      "discriminator": [0, 186, 79, 129, 194, 76, 94, 9]
-    },
-    {
-      "name": "TransactionExecuted",
-      "discriminator": [211, 227, 168, 14, 32, 111, 189, 210]
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
+      ]
     }
   ],
   "errors": [
@@ -870,7 +2046,7 @@
     },
     {
       "code": 6001,
-      "name": "SmartWalletMismatch",
+      "name": "SmartWalletDataMismatch",
       "msg": "Smart wallet address mismatch with authenticator"
     },
     {
@@ -1327,106 +2503,143 @@
       "code": 6092,
       "name": "InvalidRefundAmount",
       "msg": "Invalid refund amount"
+    },
+    {
+      "code": 6093,
+      "name": "AllVaultsFull",
+      "msg": "All vault slots are full"
+    },
+    {
+      "code": 6094,
+      "name": "VaultNotFound",
+      "msg": "Vault not found for the specified mint"
+    },
+    {
+      "code": 6095,
+      "name": "InsufficientVaultBalance",
+      "msg": "Insufficient balance in vault"
+    },
+    {
+      "code": 6096,
+      "name": "VaultOverflow",
+      "msg": "Vault balance overflow"
+    },
+    {
+      "code": 6097,
+      "name": "InvalidVaultIndex",
+      "msg": "Invalid vault index"
+    },
+    {
+      "code": 6098,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance"
+    },
+    {
+      "code": 6099,
+      "name": "InvalidAction",
+      "msg": "Invalid action"
     }
   ],
   "types": [
     {
-      "name": "AuthenticatorAdded",
-      "docs": ["Event emitted when a new authenticator is added"],
+      "name": "AuthorizeEphemeralExecutionArgs",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_wallet_device",
-            "type": "pubkey"
-          },
-          {
-            "name": "passkey_hash",
+            "name": "passkey_public_key",
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
-            "name": "added_by",
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "ephemeral_public_key",
             "type": "pubkey"
           },
           {
-            "name": "timestamp",
+            "name": "expires_at",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
           },
           {
-            "name": "create_smart_wallet_fee",
-            "type": "u64"
+            "name": "vault_index",
+            "type": "u8"
           },
           {
-            "name": "execute_fee",
-            "type": "u64"
-          },
-          {
-            "name": "default_policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "is_paused",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ConfigUpdated",
-      "docs": ["Event emitted when program configuration is updated"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "update_type",
-            "type": "string"
-          },
-          {
-            "name": "old_value",
-            "type": "string"
-          },
-          {
-            "name": "new_value",
-            "type": "string"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CreateSessionArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_pubkey",
+            "name": "instruction_data_list",
             "type": {
-              "array": ["u8", 33]
+              "vec": "bytes"
+            }
+          },
+          {
+            "name": "split_index",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdateType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CreateWalletFee"
+          },
+          {
+            "name": "FeePayerFee"
+          },
+          {
+            "name": "ReferralFee"
+          },
+          {
+            "name": "LazorkitFee"
+          },
+          {
+            "name": "DefaultPolicyProgram"
+          },
+          {
+            "name": "Admin"
+          },
+          {
+            "name": "PauseProgram"
+          },
+          {
+            "name": "UnpauseProgram"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateDeferredExecutionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1452,6 +2665,10 @@
           {
             "name": "expires_at",
             "type": "i64"
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
           }
         ]
       }
@@ -1462,9 +2679,12 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_pubkey",
+            "name": "passkey_public_key",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1480,52 +2700,113 @@
             "type": "u64"
           },
           {
-            "name": "is_pay_for_user",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ErrorEvent",
-      "docs": ["Event emitted for errors that are caught and handled"],
-      "type": {
-        "kind": "struct",
-        "fields": [
+            "name": "amount",
+            "type": "u64"
+          },
           {
-            "name": "smart_wallet",
+            "name": "referral_address",
             "type": {
               "option": "pubkey"
             }
           },
           {
-            "name": "error_code",
-            "type": "string"
-          },
-          {
-            "name": "error_message",
-            "type": "string"
-          },
-          {
-            "name": "action_attempted",
-            "type": "string"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
+            "name": "vault_index",
+            "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "ExecuteTransactionArgs",
+      "name": "EphemeralAuthorization",
+      "docs": [
+        "Ephemeral authorization for temporary program access.",
+        "Created after passkey authentication. Allows execution with ephemeral key",
+        "for a limited time to authorized programs with multiple instructions."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_pubkey",
+            "name": "owner_wallet_address",
+            "docs": [
+              "Smart wallet that authorized this session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ephemeral_public_key",
+            "docs": [
+              "Ephemeral public key that can sign transactions"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix timestamp when this session expires"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "fee_payer_address",
+            "docs": [
+              "Fee payer for transactions in this session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_refund_address",
+            "docs": [
+              "Where to refund rent when closing the session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Vault index for fee collection"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "instruction_data_hash",
+            "docs": [
+              "Combined hash of all instruction data that can be executed"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts_metadata_hash",
+            "docs": [
+              "Combined hash of all accounts that will be used"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecuteDirectTransactionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1555,48 +2836,26 @@
           {
             "name": "cpi_data",
             "type": "bytes"
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "FeeCollected",
-      "docs": ["Event emitted when a fee is collected"],
+      "name": "InvokeWalletPolicyArgs",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "fee_type",
-            "type": "string"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "recipient",
-            "type": "pubkey"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InvokePolicyArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_pubkey",
+            "name": "passkey_public_key",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -1628,6 +2887,10 @@
                 }
               }
             }
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
           }
         ]
       }
@@ -1638,64 +2901,17 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_pubkey",
+            "name": "passkey_public_key",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "credential_id",
             "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PolicyProgramChanged",
-      "docs": ["Event emitted when a policy program is changed"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "old_policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PolicyProgramRegistered",
-      "docs": ["Event emitted when a policy program is added to registry"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
           }
         ]
       }
@@ -1709,23 +2925,26 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "programs",
-            "docs": ["List of registered policy program addresses"],
+            "name": "registered_programs",
+            "docs": [
+              "List of registered policy program addresses"
+            ],
             "type": {
               "vec": "pubkey"
             }
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "ProgramInitialized",
-      "docs": ["Event emitted when program is initialized"],
+      "name": "ProgramConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1734,194 +2953,74 @@
             "type": "pubkey"
           },
           {
-            "name": "default_policy_program",
-            "type": "pubkey"
+            "name": "create_smart_wallet_fee",
+            "type": "u64"
           },
           {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ProgramPausedStateChanged",
-      "docs": ["Event emitted when program is paused/unpaused"],
-      "type": {
-        "kind": "struct",
-        "fields": [
+            "name": "fee_payer_fee",
+            "type": "u64"
+          },
           {
-            "name": "authority",
+            "name": "referral_fee",
+            "type": "u64"
+          },
+          {
+            "name": "lazorkit_fee",
+            "type": "u64"
+          },
+          {
+            "name": "default_policy_program_id",
             "type": "pubkey"
           },
           {
             "name": "is_paused",
             "type": "bool"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "SecurityEvent",
-      "docs": ["Event emitted for security-related events"],
+      "name": "SmartWalletData",
+      "docs": [
+        "Data account for a smart wallet"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "event_type",
-            "type": "string"
-          },
-          {
-            "name": "smart_wallet",
-            "type": {
-              "option": "pubkey"
-            }
-          },
-          {
-            "name": "details",
-            "type": "string"
-          },
-          {
-            "name": "severity",
-            "type": "string"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SmartWallet",
-      "docs": ["Data account for a smart wallet"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "id",
-            "docs": ["Unique identifier for this smart wallet"],
+            "name": "wallet_id",
+            "docs": [
+              "Unique identifier for this smart wallet"
+            ],
             "type": "u64"
           },
           {
-            "name": "policy_program",
-            "docs": ["Policy program that governs this wallet's operations"],
+            "name": "referral_address",
+            "docs": [
+              "Referral address that governs this wallet's operations"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policy_program_id",
+            "docs": [
+              "Policy program that governs this wallet's operations"
+            ],
             "type": "pubkey"
           },
           {
             "name": "last_nonce",
-            "docs": ["Last nonce used for message verification"],
+            "docs": [
+              "Last nonce used for message verification"
+            ],
             "type": "u64"
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SmartWalletCreated",
-      "docs": ["Event emitted when a new smart wallet is created"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "authenticator",
-            "type": "pubkey"
-          },
-          {
-            "name": "sequence_id",
-            "type": "u64"
-          },
-          {
-            "name": "policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "passkey_hash",
-            "type": {
-              "array": ["u8", 32]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SolTransfer",
-      "docs": ["Event emitted when a SOL transfer occurs"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "destination",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TransactionExecuted",
-      "docs": ["Event emitted when a transaction is executed"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "smart_wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "authenticator",
-            "type": "pubkey"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "policy_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "cpi_program",
-            "type": "pubkey"
-          },
-          {
-            "name": "success",
-            "type": "bool"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
           }
         ]
       }
@@ -1937,24 +3036,34 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "owner_wallet",
-            "docs": ["Smart wallet that authorized this session"],
+            "name": "owner_wallet_address",
+            "docs": [
+              "Smart wallet that authorized this session"
+            ],
             "type": "pubkey"
           },
           {
-            "name": "data_hash",
-            "docs": ["sha256 of transaction instruction data"],
+            "name": "instruction_data_hash",
+            "docs": [
+              "Combined sha256 hash of all transaction instruction data"
+            ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
-            "name": "accounts_hash",
+            "name": "accounts_metadata_hash",
             "docs": [
-              "sha256 over ordered remaining account metas plus target program"
+              "Combined sha256 hash over all ordered remaining account metas plus target programs"
             ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1966,52 +3075,40 @@
           },
           {
             "name": "expires_at",
-            "docs": ["Unix expiration timestamp"],
+            "docs": [
+              "Unix expiration timestamp"
+            ],
             "type": "i64"
           },
           {
-            "name": "rent_refund_to",
-            "docs": ["Where to refund rent when closing the session"],
+            "name": "rent_refund_address",
+            "docs": [
+              "Where to refund rent when closing the session"
+            ],
             "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Vault index for fee collection"
+            ],
+            "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "UpdateConfigType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CreateWalletFee"
-          },
-          {
-            "name": "ExecuteFee"
-          },
-          {
-            "name": "DefaultPolicyProgram"
-          },
-          {
-            "name": "Admin"
-          },
-          {
-            "name": "PauseProgram"
-          },
-          {
-            "name": "UnpauseProgram"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdatePolicyArgs",
+      "name": "UpdateWalletPolicyArgs",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_pubkey",
+            "name": "passkey_public_key",
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -2051,6 +3148,10 @@
                 }
               }
             }
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
           }
         ]
       }
@@ -2058,33 +3159,42 @@
     {
       "name": "WalletDevice",
       "docs": [
-        "Account that stores a wallet_device (passkey) used to authenticate to a smart wallet"
+        "Account that stores a wallet device (passkey) used to authenticate to a smart wallet"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_pubkey",
+            "name": "passkey_public_key",
             "docs": [
-              "The public key of the passkey for this wallet_device that can authorize transactions"
+              "The public key of the passkey for this wallet device that can authorize transactions"
             ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
-            "name": "smart_wallet",
-            "docs": ["The smart wallet this wallet_device belongs to"],
+            "name": "smart_wallet_address",
+            "docs": [
+              "The smart wallet this wallet device belongs to"
+            ],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["The credential ID this wallet_device belongs to"],
+            "docs": [
+              "The credential ID this wallet device belongs to"
+            ],
             "type": "bytes"
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": [
+              "Bump seed for PDA derivation"
+            ],
             "type": "u8"
           }
         ]

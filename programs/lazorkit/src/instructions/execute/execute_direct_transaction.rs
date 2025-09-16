@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{Args as _, ExecuteTransactionArgs};
+use crate::instructions::{Args as _, ExecuteDirectTransactionArgs};
 use crate::security::validation;
-use crate::state::ExecuteMessage;
+use crate::state::{ExecuteMessage, LazorKitVault};
 use crate::utils::{
     check_whitelist, execute_cpi, get_wallet_device_signer, sighash, split_remaining_accounts,
     verify_authorization, PdaSigner,
@@ -10,9 +10,9 @@ use crate::utils::{
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn execute_transaction<'c: 'info, 'info>(
-    ctx: Context<'_, '_, 'c, 'info, ExecuteTransaction<'info>>,
-    args: ExecuteTransactionArgs,
+pub fn execute_direct_transaction<'c: 'info, 'info>(
+    ctx: Context<'_, '_, 'c, 'info, ExecuteDirectTransaction<'info>>,
+    args: ExecuteDirectTransactionArgs,
 ) -> Result<()> {
     // 0. Validate args and global state
     args.validate()?;
@@ -24,7 +24,7 @@ pub fn execute_transaction<'c: 'info, 'info>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
-        args.passkey_pubkey,
+        args.passkey_public_key,
         args.signature.clone(),
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
@@ -46,13 +46,13 @@ pub fn execute_transaction<'c: 'info, 'info>(
 
     // Ensure policy program matches wallet configuration
     require!(
-        policy_program_info.key() == ctx.accounts.smart_wallet_data.policy_program,
+        policy_program_info.key() == ctx.accounts.smart_wallet_data.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
 
     // 2. Prepare PDA signer for policy CPI
     let policy_signer = get_wallet_device_signer(
-        &args.passkey_pubkey,
+        &args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
     );
@@ -95,20 +95,13 @@ pub fn execute_transaction<'c: 'info, 'info>(
     );
 
     // 5. Execute policy CPI to check if the transaction is allowed
-    msg!(
-        "Executing policy check for smart wallet: {}",
-        ctx.accounts.smart_wallet.key()
-    );
 
     execute_cpi(
         policy_accounts,
         policy_data,
         policy_program_info,
         policy_signer,
-        &[],
     )?;
-
-    msg!("Policy check passed");
 
     // 6. Validate CPI payload and compare hashes
     validation::validate_cpi_data(&args.cpi_data)?;
@@ -143,25 +136,20 @@ pub fn execute_transaction<'c: 'info, 'info>(
     let wallet_signer = PdaSigner {
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
-            ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
+            ctx.accounts
+                .smart_wallet_data
+                .wallet_id
+                .to_le_bytes()
+                .to_vec(),
         ],
         bump: ctx.accounts.smart_wallet_data.bump,
-        owner: anchor_lang::system_program::ID,
     };
-
-    msg!(
-        "Executing CPI to program: {}",
-        ctx.accounts.cpi_program.key()
-    );
     execute_cpi(
         cpi_accounts,
         &args.cpi_data,
         &ctx.accounts.cpi_program,
         wallet_signer.clone(),
-        &[ctx.accounts.payer.key()],
     )?;
-
-    msg!("Transaction executed successfully");
 
     // 8. Increment nonce
     ctx.accounts.smart_wallet_data.last_nonce = ctx
@@ -187,42 +175,45 @@ pub fn execute_transaction<'c: 'info, 'info>(
         &ctx.accounts.lazorkit_vault.to_account_info(),
         &ctx.accounts.system_program,
         wallet_signer,
-        msg.nonce,
     )?;
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct ExecuteTransaction<'info> {
+#[instruction(args: ExecuteDirectTransactionArgs)]
+pub struct ExecuteDirectTransaction<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
+        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = system_program.key(),
     )]
     /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [crate::state::SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [crate::state::SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, crate::state::SmartWallet>>,
+    pub smart_wallet_data: Box<Account<'info, crate::state::SmartWalletData>>,
 
     /// CHECK: referral account (matches smart_wallet_data.referral)
-    #[account(mut, address = smart_wallet_data.referral)]
+    #[account(mut, address = smart_wallet_data.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
-    #[account(mut, owner = crate::ID)]
+    #[account(
+        mut,
+        seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
+        bump,
+    )]
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
-    pub lazorkit_vault: UncheckedAccount<'info>,
+    pub lazorkit_vault: SystemAccount<'info>,
 
     #[account(owner = crate::ID)]
     pub wallet_device: Box<Account<'info, crate::state::WalletDevice>>,
@@ -239,11 +230,11 @@ pub struct ExecuteTransaction<'info> {
     #[account(executable)]
     pub cpi_program: UncheckedAccount<'info>,
     #[account(
-        seeds = [crate::state::Config::PREFIX_SEED],
+        seeds = [crate::state::ProgramConfig::PREFIX_SEED],
         bump,
         owner = crate::ID
     )]
-    pub config: Box<Account<'info, crate::state::Config>>,
+    pub config: Box<Account<'info, crate::state::ProgramConfig>>,
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,

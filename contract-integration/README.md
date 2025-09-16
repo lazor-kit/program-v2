@@ -51,7 +51,7 @@ The main client for interacting with the LazorKit program.
 
 **Key Methods:**
 
-- **PDA Derivation**: `configPda()`, `smartWalletPda()`, `walletDevicePda()`, etc.
+- **PDA Derivation**: `programConfigPda()`, `smartWalletPda()`, `walletDevicePda()`, etc.
 - **Account Data**: `getSmartWalletData()`, `getWalletDeviceData()`, etc.
 - **Low-level Builders**: `buildCreateSmartWalletInstruction()`, `buildExecuteTransactionInstruction()`, etc.
 - **High-level Builders**: `createSmartWalletTransaction()`, `executeTransactionWithAuth()`, etc.

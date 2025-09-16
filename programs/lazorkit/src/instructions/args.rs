@@ -7,18 +7,18 @@ pub trait Args {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateSmartWalletArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     pub credential_id: Vec<u8>,
     pub policy_data: Vec<u8>,
     pub wallet_id: u64, // Random ID provided by client,
-    pub is_pay_for_user: bool,
-    pub referral: Option<Pubkey>,
+    pub amount: u64,
+    pub referral_address: Option<Pubkey>,
     pub vault_index: u8, // Random vault index (0-31) calculated off-chain
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ExecuteTransactionArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+pub struct ExecuteDirectTransactionArgs {
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -30,8 +30,8 @@ pub struct ExecuteTransactionArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct UpdatePolicyArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+pub struct UpdateWalletPolicyArgs {
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -44,8 +44,8 @@ pub struct UpdatePolicyArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct InvokePolicyArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+pub struct InvokeWalletPolicyArgs {
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -56,8 +56,8 @@ pub struct InvokePolicyArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CreateSessionArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+pub struct CreateDeferredExecutionArgs {
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -69,54 +69,30 @@ pub struct CreateSessionArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct NewWalletDeviceArgs {
-    pub passkey_pubkey: [u8; PASSKEY_SIZE],
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
     #[max_len(256)]
     pub credential_id: Vec<u8>,
 }
 
-macro_rules! impl_args_validate {
-    ($t:ty) => {
-        impl Args for $t {
-            fn validate(&self) -> Result<()> {
-                // Validate passkey format
-                require!(
-                    self.passkey_pubkey[0] == 0x02 || self.passkey_pubkey[0] == 0x03,
-                    LazorKitError::InvalidPasskeyFormat
-                );
-
-                // Validate signature length (Secp256r1 signature should be 64 bytes)
-                require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
-
-                // Validate client data and authenticator data are not empty
-                require!(
-                    !self.client_data_json_raw.is_empty(),
-                    LazorKitError::InvalidInstructionData
-                );
-                require!(
-                    !self.authenticator_data_raw.is_empty(),
-                    LazorKitError::InvalidInstructionData
-                );
-
-                // Validate verify instruction index
-                require!(
-                    self.verify_instruction_index < 255,
-                    LazorKitError::InvalidInstructionData
-                );
-
-                // Validate vault index
-                require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
-
-                Ok(())
-            }
-        }
-    };
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct AuthorizeEphemeralExecutionArgs {
+    pub passkey_public_key: [u8; PASSKEY_SIZE],
+    pub signature: Vec<u8>,
+    pub client_data_json_raw: Vec<u8>,
+    pub authenticator_data_raw: Vec<u8>,
+    pub verify_instruction_index: u8,
+    pub ephemeral_public_key: Pubkey,
+    pub expires_at: i64,
+    pub vault_index: u8, // Random vault index (0-31) calculated off-chain
+    pub instruction_data_list: Vec<Vec<u8>>, // All instruction data to be authorized
+    pub split_index: Vec<u8>, // Split indices for accounts (n-1 for n instructions)
 }
 
-impl Args for CreateSessionArgs {
+impl Args for CreateDeferredExecutionArgs {
     fn validate(&self) -> Result<()> {
         // Common passkey/signature/client/auth checks
         require!(
-            self.passkey_pubkey[0] == 0x02 || self.passkey_pubkey[0] == 0x03,
+            self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
         require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
@@ -151,11 +127,11 @@ impl Args for CreateSessionArgs {
 }
 
 // Only ExecuteTransactionArgs has vault_index, so we need separate validation
-impl Args for ExecuteTransactionArgs {
+impl Args for ExecuteDirectTransactionArgs {
     fn validate(&self) -> Result<()> {
         // Validate passkey format
         require!(
-            self.passkey_pubkey[0] == 0x02 || self.passkey_pubkey[0] == 0x03,
+            self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
 
@@ -185,5 +161,44 @@ impl Args for ExecuteTransactionArgs {
     }
 }
 
-impl_args_validate!(UpdatePolicyArgs);
-impl_args_validate!(InvokePolicyArgs);
+macro_rules! impl_args_validate {
+    ($t:ty) => {
+        impl Args for $t {
+            fn validate(&self) -> Result<()> {
+                // Validate passkey format
+                require!(
+                    self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
+                    LazorKitError::InvalidPasskeyFormat
+                );
+
+                // Validate signature length (Secp256r1 signature should be 64 bytes)
+                require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
+
+                // Validate client data and authenticator data are not empty
+                require!(
+                    !self.client_data_json_raw.is_empty(),
+                    LazorKitError::InvalidInstructionData
+                );
+                require!(
+                    !self.authenticator_data_raw.is_empty(),
+                    LazorKitError::InvalidInstructionData
+                );
+
+                // Validate verify instruction index
+                require!(
+                    self.verify_instruction_index < 255,
+                    LazorKitError::InvalidInstructionData
+                );
+
+                // Validate vault index
+                require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_args_validate!(UpdateWalletPolicyArgs);
+impl_args_validate!(InvokeWalletPolicyArgs);
+impl_args_validate!(AuthorizeEphemeralExecutionArgs);

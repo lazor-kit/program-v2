@@ -18,7 +18,7 @@ export type DefaultPolicy = {
       discriminator: [21, 27, 66, 42, 18, 30, 14, 18];
       accounts: [
         {
-          name: 'payer';
+          name: 'smartWallet';
           writable: true;
           signer: true;
         },
@@ -88,23 +88,31 @@ export type DefaultPolicy = {
           writable: true;
         }
       ];
-      args: [];
+      args: [
+        {
+          name: 'walletId';
+          type: 'u64';
+        },
+        {
+          name: 'passkeyPublicKey';
+          type: {
+            array: ['u8', 33];
+          };
+        }
+      ];
     },
     {
       name: 'initPolicy';
       discriminator: [45, 234, 110, 100, 209, 146, 191, 86];
       accounts: [
         {
-          name: 'payer';
+          name: 'smartWallet';
           writable: true;
           signer: true;
         },
         {
-          name: 'smartWallet';
-        },
-        {
           name: 'walletDevice';
-          signer: true;
+          writable: true;
         },
         {
           name: 'policy';
@@ -131,7 +139,18 @@ export type DefaultPolicy = {
           address: '11111111111111111111111111111111';
         }
       ];
-      args: [];
+      args: [
+        {
+          name: 'walletId';
+          type: 'u64';
+        },
+        {
+          name: 'passkeyPublicKey';
+          type: {
+            array: ['u8', 33];
+          };
+        }
+      ];
     }
   ];
   accounts: [
@@ -176,28 +195,28 @@ export type DefaultPolicy = {
     {
       name: 'walletDevice';
       docs: [
-        'Account that stores a wallet_device (passkey) used to authenticate to a smart wallet'
+        'Account that stores a wallet device (passkey) used to authenticate to a smart wallet'
       ];
       type: {
         kind: 'struct';
         fields: [
           {
-            name: 'passkeyPubkey';
+            name: 'passkeyPublicKey';
             docs: [
-              'The public key of the passkey for this wallet_device that can authorize transactions'
+              'The public key of the passkey for this wallet device that can authorize transactions'
             ];
             type: {
               array: ['u8', 33];
             };
           },
           {
-            name: 'smartWallet';
-            docs: ['The smart wallet this wallet_device belongs to'];
+            name: 'smartWalletAddress';
+            docs: ['The smart wallet this wallet device belongs to'];
             type: 'pubkey';
           },
           {
             name: 'credentialId';
-            docs: ['The credential ID this wallet_device belongs to'];
+            docs: ['The credential ID this wallet device belongs to'];
             type: 'bytes';
           },
           {

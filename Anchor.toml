@@ -22,7 +22,7 @@ default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

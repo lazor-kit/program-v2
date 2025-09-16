@@ -6,7 +6,7 @@ use anchor_lang::prelude::*;
 pub struct PolicyProgramRegistry {
     /// List of registered policy program addresses
     #[max_len(10)]
-    pub programs: Vec<Pubkey>,
+    pub registered_programs: Vec<Pubkey>,
     /// Bump seed for PDA derivation
     pub bump: u8,
 }

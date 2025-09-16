@@ -2,31 +2,31 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{Config, PolicyProgramRegistry},
+    state::{PolicyProgramRegistry, ProgramConfig},
 };
 
-pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+pub fn initialize_program(ctx: Context<InitializeProgram>) -> Result<()> {
     // Check if the default policy program is executable
     if !ctx.accounts.default_policy_program.executable {
         return err!(LazorKitError::ProgramNotExecutable);
     }
 
     let policy_program_registry = &mut ctx.accounts.policy_program_registry;
-    policy_program_registry.programs = vec![ctx.accounts.default_policy_program.key()];
+    policy_program_registry.registered_programs = vec![ctx.accounts.default_policy_program.key()];
 
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
     config.fee_payer_fee = 30000; // LAMPORTS
     config.referral_fee = 10000; // LAMPORTS
     config.lazorkit_fee = 10000; // LAMPORTS
-    config.default_policy_program = ctx.accounts.default_policy_program.key();
+    config.default_policy_program_id = ctx.accounts.default_policy_program.key();
     config.is_paused = false;
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct InitializeProgram<'info> {
     /// The signer of the transaction, who will be the initial authority.
     #[account(mut)]
     pub signer: Signer<'info>,
@@ -35,11 +35,11 @@ pub struct Initialize<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = 8 + Config::INIT_SPACE,
-        seeds = [Config::PREFIX_SEED],
+        space = 8 + ProgramConfig::INIT_SPACE,
+        seeds = [ProgramConfig::PREFIX_SEED],
         bump,
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub config: Box<Account<'info, ProgramConfig>>,
 
     /// The registry of policy programs that can be used with smart wallets.
     #[account(

@@ -31,14 +31,14 @@ export class DefaultPolicyClient {
   }
 
   async buildInitPolicyIx(
-    payer: PublicKey,
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
     smartWallet: PublicKey,
     walletDevice: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .initPolicy()
+      .initPolicy(walletId, passkeyPublicKey)
       .accountsPartial({
-        payer,
         smartWallet,
         walletDevice,
         policy: this.policyPda(walletDevice),
@@ -48,11 +48,13 @@ export class DefaultPolicyClient {
   }
 
   async buildCheckPolicyIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
     walletDevice: PublicKey,
     smartWallet: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .checkPolicy()
+      .checkPolicy(walletId, passkeyPublicKey)
       .accountsPartial({
         policy: this.policyPda(walletDevice),
         smartWallet,
@@ -62,14 +64,14 @@ export class DefaultPolicyClient {
   }
 
   async buildAddDeviceIx(
-    payer: PublicKey,
+    smartWallet: PublicKey,
     walletDevice: PublicKey,
     newWalletDevice: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
       .addDevice()
       .accountsPartial({
-        payer,
+        smartWallet,
         walletDevice,
         newWalletDevice,
         policy: this.policyPda(walletDevice),

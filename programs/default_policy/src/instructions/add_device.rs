@@ -14,7 +14,7 @@ pub fn add_device(ctx: Context<AddDevice>) -> Result<()> {
 #[derive(Accounts)]
 pub struct AddDevice<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub smart_wallet: Signer<'info>,
 
     #[account(
         owner = lazorkit.key(),
@@ -36,7 +36,7 @@ pub struct AddDevice<'info> {
 
     #[account(
         init,
-        payer = payer,
+        payer = smart_wallet,
         space = 8 + Policy::INIT_SPACE,
         seeds = [Policy::PREFIX_SEED, new_wallet_device.key().as_ref()],
         bump,
