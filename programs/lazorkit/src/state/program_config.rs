@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(Default, InitSpace)]
 pub struct ProgramConfig {
-    pub authority_address: Pubkey,
+    pub authority: Pubkey,
     pub create_smart_wallet_fee: u64,
     pub fee_payer_fee: u64,
     pub referral_fee: u64,

@@ -1,5 +1,5 @@
 use crate::constants::{PASSKEY_SIZE, SECP256R1_ID};
-use crate::state::{ExecuteMessage, InvokePolicyMessage, UpdatePolicyMessage};
+use crate::state::{ExecuteMessage, InvokeWalletPolicyMessage, UpdateWalletPolicyMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
@@ -17,14 +17,12 @@ const SECP_HEADER_TOTAL: usize = 16;
 /// byte-slices at every call-site is error-prone, so we hide the details behind this struct.  The
 /// helper converts the `Vec<Vec<u8>>` into the required `&[&[u8]]` on the stack just before the
 /// CPI.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PdaSigner {
     /// PDA derivation seeds **without** the trailing bump.
     pub seeds: Vec<Vec<u8>>,
     /// The bump associated with the PDA.
     pub bump: u8,
-    /// The owner of the PDA.
-    pub owner: Pubkey,
 }
 
 /// Helper to check if a slice matches a pattern
@@ -48,11 +46,10 @@ pub fn execute_cpi(
     data: &[u8],
     program: &AccountInfo,
     signer: PdaSigner,
-    allowed_signers: &[Pubkey],
 ) -> Result<()> {
     // Allocate a single Vec<u8> for the instruction – unavoidable because the SDK expects owned
     // data.  This keeps the allocation inside the helper and eliminates clones at the call-site.
-    let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer, allowed_signers);
+    let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer);
 
     // Build seed slice **once** to avoid repeated heap allocations.
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
@@ -67,10 +64,9 @@ fn create_cpi_instruction(
     data: Vec<u8>,
     program: &AccountInfo,
     pda_signer: &PdaSigner,
-    allowed_signers: &[Pubkey],
 ) -> Instruction {
     let seed_slices: Vec<&[u8]> = pda_signer.seeds.iter().map(|s| s.as_slice()).collect();
-    let pda_pubkey = Pubkey::find_program_address(&seed_slices, &pda_signer.owner).0;
+    let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
 
     Instruction {
         program_id: program.key(),
@@ -78,10 +74,9 @@ fn create_cpi_instruction(
             .iter()
             .map(|acc| {
                 let is_pda_signer = *acc.key == pda_pubkey;
-                let is_allowed_outer = allowed_signers.iter().any(|k| k == acc.key);
                 AccountMeta {
                     pubkey: *acc.key,
-                    is_signer: is_pda_signer || is_allowed_outer,
+                    is_signer: is_pda_signer,
                     is_writable: acc.is_writable,
                 }
             })
@@ -217,7 +212,6 @@ pub fn get_wallet_device_signer(
             passkey.to_hashed_bytes(wallet).to_vec(),
         ],
         bump,
-        owner: ID,
     }
 }
 
@@ -227,7 +221,7 @@ pub fn check_whitelist(
     program: &Pubkey,
 ) -> Result<()> {
     require!(
-        registry.programs.contains(program),
+        registry.registered_programs.contains(program),
         crate::error::LazorKitError::PolicyProgramNotRegistered
     );
     Ok(())
@@ -239,7 +233,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     ix_sysvar: &AccountInfo,
     device: &crate::state::WalletDevice,
     smart_wallet_key: Pubkey,
-    passkey_pubkey: [u8; PASSKEY_SIZE],
+    passkey_public_key: [u8; PASSKEY_SIZE],
     signature: Vec<u8>,
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],
@@ -251,12 +245,12 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
 
     // 1) passkey & wallet checks
     require!(
-        device.passkey_pubkey == passkey_pubkey,
+        device.passkey_public_key == passkey_public_key,
         crate::error::LazorKitError::PasskeyMismatch
     );
     require!(
-        device.smart_wallet == smart_wallet_key,
-        crate::error::LazorKitError::SmartWalletMismatch
+        device.smart_wallet_address == smart_wallet_key,
+        crate::error::LazorKitError::SmartWalletDataMismatch
     );
 
     // 2) locate the secp256r1 verify instruction
@@ -282,7 +276,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
         .decode(challenge_clean)
         .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
 
-    verify_secp256r1_instruction(&secp_ix, device.passkey_pubkey, message, signature)?;
+    verify_secp256r1_instruction(&secp_ix, device.passkey_public_key, message, signature)?;
     // Verify header and return the typed message
     M::verify(challenge_bytes.clone(), last_nonce)?;
     let t: M = AnchorDeserialize::deserialize(&mut &challenge_bytes[..])
@@ -308,7 +302,7 @@ impl HasHeader for ExecuteMessage {
         }
     }
 }
-impl HasHeader for InvokePolicyMessage {
+impl HasHeader for InvokeWalletPolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -316,7 +310,7 @@ impl HasHeader for InvokePolicyMessage {
         }
     }
 }
-impl HasHeader for UpdatePolicyMessage {
+impl HasHeader for UpdateWalletPolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -338,62 +332,44 @@ pub fn split_remaining_accounts<'a>(
     Ok(accounts.split_at(idx))
 }
 
-
 /// Distribute fees to payer, referral, and lazorkit vault (empty PDA)
 pub fn distribute_fees<'info>(
-    config: &crate::state::Config,
+    config: &crate::state::ProgramConfig,
     smart_wallet: &AccountInfo<'info>,
     payer: &AccountInfo<'info>,
     referral: &AccountInfo<'info>,
     lazorkit_vault: &AccountInfo<'info>,
     system_program: &Program<'info, System>,
     wallet_signer: PdaSigner,
-    _nonce: u64,
 ) -> Result<()> {
     use anchor_lang::solana_program::system_instruction;
 
     // 1. Fee to payer (reimburse transaction fees)
     if config.fee_payer_fee > 0 {
-        let transfer_to_payer = system_instruction::transfer(
-            &smart_wallet.key(),
-            &payer.key(),
-            config.fee_payer_fee,
-        );
+        let transfer_to_payer =
+            system_instruction::transfer(&smart_wallet.key(), &payer.key(), config.fee_payer_fee);
 
         execute_cpi(
-            &[
-                smart_wallet.clone(),
-                payer.clone(),
-            ],
+            &[smart_wallet.clone(), payer.clone()],
             &transfer_to_payer.data,
             system_program,
             wallet_signer.clone(),
-            &[],
         )?;
 
-        msg!("Paid {} lamports to fee payer", config.fee_payer_fee);
     }
 
     // 2. Fee to referral
     if config.referral_fee > 0 {
-        let transfer_to_referral = system_instruction::transfer(
-            &smart_wallet.key(),
-            &referral.key(),
-            config.referral_fee,
-        );
+        let transfer_to_referral =
+            system_instruction::transfer(&smart_wallet.key(), &referral.key(), config.referral_fee);
 
         execute_cpi(
-            &[
-                smart_wallet.clone(),
-                referral.clone(),
-            ],
+            &[smart_wallet.clone(), referral.clone()],
             &transfer_to_referral.data,
             system_program,
             wallet_signer.clone(),
-            &[],
         )?;
 
-        msg!("Paid {} lamports to referral", config.referral_fee);
     }
 
     // 3. Fee to lazorkit vault (empty PDA)
@@ -405,92 +381,13 @@ pub fn distribute_fees<'info>(
         );
 
         execute_cpi(
-            &[
-                smart_wallet.clone(),
-                lazorkit_vault.clone(),
-            ],
+            &[smart_wallet.clone(), lazorkit_vault.clone()],
             &transfer_to_vault.data,
             system_program,
             wallet_signer.clone(),
-            &[],
         )?;
 
-        msg!("Paid {} lamports to LazorKit vault", config.lazorkit_fee);
     }
 
     Ok(())
-}
-
-/// Distribute fees with graceful error handling (for session transactions)
-pub fn distribute_fees_graceful<'info>(
-    config: &crate::state::Config,
-    smart_wallet: &AccountInfo<'info>,
-    payer: &AccountInfo<'info>,
-    referral: &AccountInfo<'info>,
-    lazorkit_vault: &AccountInfo<'info>,
-    system_program: &Program<'info, System>,
-    wallet_signer: PdaSigner,
-    _nonce: u64,
-) {
-    use anchor_lang::solana_program::system_instruction;
-
-    // 1. Fee to payer (reimburse transaction fees)
-    if config.fee_payer_fee > 0 {
-        let transfer_to_payer = system_instruction::transfer(
-            &smart_wallet.key(),
-            &payer.key(),
-            config.fee_payer_fee,
-        );
-
-        let _ = execute_cpi(
-            &[
-                smart_wallet.clone(),
-                payer.clone(),
-            ],
-            &transfer_to_payer.data,
-            system_program,
-            wallet_signer.clone(),
-            &[],
-        );
-    }
-
-    // 2. Fee to referral
-    if config.referral_fee > 0 {
-        let transfer_to_referral = system_instruction::transfer(
-            &smart_wallet.key(),
-            &referral.key(),
-            config.referral_fee,
-        );
-
-        let _ = execute_cpi(
-            &[
-                smart_wallet.clone(),
-                referral.clone(),
-            ],
-            &transfer_to_referral.data,
-            system_program,
-            wallet_signer.clone(),
-            &[],
-        );
-    }
-
-    // 3. Fee to lazorkit vault (empty PDA)
-    if config.lazorkit_fee > 0 {
-        let transfer_to_vault = system_instruction::transfer(
-            &smart_wallet.key(),
-            &lazorkit_vault.key(),
-            config.lazorkit_fee,
-        );
-
-        let _ = execute_cpi(
-            &[
-                smart_wallet.clone(),
-                lazorkit_vault.clone(),
-            ],
-            &transfer_to_vault.data,
-            system_program,
-            wallet_signer.clone(),
-            &[],
-        );
-    }
 }

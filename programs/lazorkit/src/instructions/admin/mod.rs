@@ -1,9 +1,7 @@
+mod manage_vault;
 mod register_policy_program;
-mod update_config;
-mod initialize_vault;
-mod withdraw_vault;
+mod update_program_config;
 
+pub use manage_vault::*;
 pub use register_policy_program::*;
-pub use update_config::*;
-pub use initialize_vault::*;
-pub use withdraw_vault::*;
+pub use update_program_config::*;

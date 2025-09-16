@@ -3,21 +3,21 @@ use anchor_lang::solana_program::hash::Hasher;
 
 use crate::error::LazorKitError;
 use crate::security::validation;
-use crate::state::{Config, SmartWallet, TransactionSession};
+use crate::state::{LazorKitVault, ProgramConfig, SmartWalletData, TransactionSession};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 
-pub fn execute_session_transaction(
-    ctx: Context<ExecuteSessionTransaction>,
-    vec_cpi_data: Vec<Vec<u8>>,
-    split_index: Vec<u8>,
+pub fn execute_deferred_transaction(
+    ctx: Context<ExecuteDeferredTransaction>,
+    instruction_data_list: Vec<Vec<u8>>, // Multiple instruction data
+    split_index: Vec<u8>,                // Split indices for accounts (n-1 for n instructions)
+    _vault_index: u8,    
 ) -> Result<()> {
     let cpi_accounts = &ctx.remaining_accounts[..];
 
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
     if validation::validate_remaining_accounts(&cpi_accounts).is_err() {
-        msg!("Invalid remaining accounts; closing session with refund due to graceful flag");
         return Ok(());
     }
 
@@ -26,48 +26,30 @@ pub fn execute_session_transaction(
     // Expiry and usage
     let now = Clock::get()?.unix_timestamp;
     if session.expires_at < now {
-        msg!("Transaction session expired");
         return Ok(());
     }
 
     // Bind wallet and target program
-    if session.owner_wallet != ctx.accounts.smart_wallet.key() {
-        msg!("The session owner does not match with smart wallet");
-        return Ok(());
-    }
-
-    // Validate the transaction_session PDA derived from (wallet, authorized_nonce)
-    let expected_session = Pubkey::find_program_address(
-        &[
-            TransactionSession::PREFIX_SEED,
-            ctx.accounts.smart_wallet.key.as_ref(),
-            &session.authorized_nonce.to_le_bytes(),
-        ],
-        &crate::ID,
-    )
-    .0;
-    if expected_session != session.key() {
-        msg!("Invalid transaction session PDA");
+    if session.owner_wallet_address != ctx.accounts.smart_wallet.key() {
         return Ok(());
     }
 
     // Validate input: for n instructions, we need n-1 split indices
     require!(
-        !vec_cpi_data.is_empty(),
+        !instruction_data_list.is_empty(),
         LazorKitError::InsufficientCpiAccounts
     );
     require!(
-        vec_cpi_data.len() == split_index.len() + 1,
+        instruction_data_list.len() == split_index.len() + 1,
         LazorKitError::InvalidInstructionData
     );
 
-    // Verify entire vec_cpi_data hash matches session
-    let serialized_cpi_data = vec_cpi_data
+    // Verify entire instruction_data_list hash matches session
+    let serialized_cpi_data = instruction_data_list
         .try_to_vec()
         .map_err(|_| LazorKitError::InvalidInstructionData)?;
     let data_hash = anchor_lang::solana_program::hash::hash(&serialized_cpi_data).to_bytes();
-    if data_hash != session.data_hash {
-        msg!("Transaction data vector does not match session");
+    if data_hash != session.instruction_data_hash {
         return Ok(());
     }
 
@@ -100,13 +82,12 @@ pub fn execute_session_transaction(
         all_accounts_hasher.hash(&[acc.is_signer as u8]);
         all_accounts_hasher.hash(&[acc.is_writable as u8]);
     }
-    if all_accounts_hasher.result().to_bytes() != session.accounts_hash {
-        msg!("Transaction accounts vector does not match session");
+    if all_accounts_hasher.result().to_bytes() != session.accounts_metadata_hash {
         return Ok(());
     }
 
     // Validate each instruction's programs for security
-    for (i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
+    for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
         let instruction_accounts = &cpi_accounts[range_start..range_end];
 
         require!(
@@ -119,13 +100,11 @@ pub fn execute_session_transaction(
 
         // Validate program is executable
         if !program_account.executable {
-            msg!("Program at index {} must be executable", i);
             return Ok(());
         }
 
         // Ensure program is not this program (prevent reentrancy)
         if program_account.key() == crate::ID {
-            msg!("Reentrancy detected at instruction {}", i);
             return Ok(());
         }
     }
@@ -134,15 +113,18 @@ pub fn execute_session_transaction(
     let wallet_signer = PdaSigner {
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
-            ctx.accounts.smart_wallet_data.id.to_le_bytes().to_vec(),
+            ctx.accounts
+                .smart_wallet_data
+                .wallet_id
+                .to_le_bytes()
+                .to_vec(),
         ],
         bump: ctx.accounts.smart_wallet_data.bump,
-        owner: anchor_lang::system_program::ID,
     };
 
     // Execute all instructions using the same account ranges
-    for (i, (cpi_data, &(range_start, range_end))) in
-        vec_cpi_data.iter().zip(account_ranges.iter()).enumerate()
+    for (_i, (cpi_data, &(range_start, range_end))) in
+        instruction_data_list.iter().zip(account_ranges.iter()).enumerate()
     {
         let instruction_accounts = &cpi_accounts[range_start..range_end];
 
@@ -150,33 +132,19 @@ pub fn execute_session_transaction(
         let program_account = &instruction_accounts[0];
         let instruction_accounts = &instruction_accounts[1..];
 
-        msg!(
-            "Executing instruction {} to program: {}",
-            i,
-            program_account.key()
-        );
 
         let exec_res = execute_cpi(
             instruction_accounts,
             cpi_data,
             program_account,
             wallet_signer.clone(),
-            &[ctx.accounts.payer.key()],
         );
 
         if exec_res.is_err() {
-            msg!(
-                "CPI {} failed; closing session with refund due to graceful flag",
-                i
-            );
             return Ok(());
         }
     }
 
-    msg!(
-        "All {} instructions executed successfully",
-        vec_cpi_data.len()
-    );
 
     // Validate that the provided vault matches the vault index from the session
     let vault_validation = crate::state::LazorKitVault::validate_vault_for_index(
@@ -187,7 +155,7 @@ pub fn execute_session_transaction(
 
     // Distribute fees gracefully (don't fail if fees can't be paid or vault validation fails)
     if vault_validation.is_ok() {
-        crate::utils::distribute_fees_graceful(
+        crate::utils::distribute_fees(
             &ctx.accounts.config,
             &ctx.accounts.smart_wallet.to_account_info(),
             &ctx.accounts.payer.to_account_info(),
@@ -195,53 +163,66 @@ pub fn execute_session_transaction(
             &ctx.accounts.lazorkit_vault.to_account_info(),
             &ctx.accounts.system_program,
             wallet_signer,
-            session.authorized_nonce,
-        );
+        )?;
     }
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct ExecuteSessionTransaction<'info> {
+#[instruction(instruction_data_list: Vec<Vec<u8>>, split_index: Vec<u8>, vault_index: u8)]
+pub struct ExecuteDeferredTransaction<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, Config>>,
+    #[account(seeds = [ProgramConfig::PREFIX_SEED], bump, owner = ID)]
+    pub config: Box<Account<'info, ProgramConfig>>,
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
+        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = system_program.key(),
     )]
     /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWallet>>,
+    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
 
     /// CHECK: referral account (matches smart_wallet_data.referral)
-    #[account(mut, address = smart_wallet_data.referral)]
+    #[account(mut, address = smart_wallet_data.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
-    #[account(mut, owner = crate::ID)]
+    #[account(
+        mut,
+        seeds = [LazorKitVault::PREFIX_SEED, &vault_index.to_le_bytes()],
+        bump,
+    )]
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
-    pub lazorkit_vault: UncheckedAccount<'info>,
+    pub lazorkit_vault: SystemAccount<'info>,
 
     /// Transaction session to execute. Closed on success to refund rent.
-    #[account(mut, close = session_refund, owner = ID)]
+    #[account(
+        mut,
+        seeds = [
+            TransactionSession::PREFIX_SEED,
+            smart_wallet.key.as_ref(),
+            &transaction_session.authorized_nonce.to_le_bytes(),
+        ], 
+        close = session_refund, 
+        owner = ID,
+        bump,
+    )]
     pub transaction_session: Account<'info, TransactionSession>,
 
     /// CHECK: rent refund destination (stored in session)
-    #[account(mut, address = transaction_session.rent_refund_to)]
+    #[account(mut, address = transaction_session.rent_refund_address)]
     pub session_refund: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,

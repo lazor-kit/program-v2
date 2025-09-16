@@ -7,7 +7,7 @@ pub enum LazorKitError {
     #[msg("Passkey public key mismatch with stored authenticator")]
     PasskeyMismatch,
     #[msg("Smart wallet address mismatch with authenticator")]
-    SmartWalletMismatch,
+    SmartWalletDataMismatch,
     #[msg("Smart wallet authenticator account not found or invalid")]
     AuthenticatorNotFound,
 
@@ -222,4 +222,6 @@ pub enum LazorKitError {
     InvalidVaultIndex,
     #[msg("Insufficient balance")]
     InsufficientBalance,
+    #[msg("Invalid action")]
+    InvalidAction,
 }

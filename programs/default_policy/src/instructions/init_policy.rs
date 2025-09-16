@@ -1,8 +1,48 @@
-use crate::state::Policy;
+use crate::{error::PolicyError, state::Policy};
 use anchor_lang::prelude::*;
-use lazorkit::program::Lazorkit;
+use lazorkit::{
+    constants::{PASSKEY_SIZE, SMART_WALLET_SEED},
+    program::Lazorkit,
+    state::WalletDevice,
+    utils::PasskeyExt as _,
+    ID as LAZORKIT_ID,
+};
 
-pub fn init_policy(ctx: Context<InitPolicy>) -> Result<()> {
+pub fn init_policy(
+    ctx: Context<InitPolicy>,
+    wallet_id: u64,
+    passkey_public_key: [u8; PASSKEY_SIZE],
+) -> Result<()> {
+    let wallet_device = &mut ctx.accounts.wallet_device;
+    let smart_wallet = &mut ctx.accounts.smart_wallet;
+
+    let expected_smart_wallet_pubkey = Pubkey::find_program_address(
+        &[SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
+        &LAZORKIT_ID,
+    )
+    .0;
+
+    let expected_wallet_device_pubkey = Pubkey::find_program_address(
+        &[
+            WalletDevice::PREFIX_SEED,
+            expected_smart_wallet_pubkey.as_ref(),
+            passkey_public_key
+                .to_hashed_bytes(expected_smart_wallet_pubkey)
+                .as_ref(),
+        ],
+        &LAZORKIT_ID,
+    )
+    .0;
+
+    require!(
+        smart_wallet.key() == expected_smart_wallet_pubkey,
+        PolicyError::Unauthorized
+    );
+    require!(
+        wallet_device.key() == expected_wallet_device_pubkey,
+        PolicyError::Unauthorized
+    );
+
     let policy = &mut ctx.accounts.policy;
 
     policy.smart_wallet = ctx.accounts.smart_wallet.key();
@@ -13,19 +53,17 @@ pub fn init_policy(ctx: Context<InitPolicy>) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct InitPolicy<'info> {
+    /// CHECK:
+    #[account(mut, signer)]
+    pub smart_wallet: SystemAccount<'info>,
+
+    /// CHECK:
     #[account(mut)]
-    pub payer: Signer<'info>,
-
-    /// CHECK:
-    pub smart_wallet: UncheckedAccount<'info>,
-
-    /// CHECK:
-    #[account(signer)]
     pub wallet_device: UncheckedAccount<'info>,
 
     #[account(
         init,
-        payer = payer,
+        payer = smart_wallet,
         space = 8 + Policy::INIT_SPACE,
         seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
         bump,

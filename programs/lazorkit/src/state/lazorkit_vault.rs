@@ -1,11 +1,14 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    prelude::*,
+    system_program::{transfer, Transfer},
+};
 
 /// Utility functions for LazorKit SOL vaults
 /// Vaults are empty PDAs owned by the LazorKit program that hold SOL
 pub struct LazorKitVault;
 
 impl LazorKitVault {
-    pub const PREFIX_SEED: &'static [u8] = b"vault";
+    pub const PREFIX_SEED: &'static [u8] = b"lazorkit_vault";
     pub const MAX_VAULTS: u8 = 32;
 
     /// Derive vault PDA for a given index
@@ -39,15 +42,58 @@ impl LazorKitVault {
         vault_account.lamports()
     }
 
-    /// Remove SOL from vault by transferring from vault to destination
-    pub fn remove_sol(vault: &AccountInfo, destination: &AccountInfo, amount: u64) -> Result<()> {
+    /// Add SOL to vault by transferring from destination to vault
+    pub fn add_sol<'info>(
+        vault: &AccountInfo<'info>,
+        destination: &AccountInfo<'info>,
+        system_program: &Program<'info, System>,
+        amount: u64,
+    ) -> Result<()> {
         require!(
-            vault.lamports() >= amount,
+            amount >= crate::constants::EMPTY_PDA_FEE_RENT,
+            crate::error::LazorKitError::InsufficientBalanceForFee
+        );
+
+        transfer(
+            CpiContext::new(
+                system_program.to_account_info(),
+                Transfer {
+                    from: destination.to_account_info(),
+                    to: vault.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        Ok(())
+    }
+
+    /// Remove SOL from vault by transferring from vault to destination
+    pub fn remove_sol<'info>(
+        vault: &AccountInfo<'info>,
+        destination: &AccountInfo<'info>,
+        system_program: &Program<'info, System>,
+        amount: u64,
+        bump: u8,
+    ) -> Result<()> {
+        require!(
+            vault.lamports() >= amount + crate::constants::EMPTY_PDA_FEE_RENT,
             crate::error::LazorKitError::InsufficientVaultBalance
         );
 
-        **vault.try_borrow_mut_lamports()? -= amount;
-        **destination.try_borrow_mut_lamports()? += amount;
+        let seeds: &[&[u8]] = &[b"vault".as_ref(), &[bump]];
+        let signer_seeds = &[&seeds[..]];
+
+        transfer(
+            CpiContext::new(
+                system_program.to_account_info(),
+                Transfer {
+                    from: vault.to_account_info(),
+                    to: destination.to_account_info(),
+                },
+            )
+            .with_signer(signer_seeds),
+            amount,
+        )?;
 
         Ok(())
     }

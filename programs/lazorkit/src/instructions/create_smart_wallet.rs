@@ -1,12 +1,14 @@
-use anchor_lang::{prelude::*, solana_program::system_instruction};
+use anchor_lang::{
+    prelude::*,
+    system_program::{transfer, Transfer},
+};
 
 use crate::{
     constants::SMART_WALLET_SEED,
     error::LazorKitError,
-    events::{FeeCollected, SmartWalletCreated},
     instructions::CreateSmartWalletArgs,
     security::validation,
-    state::{Config, PolicyProgramRegistry, SmartWallet, WalletDevice},
+    state::{PolicyProgramRegistry, ProgramConfig, SmartWalletData, WalletDevice},
     utils::{execute_cpi, PasskeyExt, PdaSigner},
     ID,
 };
@@ -24,7 +26,7 @@ pub fn create_smart_wallet(
 
     // Validate passkey format (ensure it's a valid compressed public key)
     require!(
-        args.passkey_pubkey[0] == 0x02 || args.passkey_pubkey[0] == 0x03,
+        args.passkey_public_key[0] == 0x02 || args.passkey_public_key[0] == 0x03,
         LazorKitError::InvalidPasskeyFormat
     );
 
@@ -41,35 +43,42 @@ pub fn create_smart_wallet(
     // Validate default policy program
     validation::validate_program_executable(&ctx.accounts.default_policy_program)?;
 
-    // === Initialize Smart Wallet ===
-    wallet_data.set_inner(SmartWallet {
-        policy_program: ctx.accounts.config.default_policy_program,
-        id: args.wallet_id,
+    // === Initialize Smart Wallet Data ===
+    wallet_data.set_inner(SmartWalletData {
+        policy_program_id: ctx.accounts.config.default_policy_program_id,
+        wallet_id: args.wallet_id,
         last_nonce: 0,
         bump: ctx.bumps.smart_wallet,
-        referral: args.referral.unwrap_or(ctx.accounts.payer.key()),
+        referral_address: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
     });
 
-    // === Initialize Wallet Device ===
+    // === Initialize Wallet Device Data ===
     wallet_device.set_inner(WalletDevice {
-        passkey_pubkey: args.passkey_pubkey,
-        smart_wallet: ctx.accounts.smart_wallet.key(),
+        passkey_public_key: args.passkey_public_key,
+        smart_wallet_address: ctx.accounts.smart_wallet.key(),
         credential_id: args.credential_id.clone(),
         bump: ctx.bumps.wallet_device,
     });
 
+    // === Transfer SOL to smart wallet ===
+    transfer(
+        CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.payer.to_account_info(),
+                to: ctx.accounts.smart_wallet.to_account_info(),
+            },
+        ),
+        args.amount,
+    )?;
+
     // === Create PDA Signer ===
-    let signer = PdaSigner {
+    let wallet_signer = PdaSigner {
         seeds: vec![
-            WalletDevice::PREFIX_SEED.to_vec(),
-            ctx.accounts.smart_wallet.key().as_ref().to_vec(),
-            args.passkey_pubkey
-                .to_hashed_bytes(ctx.accounts.smart_wallet.key())
-                .as_ref()
-                .to_vec(),
+            SMART_WALLET_SEED.to_vec(),
+            args.wallet_id.to_le_bytes().to_vec(),
         ],
-        bump: ctx.bumps.wallet_device,
-        owner: ctx.accounts.system_program.key(),
+        bump: ctx.bumps.smart_wallet,
     };
 
     // === Execute Policy Program CPI ===
@@ -77,62 +86,7 @@ pub fn create_smart_wallet(
         &ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.default_policy_program,
-        signer.clone(),
-        &[ctx.accounts.payer.key()],
-    )?;
-
-    if !args.is_pay_for_user {
-        // === Collect Creation Fee ===
-        let fee = ctx.accounts.config.create_smart_wallet_fee;
-        if fee > 0 {
-            // Ensure the smart wallet has sufficient balance after fee deduction
-            let smart_wallet_balance = ctx.accounts.smart_wallet.lamports();
-            let rent = Rent::get()?.minimum_balance(0);
-
-            require!(
-                smart_wallet_balance >= fee + rent,
-                LazorKitError::InsufficientBalanceForFee
-            );
-
-            let transfer = system_instruction::transfer(
-                &ctx.accounts.smart_wallet.key(),
-                &ctx.accounts.payer.key(),
-                fee,
-            );
-
-            execute_cpi(
-                &[
-                    ctx.accounts.smart_wallet.to_account_info(),
-                    ctx.accounts.payer.to_account_info(),
-                ],
-                &transfer.data,
-                &ctx.accounts.system_program,
-                signer.clone(),
-                &[],
-            )?;
-
-            emit!(FeeCollected {
-                smart_wallet: ctx.accounts.smart_wallet.key(),
-                fee_type: "CREATE_WALLET".to_string(),
-                amount: fee,
-                recipient: ctx.accounts.payer.key(),
-                timestamp: Clock::get()?.unix_timestamp,
-            });
-        }
-    }
-
-    // === Emit Events ===
-    msg!("Smart wallet created: {}", ctx.accounts.smart_wallet.key());
-    msg!("Device: {}", ctx.accounts.wallet_device.key());
-    msg!("Wallet ID: {}", args.wallet_id);
-
-    // Emit wallet creation event
-    SmartWalletCreated::emit_event(
-        ctx.accounts.smart_wallet.key(),
-        ctx.accounts.wallet_device.key(),
-        args.wallet_id,
-        ctx.accounts.config.default_policy_program,
-        args.passkey_pubkey,
+        wallet_signer.clone(),
     )?;
 
     Ok(())
@@ -149,11 +103,11 @@ pub struct CreateSmartWallet<'info> {
         seeds = [PolicyProgramRegistry::PREFIX_SEED],
         bump,
         owner = ID,
-        constraint = policy_program_registry.programs.contains(&default_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+        constraint = policy_program_registry.registered_programs.contains(&default_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
     )]
     pub policy_program_registry: Account<'info, PolicyProgramRegistry>,
 
-    /// The smart wallet PDA being created with random ID
+    /// The smart wallet address PDA being created with random ID
     #[account(
         mut,
         seeds = [SMART_WALLET_SEED, args.wallet_id.to_le_bytes().as_ref()],
@@ -166,11 +120,11 @@ pub struct CreateSmartWallet<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + SmartWallet::INIT_SPACE,
-        seeds = [SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
+        space = 8 + SmartWalletData::INIT_SPACE,
+        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWallet>>,
+    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
 
     /// Wallet device for the passkey
     #[account(
@@ -180,7 +134,7 @@ pub struct CreateSmartWallet<'info> {
         seeds = [
             WalletDevice::PREFIX_SEED,
             smart_wallet.key().as_ref(),
-            args.passkey_pubkey.to_hashed_bytes(smart_wallet.key()).as_ref()
+            args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()
         ],
         bump
     )]
@@ -188,15 +142,15 @@ pub struct CreateSmartWallet<'info> {
 
     /// Program configuration
     #[account(
-        seeds = [Config::PREFIX_SEED],
+        seeds = [ProgramConfig::PREFIX_SEED],
         bump,
         owner = ID
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub config: Box<Account<'info, ProgramConfig>>,
 
     /// Default policy program for the smart wallet
     #[account(
-        address = config.default_policy_program,
+        address = config.default_policy_program_id,
         executable,
         constraint = default_policy_program.executable @ LazorKitError::ProgramNotExecutable
     )]

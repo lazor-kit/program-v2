@@ -12,12 +12,14 @@ import {
 import LazorkitIdl from '../anchor/idl/lazorkit.json';
 import { Lazorkit } from '../anchor/types/lazorkit';
 import {
-  deriveConfigPda,
+  deriveProgramConfigPda,
   derivePolicyProgramRegistryPda,
   deriveSmartWalletPda,
   deriveSmartWalletDataPda,
   deriveWalletDevicePda,
   deriveTransactionSessionPda,
+  deriveEphemeralAuthorizationPda,
+  deriveLazorkitVaultPda,
 } from '../pda/lazorkit';
 import { getRandomBytes, instructionToAccountMetas } from '../utils';
 import * as types from '../types';
@@ -78,8 +80,8 @@ export class LazorkitClient {
   /**
    * Derives the program configuration PDA
    */
-  configPda(): PublicKey {
-    return deriveConfigPda(this.programId);
+  programConfigPda(): PublicKey {
+    return deriveProgramConfigPda(this.programId);
   }
 
   /**
@@ -87,6 +89,13 @@ export class LazorkitClient {
    */
   policyProgramRegistryPda(): PublicKey {
     return derivePolicyProgramRegistryPda(this.programId);
+  }
+
+  /**
+   * Derives the LazorKit vault PDA
+   */
+  lazorkitVaultPda(index: number): PublicKey {
+    return deriveLazorkitVaultPda(this.programId, index);
   }
 
   /**
@@ -117,6 +126,20 @@ export class LazorkitClient {
     return deriveTransactionSessionPda(this.programId, smartWallet, lastNonce);
   }
 
+  /**
+   * Derives an ephemeral authorization PDA for a given smart wallet and ephemeral key
+   */
+  ephemeralAuthorizationPda(
+    smartWallet: PublicKey,
+    ephemeralPublicKey: PublicKey
+  ): PublicKey {
+    return deriveEphemeralAuthorizationPda(
+      this.programId,
+      smartWallet,
+      ephemeralPublicKey
+    );
+  }
+
   // ============================================================================
   // Utility Methods
   // ============================================================================
@@ -128,6 +151,49 @@ export class LazorkitClient {
     return new BN(getRandomBytes(8), 'le');
   }
 
+  /**
+   * Gets the referral account for a smart wallet
+   */
+  private async getReferralAccount(smartWallet: PublicKey): Promise<PublicKey> {
+    const smartWalletData = await this.getSmartWalletData(smartWallet);
+    return smartWalletData.referralAddress;
+  }
+
+  /**
+   * Gets the LazorKit vault for a given vault index
+   */
+  private getLazorkitVault(vaultIndex: number): PublicKey {
+    const [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('vault'), Buffer.from([vaultIndex])],
+      this.programId
+    );
+    return vaultPda;
+  }
+
+  /**
+   * Generates a random vault index (0-31)
+   */
+  generateVaultIndex(): number {
+    return Math.floor(Math.random() * 32);
+  }
+
+  /**
+   * Calculates split indices for multiple CPI instructions
+   */
+  private calculateSplitIndex(
+    instructions: TransactionInstruction[]
+  ): number[] {
+    const splitIndex: number[] = [];
+    let currentIndex = 0;
+
+    for (let i = 0; i < instructions.length - 1; i++) {
+      currentIndex += instructions[i].keys.length;
+      splitIndex.push(currentIndex);
+    }
+
+    return splitIndex;
+  }
+
   // ============================================================================
   // Account Data Fetching Methods
   // ============================================================================
@@ -136,7 +202,9 @@ export class LazorkitClient {
    * Fetches program configuration data
    */
   async getConfigData() {
-    return await this.program.account.config.fetch(this.configPda());
+    return await this.program.account.programConfig.fetch(
+      this.programConfigPda()
+    );
   }
 
   /**
@@ -144,7 +212,7 @@ export class LazorkitClient {
    */
   async getSmartWalletData(smartWallet: PublicKey) {
     const pda = this.smartWalletDataPda(smartWallet);
-    return await this.program.account.smartWallet.fetch(pda);
+    return await this.program.account.smartWalletData.fetch(pda);
   }
 
   /**
@@ -157,7 +225,7 @@ export class LazorkitClient {
   /**
    * Finds a smart wallet by passkey public key
    */
-  async getSmartWalletByPasskey(passkeyPubkey: number[]): Promise<{
+  async getSmartWalletByPasskey(passkeyPublicKey: number[]): Promise<{
     smartWallet: PublicKey | null;
     walletDevice: PublicKey | null;
   }> {
@@ -172,7 +240,7 @@ export class LazorkitClient {
       },
       filters: [
         { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
-        { memcmp: { offset: 8, bytes: bs58.encode(passkeyPubkey) } },
+        { memcmp: { offset: 8, bytes: bs58.encode(passkeyPublicKey) } },
       ],
     });
 
@@ -184,7 +252,7 @@ export class LazorkitClient {
 
     return {
       walletDevice: accounts[0].pubkey,
-      smartWallet: walletDeviceData.smartWallet,
+      smartWallet: walletDeviceData.smartWalletAddress,
     };
   }
 
@@ -195,14 +263,14 @@ export class LazorkitClient {
   /**
    * Builds the initialize program instruction
    */
-  async buildInitializeInstruction(
+  async buildInitializeProgramInstruction(
     payer: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .initialize()
+      .initializeProgram()
       .accountsPartial({
         signer: payer,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         policyProgramRegistry: this.policyProgramRegistryPda(),
         defaultPolicyProgram: this.defaultPolicyProgram.programId,
         systemProgram: SystemProgram.programId,
@@ -224,57 +292,58 @@ export class LazorkitClient {
       .createSmartWallet(args)
       .accountsPartial({
         payer,
+        policyProgramRegistry: this.policyProgramRegistryPda(),
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        policyProgramRegistry: this.policyProgramRegistryPda(),
         walletDevice,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         defaultPolicyProgram: this.defaultPolicyProgram.programId,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([
-        ...instructionToAccountMetas(policyInstruction, payer),
-      ])
+      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
   }
 
   /**
-   * Builds the execute transaction instruction
+   * Builds the execute direct transaction instruction
    */
-  async buildExecuteTransactionInstruction(
+  async buildExecuteDirectTransactionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.ExecuteTransactionArgs,
+    args: types.ExecuteDirectTransactionArgs,
     policyInstruction: TransactionInstruction,
     cpiInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .executeTransaction(args)
+      .executeDirectTransaction(args)
       .accountsPartial({
         payer,
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        referral: await this.getReferralAccount(smartWallet),
+        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         policyProgramRegistry: this.policyProgramRegistryPda(),
         policyProgram: policyInstruction.programId,
         cpiProgram: cpiInstruction.programId,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: SystemProgram.programId,
       })
       .remainingAccounts([
-        ...instructionToAccountMetas(policyInstruction, payer),
-        ...instructionToAccountMetas(cpiInstruction, payer),
+        ...instructionToAccountMetas(policyInstruction),
+        ...instructionToAccountMetas(cpiInstruction),
       ])
       .instruction();
   }
 
   /**
-   * Builds the invoke policy instruction
+   * Builds the invoke wallet policy instruction
    */
-  async buildInvokePolicyInstruction(
+  async buildInvokeWalletPolicyInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.InvokePolicyArgs,
+    args: types.InvokeWalletPolicyArgs,
     policyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     const remaining: AccountMeta[] = [];
@@ -282,7 +351,7 @@ export class LazorkitClient {
     if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newWalletDevice.passkeyPubkey
+        args.newWalletDevice.passkeyPublicKey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -291,16 +360,18 @@ export class LazorkitClient {
       });
     }
 
-    remaining.push(...instructionToAccountMetas(policyInstruction, payer));
+    remaining.push(...instructionToAccountMetas(policyInstruction));
 
     return await this.program.methods
-      .invokePolicy(args)
+      .invokeWalletPolicy(args)
       .accountsPartial({
         payer,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        referral: await this.getReferralAccount(smartWallet),
+        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         policyProgram: policyInstruction.programId,
         policyProgramRegistry: this.policyProgramRegistryPda(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
@@ -311,12 +382,12 @@ export class LazorkitClient {
   }
 
   /**
-   * Builds the update policy instruction
+   * Builds the update wallet policy instruction
    */
-  async buildUpdatePolicyInstruction(
+  async buildUpdateWalletPolicyInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.UpdatePolicyArgs,
+    args: types.UpdateWalletPolicyArgs,
     destroyPolicyInstruction: TransactionInstruction,
     initPolicyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
@@ -325,7 +396,7 @@ export class LazorkitClient {
     if (args.newWalletDevice) {
       const newWalletDevice = this.walletDevicePda(
         smartWallet,
-        args.newWalletDevice.passkeyPubkey
+        args.newWalletDevice.passkeyPublicKey
       );
       remaining.push({
         pubkey: newWalletDevice,
@@ -334,19 +405,19 @@ export class LazorkitClient {
       });
     }
 
-    remaining.push(
-      ...instructionToAccountMetas(destroyPolicyInstruction, payer)
-    );
-    remaining.push(...instructionToAccountMetas(initPolicyInstruction, payer));
+    remaining.push(...instructionToAccountMetas(destroyPolicyInstruction));
+    remaining.push(...instructionToAccountMetas(initPolicyInstruction));
 
     return await this.program.methods
-      .updatePolicy(args)
+      .updateWalletPolicy(args)
       .accountsPartial({
         payer,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        referral: await this.getReferralAccount(smartWallet),
+        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         oldPolicyProgram: destroyPolicyInstruction.programId,
         newPolicyProgram: initPolicyInstruction.programId,
         policyProgramRegistry: this.policyProgramRegistryPda(),
@@ -358,40 +429,43 @@ export class LazorkitClient {
   }
 
   /**
-   * Builds the create transaction session instruction
+   * Builds the create deferred execution instruction
    */
-  async buildCreateTransactionSessionInstruction(
+  async buildCreateDeferredExecutionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    args: types.CreateSessionArgs,
+    args: types.CreateDeferredExecutionArgs,
     policyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .createTransactionSession(args)
+      .createDeferredExecution(args)
       .accountsPartial({
         payer,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPubkey),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         policyProgramRegistry: this.policyProgramRegistryPda(),
         policyProgram: policyInstruction.programId,
+        transactionSession: this.transactionSessionPda(
+          smartWallet,
+          await this.getSmartWalletData(smartWallet).then((d) => d.lastNonce)
+        ),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([
-        ...instructionToAccountMetas(policyInstruction, payer),
-      ])
+      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
   }
 
   /**
-   * Builds the execute session transaction instruction
+   * Builds the execute deferred transaction instruction
    */
-  async buildExecuteSessionTransactionInstruction(
+  async buildExecuteDeferredTransactionInstruction(
     payer: PublicKey,
     smartWallet: PublicKey,
-    cpiInstruction: TransactionInstruction
+    cpiInstructions: TransactionInstruction[],
+    vaultIndex: number
   ): Promise<TransactionInstruction> {
     const cfg = await this.getSmartWalletData(smartWallet);
     const transactionSession = this.transactionSessionPda(
@@ -399,24 +473,146 @@ export class LazorkitClient {
       cfg.lastNonce
     );
 
+    // Prepare CPI data and split indices
+    const instructionDataList = cpiInstructions.map((ix) =>
+      Array.from(ix.data)
+    );
+    const splitIndex = this.calculateSplitIndex(cpiInstructions);
+
+    // Combine all account metas from all instructions
+    const allAccountMetas = cpiInstructions.flatMap((ix) =>
+      instructionToAccountMetas(ix)
+    );
+
     return await this.program.methods
-      .executeSessionTransaction(cpiInstruction.data)
+      .executeDeferredTransaction(
+        instructionDataList.map((data) => Buffer.from(data)),
+        Buffer.from(splitIndex),
+        vaultIndex
+      )
       .accountsPartial({
         payer,
-        config: this.configPda(),
+        config: this.programConfigPda(),
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
-        cpiProgram: cpiInstruction.programId,
+        referral: await this.getReferralAccount(smartWallet),
+        lazorkitVault: this.getLazorkitVault(vaultIndex), // Will be updated based on session
         transactionSession,
         sessionRefund: payer,
+        systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([...instructionToAccountMetas(cpiInstruction, payer)])
+      .remainingAccounts(allAccountMetas)
+      .instruction();
+  }
+
+  /**
+   * Builds the authorize ephemeral execution instruction
+   */
+  async buildAuthorizeEphemeralExecutionInstruction(
+    payer: PublicKey,
+    smartWallet: PublicKey,
+    args: types.AuthorizeEphemeralExecutionArgs,
+    cpiInstructions: TransactionInstruction[]
+  ): Promise<TransactionInstruction> {
+    // Prepare CPI data and split indices
+    const instructionDataList = cpiInstructions.map((ix) =>
+      Array.from(ix.data)
+    );
+    const splitIndex = this.calculateSplitIndex(cpiInstructions);
+
+    // Combine all account metas from all instructions
+    const allAccountMetas = cpiInstructions.flatMap((ix) =>
+      instructionToAccountMetas(ix)
+    );
+
+    return await this.program.methods
+      .authorizeEphemeralExecution(args)
+      .accountsPartial({
+        payer,
+        config: this.programConfigPda(),
+        smartWallet,
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
+        ephemeralAuthorization: this.ephemeralAuthorizationPda(
+          smartWallet,
+          args.ephemeralPublicKey
+        ),
+        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts(allAccountMetas)
+      .instruction();
+  }
+
+  /**
+   * Builds the execute ephemeral authorization instruction
+   */
+  async buildExecuteEphemeralAuthorizationInstruction(
+    feePayer: PublicKey,
+    ephemeralSigner: PublicKey,
+    smartWallet: PublicKey,
+    ephemeralAuthorization: PublicKey,
+    cpiInstructions: TransactionInstruction[],
+    vaultIndex: number
+  ): Promise<TransactionInstruction> {
+    // Prepare CPI data and split indices
+    const instructionDataList = cpiInstructions.map((ix) =>
+      Array.from(ix.data)
+    );
+    const splitIndex = this.calculateSplitIndex(cpiInstructions);
+
+    // Combine all account metas from all instructions
+    const allAccountMetas = cpiInstructions.flatMap((ix) =>
+      instructionToAccountMetas(ix)
+    );
+
+    return await this.program.methods
+      .executeEphemeralAuthorization(
+        instructionDataList.map((data) => Buffer.from(data)),
+        Buffer.from(splitIndex),
+        vaultIndex
+      )
+      .accountsPartial({
+        feePayer,
+        ephemeralSigner,
+        config: this.programConfigPda(),
+        smartWallet,
+        smartWalletData: this.smartWalletDataPda(smartWallet),
+        referral: await this.getReferralAccount(smartWallet),
+        lazorkitVault: this.getLazorkitVault(0), // Will be updated based on authorization
+        ephemeralAuthorization,
+        authorizationRefund: feePayer,
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts(allAccountMetas)
       .instruction();
   }
 
   // ============================================================================
   // High-Level Transaction Builders (with Authentication)
   // ============================================================================
+
+  async createManageVaultTransaction(
+    params: types.ManageVaultParams
+  ): Promise<VersionedTransaction> {
+    const manageVaultInstruction = await this.program.methods
+      .manageVault(
+        params.action === 'deposit' ? 0 : 1,
+        params.amount,
+        params.vaultIndex
+      )
+      .accountsPartial({
+        authority: params.payer,
+        config: this.programConfigPda(),
+        vault: this.lazorkitVaultPda(params.vaultIndex),
+        destination: params.destination,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+    return buildVersionedTransaction(this.connection, params.payer, [
+      manageVaultInstruction,
+    ]);
+  }
 
   /**
    * Creates a smart wallet with passkey authentication
@@ -432,11 +628,12 @@ export class LazorkitClient {
     const smartWallet = this.smartWalletPda(smartWalletId);
     const walletDevice = this.walletDevicePda(
       smartWallet,
-      params.passkeyPubkey
+      params.passkeyPublicKey
     );
 
     let policyInstruction = await this.defaultPolicyProgram.buildInitPolicyIx(
-      params.payer,
+      params.smartWalletId,
+      params.passkeyPublicKey,
       smartWallet,
       walletDevice
     );
@@ -446,11 +643,13 @@ export class LazorkitClient {
     }
 
     const args = {
-      passkeyPubkey: params.passkeyPubkey,
+      passkeyPublicKey: params.passkeyPublicKey,
       credentialId: Buffer.from(params.credentialIdBase64, 'base64'),
       policyData: policyInstruction.data,
       walletId: smartWalletId,
-      isPayForUser: params.isPayForUser === true,
+      amount: params.amount,
+      referralAddress: params.referral_address || null,
+      vaultIndex: params.vaultIndex || this.generateVaultIndex(),
     };
 
     const instruction = await this.buildCreateSmartWalletInstruction(
@@ -475,19 +674,25 @@ export class LazorkitClient {
   }
 
   /**
-   * Executes a transaction with passkey authentication
+   * Executes a direct transaction with passkey authentication
    */
-  async executeTransactionWithAuth(
-    params: types.ExecuteTransactionParams
+  async createExecuteDirectTransaction(
+    params: types.ExecuteDirectTransactionParams
   ): Promise<VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
 
+    const smartWalletId = await this.getSmartWalletData(
+      params.smartWallet
+    ).then((d) => d.walletId);
+
     let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
+      smartWalletId,
+      params.passkeySignature.passkeyPublicKey,
       this.walletDevicePda(
         params.smartWallet,
-        params.passkeySignature.passkeyPubkey
+        params.passkeySignature.passkeyPublicKey
       ),
       params.smartWallet
     );
@@ -500,15 +705,16 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const execInstruction = await this.buildExecuteTransactionInstruction(
+    const execInstruction = await this.buildExecuteDirectTransactionInstruction(
       params.payer,
       params.smartWallet,
       {
         ...signatureArgs,
         verifyInstructionIndex: 0,
+        splitIndex: policyInstruction.keys.length,
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
-        splitIndex: policyInstruction.keys.length,
+        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
       },
       policyInstruction,
       params.cpiInstruction
@@ -525,10 +731,10 @@ export class LazorkitClient {
   }
 
   /**
-   * Invokes a policy with passkey authentication
+   * Invokes a wallet policy with passkey authentication
    */
-  async invokePolicyWithAuth(
-    params: types.InvokePolicyParams
+  async createInvokeWalletPolicyTransaction(
+    params: types.InvokeWalletPolicyParams
   ): Promise<VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
@@ -538,14 +744,16 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const invokeInstruction = await this.buildInvokePolicyInstruction(
+    const invokeInstruction = await this.buildInvokeWalletPolicyInstruction(
       params.payer,
       params.smartWallet,
       {
         ...signatureArgs,
         newWalletDevice: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
+              passkeyPublicKey: Array.from(
+                params.newWalletDevice.passkeyPublicKey
+              ),
               credentialId: Buffer.from(
                 params.newWalletDevice.credentialIdBase64,
                 'base64'
@@ -554,6 +762,7 @@ export class LazorkitClient {
           : null,
         policyData: params.policyInstruction.data,
         verifyInstructionIndex: 0,
+        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
       },
       params.policyInstruction
     );
@@ -569,10 +778,10 @@ export class LazorkitClient {
   }
 
   /**
-   * Updates a policy with passkey authentication
+   * Updates a wallet policy with passkey authentication
    */
-  async updatePolicyWithAuth(
-    params: types.UpdatePolicyParams
+  async createUpdateWalletPolicyTransaction(
+    params: types.UpdateWalletPolicyParams
   ): Promise<VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
@@ -582,7 +791,7 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const updateInstruction = await this.buildUpdatePolicyInstruction(
+    const updateInstruction = await this.buildUpdateWalletPolicyInstruction(
       params.payer,
       params.smartWallet,
       {
@@ -595,13 +804,16 @@ export class LazorkitClient {
           params.destroyPolicyInstruction.keys.length,
         newWalletDevice: params.newWalletDevice
           ? {
-              passkeyPubkey: Array.from(params.newWalletDevice.passkeyPubkey),
+              passkeyPublicKey: Array.from(
+                params.newWalletDevice.passkeyPublicKey
+              ),
               credentialId: Buffer.from(
                 params.newWalletDevice.credentialIdBase64,
                 'base64'
               ),
             }
           : null,
+        vaultIndex: params.vaultIndex || this.generateVaultIndex(),
       },
       params.destroyPolicyInstruction,
       params.initPolicyInstruction
@@ -618,19 +830,25 @@ export class LazorkitClient {
   }
 
   /**
-   * Creates a transaction session with passkey authentication
+   * Creates a deferred execution with passkey authentication
    */
-  async createTransactionSessionWithAuth(
-    params: types.CreateTransactionSessionParams
+  async createDeferredExecutionTransaction(
+    params: types.CreateDeferredExecutionParams
   ): Promise<VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
 
+    const smartWalletId = await this.getSmartWalletData(
+      params.smartWallet
+    ).then((d) => d.walletId);
+
     let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
+      smartWalletId,
+      params.passkeySignature.passkeyPublicKey,
       this.walletDevicePda(
         params.smartWallet,
-        params.passkeySignature.passkeyPubkey
+        params.passkeySignature.passkeyPublicKey
       ),
       params.smartWallet
     );
@@ -644,7 +862,7 @@ export class LazorkitClient {
     );
 
     const sessionInstruction =
-      await this.buildCreateTransactionSessionInstruction(
+      await this.buildCreateDeferredExecutionInstruction(
         params.payer,
         params.smartWallet,
         {
@@ -652,6 +870,7 @@ export class LazorkitClient {
           expiresAt: new BN(params.expiresAt),
           policyData: policyInstruction.data,
           verifyInstructionIndex: 0,
+          vaultIndex: params.vaultIndex || this.generateVaultIndex(),
         },
         policyInstruction
       );
@@ -667,15 +886,19 @@ export class LazorkitClient {
   }
 
   /**
-   * Executes a session transaction (no authentication needed)
+   * Executes a deferred transaction (no authentication needed)
    */
-  async executeSessionTransaction(
-    params: types.ExecuteSessionTransactionParams
+  async createExecuteDeferredTransactionTransaction(
+    params: types.ExecuteDeferredTransactionParams,
+    vaultIndex?: number
   ): Promise<VersionedTransaction> {
-    const instruction = await this.buildExecuteSessionTransactionInstruction(
+    const vaultIdx = vaultIndex || this.generateVaultIndex();
+
+    const instruction = await this.buildExecuteDeferredTransactionInstruction(
       params.payer,
       params.smartWallet,
-      params.cpiInstruction
+      params.cpiInstructions,
+      vaultIdx
     );
 
     return buildVersionedTransaction(this.connection, params.payer, [
@@ -694,19 +917,25 @@ export class LazorkitClient {
     action: types.SmartWalletActionArgs;
     payer: PublicKey;
     smartWallet: PublicKey;
-    passkeyPubkey: number[];
+    passkeyPublicKey: number[];
   }): Promise<Buffer> {
     let message: Buffer;
-    const { action, payer, smartWallet, passkeyPubkey } = params;
+    const { action, payer, smartWallet, passkeyPublicKey } = params;
 
     switch (action.type) {
-      case types.SmartWalletAction.ExecuteTransaction: {
+      case types.SmartWalletAction.ExecuteDirectTransaction: {
         const { policyInstruction: policyIns, cpiInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteTransaction];
+          action.args as types.ArgsByAction[types.SmartWalletAction.ExecuteDirectTransaction];
+
+        const smartWalletId = await this.getSmartWalletData(smartWallet).then(
+          (d) => d.walletId
+        );
 
         let policyInstruction =
           await this.defaultPolicyProgram.buildCheckPolicyIx(
-            this.walletDevicePda(smartWallet, passkeyPubkey),
+            smartWalletId,
+            passkeyPublicKey,
+            this.walletDevicePda(smartWallet, passkeyPublicKey),
             params.smartWallet
           );
 
@@ -726,9 +955,9 @@ export class LazorkitClient {
         );
         break;
       }
-      case types.SmartWalletAction.InvokePolicy: {
+      case types.SmartWalletAction.InvokeWalletPolicy: {
         const { policyInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.InvokePolicy];
+          action.args as types.ArgsByAction[types.SmartWalletAction.InvokeWalletPolicy];
 
         const smartWalletData = await this.getSmartWalletData(smartWallet);
 
@@ -741,9 +970,9 @@ export class LazorkitClient {
         );
         break;
       }
-      case types.SmartWalletAction.UpdatePolicy: {
+      case types.SmartWalletAction.UpdateWalletPolicy: {
         const { initPolicyIns, destroyPolicyIns } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.UpdatePolicy];
+          action.args as types.ArgsByAction[types.SmartWalletAction.UpdateWalletPolicy];
 
         const smartWalletData = await this.getSmartWalletData(smartWallet);
 
@@ -763,42 +992,5 @@ export class LazorkitClient {
     }
 
     return message;
-  }
-
-  // ============================================================================
-  // Legacy Compatibility Methods (Deprecated)
-  // ============================================================================
-
-  /**
-   * @deprecated Use createSmartWalletTransaction instead
-   */
-  async createSmartWalletTx(params: {
-    payer: PublicKey;
-    passkeyPubkey: number[];
-    credentialIdBase64: string;
-    policyInstruction?: TransactionInstruction | null;
-    isPayForUser?: boolean;
-    smartWalletId?: BN;
-  }) {
-    return this.createSmartWalletTransaction({
-      payer: params.payer,
-      passkeyPubkey: params.passkeyPubkey,
-      credentialIdBase64: params.credentialIdBase64,
-      policyInstruction: params.policyInstruction,
-      isPayForUser: params.isPayForUser,
-      smartWalletId: params.smartWalletId,
-    });
-  }
-
-  /**
-   * @deprecated Use buildAuthorizationMessage instead
-   */
-  async buildMessage(params: {
-    action: types.SmartWalletActionArgs;
-    payer: PublicKey;
-    smartWallet: PublicKey;
-    passkeyPubkey: number[];
-  }): Promise<Buffer> {
-    return this.buildAuthorizationMessage(params);
   }
 }

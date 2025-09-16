@@ -23,7 +23,7 @@ export function buildPasskeyVerificationInstruction(
       authenticatorDataRaw,
       Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
     ]),
-    passkeySignature.passkeyPubkey,
+    passkeySignature.passkeyPublicKey,
     Buffer.from(passkeySignature.signature64, 'base64')
   );
 }
@@ -34,13 +34,13 @@ export function buildPasskeyVerificationInstruction(
 export function convertPasskeySignatureToInstructionArgs(
   passkeySignature: PasskeySignature
 ): {
-  passkeyPubkey: number[];
+  passkeyPublicKey: number[];
   signature: Buffer;
   clientDataJsonRaw: Buffer;
   authenticatorDataRaw: Buffer;
 } {
   return {
-    passkeyPubkey: passkeySignature.passkeyPubkey,
+    passkeyPublicKey: passkeySignature.passkeyPublicKey,
     signature: Buffer.from(passkeySignature.signature64, 'base64'),
     clientDataJsonRaw: Buffer.from(
       passkeySignature.clientDataJsonRaw64,

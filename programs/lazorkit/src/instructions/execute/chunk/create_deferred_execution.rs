@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::CreateSessionArgs;
+use crate::instructions::CreateDeferredExecutionArgs;
 use crate::security::validation;
 use crate::state::{
-    Config, ExecueSessionMessage, PolicyProgramRegistry, SmartWallet, TransactionSession,
-    WalletDevice,
+    ExecuteSessionMessage, PolicyProgramRegistry, ProgramConfig, SmartWalletData,
+    TransactionSession, WalletDevice,
 };
 use crate::utils::{
     execute_cpi, get_wallet_device_signer, sighash, verify_authorization, PasskeyExt,
@@ -12,9 +12,9 @@ use crate::utils::{
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn create_transaction_session(
-    ctx: Context<CreateTransactionSession>,
-    args: CreateSessionArgs,
+pub fn create_deferred_execution(
+    ctx: Context<CreateDeferredExecution>,
+    args: CreateDeferredExecutionArgs,
 ) -> Result<()> {
     // 0. Validate
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
@@ -22,11 +22,11 @@ pub fn create_transaction_session(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
     // 1. Authorization -> typed ExecuteMessage
-    let msg: ExecueSessionMessage = verify_authorization::<ExecueSessionMessage>(
+    let msg: ExecuteSessionMessage = verify_authorization::<ExecuteSessionMessage>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
-        args.passkey_pubkey,
+        args.passkey_public_key,
         args.signature.clone(),
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
@@ -41,7 +41,7 @@ pub fn create_transaction_session(
     // Ensure policy program matches config and registry
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
     require!(
-        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program,
+        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
     crate::utils::check_whitelist(
@@ -69,7 +69,7 @@ pub fn create_transaction_session(
 
     // Execute policy check
     let policy_signer = get_wallet_device_signer(
-        &args.passkey_pubkey,
+        &args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
     );
@@ -82,58 +82,56 @@ pub fn create_transaction_session(
         &args.policy_data,
         &ctx.accounts.policy_program,
         policy_signer,
-        &[],
     )?;
 
     // 5. Write session using hashes from message
-    let session = &mut ctx.accounts.transaction_session;
-    session.owner_wallet = ctx.accounts.smart_wallet.key();
-    session.data_hash = msg.cpi_data_hash;
-    session.accounts_hash = msg.cpi_accounts_hash;
+    let session: &mut Account<'_, TransactionSession> = &mut ctx.accounts.transaction_session;
+    session.owner_wallet_address = ctx.accounts.smart_wallet.key();
+    session.instruction_data_hash = msg.cpi_data_hash;
+    session.accounts_metadata_hash = msg.cpi_accounts_hash;
     session.authorized_nonce = ctx.accounts.smart_wallet_data.last_nonce;
     session.expires_at = args.expires_at;
-    session.rent_refund_to = ctx.accounts.payer.key();
+    session.rent_refund_address = ctx.accounts.payer.key();
     session.vault_index = args.vault_index;
 
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(args: CreateSessionArgs)]
-pub struct CreateTransactionSession<'info> {
+#[instruction(args: CreateDeferredExecutionArgs)]
+pub struct CreateDeferredExecution<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, Config>>,
+    #[account(seeds = [ProgramConfig::PREFIX_SEED], bump, owner = ID)]
+    pub config: Box<Account<'info, ProgramConfig>>,
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.id.to_le_bytes().as_ref()],
+        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
-        owner = system_program.key(),
     )]
     /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [SmartWallet::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWallet>>,
+    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
 
     #[account(
         seeds = [
             WalletDevice::PREFIX_SEED,
             smart_wallet.key().as_ref(),
-            args.passkey_pubkey.to_hashed_bytes(smart_wallet.key()).as_ref()
+            args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()
         ],
         bump = wallet_device.bump,
         owner = ID,
-        constraint = wallet_device.smart_wallet == smart_wallet.key() @ LazorKitError::SmartWalletMismatch,
-        constraint = wallet_device.passkey_pubkey == args.passkey_pubkey @ LazorKitError::PasskeyMismatch
+        constraint = wallet_device.smart_wallet_address == smart_wallet.key() @ LazorKitError::SmartWalletDataMismatch,
+        constraint = wallet_device.passkey_public_key == args.passkey_public_key @ LazorKitError::PasskeyMismatch
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 

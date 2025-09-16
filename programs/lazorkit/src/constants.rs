@@ -9,4 +9,4 @@ pub const SMART_WALLET_SEED: &[u8] = b"smart_wallet";
 /// Size constants for account data
 pub const PASSKEY_SIZE: usize = 33; // Secp256r1 compressed pubkey size
 
-pub const SOL_TRANSFER_DISCRIMINATOR: [u8; 4] = [2, 0, 0, 0];
+pub const EMPTY_PDA_FEE_RENT: u64 = 890880;
