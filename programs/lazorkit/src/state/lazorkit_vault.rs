@@ -73,6 +73,7 @@ impl LazorKitVault {
         destination: &AccountInfo<'info>,
         system_program: &Program<'info, System>,
         amount: u64,
+        index: u8,
         bump: u8,
     ) -> Result<()> {
         require!(
@@ -80,7 +81,7 @@ impl LazorKitVault {
             crate::error::LazorKitError::InsufficientVaultBalance
         );
 
-        let seeds: &[&[u8]] = &[b"vault".as_ref(), &[bump]];
+        let seeds: &[&[u8]] = &[Self::PREFIX_SEED.as_ref(), &[index], &[bump]];
         let signer_seeds = &[&seeds[..]];
 
         transfer(

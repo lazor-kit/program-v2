@@ -11,7 +11,7 @@ pub fn manage_vault(ctx: Context<ManageVault>, action: u8, amount: u64, index: u
             crate::state::LazorKitVault::add_sol(&ctx.accounts.vault, &ctx.accounts.destination, &ctx.accounts.system_program, amount)?
         }
         1 => {
-            crate::state::LazorKitVault::remove_sol(&ctx.accounts.vault, &ctx.accounts.destination, &ctx.accounts.system_program, amount, ctx.bumps.vault)?
+            crate::state::LazorKitVault::remove_sol(&ctx.accounts.vault, &ctx.accounts.destination, &ctx.accounts.system_program, amount, index, ctx.bumps.vault)?
         }
         _ => {
             return Err(LazorKitError::InvalidAction.into());

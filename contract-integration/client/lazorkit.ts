@@ -160,17 +160,6 @@ export class LazorkitClient {
   }
 
   /**
-   * Gets the LazorKit vault for a given vault index
-   */
-  private getLazorkitVault(vaultIndex: number): PublicKey {
-    const [vaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from('vault'), Buffer.from([vaultIndex])],
-      this.programId
-    );
-    return vaultPda;
-  }
-
-  /**
    * Generates a random vault index (0-31)
    */
   generateVaultIndex(): number {
@@ -321,7 +310,7 @@ export class LazorkitClient {
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        lazorkitVault: this.lazorkitVaultPda(args.vaultIndex),
         walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         policyProgramRegistry: this.policyProgramRegistryPda(),
         policyProgram: policyInstruction.programId,
@@ -332,7 +321,7 @@ export class LazorkitClient {
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction),
-        ...instructionToAccountMetas(cpiInstruction),
+        ...instructionToAccountMetas(cpiInstruction, [payer]),
       ])
       .instruction();
   }
@@ -370,7 +359,7 @@ export class LazorkitClient {
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        lazorkitVault: this.lazorkitVaultPda(args.vaultIndex),
         walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         policyProgram: policyInstruction.programId,
         policyProgramRegistry: this.policyProgramRegistryPda(),
@@ -416,7 +405,7 @@ export class LazorkitClient {
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVault(args.vaultIndex),
+        lazorkitVault: this.lazorkitVaultPda(args.vaultIndex),
         walletDevice: this.walletDevicePda(smartWallet, args.passkeyPublicKey),
         oldPolicyProgram: destroyPolicyInstruction.programId,
         newPolicyProgram: initPolicyInstruction.programId,
@@ -480,9 +469,14 @@ export class LazorkitClient {
     const splitIndex = this.calculateSplitIndex(cpiInstructions);
 
     // Combine all account metas from all instructions
-    const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix)
-    );
+    const allAccountMetas = cpiInstructions.flatMap((ix) => [
+      {
+        pubkey: ix.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      ...instructionToAccountMetas(ix, [payer]),
+    ]);
 
     return await this.program.methods
       .executeDeferredTransaction(
@@ -496,7 +490,7 @@ export class LazorkitClient {
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVault(vaultIndex), // Will be updated based on session
+        lazorkitVault: this.lazorkitVaultPda(vaultIndex), // Will be updated based on session
         transactionSession,
         sessionRefund: payer,
         systemProgram: SystemProgram.programId,
@@ -514,15 +508,9 @@ export class LazorkitClient {
     args: types.AuthorizeEphemeralExecutionArgs,
     cpiInstructions: TransactionInstruction[]
   ): Promise<TransactionInstruction> {
-    // Prepare CPI data and split indices
-    const instructionDataList = cpiInstructions.map((ix) =>
-      Array.from(ix.data)
-    );
-    const splitIndex = this.calculateSplitIndex(cpiInstructions);
-
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix)
+      instructionToAccountMetas(ix, [payer])
     );
 
     return await this.program.methods
@@ -563,7 +551,7 @@ export class LazorkitClient {
 
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix)
+      instructionToAccountMetas(ix, [feePayer])
     );
 
     return await this.program.methods
@@ -579,7 +567,7 @@ export class LazorkitClient {
         smartWallet,
         smartWalletData: this.smartWalletDataPda(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVault(0), // Will be updated based on authorization
+        lazorkitVault: this.lazorkitVaultPda(0), // Will be updated based on authorization
         ephemeralAuthorization,
         authorizationRefund: feePayer,
         systemProgram: SystemProgram.programId,
@@ -946,12 +934,12 @@ export class LazorkitClient {
         const smartWalletData = await this.getSmartWalletData(smartWallet);
 
         message = buildExecuteMessage(
-          payer,
           smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
           policyInstruction,
-          cpiInstruction
+          cpiInstruction,
+          [payer]
         );
         break;
       }
@@ -962,11 +950,11 @@ export class LazorkitClient {
         const smartWalletData = await this.getSmartWalletData(smartWallet);
 
         message = buildInvokePolicyMessage(
-          payer,
           smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),
-          policyInstruction
+          policyInstruction,
+          [payer]
         );
         break;
       }
@@ -977,7 +965,6 @@ export class LazorkitClient {
         const smartWalletData = await this.getSmartWalletData(smartWallet);
 
         message = buildUpdatePolicyMessage(
-          payer,
           smartWallet,
           smartWalletData.lastNonce,
           new BN(Math.floor(Date.now() / 1000)),

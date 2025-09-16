@@ -1,12 +1,14 @@
 import * as anchor from '@coral-xyz/anchor';
+import { PublicKey } from '@solana/web3.js';
 
 export function instructionToAccountMetas(
-  ix: anchor.web3.TransactionInstruction
+  ix: anchor.web3.TransactionInstruction,
+  allowSigner?: PublicKey[]
 ): anchor.web3.AccountMeta[] {
   return ix.keys.map((k) => ({
     pubkey: k.pubkey,
     isWritable: k.isWritable,
-    isSigner: false,
+    isSigner: allowSigner ? allowSigner.includes(k.pubkey) : false,
   }));
 }
 export function getRandomBytes(len: number): Uint8Array {

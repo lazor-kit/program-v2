@@ -12,19 +12,8 @@
   "instructions": [
     {
       "name": "authorize_ephemeral_execution",
-      "docs": [
-        "Authorize ephemeral execution for temporary program access"
-      ],
-      "discriminator": [
-        220,
-        152,
-        90,
-        147,
-        146,
-        90,
-        72,
-        115
-      ],
+      "docs": ["Authorize ephemeral execution for temporary program access"],
+      "discriminator": [220, 152, 90, 147, 146, 90, 72, 115],
       "accounts": [
         {
           "name": "payer",
@@ -37,14 +26,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -57,18 +39,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -87,23 +58,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -120,19 +76,7 @@
               {
                 "kind": "const",
                 "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  101,
-                  118,
-                  105,
-                  99,
-                  101
+                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
                 ]
               },
               {
@@ -148,38 +92,15 @@
         },
         {
           "name": "ephemeral_authorization",
-          "docs": [
-            "New ephemeral authorization account (rent payer: payer)"
-          ],
+          "docs": ["New ephemeral authorization account (rent payer: payer)"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
-                  108,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  122,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
+                  101, 112, 104, 101, 109, 101, 114, 97, 108, 95, 97, 117, 116,
+                  104, 111, 114, 105, 122, 97, 116, 105, 111, 110
                 ]
               },
               {
@@ -215,16 +136,7 @@
     },
     {
       "name": "create_deferred_execution",
-      "discriminator": [
-        78,
-        46,
-        57,
-        47,
-        157,
-        183,
-        68,
-        164
-      ],
+      "discriminator": [78, 46, 57, 47, 157, 183, 68, 164],
       "accounts": [
         {
           "name": "payer",
@@ -237,14 +149,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -257,18 +162,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -287,23 +181,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -320,19 +199,7 @@
               {
                 "kind": "const",
                 "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  101,
-                  118,
-                  105,
-                  99,
-                  101
+                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
                 ]
               },
               {
@@ -353,21 +220,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -381,34 +235,15 @@
         },
         {
           "name": "transaction_session",
-          "docs": [
-            "New transaction session account (rent payer: payer)"
-          ],
+          "docs": ["New transaction session account (rent payer: payer)"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116,
-                  114,
-                  97,
-                  110,
-                  115,
-                  97,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
+                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
+                  101, 115, 115, 105, 111, 110
                 ]
               },
               {
@@ -445,19 +280,8 @@
     },
     {
       "name": "create_smart_wallet",
-      "docs": [
-        "Create a new smart wallet with passkey authentication"
-      ],
-      "discriminator": [
-        129,
-        39,
-        235,
-        18,
-        132,
-        68,
-        203,
-        19
-      ],
+      "docs": ["Create a new smart wallet with passkey authentication"],
+      "discriminator": [129, 39, 235, 18, 132, 68, 203, 19],
       "accounts": [
         {
           "name": "payer",
@@ -466,29 +290,14 @@
         },
         {
           "name": "policy_program_registry",
-          "docs": [
-            "Policy program registry"
-          ],
+          "docs": ["Policy program registry"],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -496,27 +305,14 @@
         },
         {
           "name": "smart_wallet",
-          "docs": [
-            "The smart wallet address PDA being created with random ID"
-          ],
+          "docs": ["The smart wallet address PDA being created with random ID"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -528,32 +324,15 @@
         },
         {
           "name": "smart_wallet_data",
-          "docs": [
-            "Smart wallet data"
-          ],
+          "docs": ["Smart wallet data"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -565,28 +344,14 @@
         },
         {
           "name": "wallet_device",
-          "docs": [
-            "Wallet device for the passkey"
-          ],
+          "docs": ["Wallet device for the passkey"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  101,
-                  118,
-                  105,
-                  99,
-                  101
+                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
                 ]
               },
               {
@@ -602,30 +367,19 @@
         },
         {
           "name": "config",
-          "docs": [
-            "Program configuration"
-          ],
+          "docs": ["Program configuration"],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
         },
         {
           "name": "default_policy_program",
-          "docs": [
-            "Default policy program for the smart wallet"
-          ]
+          "docs": ["Default policy program for the smart wallet"]
         },
         {
           "name": "system_program",
@@ -645,16 +399,7 @@
     },
     {
       "name": "execute_deferred_transaction",
-      "discriminator": [
-        165,
-        130,
-        174,
-        92,
-        162,
-        205,
-        131,
-        241
-      ],
+      "discriminator": [165, 130, 174, 92, 162, 205, 131, 241],
       "accounts": [
         {
           "name": "payer",
@@ -667,14 +412,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -687,18 +425,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -717,23 +444,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -758,19 +470,7 @@
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -792,25 +492,8 @@
               {
                 "kind": "const",
                 "value": [
-                  116,
-                  114,
-                  97,
-                  110,
-                  115,
-                  97,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
+                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
+                  101, 115, 115, 105, 111, 110
                 ]
               },
               {
@@ -853,16 +536,7 @@
     },
     {
       "name": "execute_direct_transaction",
-      "discriminator": [
-        133,
-        33,
-        175,
-        46,
-        56,
-        92,
-        169,
-        220
-      ],
+      "discriminator": [133, 33, 175, 46, 56, 92, 169, 220],
       "accounts": [
         {
           "name": "payer",
@@ -877,18 +551,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -907,23 +570,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -948,19 +596,7 @@
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -981,21 +617,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -1013,14 +636,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1047,33 +663,18 @@
     },
     {
       "name": "execute_ephemeral_authorization",
-      "docs": [
-        "Execute transactions using ephemeral authorization"
-      ],
-      "discriminator": [
-        34,
-        195,
-        199,
-        141,
-        192,
-        147,
-        156,
-        14
-      ],
+      "docs": ["Execute transactions using ephemeral authorization"],
+      "discriminator": [34, 195, 199, 141, 192, 147, 156, 14],
       "accounts": [
         {
           "name": "fee_payer",
-          "docs": [
-            "Fee payer for the transaction (stored in authorization)"
-          ],
+          "docs": ["Fee payer for the transaction (stored in authorization)"],
           "writable": true,
           "signer": true
         },
         {
           "name": "ephemeral_signer",
-          "docs": [
-            "Ephemeral key that can sign transactions (must be signer)"
-          ],
+          "docs": ["Ephemeral key that can sign transactions (must be signer)"],
           "signer": true
         },
         {
@@ -1082,14 +683,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1102,18 +696,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -1132,23 +715,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -1173,19 +741,7 @@
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -1231,19 +787,8 @@
     },
     {
       "name": "initialize_program",
-      "docs": [
-        "Initialize the program by creating the sequence tracker"
-      ],
-      "discriminator": [
-        176,
-        107,
-        205,
-        168,
-        24,
-        157,
-        175,
-        103
-      ],
+      "docs": ["Initialize the program by creating the sequence tracker"],
+      "discriminator": [176, 107, 205, 168, 24, 157, 175, 103],
       "accounts": [
         {
           "name": "signer",
@@ -1255,22 +800,13 @@
         },
         {
           "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
+          "docs": ["The program's configuration account."],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1286,21 +822,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -1314,9 +837,7 @@
         },
         {
           "name": "system_program",
-          "docs": [
-            "The system program."
-          ],
+          "docs": ["The system program."],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1324,16 +845,7 @@
     },
     {
       "name": "invoke_wallet_policy",
-      "discriminator": [
-        86,
-        172,
-        240,
-        211,
-        83,
-        157,
-        165,
-        98
-      ],
+      "discriminator": [86, 172, 240, 211, 83, 157, 165, 98],
       "accounts": [
         {
           "name": "payer",
@@ -1346,14 +858,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1366,18 +871,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -1396,23 +890,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -1437,19 +916,7 @@
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -1473,21 +940,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -1515,76 +969,38 @@
     },
     {
       "name": "manage_vault",
-      "docs": [
-        "Withdraw SOL from vault"
-      ],
-      "discriminator": [
-        165,
-        7,
-        106,
-        242,
-        73,
-        193,
-        195,
-        128
-      ],
+      "docs": ["Withdraw SOL from vault"],
+      "discriminator": [165, 7, 106, 242, 73, 193, 195, 128],
       "accounts": [
         {
           "name": "authority",
-          "docs": [
-            "The current authority of the program."
-          ],
+          "docs": ["The current authority of the program."],
           "writable": true,
           "signer": true,
-          "relations": [
-            "config"
-          ]
+          "relations": ["config"]
         },
         {
           "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
+          "docs": ["The program's configuration account."],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
         },
         {
           "name": "vault",
-          "docs": [
-            "Individual vault PDA (empty account that holds SOL)"
-          ],
+          "docs": ["Individual vault PDA (empty account that holds SOL)"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -1601,9 +1017,7 @@
         },
         {
           "name": "system_program",
-          "docs": [
-            "System program"
-          ],
+          "docs": ["System program"],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1624,27 +1038,14 @@
     },
     {
       "name": "register_policy_program",
-      "docs": [
-        "Add a program to the policy program registry"
-      ],
-      "discriminator": [
-        15,
-        54,
-        85,
-        112,
-        89,
-        180,
-        121,
-        13
-      ],
+      "docs": ["Add a program to the policy program registry"],
+      "discriminator": [15, 54, 85, 112, 89, 180, 121, 13],
       "accounts": [
         {
           "name": "authority",
           "writable": true,
           "signer": true,
-          "relations": [
-            "config"
-          ]
+          "relations": ["config"]
         },
         {
           "name": "config",
@@ -1652,14 +1053,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1672,21 +1066,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -1697,49 +1078,25 @@
     },
     {
       "name": "update_program_config",
-      "docs": [
-        "Update the program configuration"
-      ],
-      "discriminator": [
-        214,
-        3,
-        187,
-        98,
-        170,
-        106,
-        33,
-        45
-      ],
+      "docs": ["Update the program configuration"],
+      "discriminator": [214, 3, 187, 98, 170, 106, 33, 45],
       "accounts": [
         {
           "name": "authority",
-          "docs": [
-            "The current authority of the program."
-          ],
+          "docs": ["The current authority of the program."],
           "writable": true,
           "signer": true,
-          "relations": [
-            "config"
-          ]
+          "relations": ["config"]
         },
         {
           "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
+          "docs": ["The program's configuration account."],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1762,16 +1119,7 @@
     },
     {
       "name": "update_wallet_policy",
-      "discriminator": [
-        90,
-        225,
-        16,
-        40,
-        95,
-        80,
-        20,
-        107
-      ],
+      "discriminator": [90, 225, 16, 40, 95, 80, 20, 107],
       "accounts": [
         {
           "name": "payer",
@@ -1784,14 +1132,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
+                "value": [99, 111, 110, 102, 105, 103]
               }
             ]
           }
@@ -1804,18 +1145,7 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
                 ]
               },
               {
@@ -1834,23 +1164,8 @@
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  100, 97, 116, 97
                 ]
               },
               {
@@ -1875,19 +1190,7 @@
               {
                 "kind": "const",
                 "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
                   116
                 ]
               },
@@ -1914,21 +1217,8 @@
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
                 ]
               }
             ]
@@ -1936,9 +1226,7 @@
         },
         {
           "name": "ix_sysvar",
-          "docs": [
-            "CHECK"
-          ],
+          "docs": ["CHECK"],
           "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
@@ -1961,81 +1249,27 @@
   "accounts": [
     {
       "name": "EphemeralAuthorization",
-      "discriminator": [
-        159,
-        254,
-        58,
-        207,
-        22,
-        91,
-        56,
-        255
-      ]
+      "discriminator": [159, 254, 58, 207, 22, 91, 56, 255]
     },
     {
       "name": "PolicyProgramRegistry",
-      "discriminator": [
-        158,
-        67,
-        114,
-        157,
-        27,
-        153,
-        86,
-        72
-      ]
+      "discriminator": [158, 67, 114, 157, 27, 153, 86, 72]
     },
     {
       "name": "ProgramConfig",
-      "discriminator": [
-        196,
-        210,
-        90,
-        231,
-        144,
-        149,
-        140,
-        63
-      ]
+      "discriminator": [196, 210, 90, 231, 144, 149, 140, 63]
     },
     {
       "name": "SmartWalletData",
-      "discriminator": [
-        124,
-        86,
-        202,
-        243,
-        63,
-        150,
-        66,
-        22
-      ]
+      "discriminator": [124, 86, 202, 243, 63, 150, 66, 22]
     },
     {
       "name": "TransactionSession",
-      "discriminator": [
-        169,
-        116,
-        227,
-        43,
-        10,
-        34,
-        251,
-        2
-      ]
+      "discriminator": [169, 116, 227, 43, 10, 34, 251, 2]
     },
     {
       "name": "WalletDevice",
-      "discriminator": [
-        35,
-        85,
-        31,
-        31,
-        179,
-        48,
-        136,
-        123
-      ]
+      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
     }
   ],
   "errors": [
@@ -2549,10 +1783,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2636,10 +1867,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2681,10 +1909,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2728,44 +1953,32 @@
         "fields": [
           {
             "name": "owner_wallet_address",
-            "docs": [
-              "Smart wallet that authorized this session"
-            ],
+            "docs": ["Smart wallet that authorized this session"],
             "type": "pubkey"
           },
           {
             "name": "ephemeral_public_key",
-            "docs": [
-              "Ephemeral public key that can sign transactions"
-            ],
+            "docs": ["Ephemeral public key that can sign transactions"],
             "type": "pubkey"
           },
           {
             "name": "expires_at",
-            "docs": [
-              "Unix timestamp when this session expires"
-            ],
+            "docs": ["Unix timestamp when this session expires"],
             "type": "i64"
           },
           {
             "name": "fee_payer_address",
-            "docs": [
-              "Fee payer for transactions in this session"
-            ],
+            "docs": ["Fee payer for transactions in this session"],
             "type": "pubkey"
           },
           {
             "name": "rent_refund_address",
-            "docs": [
-              "Where to refund rent when closing the session"
-            ],
+            "docs": ["Where to refund rent when closing the session"],
             "type": "pubkey"
           },
           {
             "name": "vault_index",
-            "docs": [
-              "Vault index for fee collection"
-            ],
+            "docs": ["Vault index for fee collection"],
             "type": "u8"
           },
           {
@@ -2774,22 +1987,14 @@
               "Combined hash of all instruction data that can be executed"
             ],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "accounts_metadata_hash",
-            "docs": [
-              "Combined hash of all accounts that will be used"
-            ],
+            "docs": ["Combined hash of all accounts that will be used"],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           }
         ]
@@ -2803,10 +2008,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2852,10 +2054,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2903,10 +2102,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -2926,18 +2122,14 @@
         "fields": [
           {
             "name": "registered_programs",
-            "docs": [
-              "List of registered policy program addresses"
-            ],
+            "docs": ["List of registered policy program addresses"],
             "type": {
               "vec": "pubkey"
             }
           },
           {
             "name": "bump",
-            "docs": [
-              "Bump seed for PDA derivation"
-            ],
+            "docs": ["Bump seed for PDA derivation"],
             "type": "u8"
           }
         ]
@@ -2981,45 +2173,33 @@
     },
     {
       "name": "SmartWalletData",
-      "docs": [
-        "Data account for a smart wallet"
-      ],
+      "docs": ["Data account for a smart wallet"],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "wallet_id",
-            "docs": [
-              "Unique identifier for this smart wallet"
-            ],
+            "docs": ["Unique identifier for this smart wallet"],
             "type": "u64"
           },
           {
             "name": "referral_address",
-            "docs": [
-              "Referral address that governs this wallet's operations"
-            ],
+            "docs": ["Referral address that governs this wallet's operations"],
             "type": "pubkey"
           },
           {
             "name": "policy_program_id",
-            "docs": [
-              "Policy program that governs this wallet's operations"
-            ],
+            "docs": ["Policy program that governs this wallet's operations"],
             "type": "pubkey"
           },
           {
             "name": "last_nonce",
-            "docs": [
-              "Last nonce used for message verification"
-            ],
+            "docs": ["Last nonce used for message verification"],
             "type": "u64"
           },
           {
             "name": "bump",
-            "docs": [
-              "Bump seed for PDA derivation"
-            ],
+            "docs": ["Bump seed for PDA derivation"],
             "type": "u8"
           }
         ]
@@ -3037,9 +2217,7 @@
         "fields": [
           {
             "name": "owner_wallet_address",
-            "docs": [
-              "Smart wallet that authorized this session"
-            ],
+            "docs": ["Smart wallet that authorized this session"],
             "type": "pubkey"
           },
           {
@@ -3048,10 +2226,7 @@
               "Combined sha256 hash of all transaction instruction data"
             ],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -3060,10 +2235,7 @@
               "Combined sha256 hash over all ordered remaining account metas plus target programs"
             ],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -3075,23 +2247,17 @@
           },
           {
             "name": "expires_at",
-            "docs": [
-              "Unix expiration timestamp"
-            ],
+            "docs": ["Unix expiration timestamp"],
             "type": "i64"
           },
           {
             "name": "rent_refund_address",
-            "docs": [
-              "Where to refund rent when closing the session"
-            ],
+            "docs": ["Where to refund rent when closing the session"],
             "type": "pubkey"
           },
           {
             "name": "vault_index",
-            "docs": [
-              "Vault index for fee collection"
-            ],
+            "docs": ["Vault index for fee collection"],
             "type": "u8"
           }
         ]
@@ -3105,10 +2271,7 @@
           {
             "name": "passkey_public_key",
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
@@ -3170,31 +2333,22 @@
               "The public key of the passkey for this wallet device that can authorize transactions"
             ],
             "type": {
-              "array": [
-                "u8",
-                33
-              ]
+              "array": ["u8", 33]
             }
           },
           {
             "name": "smart_wallet_address",
-            "docs": [
-              "The smart wallet this wallet device belongs to"
-            ],
+            "docs": ["The smart wallet this wallet device belongs to"],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": [
-              "The credential ID this wallet device belongs to"
-            ],
+            "docs": ["The credential ID this wallet device belongs to"],
             "type": "bytes"
           },
           {
             "name": "bump",
-            "docs": [
-              "Bump seed for PDA derivation"
-            ],
+            "docs": ["Bump seed for PDA derivation"],
             "type": "u8"
           }
         ]
