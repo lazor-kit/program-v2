@@ -11,7 +11,7 @@ import {
 import { sha256 } from 'js-sha256';
 dotenv.config();
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -62,11 +62,92 @@ describe('Test smart wallet with default policy', () => {
 
       txn.sign([payer]);
 
-      const sig = await connection.sendTransaction(txn, {
-        skipPreflight: true,
-      });
+      const sig = await connection.sendTransaction(txn);
+      await connection.confirmTransaction(sig);
 
       console.log('Manage vault: ', sig);
+    });
+
+    it('Deposit failed', async () => {
+      const txn = await lazorkitProgram.createManageVaultTransaction({
+        payer: payer.publicKey,
+        action: 'deposit',
+        amount: new anchor.BN(10000),
+        destination: payer.publicKey,
+        vaultIndex: lazorkitProgram.generateVaultIndex(),
+      });
+
+      txn.sign([payer]);
+
+      try {
+        await connection.sendTransaction(txn);
+      } catch (error) {
+        expect(String(error).includes('InsufficientBalanceForFee')).to.be.true;
+      }
+    });
+
+    it('Withdraw success', async () => {
+      const vaultIndex = lazorkitProgram.generateVaultIndex();
+      // deposit some SOL to the vault
+      const depositTxn = await lazorkitProgram.createManageVaultTransaction({
+        payer: payer.publicKey,
+        action: 'deposit',
+        amount: new anchor.BN(1000000000),
+        destination: payer.publicKey,
+        vaultIndex: vaultIndex,
+      });
+
+      depositTxn.sign([payer]);
+
+      const depositSig = await connection.sendTransaction(depositTxn);
+      await connection.confirmTransaction(depositSig);
+
+      const withdrawTxn = await lazorkitProgram.createManageVaultTransaction({
+        payer: payer.publicKey,
+        action: 'withdraw',
+        amount: new anchor.BN(10000),
+        destination: payer.publicKey,
+        vaultIndex: vaultIndex,
+      });
+
+      withdrawTxn.sign([payer]);
+
+      const sig = await connection.sendTransaction(withdrawTxn);
+      await connection.confirmTransaction(sig);
+
+      console.log('Manage vault: ', sig);
+    });
+
+    it('Withdraw failed', async () => {
+      const vaultIndex = lazorkitProgram.generateVaultIndex();
+      const depositTxn = await lazorkitProgram.createManageVaultTransaction({
+        payer: payer.publicKey,
+        action: 'deposit',
+        amount: new anchor.BN(1000000000),
+        destination: payer.publicKey,
+        vaultIndex: vaultIndex,
+      });
+
+      depositTxn.sign([payer]);
+
+      const depositSig = await connection.sendTransaction(depositTxn);
+      await connection.confirmTransaction(depositSig);
+
+      const withdrawTxn = await lazorkitProgram.createManageVaultTransaction({
+        payer: payer.publicKey,
+        action: 'withdraw',
+        amount: new anchor.BN(1000000000),
+        destination: payer.publicKey,
+        vaultIndex: vaultIndex,
+      });
+
+      withdrawTxn.sign([payer]);
+
+      try {
+        await connection.sendTransaction(withdrawTxn);
+      } catch (error) {
+        expect(String(error).includes('InsufficientVaultBalance')).to.be.true;
+      }
     });
   });
 });

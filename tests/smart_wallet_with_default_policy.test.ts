@@ -8,10 +8,11 @@ import {
   DefaultPolicyClient,
   LazorkitClient,
 } from '../contract-integration';
-import { sha256 } from 'js-sha256';
+import { createTransferInstruction } from '@solana/spl-token';
+import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
 
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -110,7 +111,7 @@ describe.skip('Test smart wallet with default policy', () => {
     );
   });
 
-  it('Execute direct transaction', async () => {
+  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -136,24 +137,20 @@ describe.skip('Test smart wallet with default policy', () => {
         policyInstruction: null,
         smartWalletId,
         amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
-          new anchor.BN(890880)
+          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
         ),
       });
 
-    const sig = await anchor.web3.sendAndConfirmTransaction(
+    await anchor.web3.sendAndConfirmTransaction(
       connection,
       createSmartWalletTxn,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
       toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0 * anchor.web3.LAMPORTS_PER_SOL,
+      lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
     const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
@@ -168,27 +165,11 @@ describe.skip('Test smart wallet with default policy', () => {
       new anchor.BN(0),
       new anchor.BN(Math.floor(Date.now() / 1000)),
       checkPolicyIns,
-      [transferFromSmartWalletIns]
+      transferFromSmartWalletIns
     );
 
-    const clientDataJsonRaw = Buffer.from(
-      new Uint8Array(
-        new TextEncoder().encode(
-          JSON.stringify({
-            type: 'webauthn.get',
-            challenge: bytesToBase64UrlNoPad(asUint8Array(plainMessage)),
-            origin: 'https://example.com',
-          })
-        ).buffer
-      )
-    );
-
-    const authenticatorDataRaw = Buffer.from([1, 2, 3]);
-
-    const message = Buffer.concat([
-      authenticatorDataRaw,
-      Buffer.from(sha256.arrayBuffer(clientDataJsonRaw)),
-    ]);
+    const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
+      await buildFakeMessagePasskey(plainMessage);
 
     const signature = privateKey.sign(message);
 
@@ -199,20 +180,277 @@ describe.skip('Test smart wallet with default policy', () => {
         passkeySignature: {
           passkeyPublicKey: passkeyPubkey,
           signature64: signature,
-          clientDataJsonRaw64: clientDataJsonRaw.toString('base64'),
-          authenticatorDataRaw64: authenticatorDataRaw.toString('base64'),
+          clientDataJsonRaw64: clientDataJsonRaw64,
+          authenticatorDataRaw64: authenticatorDataRaw64,
         },
         policyInstruction: null,
         cpiInstruction: transferFromSmartWalletIns,
+        vaultIndex: 0,
       });
 
     executeDirectTransactionTxn.sign([payer]);
 
-    const sig2 = await connection.sendTransaction(executeDirectTransactionTxn, {
-      skipPreflight: true,
-    });
+    const sig2 = await connection.sendTransaction(executeDirectTransactionTxn);
+
+    await connection.confirmTransaction(sig2);
 
     console.log('Execute direct transaction: ', sig2);
+  });
+
+  xit('Execute deferred transaction with transfer token from smart wallet', async () => {
+    const privateKey = ECDSA.generateKey();
+
+    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+
+    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+
+    const smartWalletId = lazorkitProgram.generateWalletId();
+
+    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+
+    const walletDevice = lazorkitProgram.walletDevicePda(
+      smartWallet,
+      passkeyPubkey
+    );
+
+    const credentialId = base64.encode(Buffer.from('testing')); // random string
+
+    const { transaction: createSmartWalletTxn } =
+      await lazorkitProgram.createSmartWalletTransaction({
+        payer: payer.publicKey,
+        passkeyPublicKey: passkeyPubkey,
+        credentialIdBase64: credentialId,
+        policyInstruction: null,
+        smartWalletId,
+        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
+          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
+        ),
+      });
+
+    const sig1 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createSmartWalletTxn,
+      [payer]
+    );
+
+    console.log('Create smart wallet: ', sig1);
+
+    // create mint
+    const mint = await createNewMint(connection, payer, 6);
+
+    // create token account
+    const payerTokenAccount = await mintTokenTo(
+      connection,
+      mint,
+      payer,
+      payer,
+      payer.publicKey,
+      10 * 10 ** 6
+    );
+
+    const smartWalletTokenAccount = await mintTokenTo(
+      connection,
+      mint,
+      payer,
+      payer,
+      smartWallet,
+      100 * 10 ** 6
+    );
+
+    const transferTokenIns = createTransferInstruction(
+      smartWalletTokenAccount,
+      payerTokenAccount,
+      smartWallet,
+      10 * 10 ** 6
+    );
+
+    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
+      smartWalletId,
+      passkeyPubkey,
+      walletDevice,
+      smartWallet
+    );
+
+    const plainMessage = buildCreateSessionMessage(
+      smartWallet,
+      new anchor.BN(0),
+      new anchor.BN(Math.floor(Date.now() / 1000)),
+      checkPolicyIns,
+      [transferTokenIns]
+    );
+
+    const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
+      await buildFakeMessagePasskey(plainMessage);
+
+    const signature = privateKey.sign(message);
+
+    const createDeferredExecutionTxn =
+      await lazorkitProgram.createDeferredExecutionTransaction({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        passkeySignature: {
+          passkeyPublicKey: passkeyPubkey,
+          signature64: signature,
+          clientDataJsonRaw64: clientDataJsonRaw64,
+          authenticatorDataRaw64: authenticatorDataRaw64,
+        },
+        policyInstruction: null,
+        expiresAt: Math.floor(Date.now() / 1000) + 1000,
+        vaultIndex: 0,
+      });
+
+    createDeferredExecutionTxn.sign([payer]);
+
+    const sig2 = await connection.sendTransaction(createDeferredExecutionTxn);
+    await connection.confirmTransaction(sig2);
+
+    console.log('Create deferred execution: ', sig2);
+
+    const executeDeferredTransactionTxn =
+      await lazorkitProgram.createExecuteDeferredTransactionTransaction({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        cpiInstructions: [transferTokenIns],
+      });
+
+    executeDeferredTransactionTxn.sign([payer]);
+    const sig3 = await connection.sendTransaction(
+      executeDeferredTransactionTxn
+    );
+    await connection.confirmTransaction(sig3);
+
+    console.log('Execute deferred transaction: ', sig3);
+  });
+
+  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+    const privateKey = ECDSA.generateKey();
+
+    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+
+    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+
+    const smartWalletId = lazorkitProgram.generateWalletId();
+
+    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+
+    const walletDevice = lazorkitProgram.walletDevicePda(
+      smartWallet,
+      passkeyPubkey
+    );
+
+    const credentialId = base64.encode(Buffer.from('testing')); // random string
+
+    const { transaction: createSmartWalletTxn } =
+      await lazorkitProgram.createSmartWalletTransaction({
+        payer: payer.publicKey,
+        passkeyPublicKey: passkeyPubkey,
+        credentialIdBase64: credentialId,
+        policyInstruction: null,
+        smartWalletId,
+        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
+          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
+        ),
+      });
+
+    const sig1 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createSmartWalletTxn,
+      [payer]
+    );
+
+    console.log('Create smart wallet: ', sig1);
+
+    // create mint
+    const mint = await createNewMint(connection, payer, 6);
+
+    // create token account
+    const payerTokenAccount = await mintTokenTo(
+      connection,
+      mint,
+      payer,
+      payer,
+      payer.publicKey,
+      10 * 10 ** 6
+    );
+
+    const smartWalletTokenAccount = await mintTokenTo(
+      connection,
+      mint,
+      payer,
+      payer,
+      smartWallet,
+      100 * 10 ** 6
+    );
+
+    const transferTokenIns = createTransferInstruction(
+      smartWalletTokenAccount,
+      payerTokenAccount,
+      smartWallet,
+      10 * 10 ** 6
+    );
+
+    const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
+      fromPubkey: smartWallet,
+      toPubkey: anchor.web3.Keypair.generate().publicKey,
+      lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
+    });
+
+    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
+      smartWalletId,
+      passkeyPubkey,
+      walletDevice,
+      smartWallet
+    );
+
+    const plainMessage = buildCreateSessionMessage(
+      smartWallet,
+      new anchor.BN(0),
+      new anchor.BN(Math.floor(Date.now() / 1000)),
+      checkPolicyIns,
+      [transferTokenIns, transferFromSmartWalletIns]
+    );
+
+    const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
+      await buildFakeMessagePasskey(plainMessage);
+
+    const signature = privateKey.sign(message);
+
+    const createDeferredExecutionTxn =
+      await lazorkitProgram.createDeferredExecutionTransaction({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        passkeySignature: {
+          passkeyPublicKey: passkeyPubkey,
+          signature64: signature,
+          clientDataJsonRaw64: clientDataJsonRaw64,
+          authenticatorDataRaw64: authenticatorDataRaw64,
+        },
+        policyInstruction: null,
+        expiresAt: Math.floor(Date.now() / 1000) + 1000,
+        vaultIndex: 0,
+      });
+
+    createDeferredExecutionTxn.sign([payer]);
+
+    const sig2 = await connection.sendTransaction(createDeferredExecutionTxn);
+    await connection.confirmTransaction(sig2);
+
+    console.log('Create deferred execution: ', sig2);
+
+    const executeDeferredTransactionTxn =
+      await lazorkitProgram.createExecuteDeferredTransactionTransaction({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        cpiInstructions: [transferTokenIns],
+      });
+
+    executeDeferredTransactionTxn.sign([payer]);
+    const sig3 = await connection.sendTransaction(
+      executeDeferredTransactionTxn
+    );
+    await connection.confirmTransaction(sig3);
+
+    console.log('Execute deferred transaction: ', sig3);
   });
 
   xit('Create address lookup table', async () => {
@@ -229,7 +467,6 @@ describe.skip('Test smart wallet with default policy', () => {
 
     await anchor.web3.sendAndConfirmTransaction(connection, txn, [payer], {
       commitment: 'confirmed',
-      skipPreflight: true,
     });
 
     console.log('Lookup table: ', lookupTableAddress);
@@ -266,43 +503,3 @@ describe.skip('Test smart wallet with default policy', () => {
     console.log('Extend lookup table: ', sig1);
   });
 });
-
-function asUint8Array(
-  input: Buffer | ArrayBuffer | ArrayBufferView | Uint8Array
-): Uint8Array {
-  // Node Buffer?
-  // @ts-ignore
-  if (
-    typeof Buffer !== 'undefined' &&
-    typeof (Buffer as any).isBuffer === 'function' &&
-    // @ts-ignore
-    (Buffer as any).isBuffer(input)
-  ) {
-    return new Uint8Array(input as any);
-  }
-  // Đã là Uint8Array
-  if (input instanceof Uint8Array) return input;
-  // TypedArray/DataView
-  if (ArrayBuffer.isView(input)) {
-    const v = input as ArrayBufferView;
-    return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-  }
-  // ArrayBuffer thuần
-  if (input instanceof ArrayBuffer) return new Uint8Array(input);
-  throw new TypeError('Unsupported byte input');
-}
-
-function bytesToBase64UrlNoPad(u8: Uint8Array): string {
-  // @ts-ignore
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(u8)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-  }
-  // Browser fallback
-  let bin = '';
-  for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}

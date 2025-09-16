@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::Hasher;
 
 use crate::error::LazorKitError;
 use crate::security::validation;
 use crate::state::{LazorKitVault, ProgramConfig, SmartWalletData, TransactionSession};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
+use anchor_lang::solana_program::hash::{hash, Hasher};
 
 pub fn execute_deferred_transaction(
     ctx: Context<ExecuteDeferredTransaction>,
@@ -18,6 +18,7 @@ pub fn execute_deferred_transaction(
     // We'll gracefully abort (close the commit and return Ok) if any binding check fails.
     // Only hard fail on obviously invalid input sizes.
     if validation::validate_remaining_accounts(&cpi_accounts).is_err() {
+        msg!("Failed validation: remaining accounts validation failed");
         return Ok(());
     }
 
@@ -26,11 +27,13 @@ pub fn execute_deferred_transaction(
     // Expiry and usage
     let now = Clock::get()?.unix_timestamp;
     if session.expires_at < now {
+        msg!("Failed validation: session expired. expires_at: {}, now: {}", session.expires_at, now);
         return Ok(());
     }
 
     // Bind wallet and target program
     if session.owner_wallet_address != ctx.accounts.smart_wallet.key() {
+        msg!("Failed validation: wallet address mismatch. session: {}, smart_wallet: {}", session.owner_wallet_address, ctx.accounts.smart_wallet.key());
         return Ok(());
     }
 
@@ -48,8 +51,9 @@ pub fn execute_deferred_transaction(
     let serialized_cpi_data = instruction_data_list
         .try_to_vec()
         .map_err(|_| LazorKitError::InvalidInstructionData)?;
-    let data_hash = anchor_lang::solana_program::hash::hash(&serialized_cpi_data).to_bytes();
+    let data_hash = hash(&serialized_cpi_data).to_bytes();
     if data_hash != session.instruction_data_hash {
+        msg!("Failed validation: instruction data hash mismatch. computed: {:?}, session: {:?}", data_hash, session.instruction_data_hash);
         return Ok(());
     }
 
@@ -75,6 +79,7 @@ pub fn execute_deferred_transaction(
     );
     account_ranges.push((start, cpi_accounts.len()));
 
+
     // Verify entire accounts vector hash matches session
     let mut all_accounts_hasher = Hasher::default();
     for acc in cpi_accounts.iter() {
@@ -83,6 +88,7 @@ pub fn execute_deferred_transaction(
         all_accounts_hasher.hash(&[acc.is_writable as u8]);
     }
     if all_accounts_hasher.result().to_bytes() != session.accounts_metadata_hash {
+        msg!("Failed validation: accounts metadata hash mismatch");
         return Ok(());
     }
 
@@ -100,11 +106,13 @@ pub fn execute_deferred_transaction(
 
         // Validate program is executable
         if !program_account.executable {
+            msg!("Failed validation: program not executable. program: {}", program_account.key());
             return Ok(());
         }
 
         // Ensure program is not this program (prevent reentrancy)
         if program_account.key() == crate::ID {
+            msg!("Failed validation: reentrancy attempt detected. program: {}", program_account.key());
             return Ok(());
         }
     }
@@ -141,6 +149,7 @@ pub fn execute_deferred_transaction(
         );
 
         if exec_res.is_err() {
+            msg!("Failed execution: CPI instruction failed. error: {:?}", exec_res.err());
             return Ok(());
         }
     }
@@ -166,6 +175,7 @@ pub fn execute_deferred_transaction(
         )?;
     }
 
+    msg!("Successfully executed deferred transaction");
     Ok(())
 }
 

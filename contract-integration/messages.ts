@@ -92,7 +92,7 @@ function computeSingleInsAccountsHash(
   h.update(programId.toBytes());
   for (const m of metas) {
     h.update(m.pubkey.toBytes());
-    h.update(Uint8Array.from([0])); // isSigner is always false
+    h.update(Uint8Array.from([m.isSigner ? 1 : 0])); // isSigner is always false
     h.update(
       Uint8Array.from([
         m.pubkey.toString() === smartWallet.toString() || m.isWritable ? 1 : 0,
@@ -106,38 +106,39 @@ function computeAllInsAccountsHash(
   metas: anchor.web3.AccountMeta[],
   smartWallet: anchor.web3.PublicKey
 ): Uint8Array {
-  // Merge duplicate accounts with the specified logic
-  const accountMap = new Map<string, anchor.web3.AccountMeta>();
+  // Keep original order but merge duplicate accounts
+  const seenAccounts = new Map<string, anchor.web3.AccountMeta>();
+  const mergedMetas: anchor.web3.AccountMeta[] = [];
 
   for (const meta of metas) {
     const key = meta.pubkey.toString();
 
-    if (accountMap.has(key)) {
-      // Account already exists, merge properties
-      const existing = accountMap.get(key)!;
+    if (seenAccounts.has(key)) {
+      // Account already exists, merge properties but keep original position
+      const existing = seenAccounts.get(key)!;
       const merged: anchor.web3.AccountMeta = {
         pubkey: meta.pubkey,
-        isSigner: false, // isSigner is always false
-        isWritable: existing.isWritable || meta.isWritable, // true if either is true
+        isSigner: existing.isSigner || meta.isSigner, // OR for isSigner
+        isWritable: existing.isWritable || meta.isWritable, // OR for isWritable
       };
-      accountMap.set(key, merged);
+      seenAccounts.set(key, merged);
+
+      // Update the existing entry in the array
+      const index = mergedMetas.findIndex((m) => m.pubkey.toString() === key);
+      if (index !== -1) {
+        mergedMetas[index] = merged;
+      }
     } else {
       // New account, add as is
-      accountMap.set(key, meta);
+      seenAccounts.set(key, meta);
+      mergedMetas.push(meta);
     }
   }
-
-  // Convert map back to array and sort by pubkey for consistent ordering
-  const mergedMetas = Array.from(accountMap.values()).sort((a, b) =>
-    a.pubkey.toString().localeCompare(b.pubkey.toString())
-  );
-
-  console.log(mergedMetas);
 
   const h = sha256.create();
   for (const m of mergedMetas) {
     h.update(m.pubkey.toBytes());
-    h.update(Uint8Array.from([0])); // isSigner is always false
+    h.update(Uint8Array.from([m.isSigner ? 1 : 0]));
     h.update(
       Uint8Array.from([
         m.pubkey.toString() === smartWallet.toString() || m.isWritable ? 1 : 0,
@@ -148,14 +149,14 @@ function computeAllInsAccountsHash(
 }
 
 export function buildExecuteMessage(
-  payer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiIns: anchor.web3.TransactionInstruction
+  cpiIns: anchor.web3.TransactionInstruction,
+  allowSigner?: anchor.web3.PublicKey[]
 ): Buffer {
-  const policyMetas = instructionToAccountMetas(policyIns);
+  const policyMetas = instructionToAccountMetas(policyIns, allowSigner);
   const policyAccountsHash = computeSingleInsAccountsHash(
     policyIns.programId,
     policyMetas,
@@ -163,7 +164,7 @@ export function buildExecuteMessage(
   );
   const policyDataHash = new Uint8Array(sha256.arrayBuffer(policyIns.data));
 
-  const cpiMetas = instructionToAccountMetas(cpiIns);
+  const cpiMetas = instructionToAccountMetas(cpiIns, allowSigner);
   const cpiAccountsHash = computeSingleInsAccountsHash(
     cpiIns.programId,
     cpiMetas,
@@ -183,13 +184,13 @@ export function buildExecuteMessage(
 }
 
 export function buildInvokePolicyMessage(
-  payer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
-  policyIns: anchor.web3.TransactionInstruction
+  policyIns: anchor.web3.TransactionInstruction,
+  allowSigner?: anchor.web3.PublicKey[]
 ): Buffer {
-  const policyMetas = instructionToAccountMetas(policyIns);
+  const policyMetas = instructionToAccountMetas(policyIns, allowSigner);
   const policyAccountsHash = computeSingleInsAccountsHash(
     policyIns.programId,
     policyMetas,
@@ -207,14 +208,14 @@ export function buildInvokePolicyMessage(
 }
 
 export function buildUpdatePolicyMessage(
-  payer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
   destroyPolicyIns: anchor.web3.TransactionInstruction,
-  initPolicyIns: anchor.web3.TransactionInstruction
+  initPolicyIns: anchor.web3.TransactionInstruction,
+  allowSigner?: anchor.web3.PublicKey[]
 ): Buffer {
-  const oldMetas = instructionToAccountMetas(destroyPolicyIns);
+  const oldMetas = instructionToAccountMetas(destroyPolicyIns, allowSigner);
   const oldAccountsHash = computeSingleInsAccountsHash(
     destroyPolicyIns.programId,
     oldMetas,
@@ -222,7 +223,7 @@ export function buildUpdatePolicyMessage(
   );
   const oldDataHash = new Uint8Array(sha256.arrayBuffer(destroyPolicyIns.data));
 
-  const newMetas = instructionToAccountMetas(initPolicyIns);
+  const newMetas = instructionToAccountMetas(initPolicyIns, allowSigner);
   const newAccountsHash = computeSingleInsAccountsHash(
     initPolicyIns.programId,
     newMetas,
@@ -246,9 +247,12 @@ export function buildCreateSessionMessage(
   nonce: anchor.BN,
   now: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiInstructions: anchor.web3.TransactionInstruction[]
+  cpiInstructions:
+    | anchor.web3.TransactionInstruction[]
+    | anchor.web3.TransactionInstruction,
+  allowSigner?: anchor.web3.PublicKey[]
 ): Buffer {
-  const policyMetas = instructionToAccountMetas(policyIns);
+  const policyMetas = instructionToAccountMetas(policyIns, allowSigner);
   const policyAccountsHash = computeSingleInsAccountsHash(
     policyIns.programId,
     policyMetas,
@@ -256,15 +260,15 @@ export function buildCreateSessionMessage(
   );
   const policyDataHash = new Uint8Array(sha256.arrayBuffer(policyIns.data));
 
-  if (cpiInstructions.length === 1) {
-    const cpiMetas = instructionToAccountMetas(cpiInstructions[0]);
+  if (!Array.isArray(cpiInstructions)) {
+    const cpiMetas = instructionToAccountMetas(cpiInstructions, allowSigner);
     const cpiAccountsHash = computeSingleInsAccountsHash(
-      cpiInstructions[0].programId,
+      cpiInstructions.programId,
       cpiMetas,
       smartWallet
     );
     const cpiDataHash = new Uint8Array(
-      sha256.arrayBuffer(cpiInstructions[0].data)
+      sha256.arrayBuffer(cpiInstructions.data)
     );
     return Buffer.from(
       coder.types.encode('ExecueSessionMessage', {
@@ -278,15 +282,28 @@ export function buildCreateSessionMessage(
     );
   }
 
-  // Combine all CPI instruction data and hash it
-  const allCpiData = cpiInstructions.map((ix) => Array.from(ix.data)).flat();
-  const cpiDataHash = new Uint8Array(
-    sha256.arrayBuffer(new Uint8Array(allCpiData))
-  );
+  // Combine all CPI instruction data and hash it (match Rust Borsh serialization)
+  const outerLength = Buffer.alloc(4);
+  outerLength.writeUInt32LE(cpiInstructions.length, 0);
 
-  const allMetas = cpiInstructions.flatMap((ix) =>
-    instructionToAccountMetas(ix)
-  );
+  const innerArrays = cpiInstructions.map((ix) => {
+    const data = Buffer.from(ix.data);
+    const length = Buffer.alloc(4);
+    length.writeUInt32LE(data.length, 0);
+    return Buffer.concat([length, data]);
+  });
+
+  const serializedCpiData = Buffer.concat([outerLength, ...innerArrays]);
+  const cpiDataHash = new Uint8Array(sha256.arrayBuffer(serializedCpiData));
+
+  const allMetas = cpiInstructions.flatMap((ix) => [
+    {
+      pubkey: ix.programId,
+      isSigner: false,
+      isWritable: false,
+    },
+    ...instructionToAccountMetas(ix, allowSigner),
+  ]);
 
   const cpiAccountsHash = computeAllInsAccountsHash(allMetas, smartWallet);
 
@@ -302,13 +319,13 @@ export function buildCreateSessionMessage(
 }
 
 export function buildAuthorizeEphemeralMessage(
-  payer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   now: anchor.BN,
   ephemeral_public_key: anchor.web3.PublicKey,
   expiresAt: anchor.BN,
-  cpiInstructions: anchor.web3.TransactionInstruction[]
+  cpiInstructions: anchor.web3.TransactionInstruction[],
+  allowSigner?: anchor.web3.PublicKey[]
 ): Buffer {
   // Combine all CPI instruction data and hash it
   const allCpiData = cpiInstructions.map((ix) => Array.from(ix.data)).flat();
@@ -318,7 +335,7 @@ export function buildAuthorizeEphemeralMessage(
 
   // Combine all account metas
   const allMetas = cpiInstructions.flatMap((ix) =>
-    instructionToAccountMetas(ix)
+    instructionToAccountMetas(ix, allowSigner)
   );
   const accountsHash = computeAllInsAccountsHash(allMetas, smartWallet);
 
