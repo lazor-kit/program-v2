@@ -1,8 +1,13 @@
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
-use crate::state::{ExecuteMessage, InvokeWalletPolicyMessage, UpdateWalletPolicyMessage};
+use crate::state::{ExecuteMessage, CallPolicyMessage, ChangePolicyMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
+
+/// Utility functions for LazorKit smart wallet operations
+///
+/// This module provides helper functions for WebAuthn signature verification,
+/// Cross-Program Invocation (CPI) execution, and message validation.
 
 // Constants for Secp256r1 signature verification
 const SECP_HEADER_SIZE: u16 = 14;
@@ -47,14 +52,17 @@ pub fn execute_cpi(
     program: &AccountInfo,
     signer: PdaSigner,
 ) -> Result<()> {
-    // Allocate a single Vec<u8> for the instruction – unavoidable because the SDK expects owned
-    // data.  This keeps the allocation inside the helper and eliminates clones at the call-site.
+    // Create the CPI instruction with proper account metadata
+    // We need to clone the data here because the SDK expects owned data
     let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer);
 
-    // Build seed slice **once** to avoid repeated heap allocations.
+    // Build the seed slice once to avoid repeated heap allocations
+    // Convert Vec<Vec<u8>> to Vec<&[u8]> for invoke_signed
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
     let bump_slice = [signer.bump];
     seed_slices.push(&bump_slice);
+    
+    // Execute the CPI with PDA signing
     invoke_signed(&ix, accounts, &[&seed_slices]).map_err(Into::into)
 }
 
@@ -65,6 +73,7 @@ fn create_cpi_instruction(
     program: &AccountInfo,
     pda_signer: &PdaSigner,
 ) -> Instruction {
+    // Derive the PDA address from the seeds to determine which account should be a signer
     let seed_slices: Vec<&[u8]> = pda_signer.seeds.iter().map(|s| s.as_slice()).collect();
     let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
 
@@ -73,6 +82,7 @@ fn create_cpi_instruction(
         accounts: accounts
             .iter()
             .map(|acc| {
+                // Mark the PDA account as a signer if it matches our derived address
                 let is_pda_signer = *acc.key == pda_pubkey;
                 AccountMeta {
                     pubkey: *acc.key,
@@ -92,11 +102,16 @@ pub fn verify_secp256r1_instruction(
     msg: Vec<u8>,
     sig: Vec<u8>,
 ) -> Result<()> {
+    // Calculate expected instruction data length based on Secp256r1 format
     let expected_len =
         (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
+    
+    // Validate the instruction format matches Secp256r1 requirements
     if ix.program_id != SECP256R1_PROGRAM_ID || !ix.accounts.is_empty() || ix.data.len() != expected_len {
         return Err(LazorKitError::Secp256r1InvalidLength.into());
     }
+    
+    // Verify the actual signature data
     verify_secp256r1_data(&ix.data, pubkey, msg, sig)
 }
 
@@ -107,13 +122,16 @@ fn verify_secp256r1_data(
     message: Vec<u8>,
     signature: Vec<u8>,
 ) -> Result<()> {
+    // Calculate the byte offsets for each component in the Secp256r1 instruction data
     let msg_len = message.len() as u16;
     let offsets = calculate_secp_offsets(msg_len);
 
+    // Verify the instruction header matches the expected Secp256r1 format
     if !verify_secp_header(data, &offsets) {
         return Err(LazorKitError::Secp256r1HeaderMismatch.into());
     }
 
+    // Verify the actual signature data (public key, signature, message) matches
     if !verify_secp_data(data, &public_key, &signature, &message) {
         return Err(LazorKitError::Secp256r1DataMismatch.into());
     }
@@ -171,9 +189,11 @@ pub trait PasskeyExt {
 impl PasskeyExt for [u8; PASSKEY_PUBLIC_KEY_SIZE] {
     #[inline]
     fn to_hashed_bytes(&self, wallet: Pubkey) -> [u8; 32] {
+        // Combine passkey public key with wallet address for unique hashing
         let mut buf = [0u8; 65];
         buf[..SECP_PUBKEY_SIZE as usize].copy_from_slice(self);
         buf[SECP_PUBKEY_SIZE as usize..].copy_from_slice(&wallet.to_bytes());
+        // Hash the combined data to create a unique identifier
         hash(&buf).to_bytes()
     }
 }
@@ -302,7 +322,7 @@ impl HasHeader for ExecuteMessage {
         }
     }
 }
-impl HasHeader for InvokeWalletPolicyMessage {
+impl HasHeader for CallPolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -310,7 +330,7 @@ impl HasHeader for InvokeWalletPolicyMessage {
         }
     }
 }
-impl HasHeader for UpdateWalletPolicyMessage {
+impl HasHeader for ChangePolicyMessage {
     fn header(&self) -> HeaderView {
         HeaderView {
             nonce: self.nonce,
@@ -334,7 +354,7 @@ pub fn split_remaining_accounts<'a>(
 
 /// Distribute fees to payer, referral, and lazorkit vault (empty PDA)
 pub fn distribute_fees<'info>(
-    config: &crate::state::ProgramConfig,
+    config: &crate::state::Config,
     smart_wallet: &AccountInfo<'info>,
     payer: &AccountInfo<'info>,
     referral: &AccountInfo<'info>,

@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 /// LazorKit program constants and configuration values
 /// 
-/// This module contains all the constant values used throughout the LazorKit program,
-/// including program IDs, seed values, and size constraints.
+/// Contains all constant values used throughout the LazorKit program including
+/// program IDs, seed values, size constraints, and configuration parameters.
 
 /// Solana's built-in Secp256r1 signature verification program ID
 pub const SECP256R1_PROGRAM_ID: Pubkey = pubkey!("Secp256r1SigVerify1111111111111111111111111");

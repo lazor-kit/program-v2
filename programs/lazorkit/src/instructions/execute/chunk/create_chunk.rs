@@ -3,8 +3,7 @@ use anchor_lang::prelude::*;
 use crate::instructions::CreateChunkArgs;
 use crate::security::validation;
 use crate::state::{
-    CreateChunkMessage, PolicyProgramRegistry, ProgramConfig, SmartWalletData,
-    TransactionSession, WalletDevice,
+    Chunk, CreateChunkMessage, PolicyProgramRegistry, Config, SmartWalletData, WalletDevice,
 };
 use crate::utils::{
     execute_cpi, get_wallet_device_signer, sighash, verify_authorization, PasskeyExt,
@@ -12,16 +11,19 @@ use crate::utils::{
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn create_chunk(
-    ctx: Context<CreateChunk>,
-    args: CreateChunkArgs,
-) -> Result<()> {
-    // 0. Validate
+/// Create a chunk buffer for large transactions
+///
+/// Creates a buffer for chunked transactions when the main execute transaction
+/// exceeds size limits. Splits large transactions into smaller, manageable
+/// chunks that can be processed separately while maintaining security.
+pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<()> {
+    // Step 1: Validate input parameters and global program state
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_policy_data(&args.policy_data)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
-    // 1. Authorization -> typed CreateChunkMessage
+    // Step 2: Verify WebAuthn signature and parse authorization message
+    // This validates the passkey signature and extracts the typed message
     let msg: CreateChunkMessage = verify_authorization::<CreateChunkMessage>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
@@ -34,27 +36,31 @@ pub fn create_chunk(
         ctx.accounts.smart_wallet_data.last_nonce,
     )?;
 
-    // 2. In session mode, all remaining accounts are for policy checking
+    // Step 3: Prepare policy program validation
+    // In chunk mode, all remaining accounts are for policy checking
     let policy_accounts = &ctx.remaining_accounts[..];
 
-    // 3. Optional policy-check now (bind policy & validate hashes)
-    // Ensure policy program matches config and registry
+    // Step 4: Validate policy program and verify data integrity
+    // Ensure policy program is executable and matches wallet configuration
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
     require!(
         ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
+    
+    // Verify policy program is registered in the whitelist
     crate::utils::check_whitelist(
         &ctx.accounts.policy_program_registry,
         &ctx.accounts.policy_program.key(),
     )?;
 
-    // Compare policy_data hash with message
+    // Verify policy data hash matches the authorization message
     require!(
         hash(&args.policy_data).to_bytes() == msg.policy_data_hash,
         LazorKitError::InvalidInstructionData
     );
-    // Compare policy_accounts hash with message
+    
+    // Verify policy accounts hash matches the authorization message
     let mut rh = Hasher::default();
     rh.hash(ctx.accounts.policy_program.key.as_ref());
     for a in policy_accounts.iter() {
@@ -67,16 +73,21 @@ pub fn create_chunk(
         LazorKitError::InvalidAccountData
     );
 
-    // Execute policy check
+    // Step 5: Execute policy program validation
+    // Create signer for policy program CPI
     let policy_signer = get_wallet_device_signer(
         &args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
     );
+    
+    // Verify policy instruction discriminator
     require!(
         args.policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
         LazorKitError::InvalidCheckPolicyDiscriminator
     );
+    
+    // Execute policy program to validate the chunked transaction
     execute_cpi(
         policy_accounts,
         &args.policy_data,
@@ -84,8 +95,9 @@ pub fn create_chunk(
         policy_signer,
     )?;
 
-    // 5. Write session using hashes from message
-    let session: &mut Account<'_, TransactionSession> = &mut ctx.accounts.transaction_session;
+    // Step 6: Create the chunk buffer with authorization data
+    // Store the hashes and metadata for later execution
+    let session: &mut Account<'_, Chunk> = &mut ctx.accounts.chunk;
     session.owner_wallet_address = ctx.accounts.smart_wallet.key();
     session.instruction_data_hash = msg.cpi_data_hash;
     session.accounts_metadata_hash = msg.cpi_accounts_hash;
@@ -103,8 +115,8 @@ pub struct CreateChunk<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [ProgramConfig::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, ProgramConfig>>,
+    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -130,8 +142,6 @@ pub struct CreateChunk<'info> {
         ],
         bump = wallet_device.bump,
         owner = ID,
-        constraint = wallet_device.smart_wallet_address == smart_wallet.key() @ LazorKitError::SmartWalletDataMismatch,
-        constraint = wallet_device.passkey_public_key == args.passkey_public_key @ LazorKitError::PasskeyMismatch
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
@@ -151,12 +161,12 @@ pub struct CreateChunk<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = 8 + TransactionSession::INIT_SPACE,
-        seeds = [TransactionSession::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_data.last_nonce.to_le_bytes()],
+        space = 8 + Chunk::INIT_SPACE,
+        seeds = [Chunk::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_data.last_nonce.to_le_bytes()],
         bump,
         owner = ID,
     )]
-    pub transaction_session: Account<'info, TransactionSession>,
+    pub chunk: Account<'info, Chunk>,
 
     /// CHECK: instructions sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]

@@ -6,24 +6,27 @@ use anchor_lang::{
     system_program::{create_account, CreateAccount},
 };
 
-/// Account that stores a wallet device (passkey) used to authenticate to a smart wallet
+/// Account that stores a wallet device (passkey) for smart wallet authentication
+///
+/// Each wallet device represents a WebAuthn passkey that can be used to authenticate
+/// transactions for a specific smart wallet. Multiple devices can be associated with
+/// a single smart wallet for enhanced security and convenience.
 #[account]
 #[derive(Debug, InitSpace)]
 pub struct WalletDevice {
-    /// The public key of the passkey for this wallet device that can authorize transactions
+    /// Public key of the WebAuthn passkey for transaction authorization
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    /// The smart wallet this wallet device belongs to
+    /// Smart wallet address this device is associated with
     pub smart_wallet_address: Pubkey,
-
-    /// The credential ID this wallet device belongs to
+    /// Unique credential ID from WebAuthn registration
     #[max_len(256)]
     pub credential_id: Vec<u8>,
-
-    /// Bump seed for PDA derivation
+    /// Bump seed for PDA derivation and verification
     pub bump: u8,
 }
 
 impl WalletDevice {
+    /// Seed prefix used for PDA derivation of wallet device accounts
     pub const PREFIX_SEED: &'static [u8] = b"wallet_device";
 
     fn from<'info>(x: &'info AccountInfo<'info>) -> Account<'info, Self> {
@@ -36,6 +39,10 @@ impl WalletDevice {
         WalletDevice::try_serialize(self, &mut writer)
     }
 
+    /// Initialize a new wallet device account with passkey credentials
+    ///
+    /// Creates a new wallet device account that can be used to authenticate
+    /// transactions for the specified smart wallet using WebAuthn passkey.
     pub fn init<'info>(
         wallet_device: &'info AccountInfo<'info>,
         payer: AccountInfo<'info>,

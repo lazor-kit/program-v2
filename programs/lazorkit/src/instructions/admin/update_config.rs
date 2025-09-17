@@ -2,70 +2,77 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{UpdateType, ProgramConfig},
+    state::{Config, UpdateType},
 };
 
-pub fn update_config(
-    ctx: Context<UpdateConfig>,
-    param: UpdateType,
-    value: u64,
-) -> Result<()> {
+/// Update program configuration settings
+///
+/// Allows the program authority to modify critical configuration parameters
+/// including fee structures, default policy programs, and operational settings.
+/// All fee updates are validated to ensure reasonable limits.
+pub fn update_config(ctx: Context<UpdateConfig>, param: UpdateType, value: u64) -> Result<()> {
     let config = &mut ctx.accounts.config;
 
     match param {
         UpdateType::CreateWalletFee => {
-            // Validate fee is reasonable (max 1 SOL)
+            // Validate fee is reasonable (max 1 SOL = 1,000,000,000 lamports)
             require!(value <= 1_000_000_000, LazorKitError::InvalidFeeAmount);
             config.create_smart_wallet_fee = value;
         }
         UpdateType::FeePayerFee => {
-            // Validate fee is reasonable (max 0.1 SOL)
+            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.fee_payer_fee = value;
         }
         UpdateType::ReferralFee => {
-            // Validate fee is reasonable (max 0.1 SOL)
+            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.referral_fee = value;
         }
         UpdateType::LazorkitFee => {
-            // Validate fee is reasonable (max 0.1 SOL)
+            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.lazorkit_fee = value;
         }
         UpdateType::DefaultPolicyProgram => {
+            // Get the new default policy program from remaining accounts
             let new_default_policy_program_info = ctx
                 .remaining_accounts
                 .first()
                 .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
-            // Check if the new default policy program is executable
+            // Ensure the new policy program is executable (not a data account)
             if !new_default_policy_program_info.executable {
                 return err!(LazorKitError::ProgramNotExecutable);
             }
 
+            // Update the default policy program ID for new wallets
             config.default_policy_program_id = new_default_policy_program_info.key();
         }
         UpdateType::Admin => {
+            // Get the new admin authority from remaining accounts
             let new_admin_info = ctx
                 .remaining_accounts
                 .first()
                 .ok_or(LazorKitError::InvalidRemainingAccounts)?;
 
-            // Cannot set admin to system program or this program
+            // Prevent setting system program or this program as admin (security measure)
             require!(
                 new_admin_info.key() != anchor_lang::system_program::ID
                     && new_admin_info.key() != crate::ID,
                 LazorKitError::InvalidAuthority
             );
 
+            // Update the program authority
             config.authority = new_admin_info.key();
         }
         UpdateType::PauseProgram => {
+            // Ensure program is not already paused
             require!(!config.is_paused, LazorKitError::ProgramPaused);
             config.is_paused = true;
         }
         UpdateType::UnpauseProgram => {
+            // Ensure program is currently paused before unpausing
             require!(config.is_paused, LazorKitError::InvalidAccountState);
             config.is_paused = false;
         }
@@ -85,9 +92,9 @@ pub struct UpdateConfig<'info> {
     /// The program's configuration account.
     #[account(
         mut,
-        seeds = [ProgramConfig::PREFIX_SEED],
+        seeds = [Config::PREFIX_SEED],
         bump,
         has_one = authority @ LazorKitError::InvalidAuthority
     )]
-    pub config: Box<Account<'info, ProgramConfig>>,
+    pub config: Box<Account<'info, Config>>,
 }

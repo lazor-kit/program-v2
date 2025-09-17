@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 
 /// Core data account for a LazorKit smart wallet
 /// 
-/// This account stores the essential state information for a smart wallet,
-/// including its unique identifier, policy program, and authentication nonce.
+/// Stores the essential state information for a smart wallet including its
+/// unique identifier, policy program configuration, and authentication nonce
+/// for replay attack prevention.
 #[account]
 #[derive(Default, InitSpace)]
 pub struct SmartWalletData {

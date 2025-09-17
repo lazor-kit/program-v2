@@ -4,21 +4,27 @@ use anchor_lang::solana_program::hash::Hasher;
 use crate::instructions::GrantPermissionArgs;
 use crate::security::validation;
 use crate::state::{
-    AuthorizeEphemeralExecutionMessage, EphemeralAuthorization, ProgramConfig, SmartWalletData,
+    GrantPermissionMessage, Permission, Config, SmartWalletData,
     WalletDevice,
 };
 use crate::utils::{verify_authorization, PasskeyExt};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
+/// Grant ephemeral permission to a keypair
+///
+/// Grants time-limited permission to an ephemeral keypair to interact with
+/// the smart wallet. Ideal for games or applications that need to perform
+/// multiple operations without repeatedly authenticating with passkey.
 pub fn grant_permission(
     ctx: Context<GrantPermission>,
     args: GrantPermissionArgs,
 ) -> Result<()> {
-    // 0. Validate
+    // Step 1: Validate input parameters and global program state
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
-    // Validate input: for n instructions, we need n-1 split indices
+    // Validate instruction data and split indices format
+    // For n instructions, we need n-1 split indices to divide the accounts
     require!(
         !args.instruction_data_list.is_empty(),
         LazorKitError::InsufficientCpiAccounts
@@ -28,9 +34,10 @@ pub fn grant_permission(
         LazorKitError::InvalidInstructionData
     );
 
-    // 1. Authorization -> typed AuthorizeEphemeralExecutionMessage
-    let msg: AuthorizeEphemeralExecutionMessage =
-        verify_authorization::<AuthorizeEphemeralExecutionMessage>(
+    // Step 2: Verify WebAuthn signature and parse authorization message
+    // This validates the passkey signature and extracts the typed message
+    let msg: GrantPermissionMessage =
+        verify_authorization::<GrantPermissionMessage>(
             &ctx.accounts.ix_sysvar,
             &ctx.accounts.wallet_device,
             ctx.accounts.smart_wallet.key(),
@@ -42,7 +49,7 @@ pub fn grant_permission(
             ctx.accounts.smart_wallet_data.last_nonce,
         )?;
 
-    // 2. Verify message fields match args
+    // Step 3: Verify message fields match arguments
     require!(
         msg.ephemeral_key == args.ephemeral_public_key,
         LazorKitError::InvalidInstructionData
@@ -52,15 +59,15 @@ pub fn grant_permission(
         LazorKitError::InvalidInstructionData
     );
 
-    // 3. Create combined hashes for verification
-    // Hash all instruction data
+    // Step 4: Create combined hashes for verification
+    // Hash all instruction data to verify integrity
     let serialized_cpi_data = args
         .instruction_data_list
         .try_to_vec()
         .map_err(|_| LazorKitError::InvalidInstructionData)?;
     let data_hash = anchor_lang::solana_program::hash::hash(&serialized_cpi_data).to_bytes();
 
-    // Hash all accounts
+    // Hash all accounts to verify they haven't been tampered with
     let mut all_accounts_hasher = Hasher::default();
     for acc in ctx.remaining_accounts.iter() {
         all_accounts_hasher.hash(acc.key.as_ref());
@@ -69,7 +76,7 @@ pub fn grant_permission(
     }
     let accounts_hash = all_accounts_hasher.result().to_bytes();
 
-    // 4. Verify hashes match message
+    // Step 5: Verify hashes match the authorization message
     require!(
         data_hash == msg.data_hash,
         LazorKitError::InvalidInstructionData
@@ -79,15 +86,15 @@ pub fn grant_permission(
         LazorKitError::InvalidAccountData
     );
 
-    // 5. Validate expiration time (max 1 hour from now)
+    // Step 6: Validate expiration time constraints
     let now = Clock::get()?.unix_timestamp;
     require!(args.expires_at > now, LazorKitError::InvalidInstructionData);
     require!(
-        args.expires_at <= now + 3600, // Max 1 hour
+        args.expires_at <= now + 3600, // Maximum 1 hour from now
         LazorKitError::InvalidInstructionData
     );
 
-    // 6. Validate account ranges using split_index
+    // Step 7: Validate account ranges using split indices
     let mut account_ranges = Vec::new();
     let mut start = 0usize;
 
@@ -109,7 +116,7 @@ pub fn grant_permission(
     );
     account_ranges.push((start, ctx.remaining_accounts.len()));
 
-    // Validate each instruction's programs for security
+    // Step 8: Validate each instruction's programs for security
     for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
         let instruction_accounts = &ctx.remaining_accounts[range_start..range_end];
 
@@ -121,19 +128,20 @@ pub fn grant_permission(
         // First account in each instruction slice is the program ID
         let program_account = &instruction_accounts[0];
 
-        // Validate program is executable
+        // Validate program is executable (not a data account)
         if !program_account.executable {
             return Err(LazorKitError::ProgramNotExecutable.into());
         }
 
-        // Ensure program is not this program (prevent reentrancy)
+        // Prevent reentrancy attacks by blocking calls to this program
         if program_account.key() == crate::ID {
             return Err(LazorKitError::ReentrancyDetected.into());
         }
     }
 
-    // 7. Write ephemeral authorization
-    let authorization = &mut ctx.accounts.ephemeral_authorization;
+    // Step 9: Create the ephemeral permission account
+    // Store the authorization data for later use by execute_with_permission
+    let authorization = &mut ctx.accounts.permission;
     authorization.owner_wallet_address = ctx.accounts.smart_wallet.key();
     authorization.ephemeral_public_key = args.ephemeral_public_key;
     authorization.expires_at = args.expires_at;
@@ -143,7 +151,8 @@ pub fn grant_permission(
     authorization.instruction_data_hash = data_hash;
     authorization.accounts_metadata_hash = accounts_hash;
 
-    // 8. Increment nonce
+    // Step 10: Update wallet state
+    // Increment nonce to prevent replay attacks
     ctx.accounts.smart_wallet_data.last_nonce = ctx
         .accounts
         .smart_wallet_data
@@ -160,8 +169,8 @@ pub struct GrantPermission<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [ProgramConfig::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, ProgramConfig>>,
+    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
+    pub config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -197,12 +206,12 @@ pub struct GrantPermission<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + EphemeralAuthorization::INIT_SPACE,
-        seeds = [EphemeralAuthorization::PREFIX_SEED, smart_wallet.key().as_ref(), args.ephemeral_public_key.as_ref()],
+        space = 8 + Permission::INIT_SPACE,
+        seeds = [Permission::PREFIX_SEED, smart_wallet.key().as_ref(), args.ephemeral_public_key.as_ref()],
         bump,
         owner = ID,
     )]
-    pub ephemeral_authorization: Account<'info, EphemeralAuthorization>,
+    pub permission: Account<'info, Permission>,
 
     /// CHECK: instructions sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
