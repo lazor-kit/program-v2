@@ -11,7 +11,7 @@ pub enum LazorKitError {
     #[msg("Passkey public key mismatch with stored authenticator")]
     PasskeyMismatch,
     #[msg("Smart wallet address mismatch with authenticator")]
-    SmartWalletDataMismatch,
+    SmartWalletConfigMismatch,
 
     // === Signature Verification Errors ===
     #[msg("Secp256r1 instruction has invalid data length")]

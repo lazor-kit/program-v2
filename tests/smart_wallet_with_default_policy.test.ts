@@ -4,7 +4,8 @@ import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { base64, bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import {
-  buildCreateSessionMessage,
+  buildCreateChunkMessage,
+  buildExecuteMessage,
   DefaultPolicyClient,
   LazorkitClient,
 } from '../contract-integration';
@@ -28,12 +29,12 @@ describe('Test smart wallet with default policy', () => {
   before(async () => {
     // airdrop some SOL to the payer
 
-    const programConfig = await connection.getAccountInfo(
-      lazorkitProgram.programConfigPda()
+    const config = await connection.getAccountInfo(
+      lazorkitProgram.getConfigPubkey()
     );
 
-    if (programConfig === null) {
-      const ix = await lazorkitProgram.buildInitializeProgramInstruction(
+    if (config === null) {
+      const ix = await lazorkitProgram.buildInitializeProgramIns(
         payer.publicKey
       );
       const txn = new anchor.web3.Transaction().add(ix);
@@ -61,9 +62,9 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
-    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const walletDevice = lazorkitProgram.walletDevicePda(
+    const walletDevice = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
       passkeyPubkey
     );
@@ -71,7 +72,7 @@ describe('Test smart wallet with default policy', () => {
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTransaction({
+      await lazorkitProgram.createSmartWalletTxn({
         payer: payer.publicKey,
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
@@ -91,11 +92,11 @@ describe('Test smart wallet with default policy', () => {
 
     console.log('Create smart-wallet: ', sig);
 
-    const smartWalletData = await lazorkitProgram.getSmartWalletData(
+    const smartWalletConfig = await lazorkitProgram.getSmartWalletConfigData(
       smartWallet
     );
 
-    expect(smartWalletData.walletId.toString()).to.be.equal(
+    expect(smartWalletConfig.walletId.toString()).to.be.equal(
       smartWalletId.toString()
     );
 
@@ -120,17 +121,17 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
-    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
-    const walletDevice = lazorkitProgram.walletDevicePda(
+    const walletDevice = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
       passkeyPubkey
     );
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTransaction({
+      await lazorkitProgram.createSmartWalletTxn({
         payer: payer.publicKey,
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
@@ -160,7 +161,7 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
-    const plainMessage = buildCreateSessionMessage(
+    const plainMessage = buildExecuteMessage(
       smartWallet,
       new anchor.BN(0),
       new anchor.BN(Math.floor(Date.now() / 1000)),
@@ -173,20 +174,19 @@ describe('Test smart wallet with default policy', () => {
 
     const signature = privateKey.sign(message);
 
-    const executeDirectTransactionTxn =
-      await lazorkitProgram.createExecuteDirectTransaction({
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey,
-          signature64: signature,
-          clientDataJsonRaw64: clientDataJsonRaw64,
-          authenticatorDataRaw64: authenticatorDataRaw64,
-        },
-        policyInstruction: null,
-        cpiInstruction: transferFromSmartWalletIns,
-        vaultIndex: 0,
-      });
+    const executeDirectTransactionTxn = await lazorkitProgram.executeTxn({
+      payer: payer.publicKey,
+      smartWallet: smartWallet,
+      passkeySignature: {
+        passkeyPublicKey: passkeyPubkey,
+        signature64: signature,
+        clientDataJsonRaw64: clientDataJsonRaw64,
+        authenticatorDataRaw64: authenticatorDataRaw64,
+      },
+      policyInstruction: null,
+      cpiInstruction: transferFromSmartWalletIns,
+      vaultIndex: 0,
+    });
 
     executeDirectTransactionTxn.sign([payer]);
 
@@ -197,7 +197,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  it('Execute deferred transaction with transfer token from smart wallet', async () => {
+  it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -206,9 +206,9 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
-    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const walletDevice = lazorkitProgram.walletDevicePda(
+    const walletDevice = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
       passkeyPubkey
     );
@@ -216,7 +216,7 @@ describe('Test smart wallet with default policy', () => {
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTransaction({
+      await lazorkitProgram.createSmartWalletTxn({
         payer: payer.publicKey,
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
@@ -271,12 +271,13 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
-    const plainMessage = buildCreateSessionMessage(
+    const plainMessage = buildCreateChunkMessage(
       smartWallet,
       new anchor.BN(0),
       new anchor.BN(Math.floor(Date.now() / 1000)),
       checkPolicyIns,
-      [transferTokenIns]
+      [transferTokenIns],
+      new anchor.BN(Math.floor(Date.now() / 1000) + 1000)
     );
 
     const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
@@ -284,20 +285,19 @@ describe('Test smart wallet with default policy', () => {
 
     const signature = privateKey.sign(message);
 
-    const createDeferredExecutionTxn =
-      await lazorkitProgram.createDeferredExecutionTransaction({
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey,
-          signature64: signature,
-          clientDataJsonRaw64: clientDataJsonRaw64,
-          authenticatorDataRaw64: authenticatorDataRaw64,
-        },
-        policyInstruction: null,
-        expiresAt: Math.floor(Date.now() / 1000) + 1000,
-        vaultIndex: 0,
-      });
+    const createDeferredExecutionTxn = await lazorkitProgram.createChunkTxn({
+      payer: payer.publicKey,
+      smartWallet: smartWallet,
+      passkeySignature: {
+        passkeyPublicKey: passkeyPubkey,
+        signature64: signature,
+        clientDataJsonRaw64: clientDataJsonRaw64,
+        authenticatorDataRaw64: authenticatorDataRaw64,
+      },
+      policyInstruction: null,
+      expiresAt: Math.floor(Date.now() / 1000) + 1000,
+      vaultIndex: 0,
+    });
 
     createDeferredExecutionTxn.sign([payer]);
 
@@ -306,12 +306,13 @@ describe('Test smart wallet with default policy', () => {
 
     console.log('Create deferred execution: ', sig2);
 
-    const executeDeferredTransactionTxn =
-      await lazorkitProgram.createExecuteDeferredTransactionTransaction({
+    const executeDeferredTransactionTxn = await lazorkitProgram.executeChunkTxn(
+      {
         payer: payer.publicKey,
         smartWallet: smartWallet,
         cpiInstructions: [transferTokenIns],
-      });
+      }
+    );
 
     executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
@@ -331,9 +332,9 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
-    const smartWallet = lazorkitProgram.smartWalletPda(smartWalletId);
+    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const walletDevice = lazorkitProgram.walletDevicePda(
+    const walletDevice = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
       passkeyPubkey
     );
@@ -341,7 +342,7 @@ describe('Test smart wallet with default policy', () => {
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTransaction({
+      await lazorkitProgram.createSmartWalletTxn({
         payer: payer.publicKey,
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
@@ -402,12 +403,13 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
-    const plainMessage = buildCreateSessionMessage(
+    const plainMessage = buildCreateChunkMessage(
       smartWallet,
       new anchor.BN(0),
       new anchor.BN(Math.floor(Date.now() / 1000)),
       checkPolicyIns,
-      [transferTokenIns, transferFromSmartWalletIns]
+      [transferTokenIns, transferFromSmartWalletIns],
+      new anchor.BN(Math.floor(Date.now() / 1000) + 1000)
     );
 
     const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
@@ -415,20 +417,19 @@ describe('Test smart wallet with default policy', () => {
 
     const signature = privateKey.sign(message);
 
-    const createDeferredExecutionTxn =
-      await lazorkitProgram.createDeferredExecutionTransaction({
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey,
-          signature64: signature,
-          clientDataJsonRaw64: clientDataJsonRaw64,
-          authenticatorDataRaw64: authenticatorDataRaw64,
-        },
-        policyInstruction: null,
-        expiresAt: Math.floor(Date.now() / 1000) + 1000,
-        vaultIndex: 0,
-      });
+    const createDeferredExecutionTxn = await lazorkitProgram.createChunkTxn({
+      payer: payer.publicKey,
+      smartWallet: smartWallet,
+      passkeySignature: {
+        passkeyPublicKey: passkeyPubkey,
+        signature64: signature,
+        clientDataJsonRaw64: clientDataJsonRaw64,
+        authenticatorDataRaw64: authenticatorDataRaw64,
+      },
+      policyInstruction: null,
+      expiresAt: Math.floor(Date.now() / 1000) + 1000,
+      vaultIndex: 0,
+    });
 
     createDeferredExecutionTxn.sign([payer]);
 
@@ -437,12 +438,13 @@ describe('Test smart wallet with default policy', () => {
 
     console.log('Create deferred execution: ', sig2);
 
-    const executeDeferredTransactionTxn =
-      await lazorkitProgram.createExecuteDeferredTransactionTransaction({
+    const executeDeferredTransactionTxn = await lazorkitProgram.executeChunkTxn(
+      {
         payer: payer.publicKey,
         smartWallet: smartWallet,
         cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
-      });
+      }
+    );
 
     executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
@@ -477,8 +479,8 @@ describe('Test smart wallet with default policy', () => {
         authority: payer.publicKey,
         lookupTable: lookupTableAddress,
         addresses: [
-          lazorkitProgram.programConfigPda(),
-          lazorkitProgram.policyProgramRegistryPda(),
+          lazorkitProgram.getConfigPubkey(),
+          lazorkitProgram.getPolicyProgramRegistryPubkey(),
           lazorkitProgram.defaultPolicyProgram.programId,
           anchor.web3.SystemProgram.programId,
           anchor.web3.SYSVAR_RENT_PUBKEY,

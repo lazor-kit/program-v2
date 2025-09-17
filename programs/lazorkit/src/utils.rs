@@ -270,7 +270,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     );
     require!(
         device.smart_wallet_address == smart_wallet_key,
-        crate::error::LazorKitError::SmartWalletDataMismatch
+        crate::error::LazorKitError::SmartWalletConfigMismatch
     );
 
     // 2) locate the secp256r1 verify instruction

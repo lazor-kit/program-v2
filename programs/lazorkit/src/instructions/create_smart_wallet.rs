@@ -8,24 +8,24 @@ use crate::{
     error::LazorKitError,
     instructions::CreateSmartWalletArgs,
     security::validation,
-    state::{PolicyProgramRegistry, Config, SmartWalletData, WalletDevice},
+    state::{Config, PolicyProgramRegistry, SmartWalletConfig, WalletDevice},
     utils::{execute_cpi, PasskeyExt, PdaSigner},
     ID,
 };
 
 /// Create a new smart wallet with WebAuthn passkey authentication
-/// 
+///
 /// This function initializes a new smart wallet with the following steps:
 /// 1. Validates input parameters and program state
 /// 2. Creates the smart wallet data account
 /// 3. Creates the associated wallet device (passkey) account
 /// 4. Transfers initial SOL to the smart wallet
 /// 5. Executes the policy program initialization
-/// 
+///
 /// # Arguments
 /// * `ctx` - The instruction context containing all required accounts
 /// * `args` - The creation arguments including passkey, policy data, and wallet ID
-/// 
+///
 /// # Returns
 /// * `Result<()>` - Success if the wallet is created successfully
 pub fn create_smart_wallet(
@@ -35,7 +35,7 @@ pub fn create_smart_wallet(
     // Step 1: Validate global program state and input parameters
     // Ensure the program is not paused before processing wallet creation
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
-    
+
     // Validate all input parameters for security and correctness
     validation::validate_credential_id(&args.credential_id)?;
     validation::validate_policy_data(&args.policy_data)?;
@@ -54,7 +54,7 @@ pub fn create_smart_wallet(
     );
 
     // Step 2: Prepare account references and validate policy program
-    let wallet_data = &mut ctx.accounts.smart_wallet_data;
+    let wallet_data = &mut ctx.accounts.smart_wallet_config;
     let wallet_device = &mut ctx.accounts.wallet_device;
 
     // Ensure the default policy program is executable (not a data account)
@@ -62,7 +62,7 @@ pub fn create_smart_wallet(
 
     // Step 3: Initialize the smart wallet data account
     // This stores the core wallet state including policy program, nonce, and referral info
-    wallet_data.set_inner(SmartWalletData {
+    wallet_data.set_inner(SmartWalletConfig {
         policy_program_id: ctx.accounts.config.default_policy_program_id,
         wallet_id: args.wallet_id,
         last_nonce: 0, // Start with nonce 0 for replay attack prevention
@@ -115,7 +115,7 @@ pub fn create_smart_wallet(
 }
 
 /// Account structure for creating a new smart wallet
-/// 
+///
 /// This struct defines all the accounts required to create a new smart wallet,
 /// including validation constraints to ensure proper initialization and security.
 #[derive(Accounts)]
@@ -147,11 +147,11 @@ pub struct CreateSmartWallet<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + SmartWalletData::INIT_SPACE,
-        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        space = 8 + SmartWalletConfig::INIT_SPACE,
+        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
     /// Wallet device account that stores the passkey authentication data
     #[account(

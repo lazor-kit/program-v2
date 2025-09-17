@@ -4,67 +4,59 @@ import { Lazorkit } from './anchor/types/lazorkit';
 // ============================================================================
 // Account Types (from on-chain state)
 // ============================================================================
-export type SmartWalletData = anchor.IdlTypes<Lazorkit>['smartWalletData'];
+export type SmartWalletConfig = anchor.IdlTypes<Lazorkit>['smartWalletConfig'];
 export type WalletDevice = anchor.IdlTypes<Lazorkit>['walletDevice'];
-export type ProgramConfig = anchor.IdlTypes<Lazorkit>['programConfig'];
+export type ProgramConfig = anchor.IdlTypes<Lazorkit>['config'];
 export type PolicyProgramRegistry =
   anchor.IdlTypes<Lazorkit>['policyProgramRegistry'];
-export type TransactionSession =
-  anchor.IdlTypes<Lazorkit>['transactionSession'];
-export type EphemeralAuthorization =
-  anchor.IdlTypes<Lazorkit>['ephemeralAuthorization'];
+export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
+export type Permission = anchor.IdlTypes<Lazorkit>['permission'];
 
 // ============================================================================
 // Instruction Argument Types (from on-chain instructions)
 // ============================================================================
 export type CreateSmartWalletArgs =
   anchor.IdlTypes<Lazorkit>['createSmartWalletArgs'];
-export type ExecuteDirectTransactionArgs =
-  anchor.IdlTypes<Lazorkit>['executeDirectTransactionArgs'];
-export type UpdateWalletPolicyArgs =
-  anchor.IdlTypes<Lazorkit>['updateWalletPolicyArgs'];
-export type InvokeWalletPolicyArgs =
-  anchor.IdlTypes<Lazorkit>['invokeWalletPolicyArgs'];
-export type CreateDeferredExecutionArgs =
-  anchor.IdlTypes<Lazorkit>['createDeferredExecutionArgs'];
-export type AuthorizeEphemeralExecutionArgs =
-  anchor.IdlTypes<Lazorkit>['authorizeEphemeralExecutionArgs'];
-export type ExecuteEphemeralAuthorizationArgs =
-  anchor.IdlTypes<Lazorkit>['authorizeEphemeralExecutionArgs'];
+export type ExecuteArgs = anchor.IdlTypes<Lazorkit>['executeArgs'];
+export type ChangePolicyArgs = anchor.IdlTypes<Lazorkit>['changePolicyArgs'];
+export type CallPolicyArgs = anchor.IdlTypes<Lazorkit>['callPolicyArgs'];
+export type CreateChunkArgs = anchor.IdlTypes<Lazorkit>['createChunkArgs'];
+export type GrantPermissionArgs =
+  anchor.IdlTypes<Lazorkit>['grantPermissionArgs'];
 export type NewWalletDeviceArgs =
   anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
 
 // ============================================================================
 // Configuration Types
 // ============================================================================
-export type UpdateType = anchor.IdlTypes<Lazorkit>['configUpdateType'];
+export type UpdateType = anchor.IdlTypes<Lazorkit>['updateType'];
 
 // ============================================================================
 // Smart Wallet Action Types
 // ============================================================================
 export enum SmartWalletAction {
-  UpdateWalletPolicy = 'update_wallet_policy',
-  InvokeWalletPolicy = 'invoke_wallet_policy',
-  ExecuteDirectTransaction = 'execute_direct_transaction',
-  CreateDeferredExecution = 'create_deferred_execution',
-  ExecuteDeferredTransaction = 'execute_deferred_transaction',
-  AuthorizeEphemeralExecution = 'authorize_ephemeral_execution',
-  ExecuteEphemeralAuthorization = 'execute_ephemeral_authorization',
+  ChangePolicy = 'change_policy',
+  CallPolicy = 'call_policy',
+  Execute = 'execute',
+  CreateChunk = 'create_chunk',
+  ExecuteChunk = 'execute_chunk',
+  GrantPermission = 'grant_permission',
+  ExecuteWithPermission = 'execute_with_permission',
 }
 
 export type ArgsByAction = {
-  [SmartWalletAction.ExecuteDirectTransaction]: {
+  [SmartWalletAction.Execute]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstruction: anchor.web3.TransactionInstruction;
   };
-  [SmartWalletAction.InvokeWalletPolicy]: {
+  [SmartWalletAction.CallPolicy]: {
     policyInstruction: anchor.web3.TransactionInstruction;
     newWalletDevice: {
       passkeyPublicKey: number[];
       credentialIdBase64: string;
     } | null;
   };
-  [SmartWalletAction.UpdateWalletPolicy]: {
+  [SmartWalletAction.ChangePolicy]: {
     destroyPolicyIns: anchor.web3.TransactionInstruction;
     initPolicyIns: anchor.web3.TransactionInstruction;
     newWalletDevice: {
@@ -72,19 +64,20 @@ export type ArgsByAction = {
       credentialIdBase64: string;
     } | null;
   };
-  [SmartWalletAction.CreateDeferredExecution]: {
+  [SmartWalletAction.CreateChunk]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
+    cpiInstructions: anchor.web3.TransactionInstruction[];
     expiresAt: number;
   };
-  [SmartWalletAction.ExecuteDeferredTransaction]: {
+  [SmartWalletAction.ExecuteChunk]: {
     cpiInstructions: anchor.web3.TransactionInstruction[];
   };
-  [SmartWalletAction.AuthorizeEphemeralExecution]: {
+  [SmartWalletAction.GrantPermission]: {
     ephemeral_public_key: anchor.web3.PublicKey;
     expiresAt: number;
     cpiInstructions: anchor.web3.TransactionInstruction[];
   };
-  [SmartWalletAction.ExecuteEphemeralAuthorization]: {
+  [SmartWalletAction.ExecuteWithPermission]: {
     cpiInstructions: anchor.web3.TransactionInstruction[];
   };
 };
@@ -137,7 +130,7 @@ export interface CreateSmartWalletParams {
   amount: anchor.BN;
 }
 
-export interface ExecuteDirectTransactionParams {
+export interface ExecuteParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
@@ -146,7 +139,7 @@ export interface ExecuteDirectTransactionParams {
   vaultIndex?: number;
 }
 
-export interface InvokeWalletPolicyParams {
+export interface CallPolicyParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
@@ -155,7 +148,7 @@ export interface InvokeWalletPolicyParams {
   vaultIndex?: number;
 }
 
-export interface UpdateWalletPolicyParams {
+export interface ChangePolicyParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
@@ -165,7 +158,7 @@ export interface UpdateWalletPolicyParams {
   vaultIndex?: number;
 }
 
-export interface CreateDeferredExecutionParams {
+export interface CreateChunkParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
@@ -174,13 +167,13 @@ export interface CreateDeferredExecutionParams {
   vaultIndex?: number;
 }
 
-export interface ExecuteDeferredTransactionParams {
+export interface ExecuteChunkParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   cpiInstructions: anchor.web3.TransactionInstruction[];
 }
 
-export interface AuthorizeEphemeralExecutionParams {
+export interface GrantPermissionParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
@@ -190,10 +183,10 @@ export interface AuthorizeEphemeralExecutionParams {
   vaultIndex?: number;
 }
 
-export interface ExecuteEphemeralAuthorizationParams {
+export interface ExecuteWithPermissionParams {
   feePayer: anchor.web3.PublicKey;
   ephemeralSigner: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
-  ephemeralAuthorization: anchor.web3.PublicKey;
+  permission: anchor.web3.PublicKey;
   cpiInstructions: anchor.web3.TransactionInstruction[];
 }
