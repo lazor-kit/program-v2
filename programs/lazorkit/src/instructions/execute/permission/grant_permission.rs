@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::Hasher;
 
-use crate::instructions::AuthorizeEphemeralExecutionArgs;
+use crate::instructions::GrantPermissionArgs;
 use crate::security::validation;
 use crate::state::{
     AuthorizeEphemeralExecutionMessage, EphemeralAuthorization, ProgramConfig, SmartWalletData,
@@ -10,9 +10,9 @@ use crate::state::{
 use crate::utils::{verify_authorization, PasskeyExt};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
-pub fn authorize_ephemeral_execution(
-    ctx: Context<AuthorizeEphemeralExecution>,
-    args: AuthorizeEphemeralExecutionArgs,
+pub fn grant_permission(
+    ctx: Context<GrantPermission>,
+    args: GrantPermissionArgs,
 ) -> Result<()> {
     // 0. Validate
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
@@ -155,8 +155,8 @@ pub fn authorize_ephemeral_execution(
 }
 
 #[derive(Accounts)]
-#[instruction(args: AuthorizeEphemeralExecutionArgs)]
-pub struct AuthorizeEphemeralExecution<'info> {
+#[instruction(args: GrantPermissionArgs)]
+pub struct GrantPermission<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 

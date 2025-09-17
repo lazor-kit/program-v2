@@ -37,7 +37,7 @@ The core smart wallet program that handles:
 - `execute_transaction` - Execute transactions directly
 - `create_transaction_session` - Create session for complex transactions
 - `execute_session_transaction` - Execute session-based transactions
-- `register_policy_program` - Add programs to the policy registry
+- `add_policy_program` - Add programs to the policy registry
 - `update_config` - Update program configuration
 
 #### 2. Default Policy Program (`CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`)

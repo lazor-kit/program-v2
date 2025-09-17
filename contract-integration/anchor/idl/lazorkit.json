@@ -1037,7 +1037,7 @@
       ]
     },
     {
-      "name": "register_policy_program",
+      "name": "add_policy_program",
       "docs": ["Add a program to the policy program registry"],
       "discriminator": [15, 54, 85, 112, 89, 180, 121, 13],
       "accounts": [
@@ -1077,7 +1077,7 @@
       "args": []
     },
     {
-      "name": "update_program_config",
+      "name": "update_config",
       "docs": ["Update the program configuration"],
       "discriminator": [214, 3, 187, 98, 170, 106, 33, 45],
       "accounts": [
@@ -1107,7 +1107,7 @@
           "name": "param",
           "type": {
             "defined": {
-              "name": "ConfigUpdateType"
+              "name": "UpdateType"
             }
           }
         },
@@ -1828,7 +1828,7 @@
       }
     },
     {
-      "name": "ConfigUpdateType",
+      "name": "UpdateType",
       "type": {
         "kind": "enum",
         "variants": [

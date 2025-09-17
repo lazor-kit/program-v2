@@ -7,11 +7,10 @@ use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn execute_deferred_transaction(
-    ctx: Context<ExecuteDeferredTransaction>,
+pub fn execute_chunk(
+    ctx: Context<ExecuteChunk>,
     instruction_data_list: Vec<Vec<u8>>, // Multiple instruction data
     split_index: Vec<u8>,                // Split indices for accounts (n-1 for n instructions)
-    _vault_index: u8,    
 ) -> Result<()> {
     let cpi_accounts = &ctx.remaining_accounts[..];
 
@@ -170,8 +169,7 @@ pub fn execute_deferred_transaction(
 }
 
 #[derive(Accounts)]
-#[instruction(instruction_data_list: Vec<Vec<u8>>, split_index: Vec<u8>, vault_index: u8)]
-pub struct ExecuteDeferredTransaction<'info> {
+pub struct ExecuteChunk<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -201,7 +199,7 @@ pub struct ExecuteDeferredTransaction<'info> {
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
     #[account(
         mut,
-        seeds = [LazorKitVault::PREFIX_SEED, &vault_index.to_le_bytes()],
+        seeds = [LazorKitVault::PREFIX_SEED, &transaction_session.vault_index.to_le_bytes()],
         bump,
     )]
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault

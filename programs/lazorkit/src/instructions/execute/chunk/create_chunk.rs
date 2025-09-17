@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::CreateDeferredExecutionArgs;
+use crate::instructions::CreateChunkArgs;
 use crate::security::validation;
 use crate::state::{
-    ExecuteSessionMessage, PolicyProgramRegistry, ProgramConfig, SmartWalletData,
+    CreateChunkMessage, PolicyProgramRegistry, ProgramConfig, SmartWalletData,
     TransactionSession, WalletDevice,
 };
 use crate::utils::{
@@ -12,17 +12,17 @@ use crate::utils::{
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn create_deferred_execution(
-    ctx: Context<CreateDeferredExecution>,
-    args: CreateDeferredExecutionArgs,
+pub fn create_chunk(
+    ctx: Context<CreateChunk>,
+    args: CreateChunkArgs,
 ) -> Result<()> {
     // 0. Validate
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_policy_data(&args.policy_data)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
-    // 1. Authorization -> typed ExecuteMessage
-    let msg: ExecuteSessionMessage = verify_authorization::<ExecuteSessionMessage>(
+    // 1. Authorization -> typed CreateChunkMessage
+    let msg: CreateChunkMessage = verify_authorization::<CreateChunkMessage>(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -98,8 +98,8 @@ pub fn create_deferred_execution(
 }
 
 #[derive(Accounts)]
-#[instruction(args: CreateDeferredExecutionArgs)]
-pub struct CreateDeferredExecution<'info> {
+#[instruction(args: CreateChunkArgs)]
+pub struct CreateChunk<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 

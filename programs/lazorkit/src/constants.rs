@@ -1,12 +1,18 @@
 use anchor_lang::prelude::*;
 
-/// Program IDs
-pub const SECP256R1_ID: Pubkey = pubkey!("Secp256r1SigVerify1111111111111111111111111");
+/// LazorKit program constants and configuration values
+/// 
+/// This module contains all the constant values used throughout the LazorKit program,
+/// including program IDs, seed values, and size constraints.
 
-/// Seeds for PDA derivation
+/// Solana's built-in Secp256r1 signature verification program ID
+pub const SECP256R1_PROGRAM_ID: Pubkey = pubkey!("Secp256r1SigVerify1111111111111111111111111");
+
+/// Seed used for smart wallet PDA derivation
 pub const SMART_WALLET_SEED: &[u8] = b"smart_wallet";
 
-/// Size constants for account data
-pub const PASSKEY_SIZE: usize = 33; // Secp256r1 compressed pubkey size
+/// Size of a Secp256r1 compressed public key in bytes
+pub const PASSKEY_PUBLIC_KEY_SIZE: usize = 33;
 
-pub const EMPTY_PDA_FEE_RENT: u64 = 890880;
+/// Minimum rent-exempt balance for empty PDA accounts (in lamports)
+pub const EMPTY_PDA_RENT_EXEMPT_BALANCE: u64 = 890880;

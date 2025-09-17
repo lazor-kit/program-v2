@@ -3,8 +3,11 @@ use anchor_lang::{
     system_program::{transfer, Transfer},
 };
 
-/// Utility functions for LazorKit SOL vaults
+/// LazorKit SOL vault management utilities
+/// 
 /// Vaults are empty PDAs owned by the LazorKit program that hold SOL
+/// for fee distribution and protocol operations. The system supports
+/// up to 32 vault slots for efficient load distribution.
 pub struct LazorKitVault;
 
 impl LazorKitVault {
@@ -50,7 +53,7 @@ impl LazorKitVault {
         amount: u64,
     ) -> Result<()> {
         require!(
-            amount >= crate::constants::EMPTY_PDA_FEE_RENT,
+            amount >= crate::constants::EMPTY_PDA_RENT_EXEMPT_BALANCE,
             crate::error::LazorKitError::InsufficientBalanceForFee
         );
 
@@ -77,7 +80,7 @@ impl LazorKitVault {
         bump: u8,
     ) -> Result<()> {
         require!(
-            vault.lamports() >= amount + crate::constants::EMPTY_PDA_FEE_RENT,
+            vault.lamports() >= amount + crate::constants::EMPTY_PDA_RENT_EXEMPT_BALANCE,
             crate::error::LazorKitError::InsufficientVaultBalance
         );
 

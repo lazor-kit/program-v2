@@ -13,6 +13,21 @@ use crate::{
     ID,
 };
 
+/// Create a new smart wallet with WebAuthn passkey authentication
+/// 
+/// This function initializes a new smart wallet with the following steps:
+/// 1. Validates input parameters and program state
+/// 2. Creates the smart wallet data account
+/// 3. Creates the associated wallet device (passkey) account
+/// 4. Transfers initial SOL to the smart wallet
+/// 5. Executes the policy program initialization
+/// 
+/// # Arguments
+/// * `ctx` - The instruction context containing all required accounts
+/// * `args` - The creation arguments including passkey, policy data, and wallet ID
+/// 
+/// # Returns
+/// * `Result<()>` - Success if the wallet is created successfully
 pub fn create_smart_wallet(
     ctx: Context<CreateSmartWallet>,
     args: CreateSmartWalletArgs,
@@ -92,13 +107,18 @@ pub fn create_smart_wallet(
     Ok(())
 }
 
+/// Account structure for creating a new smart wallet
+/// 
+/// This struct defines all the accounts required to create a new smart wallet,
+/// including validation constraints to ensure proper initialization and security.
 #[derive(Accounts)]
 #[instruction(args: CreateSmartWalletArgs)]
 pub struct CreateSmartWallet<'info> {
+    /// The account that pays for the wallet creation and initial SOL transfer
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// Policy program registry
+    /// Policy program registry that validates the default policy program
     #[account(
         seeds = [PolicyProgramRegistry::PREFIX_SEED],
         bump,
@@ -107,7 +127,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub policy_program_registry: Account<'info, PolicyProgramRegistry>,
 
-    /// The smart wallet address PDA being created with random ID
+    /// The smart wallet address PDA being created with the provided wallet ID
     #[account(
         mut,
         seeds = [SMART_WALLET_SEED, args.wallet_id.to_le_bytes().as_ref()],
@@ -116,7 +136,7 @@ pub struct CreateSmartWallet<'info> {
     /// CHECK: This account is only used for its public key and seeds.
     pub smart_wallet: SystemAccount<'info>,
 
-    /// Smart wallet data
+    /// Smart wallet data account that stores wallet state and configuration
     #[account(
         init,
         payer = payer,
@@ -126,7 +146,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
 
-    /// Wallet device for the passkey
+    /// Wallet device account that stores the passkey authentication data
     #[account(
         init,
         payer = payer,
@@ -140,7 +160,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    /// Program configuration
+    /// Program configuration account containing global settings
     #[account(
         seeds = [ProgramConfig::PREFIX_SEED],
         bump,
@@ -148,7 +168,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub config: Box<Account<'info, ProgramConfig>>,
 
-    /// Default policy program for the smart wallet
+    /// Default policy program that will govern this smart wallet's transactions
     #[account(
         address = config.default_policy_program_id,
         executable,
@@ -157,5 +177,6 @@ pub struct CreateSmartWallet<'info> {
     /// CHECK: Validated to be executable and in registry
     pub default_policy_program: UncheckedAccount<'info>,
 
+    /// System program for account creation and SOL transfers
     pub system_program: Program<'info, System>,
 }

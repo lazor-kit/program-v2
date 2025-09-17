@@ -2,38 +2,38 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{ConfigUpdateType, ProgramConfig},
+    state::{UpdateType, ProgramConfig},
 };
 
-pub fn update_program_config(
-    ctx: Context<UpdateProgramConfig>,
-    param: ConfigUpdateType,
+pub fn update_config(
+    ctx: Context<UpdateConfig>,
+    param: UpdateType,
     value: u64,
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
 
     match param {
-        ConfigUpdateType::CreateWalletFee => {
+        UpdateType::CreateWalletFee => {
             // Validate fee is reasonable (max 1 SOL)
             require!(value <= 1_000_000_000, LazorKitError::InvalidFeeAmount);
             config.create_smart_wallet_fee = value;
         }
-        ConfigUpdateType::FeePayerFee => {
+        UpdateType::FeePayerFee => {
             // Validate fee is reasonable (max 0.1 SOL)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.fee_payer_fee = value;
         }
-        ConfigUpdateType::ReferralFee => {
+        UpdateType::ReferralFee => {
             // Validate fee is reasonable (max 0.1 SOL)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.referral_fee = value;
         }
-        ConfigUpdateType::LazorkitFee => {
+        UpdateType::LazorkitFee => {
             // Validate fee is reasonable (max 0.1 SOL)
             require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
             config.lazorkit_fee = value;
         }
-        ConfigUpdateType::DefaultPolicyProgram => {
+        UpdateType::DefaultPolicyProgram => {
             let new_default_policy_program_info = ctx
                 .remaining_accounts
                 .first()
@@ -46,7 +46,7 @@ pub fn update_program_config(
 
             config.default_policy_program_id = new_default_policy_program_info.key();
         }
-        ConfigUpdateType::Admin => {
+        UpdateType::Admin => {
             let new_admin_info = ctx
                 .remaining_accounts
                 .first()
@@ -61,11 +61,11 @@ pub fn update_program_config(
 
             config.authority = new_admin_info.key();
         }
-        ConfigUpdateType::PauseProgram => {
+        UpdateType::PauseProgram => {
             require!(!config.is_paused, LazorKitError::ProgramPaused);
             config.is_paused = true;
         }
-        ConfigUpdateType::UnpauseProgram => {
+        UpdateType::UnpauseProgram => {
             require!(config.is_paused, LazorKitError::InvalidAccountState);
             config.is_paused = false;
         }
@@ -74,7 +74,7 @@ pub fn update_program_config(
 }
 
 #[derive(Accounts)]
-pub struct UpdateProgramConfig<'info> {
+pub struct UpdateConfig<'info> {
     /// The current authority of the program.
     #[account(
         mut,

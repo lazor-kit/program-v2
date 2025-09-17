@@ -37,7 +37,7 @@ export type NewWalletDeviceArgs =
 // ============================================================================
 // Configuration Types
 // ============================================================================
-export type ConfigUpdateType = anchor.IdlTypes<Lazorkit>['configUpdateType'];
+export type UpdateType = anchor.IdlTypes<Lazorkit>['configUpdateType'];
 
 // ============================================================================
 // Smart Wallet Action Types

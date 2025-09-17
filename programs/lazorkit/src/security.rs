@@ -1,30 +1,39 @@
 use anchor_lang::prelude::*;
 
-// Security constants and validation utilities
+/// LazorKit security constants and validation utilities
+/// 
+/// This module contains all security-related constants and validation functions
+/// used throughout the LazorKit program to ensure safe operation and prevent
+/// various attack vectors including DoS, overflow, and unauthorized access.
 
-/// Maximum allowed size for credential ID to prevent DoS
+// === Size Limits ===
+/// Maximum allowed size for credential ID to prevent DoS attacks
 pub const MAX_CREDENTIAL_ID_SIZE: usize = 256;
 
-/// Maximum allowed size for policy data
+/// Maximum allowed size for policy data to prevent excessive memory usage
 pub const MAX_POLICY_DATA_SIZE: usize = 1024;
 
-/// Maximum allowed size for CPI data
+/// Maximum allowed size for CPI data to prevent resource exhaustion
 pub const MAX_CPI_DATA_SIZE: usize = 1024;
 
-/// Maximum allowed remaining accounts
+/// Maximum allowed remaining accounts to prevent account exhaustion
 pub const MAX_REMAINING_ACCOUNTS: usize = 32;
 
-/// Minimum rent-exempt balance buffer (in lamports)
+// === Financial Limits ===
+/// Minimum rent-exempt balance buffer (in lamports) to ensure account viability
 pub const MIN_RENT_EXEMPT_BUFFER: u64 = 1_000_000; // 0.001 SOL
 
-/// Maximum transaction age in seconds
+// === Time-based Security ===
+/// Maximum transaction age in seconds to prevent replay attacks
 pub const MAX_TRANSACTION_AGE: i64 = 300; // 5 minutes
 
-/// Maximum allowed session TTL in seconds
+/// Maximum allowed session TTL in seconds for deferred execution
 pub const MAX_SESSION_TTL_SECONDS: i64 = 30; // 30 seconds
 
-/// Rate limiting parameters
+// === Rate Limiting ===
+/// Maximum transactions per block to prevent spam
 pub const MAX_TRANSACTIONS_PER_BLOCK: u8 = 5;
+/// Rate limiting window in blocks
 pub const RATE_LIMIT_WINDOW_BLOCKS: u64 = 10;
 
 /// Security validation functions

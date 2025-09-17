@@ -1,6 +1,10 @@
 use anchor_lang::error_code;
 
-/// Custom errors for the Lazor Kit program
+/// Comprehensive error definitions for the LazorKit smart wallet program
+/// 
+/// This enum defines all possible error conditions that can occur during
+/// smart wallet operations, providing clear error messages for debugging
+/// and user feedback.
 #[error_code]
 pub enum LazorKitError {
     // === Authentication & Passkey Errors ===
