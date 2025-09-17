@@ -40,7 +40,7 @@ The core smart wallet program that handles:
 - `add_policy_program` - Add programs to the policy registry
 - `update_config` - Update program configuration
 
-#### 2. Default Policy Program (`CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE`)
+#### 2. Default Policy Program (`7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381`)
 
 A reference implementation of transaction policies that provides:
 
@@ -120,20 +120,20 @@ anchor deploy --provider.cluster devnet --program-name default_policy
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl init -f ./target/idl/lazorkit.json J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W
+anchor idl init -f ./target/idl/lazorkit.json G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ
 
 # Initialize IDL for Default Policy
-anchor idl init -f ./target/idl/default_policy.json CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE
+anchor idl init -f ./target/idl/default_policy.json 7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381
 ```
 
 ### Upgrade IDL
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl upgrade J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W -f ./target/idl/lazorkit.json
+anchor idl upgrade G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ -f ./target/idl/lazorkit.json
 
 # Initialize IDL for Default Policy
-anchor idl upgrade CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE -f ./target/idl/default_policy.json
+anchor idl upgrade 7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381 -f ./target/idl/default_policy.json
 ```
 
 ## SDK Usage
@@ -325,8 +325,8 @@ The test suite includes:
 
 | Program        | Devnet                                         | Mainnet                                        |
 | -------------- | ---------------------------------------------- | ---------------------------------------------- |
-| LazorKit       | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` | `J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W` |
-| Default Policy | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` | `CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE` |
+| LazorKit       | `G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ` | `G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ` |
+| Default Policy | `7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381` | `7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381` |
 
 ## Address Lookup Table
 

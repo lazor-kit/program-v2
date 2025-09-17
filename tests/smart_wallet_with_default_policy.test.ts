@@ -53,7 +53,7 @@ describe('Test smart wallet with default policy', () => {
     }
   });
 
-  xit('Init smart wallet with default policy successfully', async () => {
+  it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();

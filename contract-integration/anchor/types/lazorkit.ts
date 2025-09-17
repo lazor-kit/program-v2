@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/lazorkit.json`.
  */
 export type Lazorkit = {
-  address: 'J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W';
+  address: 'G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ';
   metadata: {
     name: 'lazorkit';
     version: '0.1.0';

@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { LazorkitClient } from '../contract-integration';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 dotenv.config();
 
 describe('Test smart wallet with default policy', () => {
@@ -49,7 +50,7 @@ describe('Test smart wallet with default policy', () => {
       const txn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
-        amount: new anchor.BN(1000000000),
+        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL),
         destination: payer.publicKey,
         vaultIndex: 0,
       });
@@ -66,7 +67,7 @@ describe('Test smart wallet with default policy', () => {
       const txn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
-        amount: new anchor.BN(10000),
+        amount: new anchor.BN(1000),
         destination: payer.publicKey,
         vaultIndex: lazorkitProgram.generateVaultIndex(),
       });
@@ -86,7 +87,7 @@ describe('Test smart wallet with default policy', () => {
       const depositTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
-        amount: new anchor.BN(1000000000),
+        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL),
         destination: payer.publicKey,
         vaultIndex: vaultIndex,
       });
@@ -117,7 +118,7 @@ describe('Test smart wallet with default policy', () => {
       const depositTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
-        amount: new anchor.BN(1000000000),
+        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL),
         destination: payer.publicKey,
         vaultIndex: vaultIndex,
       });
@@ -130,7 +131,7 @@ describe('Test smart wallet with default policy', () => {
       const withdrawTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'withdraw',
-        amount: new anchor.BN(1000000000),
+        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL - 1000),
         destination: payer.publicKey,
         vaultIndex: vaultIndex,
       });
