@@ -31,7 +31,7 @@ const client = new LazorkitClient(connection);
 
 // Create a smart wallet
 const { transaction, smartWalletId, smartWallet } =
-  await client.createSmartWalletTransaction({
+  await client.createSmartWalletTxn({
     payer: payer.publicKey,
     passkeyPubkey: [
       /* 33 bytes */
@@ -51,10 +51,10 @@ The main client for interacting with the LazorKit program.
 
 **Key Methods:**
 
-- **PDA Derivation**: `programConfigPda()`, `smartWalletPda()`, `walletDevicePda()`, etc.
-- **Account Data**: `getSmartWalletData()`, `getWalletDeviceData()`, etc.
-- **Low-level Builders**: `buildCreateSmartWalletInstruction()`, `buildExecuteTransactionInstruction()`, etc.
-- **High-level Builders**: `createSmartWalletTransaction()`, `executeTransactionWithAuth()`, etc.
+- **PDA Derivation**: `getConfigPubkey()`, `getSmartWalletPubkey()`, `getWalletDevicePubkey()`, etc.
+- **Account Data**: `getSmartWalletConfigData()`, `getWalletDeviceData()`, etc.
+- **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, etc.
+- **High-level Builders**: `createSmartWalletTxn()`, `executeTransactionWithAuth()`, etc.
 
 #### `DefaultPolicyClient`
 
@@ -156,22 +156,22 @@ interface ExecuteTransactionParams {
 
 Methods that build individual instructions:
 
-- `buildCreateSmartWalletInstruction()`
-- `buildExecuteTransactionInstruction()`
+- `buildCreateSmartWalletIns()`
+- `buildExecuteIns()`
 - `buildInvokePolicyInstruction()`
 - `buildUpdatePolicyInstruction()`
-- `buildCreateTransactionSessionInstruction()`
+- `buildCreateChunkInstruction()`
 - `buildExecuteSessionTransactionInstruction()`
 
 #### High-Level Transaction Builders
 
 Methods that build complete transactions with authentication:
 
-- `createSmartWalletTransaction()`
+- `createSmartWalletTxn()`
 - `executeTransactionWithAuth()`
 - `invokePolicyWithAuth()`
 - `updatePolicyWithAuth()`
-- `createTransactionSessionWithAuth()`
+- `createChunkWithAuth()`
 - `executeSessionTransaction()`
 
 #### Utility Methods
@@ -179,7 +179,7 @@ Methods that build complete transactions with authentication:
 Helper methods for common operations:
 
 - `generateWalletId()`
-- `getSmartWalletData()`
+- `getSmartWalletConfigData()`
 - `buildAuthorizationMessage()`
 - `getSmartWalletByPasskey()`
 
@@ -203,7 +203,7 @@ await client.createSmartWalletTx({
 **New:**
 
 ```typescript
-await client.createSmartWalletTransaction({
+await client.createSmartWalletTxn({
   payer: payer.publicKey,
   passkeyPubkey: [
     /* bytes */
@@ -220,7 +220,7 @@ await client.createSmartWalletTransaction({
    - `executeTxnDirectTx` → `executeTransactionWithAuth`
    - `callRuleDirectTx` → `invokePolicyWithAuth`
    - `changeRuleDirectTx` → `updatePolicyWithAuth`
-   - `commitCpiTx` → `createTransactionSessionWithAuth`
+   - `commitCpiTx` → `createChunkWithAuth`
    - `executeCommitedTx` → `executeSessionTransaction`
 
 2. **Parameter Structure**: Better organized with typed interfaces
@@ -256,7 +256,7 @@ The integration includes comprehensive type safety and can be tested with:
 // Test smart wallet creation
 it('should create smart wallet successfully', async () => {
   const { transaction, smartWalletId, smartWallet } =
-    await client.createSmartWalletTransaction({
+    await client.createSmartWalletTxn({
       payer: payer.publicKey,
       passkeyPubkey: [
         /* test bytes */
@@ -283,7 +283,7 @@ it('should create smart wallet successfully', async () => {
 
 ```typescript
 const { transaction, smartWalletId, smartWallet } =
-  await client.createSmartWalletTransaction({
+  await client.createSmartWalletTxn({
     payer: payer.publicKey,
     passkeyPubkey: [
       /* 33 bytes */
@@ -315,7 +315,7 @@ const transaction = await client.executeTransactionWithAuth({
 ### Creating a Transaction Session
 
 ```typescript
-const sessionTx = await client.createTransactionSessionWithAuth({
+const sessionTx = await client.createChunkWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {

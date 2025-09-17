@@ -7,13 +7,81 @@
     "description": "Created with Anchor"
   },
   "docs": [
-    "The Lazor Kit program provides smart wallet functionality with passkey authentication"
+    "LazorKit: Enterprise Smart Wallet with WebAuthn Passkey Authentication",
+    "",
+    "LazorKit is a comprehensive smart wallet solution that enables secure, user-friendly",
+    "transaction execution using WebAuthn passkey authentication. The program provides:",
+    "",
+    "- **Passkey-based Authentication**: Secure transaction signing using WebAuthn standards",
+    "- **Policy-driven Security**: Configurable transaction validation through policy programs",
+    "- **Chunked Transactions**: Support for large transactions via chunked execution",
+    "- **Permission System**: Ephemeral key grants for enhanced user experience",
+    "- **Vault Management**: Multi-slot fee distribution and SOL management",
+    "- **Admin Controls**: Program configuration and policy program registration",
+    "",
+    "The program is designed for enterprise use cases requiring high security, scalability,",
+    "and user experience while maintaining compatibility with existing Solana infrastructure."
   ],
   "instructions": [
     {
-      "name": "authorize_ephemeral_execution",
-      "docs": ["Authorize ephemeral execution for temporary program access"],
-      "discriminator": [220, 152, 90, 147, 146, 90, 72, 115],
+      "name": "add_policy_program",
+      "docs": [
+        "Register a new policy program in the whitelist",
+        "",
+        "Allows the program authority to add new policy programs to the registry.",
+        "These policy programs can then be used by smart wallets for transaction",
+        "validation and security enforcement."
+      ],
+      "discriminator": [172, 91, 65, 142, 231, 42, 251, 227],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["config"]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy_program_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_policy_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "call_policy",
+      "docs": [
+        "Execute policy program instructions",
+        "",
+        "Calls the policy program to perform operations like adding/removing devices",
+        "or other policy-specific actions. Requires proper passkey authentication",
+        "and validates the policy program is registered."
+      ],
+      "discriminator": [57, 50, 158, 108, 226, 148, 41, 221],
       "accounts": [
         {
           "name": "payer",
@@ -44,14 +112,14 @@
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
               }
             ]
           }
         },
         {
-          "name": "smart_wallet_data",
+          "name": "smart_wallet_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -59,7 +127,7 @@
                 "kind": "const",
                 "value": [
                   115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  99, 111, 110, 102, 105, 103
                 ]
               },
               {
@@ -70,46 +138,47 @@
           }
         },
         {
-          "name": "wallet_device",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              },
-              {
-                "kind": "arg",
-                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
-              }
-            ]
-          }
+          "name": "referral",
+          "writable": true
         },
         {
-          "name": "ephemeral_authorization",
-          "docs": ["New ephemeral authorization account (rent payer: payer)"],
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  101, 112, 104, 101, 109, 101, 114, 97, 108, 95, 97, 117, 116,
-                  104, 111, 114, 105, 122, 97, 116, 105, 111, 110
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  116
                 ]
               },
               {
-                "kind": "account",
-                "path": "smart_wallet"
-              },
-              {
                 "kind": "arg",
-                "path": "args.ephemeral_public_key"
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device"
+        },
+        {
+          "name": "policy_program"
+        },
+        {
+          "name": "policy_program_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
+                ]
               }
             ]
           }
@@ -128,15 +197,22 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "AuthorizeEphemeralExecutionArgs"
+              "name": "CallPolicyArgs"
             }
           }
         }
       ]
     },
     {
-      "name": "create_deferred_execution",
-      "discriminator": [78, 46, 57, 47, 157, 183, 68, 164],
+      "name": "change_policy",
+      "docs": [
+        "Change the policy program for a smart wallet",
+        "",
+        "Allows changing the policy program that governs a smart wallet's transaction",
+        "validation rules. Requires proper passkey authentication and validates that",
+        "the new policy program is registered in the whitelist."
+      ],
+      "discriminator": [105, 129, 139, 210, 10, 152, 183, 3],
       "accounts": [
         {
           "name": "payer",
@@ -167,14 +243,14 @@
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
               }
             ]
           }
         },
         {
-          "name": "smart_wallet_data",
+          "name": "smart_wallet_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -182,7 +258,142 @@
                 "kind": "const",
                 "value": [
                   115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  99, 111, 110, 102, 105, 103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device"
+        },
+        {
+          "name": "old_policy_program"
+        },
+        {
+          "name": "new_policy_program"
+        },
+        {
+          "name": "policy_program_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
+                  114, 121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "docs": ["CHECK"],
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ChangePolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_chunk",
+      "docs": [
+        "Create a chunk buffer for large transactions",
+        "",
+        "Creates a buffer for chunked transactions when the main execute transaction",
+        "exceeds size limits. Splits large transactions into smaller, manageable",
+        "chunks that can be processed separately while maintaining security."
+      ],
+      "discriminator": [83, 226, 15, 219, 9, 19, 186, 90],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  99, 111, 110, 102, 105, 103
                 ]
               },
               {
@@ -234,17 +445,14 @@
           ]
         },
         {
-          "name": "transaction_session",
+          "name": "chunk",
           "docs": ["New transaction session account (rent payer: payer)"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
-                  101, 115, 115, 105, 111, 110
-                ]
+                "value": [99, 104, 117, 110, 107]
               },
               {
                 "kind": "account",
@@ -252,8 +460,8 @@
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.last_nonce",
-                "account": "SmartWalletData"
+                "path": "smart_wallet_config.last_nonce",
+                "account": "SmartWalletConfig"
               }
             ]
           }
@@ -272,7 +480,7 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "CreateDeferredExecutionArgs"
+              "name": "CreateChunkArgs"
             }
           }
         }
@@ -280,17 +488,28 @@
     },
     {
       "name": "create_smart_wallet",
-      "docs": ["Create a new smart wallet with passkey authentication"],
+      "docs": [
+        "Create a new smart wallet with WebAuthn passkey authentication",
+        "",
+        "Creates a new smart wallet account with associated passkey device for secure",
+        "authentication. The wallet is initialized with the specified policy program",
+        "for transaction validation and can receive initial SOL funding."
+      ],
       "discriminator": [129, 39, 235, 18, 132, 68, 203, 19],
       "accounts": [
         {
           "name": "payer",
+          "docs": [
+            "The account that pays for the wallet creation and initial SOL transfer"
+          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "policy_program_registry",
-          "docs": ["Policy program registry"],
+          "docs": [
+            "Policy program registry that validates the default policy program"
+          ],
           "pda": {
             "seeds": [
               {
@@ -305,7 +524,9 @@
         },
         {
           "name": "smart_wallet",
-          "docs": ["The smart wallet address PDA being created with random ID"],
+          "docs": [
+            "The smart wallet address PDA being created with the provided wallet ID"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -323,8 +544,10 @@
           }
         },
         {
-          "name": "smart_wallet_data",
-          "docs": ["Smart wallet data"],
+          "name": "smart_wallet_config",
+          "docs": [
+            "Smart wallet data account that stores wallet state and configuration"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -332,7 +555,7 @@
                 "kind": "const",
                 "value": [
                   115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  99, 111, 110, 102, 105, 103
                 ]
               },
               {
@@ -344,7 +567,9 @@
         },
         {
           "name": "wallet_device",
-          "docs": ["Wallet device for the passkey"],
+          "docs": [
+            "Wallet device account that stores the passkey authentication data"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -367,7 +592,7 @@
         },
         {
           "name": "config",
-          "docs": ["Program configuration"],
+          "docs": ["Program configuration account containing global settings"],
           "pda": {
             "seeds": [
               {
@@ -379,10 +604,13 @@
         },
         {
           "name": "default_policy_program",
-          "docs": ["Default policy program for the smart wallet"]
+          "docs": [
+            "Default policy program that will govern this smart wallet's transactions"
+          ]
         },
         {
           "name": "system_program",
+          "docs": ["System program for account creation and SOL transfers"],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -398,145 +626,15 @@
       ]
     },
     {
-      "name": "execute_deferred_transaction",
-      "discriminator": [165, 130, 174, 92, 162, 205, 131, 241],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet_data",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "vault_index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "transaction_session",
-          "docs": [
-            "Transaction session to execute. Closed on success to refund rent."
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 95, 115,
-                  101, 115, 115, 105, 111, 110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              },
-              {
-                "kind": "account",
-                "path": "transaction_session.authorized_nonce",
-                "account": "TransactionSession"
-              }
-            ]
-          }
-        },
-        {
-          "name": "session_refund",
-          "writable": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
+      "name": "execute",
+      "docs": [
+        "Execute a transaction through the smart wallet",
+        "",
+        "The main transaction execution function that validates the transaction through",
+        "the policy program before executing the target program instruction. Supports",
+        "complex multi-instruction transactions with proper authentication."
       ],
-      "args": [
-        {
-          "name": "instruction_data_list",
-          "type": {
-            "vec": "bytes"
-          }
-        },
-        {
-          "name": "split_index",
-          "type": "bytes"
-        },
-        {
-          "name": "vault_index",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "execute_direct_transaction",
-      "discriminator": [133, 33, 175, 46, 56, 92, 169, 220],
+      "discriminator": [130, 221, 242, 154, 13, 193, 189, 29],
       "accounts": [
         {
           "name": "payer",
@@ -556,14 +654,14 @@
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
               }
             ]
           }
         },
         {
-          "name": "smart_wallet_data",
+          "name": "smart_wallet_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -571,7 +669,7 @@
                 "kind": "const",
                 "value": [
                   115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  99, 111, 110, 102, 105, 103
                 ]
               },
               {
@@ -655,16 +753,160 @@
           "name": "args",
           "type": {
             "defined": {
-              "name": "ExecuteDirectTransactionArgs"
+              "name": "ExecuteArgs"
             }
           }
         }
       ]
     },
     {
-      "name": "execute_ephemeral_authorization",
-      "docs": ["Execute transactions using ephemeral authorization"],
-      "discriminator": [34, 195, 199, 141, 192, 147, 156, 14],
+      "name": "execute_chunk",
+      "docs": [
+        "Execute a chunk from the chunk buffer",
+        "",
+        "Executes a chunk from the previously created buffer. Used when the main",
+        "execute transaction is too large and needs to be split into smaller,",
+        "manageable pieces for processing."
+      ],
+      "discriminator": [106, 83, 113, 47, 89, 243, 39, 220],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  99, 111, 110, 102, 105, 103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkit_vault",
+          "docs": [
+            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "chunk.vault_index",
+                "account": "Chunk"
+              }
+            ]
+          }
+        },
+        {
+          "name": "chunk",
+          "docs": [
+            "Transaction session to execute. Closed on success to refund rent."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 104, 117, 110, 107]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "account",
+                "path": "chunk.authorized_nonce",
+                "account": "Chunk"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_refund",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "instruction_data_list",
+          "type": {
+            "vec": "bytes"
+          }
+        },
+        {
+          "name": "split_index",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "execute_with_permission",
+      "docs": [
+        "Execute transactions using ephemeral permission",
+        "",
+        "Executes transactions using a previously granted ephemeral key, allowing",
+        "multiple operations without repeated passkey authentication. Perfect for",
+        "games or applications that require frequent interactions with the wallet."
+      ],
+      "discriminator": [213, 159, 47, 243, 150, 206, 78, 67],
       "accounts": [
         {
           "name": "fee_payer",
@@ -701,14 +943,14 @@
               },
               {
                 "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
               }
             ]
           }
         },
         {
-          "name": "smart_wallet_data",
+          "name": "smart_wallet_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -716,7 +958,7 @@
                 "kind": "const",
                 "value": [
                   115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
+                  99, 111, 110, 102, 105, 103
                 ]
               },
               {
@@ -746,14 +988,15 @@
                 ]
               },
               {
-                "kind": "arg",
-                "path": "vault_index"
+                "kind": "account",
+                "path": "permission.vault_index",
+                "account": "Permission"
               }
             ]
           }
         },
         {
-          "name": "ephemeral_authorization",
+          "name": "permission",
           "docs": [
             "Ephemeral authorization to execute. Closed on success to refund rent."
           ],
@@ -778,16 +1021,145 @@
         {
           "name": "split_index",
           "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "grant_permission",
+      "docs": [
+        "Grant ephemeral permission to a keypair",
+        "",
+        "Grants time-limited permission to an ephemeral keypair to interact with",
+        "the smart wallet. Ideal for games or applications that need to perform",
+        "multiple operations without repeatedly authenticating with passkey."
+      ],
+      "discriminator": [50, 6, 1, 242, 15, 73, 99, 164],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "vault_index",
-          "type": "u8"
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
+                  99, 111, 110, 102, 105, 103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "permission",
+          "docs": ["New ephemeral authorization account (rent payer: payer)"],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 101, 114, 109, 105, 115, 115, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.ephemeral_public_key"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "GrantPermissionArgs"
+            }
+          }
         }
       ]
     },
     {
       "name": "initialize_program",
-      "docs": ["Initialize the program by creating the sequence tracker"],
+      "docs": [
+        "Initialize the LazorKit program with essential configuration",
+        "",
+        "Sets up the program's initial state including the sequence tracker for transaction",
+        "ordering and default configuration parameters. This must be called before any",
+        "other operations can be performed."
+      ],
       "discriminator": [176, 107, 205, 168, 24, 157, 175, 103],
       "accounts": [
         {
@@ -844,132 +1216,13 @@
       "args": []
     },
     {
-      "name": "invoke_wallet_policy",
-      "discriminator": [86, 172, 240, 211, 83, 157, 165, 98],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet_data",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "wallet_device"
-        },
-        {
-          "name": "policy_program"
-        },
-        {
-          "name": "policy_program_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "ix_sysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "InvokeWalletPolicyArgs"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "manage_vault",
-      "docs": ["Withdraw SOL from vault"],
+      "docs": [
+        "Manage SOL transfers in the vault system",
+        "",
+        "Handles SOL transfers to and from the LazorKit vault system, supporting",
+        "multiple vault slots for efficient fee distribution and program operations."
+      ],
       "discriminator": [165, 7, 106, 242, 73, 193, 195, 128],
       "accounts": [
         {
@@ -1037,49 +1290,15 @@
       ]
     },
     {
-      "name": "add_policy_program",
-      "docs": ["Add a program to the policy program registry"],
-      "discriminator": [15, 54, 85, 112, 89, 180, 121, 13],
-      "accounts": [
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true,
-          "relations": ["config"]
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
-              }
-            ]
-          }
-        },
-        {
-          "name": "policy_program_registry",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
-                ]
-              }
-            ]
-          }
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "update_config",
-      "docs": ["Update the program configuration"],
-      "discriminator": [214, 3, 187, 98, 170, 106, 33, 45],
+      "docs": [
+        "Update program configuration settings",
+        "",
+        "Allows the program authority to modify critical configuration parameters including",
+        "fee structures, default policy programs, and operational settings. This function",
+        "supports updating various configuration types through the UpdateType enum."
+      ],
+      "discriminator": [29, 158, 252, 191, 10, 83, 219, 99],
       "accounts": [
         {
           "name": "authority",
@@ -1116,156 +1335,28 @@
           "type": "u64"
         }
       ]
-    },
-    {
-      "name": "update_wallet_policy",
-      "discriminator": [90, 225, 16, 40, 95, 80, 20, 107],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet_data.wallet_id",
-                "account": "SmartWalletData"
-              }
-            ]
-          }
-        },
-        {
-          "name": "smart_wallet_data",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  100, 97, 116, 97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smart_wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "wallet_device"
-        },
-        {
-          "name": "old_policy_program"
-        },
-        {
-          "name": "new_policy_program"
-        },
-        {
-          "name": "policy_program_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "ix_sysvar",
-          "docs": ["CHECK"],
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "UpdateWalletPolicyArgs"
-            }
-          }
-        }
-      ]
     }
   ],
   "accounts": [
     {
-      "name": "EphemeralAuthorization",
-      "discriminator": [159, 254, 58, 207, 22, 91, 56, 255]
+      "name": "Chunk",
+      "discriminator": [134, 67, 80, 65, 135, 143, 156, 196]
+    },
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Permission",
+      "discriminator": [224, 83, 28, 79, 10, 253, 161, 28]
     },
     {
       "name": "PolicyProgramRegistry",
       "discriminator": [158, 67, 114, 157, 27, 153, 86, 72]
     },
     {
-      "name": "ProgramConfig",
-      "discriminator": [196, 210, 90, 231, 144, 149, 140, 63]
-    },
-    {
-      "name": "SmartWalletData",
-      "discriminator": [124, 86, 202, 243, 63, 150, 66, 22]
-    },
-    {
-      "name": "TransactionSession",
-      "discriminator": [169, 116, 227, 43, 10, 34, 251, 2]
+      "name": "SmartWalletConfig",
+      "discriminator": [138, 211, 3, 80, 65, 100, 207, 142]
     },
     {
       "name": "WalletDevice",
@@ -1280,555 +1371,978 @@
     },
     {
       "code": 6001,
-      "name": "SmartWalletDataMismatch",
+      "name": "SmartWalletConfigMismatch",
       "msg": "Smart wallet address mismatch with authenticator"
     },
     {
       "code": 6002,
-      "name": "AuthenticatorNotFound",
-      "msg": "Smart wallet authenticator account not found or invalid"
-    },
-    {
-      "code": 6003,
       "name": "Secp256r1InvalidLength",
       "msg": "Secp256r1 instruction has invalid data length"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "Secp256r1HeaderMismatch",
       "msg": "Secp256r1 instruction header validation failed"
     },
     {
-      "code": 6005,
+      "code": 6004,
       "name": "Secp256r1DataMismatch",
       "msg": "Secp256r1 signature data validation failed"
     },
     {
-      "code": 6006,
-      "name": "Secp256r1InstructionNotFound",
-      "msg": "Secp256r1 instruction not found at specified index"
-    },
-    {
-      "code": 6007,
+      "code": 6005,
       "name": "InvalidSignature",
       "msg": "Invalid signature provided for passkey verification"
     },
     {
-      "code": 6008,
+      "code": 6006,
       "name": "ClientDataInvalidUtf8",
       "msg": "Client data JSON is not valid UTF-8"
     },
     {
-      "code": 6009,
+      "code": 6007,
       "name": "ClientDataJsonParseError",
       "msg": "Client data JSON parsing failed"
     },
     {
-      "code": 6010,
+      "code": 6008,
       "name": "ChallengeMissing",
       "msg": "Challenge field missing from client data JSON"
     },
     {
-      "code": 6011,
+      "code": 6009,
       "name": "ChallengeBase64DecodeError",
       "msg": "Challenge base64 decoding failed"
     },
     {
-      "code": 6012,
+      "code": 6010,
       "name": "ChallengeDeserializationError",
       "msg": "Challenge message deserialization failed"
     },
     {
-      "code": 6013,
+      "code": 6011,
       "name": "TimestampTooOld",
       "msg": "Message timestamp is too far in the past"
     },
     {
-      "code": 6014,
+      "code": 6012,
       "name": "TimestampTooNew",
       "msg": "Message timestamp is too far in the future"
     },
     {
-      "code": 6015,
+      "code": 6013,
       "name": "NonceMismatch",
       "msg": "Nonce mismatch: expected different value"
     },
     {
-      "code": 6016,
+      "code": 6014,
       "name": "NonceOverflow",
       "msg": "Nonce overflow: cannot increment further"
     },
     {
-      "code": 6017,
+      "code": 6015,
       "name": "PolicyProgramNotRegistered",
       "msg": "Policy program not found in registry"
     },
     {
-      "code": 6018,
+      "code": 6016,
       "name": "WhitelistFull",
       "msg": "The policy program registry is full."
     },
     {
-      "code": 6019,
-      "name": "PolicyDataRequired",
-      "msg": "Policy data is required but not provided"
-    },
-    {
-      "code": 6020,
+      "code": 6017,
       "name": "InvalidCheckPolicyDiscriminator",
       "msg": "Invalid instruction discriminator for check_policy"
     },
     {
-      "code": 6021,
+      "code": 6018,
       "name": "InvalidDestroyDiscriminator",
       "msg": "Invalid instruction discriminator for destroy"
     },
     {
-      "code": 6022,
+      "code": 6019,
       "name": "InvalidInitPolicyDiscriminator",
       "msg": "Invalid instruction discriminator for init_policy"
     },
     {
-      "code": 6023,
+      "code": 6020,
       "name": "PolicyProgramsIdentical",
       "msg": "Old and new policy programs are identical"
     },
     {
-      "code": 6024,
+      "code": 6021,
       "name": "NoDefaultPolicyProgram",
       "msg": "Neither old nor new policy program is the default"
     },
     {
-      "code": 6025,
+      "code": 6022,
+      "name": "PolicyProgramAlreadyRegistered",
+      "msg": "Policy program already registered"
+    },
+    {
+      "code": 6023,
       "name": "InvalidRemainingAccounts",
       "msg": "Invalid remaining accounts"
     },
     {
-      "code": 6026,
+      "code": 6024,
       "name": "CpiDataMissing",
       "msg": "CPI data is required but not provided"
     },
     {
-      "code": 6027,
-      "name": "InvalidCpiData",
-      "msg": "CPI data is invalid or malformed"
-    },
-    {
-      "code": 6028,
+      "code": 6025,
       "name": "InsufficientPolicyAccounts",
       "msg": "Insufficient remaining accounts for policy instruction"
     },
     {
-      "code": 6029,
+      "code": 6026,
       "name": "InsufficientCpiAccounts",
       "msg": "Insufficient remaining accounts for CPI instruction"
     },
     {
-      "code": 6030,
+      "code": 6027,
       "name": "AccountSliceOutOfBounds",
       "msg": "Account slice index out of bounds"
     },
     {
-      "code": 6031,
-      "name": "SolTransferInsufficientAccounts",
-      "msg": "SOL transfer requires at least 2 remaining accounts"
-    },
-    {
-      "code": 6032,
-      "name": "NewWalletDeviceMissing",
-      "msg": "New authenticator account is required but not provided"
-    },
-    {
-      "code": 6033,
-      "name": "NewWalletDevicePasskeyMissing",
-      "msg": "New authenticator passkey is required but not provided"
-    },
-    {
-      "code": 6034,
-      "name": "InsufficientLamports",
-      "msg": "Insufficient lamports for requested transfer"
-    },
-    {
-      "code": 6035,
+      "code": 6028,
       "name": "TransferAmountOverflow",
       "msg": "Transfer amount would cause arithmetic overflow"
     },
     {
-      "code": 6036,
+      "code": 6029,
       "name": "InvalidBumpSeed",
       "msg": "Invalid bump seed for PDA derivation"
     },
     {
-      "code": 6037,
+      "code": 6030,
       "name": "InvalidAccountOwner",
       "msg": "Account owner verification failed"
     },
     {
-      "code": 6038,
-      "name": "InvalidAccountDiscriminator",
-      "msg": "Account discriminator mismatch"
-    },
-    {
-      "code": 6039,
-      "name": "InvalidProgramId",
-      "msg": "Invalid program ID"
-    },
-    {
-      "code": 6040,
+      "code": 6031,
       "name": "ProgramNotExecutable",
       "msg": "Program not executable"
     },
     {
-      "code": 6041,
-      "name": "WalletDeviceAlreadyInitialized",
-      "msg": "Wallet device already initialized"
-    },
-    {
-      "code": 6042,
-      "name": "CredentialIdTooLarge",
-      "msg": "Credential ID exceeds maximum allowed size"
-    },
-    {
-      "code": 6043,
-      "name": "CredentialIdEmpty",
-      "msg": "Credential ID cannot be empty"
-    },
-    {
-      "code": 6044,
-      "name": "PolicyDataTooLarge",
-      "msg": "Policy data exceeds maximum allowed size"
-    },
-    {
-      "code": 6045,
-      "name": "CpiDataTooLarge",
-      "msg": "CPI data exceeds maximum allowed size"
-    },
-    {
-      "code": 6046,
-      "name": "TooManyRemainingAccounts",
-      "msg": "Too many remaining accounts provided"
-    },
-    {
-      "code": 6047,
-      "name": "InvalidPDADerivation",
-      "msg": "Invalid PDA derivation"
-    },
-    {
-      "code": 6048,
-      "name": "TransactionTooOld",
-      "msg": "Transaction is too old"
-    },
-    {
-      "code": 6049,
-      "name": "RateLimitExceeded",
-      "msg": "Rate limit exceeded"
-    },
-    {
-      "code": 6050,
-      "name": "InvalidAccountData",
-      "msg": "Invalid account data"
-    },
-    {
-      "code": 6051,
-      "name": "Unauthorized",
-      "msg": "Unauthorized access attempt"
-    },
-    {
-      "code": 6052,
+      "code": 6032,
       "name": "ProgramPaused",
       "msg": "Program is paused"
     },
     {
-      "code": 6053,
+      "code": 6033,
+      "name": "WalletDeviceAlreadyInitialized",
+      "msg": "Wallet device already initialized"
+    },
+    {
+      "code": 6034,
+      "name": "CredentialIdTooLarge",
+      "msg": "Credential ID exceeds maximum allowed size"
+    },
+    {
+      "code": 6035,
+      "name": "CredentialIdEmpty",
+      "msg": "Credential ID cannot be empty"
+    },
+    {
+      "code": 6036,
+      "name": "PolicyDataTooLarge",
+      "msg": "Policy data exceeds maximum allowed size"
+    },
+    {
+      "code": 6037,
+      "name": "CpiDataTooLarge",
+      "msg": "CPI data exceeds maximum allowed size"
+    },
+    {
+      "code": 6038,
+      "name": "TooManyRemainingAccounts",
+      "msg": "Too many remaining accounts provided"
+    },
+    {
+      "code": 6039,
+      "name": "InvalidPDADerivation",
+      "msg": "Invalid PDA derivation"
+    },
+    {
+      "code": 6040,
+      "name": "TransactionTooOld",
+      "msg": "Transaction is too old"
+    },
+    {
+      "code": 6041,
+      "name": "InvalidAccountData",
+      "msg": "Invalid account data"
+    },
+    {
+      "code": 6042,
       "name": "InvalidInstructionData",
       "msg": "Invalid instruction data"
     },
     {
-      "code": 6054,
+      "code": 6043,
       "name": "AccountAlreadyInitialized",
       "msg": "Account already initialized"
     },
     {
-      "code": 6055,
-      "name": "AccountNotInitialized",
-      "msg": "Account not initialized"
-    },
-    {
-      "code": 6056,
+      "code": 6044,
       "name": "InvalidAccountState",
       "msg": "Invalid account state"
     },
     {
-      "code": 6057,
-      "name": "IntegerOverflow",
-      "msg": "Operation would cause integer overflow"
-    },
-    {
-      "code": 6058,
-      "name": "IntegerUnderflow",
-      "msg": "Operation would cause integer underflow"
-    },
-    {
-      "code": 6059,
+      "code": 6045,
       "name": "InvalidFeeAmount",
       "msg": "Invalid fee amount"
     },
     {
-      "code": 6060,
+      "code": 6046,
       "name": "InsufficientBalanceForFee",
       "msg": "Insufficient balance for fee"
     },
     {
-      "code": 6061,
+      "code": 6047,
       "name": "InvalidAuthority",
       "msg": "Invalid authority"
     },
     {
-      "code": 6062,
+      "code": 6048,
       "name": "AuthorityMismatch",
       "msg": "Authority mismatch"
     },
     {
-      "code": 6063,
+      "code": 6049,
       "name": "InvalidSequenceNumber",
       "msg": "Invalid sequence number"
     },
     {
-      "code": 6064,
-      "name": "DuplicateTransaction",
-      "msg": "Duplicate transaction detected"
-    },
-    {
-      "code": 6065,
-      "name": "InvalidTransactionOrdering",
-      "msg": "Invalid transaction ordering"
-    },
-    {
-      "code": 6066,
-      "name": "MaxWalletLimitReached",
-      "msg": "Maximum wallet limit reached"
-    },
-    {
-      "code": 6067,
-      "name": "InvalidWalletConfiguration",
-      "msg": "Invalid wallet configuration"
-    },
-    {
-      "code": 6068,
-      "name": "WalletNotFound",
-      "msg": "Wallet not found"
-    },
-    {
-      "code": 6069,
+      "code": 6050,
       "name": "InvalidPasskeyFormat",
       "msg": "Invalid passkey format"
     },
     {
-      "code": 6070,
-      "name": "PasskeyAlreadyRegistered",
-      "msg": "Passkey already registered"
-    },
-    {
-      "code": 6071,
+      "code": 6051,
       "name": "InvalidMessageFormat",
       "msg": "Invalid message format"
     },
     {
-      "code": 6072,
-      "name": "MessageSizeExceedsLimit",
-      "msg": "Message size exceeds limit"
-    },
-    {
-      "code": 6073,
+      "code": 6052,
       "name": "InvalidSplitIndex",
       "msg": "Invalid split index"
     },
     {
-      "code": 6074,
-      "name": "CpiExecutionFailed",
-      "msg": "CPI execution failed"
-    },
-    {
-      "code": 6075,
+      "code": 6053,
       "name": "InvalidProgramAddress",
       "msg": "Invalid program address"
     },
     {
-      "code": 6076,
-      "name": "WhitelistOperationFailed",
-      "msg": "Whitelist operation failed"
-    },
-    {
-      "code": 6077,
-      "name": "InvalidWhitelistState",
-      "msg": "Invalid whitelist state"
-    },
-    {
-      "code": 6078,
-      "name": "EmergencyShutdown",
-      "msg": "Emergency shutdown activated"
-    },
-    {
-      "code": 6079,
-      "name": "RecoveryModeRequired",
-      "msg": "Recovery mode required"
-    },
-    {
-      "code": 6080,
-      "name": "InvalidRecoveryAttempt",
-      "msg": "Invalid recovery attempt"
-    },
-    {
-      "code": 6081,
-      "name": "AuditLogFull",
-      "msg": "Audit log full"
-    },
-    {
-      "code": 6082,
-      "name": "InvalidAuditEntry",
-      "msg": "Invalid audit entry"
-    },
-    {
-      "code": 6083,
+      "code": 6054,
       "name": "ReentrancyDetected",
       "msg": "Reentrancy detected"
     },
     {
-      "code": 6084,
-      "name": "InvalidCallDepth",
-      "msg": "Invalid call depth"
-    },
-    {
-      "code": 6085,
-      "name": "StackOverflowProtection",
-      "msg": "Stack overflow protection triggered"
-    },
-    {
-      "code": 6086,
-      "name": "MemoryLimitExceeded",
-      "msg": "Memory limit exceeded"
-    },
-    {
-      "code": 6087,
-      "name": "ComputationLimitExceeded",
-      "msg": "Computation limit exceeded"
-    },
-    {
-      "code": 6088,
-      "name": "InvalidRentExemption",
-      "msg": "Invalid rent exemption"
-    },
-    {
-      "code": 6089,
-      "name": "AccountClosureFailed",
-      "msg": "Account closure failed"
-    },
-    {
-      "code": 6090,
-      "name": "InvalidAccountClosure",
-      "msg": "Invalid account closure"
-    },
-    {
-      "code": 6091,
-      "name": "RefundFailed",
-      "msg": "Refund failed"
-    },
-    {
-      "code": 6092,
-      "name": "InvalidRefundAmount",
-      "msg": "Invalid refund amount"
-    },
-    {
-      "code": 6093,
-      "name": "AllVaultsFull",
-      "msg": "All vault slots are full"
-    },
-    {
-      "code": 6094,
-      "name": "VaultNotFound",
-      "msg": "Vault not found for the specified mint"
-    },
-    {
-      "code": 6095,
-      "name": "InsufficientVaultBalance",
-      "msg": "Insufficient balance in vault"
-    },
-    {
-      "code": 6096,
-      "name": "VaultOverflow",
-      "msg": "Vault balance overflow"
-    },
-    {
-      "code": 6097,
+      "code": 6055,
       "name": "InvalidVaultIndex",
       "msg": "Invalid vault index"
     },
     {
-      "code": 6098,
+      "code": 6056,
       "name": "InsufficientBalance",
       "msg": "Insufficient balance"
     },
     {
-      "code": 6099,
+      "code": 6057,
       "name": "InvalidAction",
       "msg": "Invalid action"
+    },
+    {
+      "code": 6058,
+      "name": "InsufficientVaultBalance",
+      "msg": "Insufficient balance in vault"
     }
   ],
   "types": [
     {
-      "name": "AuthorizeEphemeralExecutionArgs",
+      "name": "CallPolicyArgs",
+      "docs": [
+        "Arguments for calling policy program instructions",
+        "",
+        "Contains WebAuthn authentication data and policy program parameters",
+        "required for executing policy program instructions like adding/removing devices."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
             "type": {
               "array": ["u8", 33]
             }
           },
           {
             "name": "signature",
+            "docs": ["WebAuthn signature for transaction authorization"],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
+            "docs": ["Raw client data JSON from WebAuthn authentication"],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
+            "docs": ["Raw authenticator data from WebAuthn authentication"],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
+            "docs": ["Index of the Secp256r1 verification instruction"],
             "type": "u8"
           },
           {
-            "name": "ephemeral_public_key",
+            "name": "policy_data",
+            "docs": ["Policy program instruction data"],
+            "type": "bytes"
+          },
+          {
+            "name": "new_wallet_device",
+            "docs": ["Optional new wallet device to add during policy call"],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "NewWalletDeviceArgs"
+                }
+              }
+            }
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChangePolicyArgs",
+      "docs": [
+        "Arguments for changing a smart wallet's policy program",
+        "",
+        "Contains WebAuthn authentication data and policy program parameters",
+        "required for securely changing the policy program governing a wallet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "signature",
+            "docs": ["WebAuthn signature for transaction authorization"],
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "docs": ["Index of the Secp256r1 verification instruction"],
+            "type": "u8"
+          },
+          {
+            "name": "split_index",
+            "docs": [
+              "Index for splitting remaining accounts between policy and CPI"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "destroy_policy_data",
+            "docs": ["Data for destroying the old policy program"],
+            "type": "bytes"
+          },
+          {
+            "name": "init_policy_data",
+            "docs": ["Data for initializing the new policy program"],
+            "type": "bytes"
+          },
+          {
+            "name": "new_wallet_device",
+            "docs": ["Optional new wallet device to add during policy change"],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "NewWalletDeviceArgs"
+                }
+              }
+            }
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Chunk",
+      "docs": [
+        "Transaction chunk for deferred execution",
+        "",
+        "Created after full passkey and policy verification. Contains all bindings",
+        "necessary to execute the transaction later without re-verification.",
+        "Used for large transactions that need to be split into manageable chunks."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner_wallet_address",
+            "docs": ["Smart wallet address that authorized this chunk session"],
             "type": "pubkey"
           },
           {
+            "name": "instruction_data_hash",
+            "docs": [
+              "Combined SHA256 hash of all transaction instruction data"
+            ],
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "accounts_metadata_hash",
+            "docs": [
+              "Combined SHA256 hash over all ordered remaining account metas plus target programs"
+            ],
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "authorized_nonce",
+            "docs": [
+              "The nonce that was authorized at chunk creation (bound into data hash)"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "expires_at",
+            "docs": ["Unix timestamp when this chunk expires"],
+            "type": "i64"
+          },
+          {
+            "name": "rent_refund_address",
+            "docs": [
+              "Address to receive rent refund when closing the chunk session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "docs": ["Vault index for fee collection during chunk execution"],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "docs": [
+        "LazorKit program configuration and settings",
+        "",
+        "Stores global program configuration including fee structures, default policy",
+        "program, and operational settings. Only the program authority can modify",
+        "these settings through the update_config instruction."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Program authority that can modify configuration settings"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "create_smart_wallet_fee",
+            "docs": [
+              "Fee charged for creating a new smart wallet (in lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fee_payer_fee",
+            "docs": [
+              "Fee charged to the fee payer for transactions (in lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "referral_fee",
+            "docs": ["Fee paid to referral addresses (in lamports)"],
+            "type": "u64"
+          },
+          {
+            "name": "lazorkit_fee",
+            "docs": ["Fee retained by LazorKit protocol (in lamports)"],
+            "type": "u64"
+          },
+          {
+            "name": "default_policy_program_id",
+            "docs": ["Default policy program ID for new smart wallets"],
+            "type": "pubkey"
+          },
+          {
+            "name": "is_paused",
+            "docs": ["Whether the program is currently paused"],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateChunkArgs",
+      "docs": [
+        "Arguments for creating a chunk buffer for large transactions",
+        "",
+        "Contains WebAuthn authentication data and parameters required for",
+        "creating chunk buffers when transactions exceed size limits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "signature",
+            "docs": ["WebAuthn signature for transaction authorization"],
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "docs": ["Index of the Secp256r1 verification instruction"],
+            "type": "u8"
+          },
+          {
+            "name": "policy_data",
+            "docs": ["Policy program instruction data"],
+            "type": "bytes"
+          },
+          {
+            "name": "expires_at",
+            "docs": ["Unix timestamp when the chunk expires"],
             "type": "i64"
           },
           {
             "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateSmartWalletArgs",
+      "docs": [
+        "Arguments for creating a new smart wallet",
+        "",
+        "Contains all necessary parameters for initializing a new smart wallet",
+        "with WebAuthn passkey authentication and policy program configuration."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "credential_id",
+            "docs": ["Unique credential ID from WebAuthn registration"],
+            "type": "bytes"
+          },
+          {
+            "name": "policy_data",
+            "docs": ["Policy program initialization data"],
+            "type": "bytes"
+          },
+          {
+            "name": "wallet_id",
+            "docs": ["Random wallet ID provided by client for uniqueness"],
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "docs": ["Initial SOL amount to transfer to the wallet"],
+            "type": "u64"
+          },
+          {
+            "name": "referral_address",
+            "docs": ["Optional referral address for fee sharing"],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecuteArgs",
+      "docs": [
+        "Arguments for executing a transaction through the smart wallet",
+        "",
+        "Contains WebAuthn authentication data and transaction parameters",
+        "required for secure transaction execution with policy validation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "signature",
+            "docs": ["WebAuthn signature for transaction authorization"],
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "docs": ["Index of the Secp256r1 verification instruction"],
+            "type": "u8"
+          },
+          {
+            "name": "split_index",
+            "docs": [
+              "Index for splitting remaining accounts between policy and CPI"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "policy_data",
+            "docs": ["Policy program instruction data"],
+            "type": "bytes"
+          },
+          {
+            "name": "cpi_data",
+            "docs": ["Cross-program invocation instruction data"],
+            "type": "bytes"
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GrantPermissionArgs",
+      "docs": [
+        "Arguments for granting ephemeral permission to a keypair",
+        "",
+        "Contains WebAuthn authentication data and parameters required for",
+        "granting time-limited permission to an ephemeral keypair for",
+        "multiple operations without repeated passkey authentication."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "signature",
+            "docs": ["WebAuthn signature for transaction authorization"],
+            "type": "bytes"
+          },
+          {
+            "name": "client_data_json_raw",
+            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "docs": ["Index of the Secp256r1 verification instruction"],
+            "type": "u8"
+          },
+          {
+            "name": "ephemeral_public_key",
+            "docs": ["Ephemeral public key that will receive permission"],
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "docs": ["Unix timestamp when the permission expires"],
+            "type": "i64"
+          },
+          {
+            "name": "vault_index",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
             "type": "u8"
           },
           {
             "name": "instruction_data_list",
+            "docs": ["All instruction data to be authorized for execution"],
             "type": {
               "vec": "bytes"
             }
           },
           {
             "name": "split_index",
+            "docs": ["Split indices for accounts (n-1 for n instructions)"],
             "type": "bytes"
           }
         ]
       }
     },
     {
+      "name": "NewWalletDeviceArgs",
+      "docs": [
+        "Arguments for adding a new wallet device (passkey)",
+        "",
+        "Contains the necessary data for adding a new WebAuthn passkey",
+        "to an existing smart wallet for enhanced security and convenience."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "docs": ["Public key of the new WebAuthn passkey"],
+            "type": {
+              "array": ["u8", 33]
+            }
+          },
+          {
+            "name": "credential_id",
+            "docs": [
+              "Unique credential ID from WebAuthn registration (max 256 bytes)"
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Permission",
+      "docs": [
+        "Ephemeral authorization for temporary program access",
+        "",
+        "Created after passkey authentication to allow execution with an ephemeral key",
+        "for a limited time. Enables multiple operations without repeated passkey",
+        "authentication, ideal for games and applications requiring frequent interactions."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner_wallet_address",
+            "docs": [
+              "Smart wallet address that authorized this permission session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ephemeral_public_key",
+            "docs": [
+              "Ephemeral public key that can sign transactions during this session"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "docs": ["Unix timestamp when this permission session expires"],
+            "type": "i64"
+          },
+          {
+            "name": "fee_payer_address",
+            "docs": ["Fee payer address for transactions in this session"],
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_refund_address",
+            "docs": ["Address to receive rent refund when closing the session"],
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "docs": ["Vault index for fee collection during this session"],
+            "type": "u8"
+          },
+          {
+            "name": "instruction_data_hash",
+            "docs": [
+              "Combined hash of all instruction data that can be executed"
+            ],
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "accounts_metadata_hash",
+            "docs": [
+              "Combined hash of all accounts that will be used in this session"
+            ],
+            "type": {
+              "array": ["u8", 32]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyProgramRegistry",
+      "docs": [
+        "Registry of approved policy programs for smart wallet operations",
+        "",
+        "Maintains a whitelist of policy programs that can be used to govern",
+        "smart wallet transaction validation and security rules."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registered_programs",
+            "docs": ["List of registered policy program addresses (max 10)"],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": ["Bump seed for PDA derivation and verification"],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SmartWalletConfig",
+      "docs": [
+        "Core data account for a LazorKit smart wallet",
+        "",
+        "Stores the essential state information for a smart wallet including its",
+        "unique identifier, policy program configuration, and authentication nonce",
+        "for replay attack prevention."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet_id",
+            "docs": ["Unique identifier for this smart wallet instance"],
+            "type": "u64"
+          },
+          {
+            "name": "referral_address",
+            "docs": [
+              "Referral address that receives referral fees from this wallet"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "policy_program_id",
+            "docs": [
+              "Policy program that governs this wallet's transaction validation rules"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "last_nonce",
+            "docs": [
+              "Last nonce used for message verification to prevent replay attacks"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": ["Bump seed for PDA derivation and verification"],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "UpdateType",
+      "docs": [
+        "Types of configuration parameters that can be updated",
+        "",
+        "Defines all the configuration parameters that can be modified through",
+        "the update_config instruction by the program authority."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -1860,469 +2374,13 @@
       }
     },
     {
-      "name": "CreateDeferredExecutionArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "signature",
-            "type": "bytes"
-          },
-          {
-            "name": "client_data_json_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticator_data_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "verify_instruction_index",
-            "type": "u8"
-          },
-          {
-            "name": "policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "expires_at",
-            "type": "i64"
-          },
-          {
-            "name": "vault_index",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CreateSmartWalletArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "credential_id",
-            "type": "bytes"
-          },
-          {
-            "name": "policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "wallet_id",
-            "type": "u64"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "referral_address",
-            "type": {
-              "option": "pubkey"
-            }
-          },
-          {
-            "name": "vault_index",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EphemeralAuthorization",
-      "docs": [
-        "Ephemeral authorization for temporary program access.",
-        "Created after passkey authentication. Allows execution with ephemeral key",
-        "for a limited time to authorized programs with multiple instructions."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner_wallet_address",
-            "docs": ["Smart wallet that authorized this session"],
-            "type": "pubkey"
-          },
-          {
-            "name": "ephemeral_public_key",
-            "docs": ["Ephemeral public key that can sign transactions"],
-            "type": "pubkey"
-          },
-          {
-            "name": "expires_at",
-            "docs": ["Unix timestamp when this session expires"],
-            "type": "i64"
-          },
-          {
-            "name": "fee_payer_address",
-            "docs": ["Fee payer for transactions in this session"],
-            "type": "pubkey"
-          },
-          {
-            "name": "rent_refund_address",
-            "docs": ["Where to refund rent when closing the session"],
-            "type": "pubkey"
-          },
-          {
-            "name": "vault_index",
-            "docs": ["Vault index for fee collection"],
-            "type": "u8"
-          },
-          {
-            "name": "instruction_data_hash",
-            "docs": [
-              "Combined hash of all instruction data that can be executed"
-            ],
-            "type": {
-              "array": ["u8", 32]
-            }
-          },
-          {
-            "name": "accounts_metadata_hash",
-            "docs": ["Combined hash of all accounts that will be used"],
-            "type": {
-              "array": ["u8", 32]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExecuteDirectTransactionArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "signature",
-            "type": "bytes"
-          },
-          {
-            "name": "client_data_json_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticator_data_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "verify_instruction_index",
-            "type": "u8"
-          },
-          {
-            "name": "split_index",
-            "type": "u16"
-          },
-          {
-            "name": "policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "cpi_data",
-            "type": "bytes"
-          },
-          {
-            "name": "vault_index",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InvokeWalletPolicyArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "signature",
-            "type": "bytes"
-          },
-          {
-            "name": "client_data_json_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticator_data_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "verify_instruction_index",
-            "type": "u8"
-          },
-          {
-            "name": "policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "new_wallet_device",
-            "type": {
-              "option": {
-                "defined": {
-                  "name": "NewWalletDeviceArgs"
-                }
-              }
-            }
-          },
-          {
-            "name": "vault_index",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "NewWalletDeviceArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "credential_id",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PolicyProgramRegistry",
-      "docs": [
-        "Registry of approved policy programs that can govern smart wallet operations"
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registered_programs",
-            "docs": ["List of registered policy program addresses"],
-            "type": {
-              "vec": "pubkey"
-            }
-          },
-          {
-            "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ProgramConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "create_smart_wallet_fee",
-            "type": "u64"
-          },
-          {
-            "name": "fee_payer_fee",
-            "type": "u64"
-          },
-          {
-            "name": "referral_fee",
-            "type": "u64"
-          },
-          {
-            "name": "lazorkit_fee",
-            "type": "u64"
-          },
-          {
-            "name": "default_policy_program_id",
-            "type": "pubkey"
-          },
-          {
-            "name": "is_paused",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SmartWalletData",
-      "docs": ["Data account for a smart wallet"],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "wallet_id",
-            "docs": ["Unique identifier for this smart wallet"],
-            "type": "u64"
-          },
-          {
-            "name": "referral_address",
-            "docs": ["Referral address that governs this wallet's operations"],
-            "type": "pubkey"
-          },
-          {
-            "name": "policy_program_id",
-            "docs": ["Policy program that governs this wallet's operations"],
-            "type": "pubkey"
-          },
-          {
-            "name": "last_nonce",
-            "docs": ["Last nonce used for message verification"],
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TransactionSession",
-      "docs": [
-        "Transaction session for deferred execution.",
-        "Created after full passkey + policy verification. Contains all bindings",
-        "necessary to execute the transaction later without re-verification."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner_wallet_address",
-            "docs": ["Smart wallet that authorized this session"],
-            "type": "pubkey"
-          },
-          {
-            "name": "instruction_data_hash",
-            "docs": [
-              "Combined sha256 hash of all transaction instruction data"
-            ],
-            "type": {
-              "array": ["u8", 32]
-            }
-          },
-          {
-            "name": "accounts_metadata_hash",
-            "docs": [
-              "Combined sha256 hash over all ordered remaining account metas plus target programs"
-            ],
-            "type": {
-              "array": ["u8", 32]
-            }
-          },
-          {
-            "name": "authorized_nonce",
-            "docs": [
-              "The nonce that was authorized at session creation (bound into data hash)"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "expires_at",
-            "docs": ["Unix expiration timestamp"],
-            "type": "i64"
-          },
-          {
-            "name": "rent_refund_address",
-            "docs": ["Where to refund rent when closing the session"],
-            "type": "pubkey"
-          },
-          {
-            "name": "vault_index",
-            "docs": ["Vault index for fee collection"],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdateWalletPolicyArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_public_key",
-            "type": {
-              "array": ["u8", 33]
-            }
-          },
-          {
-            "name": "signature",
-            "type": "bytes"
-          },
-          {
-            "name": "client_data_json_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticator_data_raw",
-            "type": "bytes"
-          },
-          {
-            "name": "verify_instruction_index",
-            "type": "u8"
-          },
-          {
-            "name": "split_index",
-            "type": "u16"
-          },
-          {
-            "name": "destroy_policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "init_policy_data",
-            "type": "bytes"
-          },
-          {
-            "name": "new_wallet_device",
-            "type": {
-              "option": {
-                "defined": {
-                  "name": "NewWalletDeviceArgs"
-                }
-              }
-            }
-          },
-          {
-            "name": "vault_index",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
       "name": "WalletDevice",
       "docs": [
-        "Account that stores a wallet device (passkey) used to authenticate to a smart wallet"
+        "Account that stores a wallet device (passkey) for smart wallet authentication",
+        "",
+        "Each wallet device represents a WebAuthn passkey that can be used to authenticate",
+        "transactions for a specific smart wallet. Multiple devices can be associated with",
+        "a single smart wallet for enhanced security and convenience."
       ],
       "type": {
         "kind": "struct",
@@ -2330,7 +2388,7 @@
           {
             "name": "passkey_public_key",
             "docs": [
-              "The public key of the passkey for this wallet device that can authorize transactions"
+              "Public key of the WebAuthn passkey for transaction authorization"
             ],
             "type": {
               "array": ["u8", 33]
@@ -2338,17 +2396,17 @@
           },
           {
             "name": "smart_wallet_address",
-            "docs": ["The smart wallet this wallet device belongs to"],
+            "docs": ["Smart wallet address this device is associated with"],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["The credential ID this wallet device belongs to"],
+            "docs": ["Unique credential ID from WebAuthn registration"],
             "type": "bytes"
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation"],
+            "docs": ["Bump seed for PDA derivation and verification"],
             "type": "u8"
           }
         ]

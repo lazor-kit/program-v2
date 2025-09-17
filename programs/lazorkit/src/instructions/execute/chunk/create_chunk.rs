@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::instructions::CreateChunkArgs;
 use crate::security::validation;
 use crate::state::{
-    Chunk, CreateChunkMessage, PolicyProgramRegistry, Config, SmartWalletData, WalletDevice,
+    Chunk, CreateChunkMessage, PolicyProgramRegistry, Config, SmartWalletConfig, WalletDevice,
 };
 use crate::utils::{
     execute_cpi, get_wallet_device_signer, sighash, verify_authorization, PasskeyExt,
@@ -33,7 +33,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_data.last_nonce,
+        ctx.accounts.smart_wallet_config.last_nonce,
     )?;
 
     // Step 3: Prepare policy program validation
@@ -44,7 +44,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     // Ensure policy program is executable and matches wallet configuration
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
     require!(
-        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program_id,
+        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_config.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
     
@@ -101,7 +101,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     session.owner_wallet_address = ctx.accounts.smart_wallet.key();
     session.instruction_data_hash = msg.cpi_data_hash;
     session.accounts_metadata_hash = msg.cpi_accounts_hash;
-    session.authorized_nonce = ctx.accounts.smart_wallet_data.last_nonce;
+    session.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;
     session.expires_at = args.expires_at;
     session.rent_refund_address = ctx.accounts.payer.key();
     session.vault_index = args.vault_index;
@@ -120,19 +120,19 @@ pub struct CreateChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_data.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
+        bump = smart_wallet_config.bump,
     )]
     /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
     #[account(
         seeds = [
@@ -162,7 +162,7 @@ pub struct CreateChunk<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + Chunk::INIT_SPACE,
-        seeds = [Chunk::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_data.last_nonce.to_le_bytes()],
+        seeds = [Chunk::PREFIX_SEED, smart_wallet.key().as_ref(), &smart_wallet_config.last_nonce.to_le_bytes()],
         bump,
         owner = ID,
     )]

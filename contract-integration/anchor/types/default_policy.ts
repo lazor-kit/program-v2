@@ -195,7 +195,11 @@ export type DefaultPolicy = {
     {
       name: 'walletDevice';
       docs: [
-        'Account that stores a wallet device (passkey) used to authenticate to a smart wallet'
+        'Account that stores a wallet device (passkey) for smart wallet authentication',
+        '',
+        'Each wallet device represents a WebAuthn passkey that can be used to authenticate',
+        'transactions for a specific smart wallet. Multiple devices can be associated with',
+        'a single smart wallet for enhanced security and convenience.'
       ];
       type: {
         kind: 'struct';
@@ -203,7 +207,7 @@ export type DefaultPolicy = {
           {
             name: 'passkeyPublicKey';
             docs: [
-              'The public key of the passkey for this wallet device that can authorize transactions'
+              'Public key of the WebAuthn passkey for transaction authorization'
             ];
             type: {
               array: ['u8', 33];
@@ -211,17 +215,17 @@ export type DefaultPolicy = {
           },
           {
             name: 'smartWalletAddress';
-            docs: ['The smart wallet this wallet device belongs to'];
+            docs: ['Smart wallet address this device is associated with'];
             type: 'pubkey';
           },
           {
             name: 'credentialId';
-            docs: ['The credential ID this wallet device belongs to'];
+            docs: ['Unique credential ID from WebAuthn registration'];
             type: 'bytes';
           },
           {
             name: 'bump';
-            docs: ['Bump seed for PDA derivation'];
+            docs: ['Bump seed for PDA derivation and verification'];
             type: 'u8';
           }
         ];

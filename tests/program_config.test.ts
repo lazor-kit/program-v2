@@ -1,17 +1,11 @@
 import * as anchor from '@coral-xyz/anchor';
-import ECDSA from 'ecdsa-secp256r1';
 import { expect } from 'chai';
 import * as dotenv from 'dotenv';
-import { base64, bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import {
-  buildCreateSessionMessage,
-  DefaultPolicyClient,
-  LazorkitClient,
-} from '../contract-integration';
-import { sha256 } from 'js-sha256';
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
+import { LazorkitClient } from '../contract-integration';
 dotenv.config();
 
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -26,12 +20,12 @@ describe.skip('Test smart wallet with default policy', () => {
   before(async () => {
     // airdrop some SOL to the payer
 
-    const programConfig = await connection.getAccountInfo(
-      lazorkitProgram.programConfigPda()
+    const config = await connection.getAccountInfo(
+      lazorkitProgram.getConfigPubkey()
     );
 
-    if (programConfig === null) {
-      const ix = await lazorkitProgram.buildInitializeProgramInstruction(
+    if (config === null) {
+      const ix = await lazorkitProgram.buildInitializeProgramIns(
         payer.publicKey
       );
       const txn = new anchor.web3.Transaction().add(ix);
@@ -52,7 +46,7 @@ describe.skip('Test smart wallet with default policy', () => {
 
   describe('Manage vault', () => {
     it('Deposit success', async () => {
-      const txn = await lazorkitProgram.createManageVaultTransaction({
+      const txn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
         amount: new anchor.BN(1000000000),
@@ -69,7 +63,7 @@ describe.skip('Test smart wallet with default policy', () => {
     });
 
     it('Deposit failed', async () => {
-      const txn = await lazorkitProgram.createManageVaultTransaction({
+      const txn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
         amount: new anchor.BN(10000),
@@ -89,7 +83,7 @@ describe.skip('Test smart wallet with default policy', () => {
     it('Withdraw success', async () => {
       const vaultIndex = lazorkitProgram.generateVaultIndex();
       // deposit some SOL to the vault
-      const depositTxn = await lazorkitProgram.createManageVaultTransaction({
+      const depositTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
         amount: new anchor.BN(1000000000),
@@ -102,7 +96,7 @@ describe.skip('Test smart wallet with default policy', () => {
       const depositSig = await connection.sendTransaction(depositTxn);
       await connection.confirmTransaction(depositSig);
 
-      const withdrawTxn = await lazorkitProgram.createManageVaultTransaction({
+      const withdrawTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'withdraw',
         amount: new anchor.BN(10000),
@@ -120,7 +114,7 @@ describe.skip('Test smart wallet with default policy', () => {
 
     it('Withdraw failed', async () => {
       const vaultIndex = lazorkitProgram.generateVaultIndex();
-      const depositTxn = await lazorkitProgram.createManageVaultTransaction({
+      const depositTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'deposit',
         amount: new anchor.BN(1000000000),
@@ -133,7 +127,7 @@ describe.skip('Test smart wallet with default policy', () => {
       const depositSig = await connection.sendTransaction(depositTxn);
       await connection.confirmTransaction(depositSig);
 
-      const withdrawTxn = await lazorkitProgram.createManageVaultTransaction({
+      const withdrawTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
         action: 'withdraw',
         amount: new anchor.BN(1000000000),

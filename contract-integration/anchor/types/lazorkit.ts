@@ -13,13 +13,94 @@ export type Lazorkit = {
     description: 'Created with Anchor';
   };
   docs: [
-    'The Lazor Kit program provides smart wallet functionality with passkey authentication'
+    'LazorKit: Enterprise Smart Wallet with WebAuthn Passkey Authentication',
+    '',
+    'LazorKit is a comprehensive smart wallet solution that enables secure, user-friendly',
+    'transaction execution using WebAuthn passkey authentication. The program provides:',
+    '',
+    '- **Passkey-based Authentication**: Secure transaction signing using WebAuthn standards',
+    '- **Policy-driven Security**: Configurable transaction validation through policy programs',
+    '- **Chunked Transactions**: Support for large transactions via chunked execution',
+    '- **Permission System**: Ephemeral key grants for enhanced user experience',
+    '- **Vault Management**: Multi-slot fee distribution and SOL management',
+    '- **Admin Controls**: Program configuration and policy program registration',
+    '',
+    'The program is designed for enterprise use cases requiring high security, scalability,',
+    'and user experience while maintaining compatibility with existing Solana infrastructure.'
   ];
   instructions: [
     {
-      name: 'authorizeEphemeralExecution';
-      docs: ['Authorize ephemeral execution for temporary program access'];
-      discriminator: [220, 152, 90, 147, 146, 90, 72, 115];
+      name: 'addPolicyProgram';
+      docs: [
+        'Register a new policy program in the whitelist',
+        '',
+        'Allows the program authority to add new policy programs to the registry.',
+        'These policy programs can then be used by smart wallets for transaction',
+        'validation and security enforcement.'
+      ];
+      discriminator: [172, 91, 65, 142, 231, 42, 251, 227];
+      accounts: [
+        {
+          name: 'authority';
+          writable: true;
+          signer: true;
+          relations: ['config'];
+        },
+        {
+          name: 'config';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [99, 111, 110, 102, 105, 103];
+              }
+            ];
+          };
+        },
+        {
+          name: 'policyProgramRegistry';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ];
+              }
+            ];
+          };
+        },
+        {
+          name: 'newPolicyProgram';
+        }
+      ];
+      args: [];
+    },
+    {
+      name: 'callPolicy';
+      docs: [
+        'Execute policy program instructions',
+        '',
+        'Calls the policy program to perform operations like adding/removing devices',
+        'or other policy-specific actions. Requires proper passkey authentication',
+        'and validates the policy program is registered.'
+      ];
+      discriminator: [57, 50, 158, 108, 226, 148, 41, 221];
       accounts: [
         {
           name: 'payer';
@@ -61,14 +142,14 @@ export type Lazorkit = {
               },
               {
                 kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
               }
             ];
           };
         },
         {
-          name: 'smartWalletData';
+          name: 'smartWalletConfig';
           writable: true;
           pda: {
             seeds: [
@@ -88,93 +169,88 @@ export type Lazorkit = {
                   101,
                   116,
                   95,
-                  100,
-                  97,
-                  116,
-                  97
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smartWallet';
-              }
-            ];
-          };
-        },
-        {
-          name: 'walletDevice';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  101,
-                  118,
-                  105,
                   99,
-                  101
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ];
               },
               {
                 kind: 'account';
                 path: 'smartWallet';
-              },
-              {
-                kind: 'arg';
-                path: 'args.passkey_public_key.to_hashed_bytes(smart_wallet';
               }
             ];
           };
         },
         {
-          name: 'ephemeralAuthorization';
-          docs: ['New ephemeral authorization account (rent payer: payer)'];
+          name: 'referral';
+          writable: true;
+        },
+        {
+          name: 'lazorkitVault';
+          docs: [
+            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
+          ];
           writable: true;
           pda: {
             seeds: [
               {
                 kind: 'const';
                 value: [
-                  101,
-                  112,
-                  104,
-                  101,
-                  109,
-                  101,
-                  114,
-                  97,
                   108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
                   95,
+                  118,
                   97,
                   117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  122,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
+                  108,
+                  116
                 ];
               },
               {
-                kind: 'account';
-                path: 'smartWallet';
-              },
-              {
                 kind: 'arg';
-                path: 'args.ephemeral_public_key';
+                path: 'args.vault_index';
+              }
+            ];
+          };
+        },
+        {
+          name: 'walletDevice';
+        },
+        {
+          name: 'policyProgram';
+        },
+        {
+          name: 'policyProgramRegistry';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ];
               }
             ];
           };
@@ -193,15 +269,22 @@ export type Lazorkit = {
           name: 'args';
           type: {
             defined: {
-              name: 'authorizeEphemeralExecutionArgs';
+              name: 'callPolicyArgs';
             };
           };
         }
       ];
     },
     {
-      name: 'createDeferredExecution';
-      discriminator: [78, 46, 57, 47, 157, 183, 68, 164];
+      name: 'changePolicy';
+      docs: [
+        'Change the policy program for a smart wallet',
+        '',
+        "Allows changing the policy program that governs a smart wallet's transaction",
+        'validation rules. Requires proper passkey authentication and validates that',
+        'the new policy program is registered in the whitelist.'
+      ];
+      discriminator: [105, 129, 139, 210, 10, 152, 183, 3];
       accounts: [
         {
           name: 'payer';
@@ -243,14 +326,14 @@ export type Lazorkit = {
               },
               {
                 kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
               }
             ];
           };
         },
         {
-          name: 'smartWalletData';
+          name: 'smartWalletConfig';
           writable: true;
           pda: {
             seeds: [
@@ -270,10 +353,200 @@ export type Lazorkit = {
                   101,
                   116,
                   95,
-                  100,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              }
+            ];
+          };
+        },
+        {
+          name: 'referral';
+          writable: true;
+        },
+        {
+          name: 'lazorkitVault';
+          docs: [
+            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
+          ];
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  108,
                   97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
                   116,
-                  97
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ];
+              },
+              {
+                kind: 'arg';
+                path: 'args.vault_index';
+              }
+            ];
+          };
+        },
+        {
+          name: 'walletDevice';
+        },
+        {
+          name: 'oldPolicyProgram';
+        },
+        {
+          name: 'newPolicyProgram';
+        },
+        {
+          name: 'policyProgramRegistry';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ];
+              }
+            ];
+          };
+        },
+        {
+          name: 'ixSysvar';
+          docs: ['CHECK'];
+          address: 'Sysvar1nstructions1111111111111111111111111';
+        },
+        {
+          name: 'systemProgram';
+          address: '11111111111111111111111111111111';
+        }
+      ];
+      args: [
+        {
+          name: 'args';
+          type: {
+            defined: {
+              name: 'changePolicyArgs';
+            };
+          };
+        }
+      ];
+    },
+    {
+      name: 'createChunk';
+      docs: [
+        'Create a chunk buffer for large transactions',
+        '',
+        'Creates a buffer for chunked transactions when the main execute transaction',
+        'exceeds size limits. Splits large transactions into smaller, manageable',
+        'chunks that can be processed separately while maintaining security.'
+      ];
+      discriminator: [83, 226, 15, 219, 9, 19, 186, 90];
+      accounts: [
+        {
+          name: 'payer';
+          writable: true;
+          signer: true;
+        },
+        {
+          name: 'config';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [99, 111, 110, 102, 105, 103];
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWallet';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWalletConfig';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ];
               },
               {
@@ -350,34 +623,14 @@ export type Lazorkit = {
           ];
         },
         {
-          name: 'transactionSession';
+          name: 'chunk';
           docs: ['New transaction session account (rent payer: payer)'];
           writable: true;
           pda: {
             seeds: [
               {
                 kind: 'const';
-                value: [
-                  116,
-                  114,
-                  97,
-                  110,
-                  115,
-                  97,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ];
+                value: [99, 104, 117, 110, 107];
               },
               {
                 kind: 'account';
@@ -385,8 +638,8 @@ export type Lazorkit = {
               },
               {
                 kind: 'account';
-                path: 'smart_wallet_data.last_nonce';
-                account: 'smartWalletData';
+                path: 'smart_wallet_config.last_nonce';
+                account: 'smartWalletConfig';
               }
             ];
           };
@@ -405,7 +658,7 @@ export type Lazorkit = {
           name: 'args';
           type: {
             defined: {
-              name: 'createDeferredExecutionArgs';
+              name: 'createChunkArgs';
             };
           };
         }
@@ -413,17 +666,28 @@ export type Lazorkit = {
     },
     {
       name: 'createSmartWallet';
-      docs: ['Create a new smart wallet with passkey authentication'];
+      docs: [
+        'Create a new smart wallet with WebAuthn passkey authentication',
+        '',
+        'Creates a new smart wallet account with associated passkey device for secure',
+        'authentication. The wallet is initialized with the specified policy program',
+        'for transaction validation and can receive initial SOL funding.'
+      ];
       discriminator: [129, 39, 235, 18, 132, 68, 203, 19];
       accounts: [
         {
           name: 'payer';
+          docs: [
+            'The account that pays for the wallet creation and initial SOL transfer'
+          ];
           writable: true;
           signer: true;
         },
         {
           name: 'policyProgramRegistry';
-          docs: ['Policy program registry'];
+          docs: [
+            'Policy program registry that validates the default policy program'
+          ];
           pda: {
             seeds: [
               {
@@ -451,7 +715,9 @@ export type Lazorkit = {
         },
         {
           name: 'smartWallet';
-          docs: ['The smart wallet address PDA being created with random ID'];
+          docs: [
+            'The smart wallet address PDA being created with the provided wallet ID'
+          ];
           writable: true;
           pda: {
             seeds: [
@@ -480,8 +746,10 @@ export type Lazorkit = {
           };
         },
         {
-          name: 'smartWalletData';
-          docs: ['Smart wallet data'];
+          name: 'smartWalletConfig';
+          docs: [
+            'Smart wallet data account that stores wallet state and configuration'
+          ];
           writable: true;
           pda: {
             seeds: [
@@ -501,10 +769,12 @@ export type Lazorkit = {
                   101,
                   116,
                   95,
-                  100,
-                  97,
-                  116,
-                  97
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ];
               },
               {
@@ -516,7 +786,9 @@ export type Lazorkit = {
         },
         {
           name: 'walletDevice';
-          docs: ['Wallet device for the passkey'];
+          docs: [
+            'Wallet device account that stores the passkey authentication data'
+          ];
           writable: true;
           pda: {
             seeds: [
@@ -551,7 +823,7 @@ export type Lazorkit = {
         },
         {
           name: 'config';
-          docs: ['Program configuration'];
+          docs: ['Program configuration account containing global settings'];
           pda: {
             seeds: [
               {
@@ -563,10 +835,13 @@ export type Lazorkit = {
         },
         {
           name: 'defaultPolicyProgram';
-          docs: ['Default policy program for the smart wallet'];
+          docs: [
+            "Default policy program that will govern this smart wallet's transactions"
+          ];
         },
         {
           name: 'systemProgram';
+          docs: ['System program for account creation and SOL transfers'];
           address: '11111111111111111111111111111111';
         }
       ];
@@ -582,24 +857,20 @@ export type Lazorkit = {
       ];
     },
     {
-      name: 'executeDeferredTransaction';
-      discriminator: [165, 130, 174, 92, 162, 205, 131, 241];
+      name: 'execute';
+      docs: [
+        'Execute a transaction through the smart wallet',
+        '',
+        'The main transaction execution function that validates the transaction through',
+        'the policy program before executing the target program instruction. Supports',
+        'complex multi-instruction transactions with proper authentication.'
+      ];
+      discriminator: [130, 221, 242, 154, 13, 193, 189, 29];
       accounts: [
         {
           name: 'payer';
           writable: true;
           signer: true;
-        },
-        {
-          name: 'config';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [99, 111, 110, 102, 105, 103];
-              }
-            ];
-          };
         },
         {
           name: 'smartWallet';
@@ -625,14 +896,14 @@ export type Lazorkit = {
               },
               {
                 kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
               }
             ];
           };
         },
         {
-          name: 'smartWalletData';
+          name: 'smartWalletConfig';
           writable: true;
           pda: {
             seeds: [
@@ -652,191 +923,12 @@ export type Lazorkit = {
                   101,
                   116,
                   95,
-                  100,
-                  97,
-                  116,
-                  97
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smartWallet';
-              }
-            ];
-          };
-        },
-        {
-          name: 'referral';
-          writable: true;
-        },
-        {
-          name: 'lazorkitVault';
-          docs: [
-            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
-          ];
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ];
-              },
-              {
-                kind: 'arg';
-                path: 'vaultIndex';
-              }
-            ];
-          };
-        },
-        {
-          name: 'transactionSession';
-          docs: [
-            'Transaction session to execute. Closed on success to refund rent.'
-          ];
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  116,
-                  114,
-                  97,
-                  110,
-                  115,
-                  97,
                   99,
-                  116,
-                  105,
                   111,
                   110,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
+                  102,
                   105,
-                  111,
-                  110
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smartWallet';
-              },
-              {
-                kind: 'account';
-                path: 'transaction_session.authorized_nonce';
-                account: 'transactionSession';
-              }
-            ];
-          };
-        },
-        {
-          name: 'sessionRefund';
-          writable: true;
-        },
-        {
-          name: 'systemProgram';
-          address: '11111111111111111111111111111111';
-        }
-      ];
-      args: [
-        {
-          name: 'instructionDataList';
-          type: {
-            vec: 'bytes';
-          };
-        },
-        {
-          name: 'splitIndex';
-          type: 'bytes';
-        },
-        {
-          name: 'vaultIndex';
-          type: 'u8';
-        }
-      ];
-    },
-    {
-      name: 'executeDirectTransaction';
-      discriminator: [133, 33, 175, 46, 56, 92, 169, 220];
-      accounts: [
-        {
-          name: 'payer';
-          writable: true;
-          signer: true;
-        },
-        {
-          name: 'smartWallet';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
-              }
-            ];
-          };
-        },
-        {
-          name: 'smartWalletData';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
+                  103
                 ];
               },
               {
@@ -945,16 +1037,200 @@ export type Lazorkit = {
           name: 'args';
           type: {
             defined: {
-              name: 'executeDirectTransactionArgs';
+              name: 'executeArgs';
             };
           };
         }
       ];
     },
     {
-      name: 'executeEphemeralAuthorization';
-      docs: ['Execute transactions using ephemeral authorization'];
-      discriminator: [34, 195, 199, 141, 192, 147, 156, 14];
+      name: 'executeChunk';
+      docs: [
+        'Execute a chunk from the chunk buffer',
+        '',
+        'Executes a chunk from the previously created buffer. Used when the main',
+        'execute transaction is too large and needs to be split into smaller,',
+        'manageable pieces for processing.'
+      ];
+      discriminator: [106, 83, 113, 47, 89, 243, 39, 220];
+      accounts: [
+        {
+          name: 'payer';
+          writable: true;
+          signer: true;
+        },
+        {
+          name: 'config';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [99, 111, 110, 102, 105, 103];
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWallet';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWalletConfig';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              }
+            ];
+          };
+        },
+        {
+          name: 'referral';
+          writable: true;
+        },
+        {
+          name: 'lazorkitVault';
+          docs: [
+            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
+          ];
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'chunk.vault_index';
+                account: 'chunk';
+              }
+            ];
+          };
+        },
+        {
+          name: 'chunk';
+          docs: [
+            'Transaction session to execute. Closed on success to refund rent.'
+          ];
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [99, 104, 117, 110, 107];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              },
+              {
+                kind: 'account';
+                path: 'chunk.authorized_nonce';
+                account: 'chunk';
+              }
+            ];
+          };
+        },
+        {
+          name: 'sessionRefund';
+          writable: true;
+        },
+        {
+          name: 'systemProgram';
+          address: '11111111111111111111111111111111';
+        }
+      ];
+      args: [
+        {
+          name: 'instructionDataList';
+          type: {
+            vec: 'bytes';
+          };
+        },
+        {
+          name: 'splitIndex';
+          type: 'bytes';
+        }
+      ];
+    },
+    {
+      name: 'executeWithPermission';
+      docs: [
+        'Execute transactions using ephemeral permission',
+        '',
+        'Executes transactions using a previously granted ephemeral key, allowing',
+        'multiple operations without repeated passkey authentication. Perfect for',
+        'games or applications that require frequent interactions with the wallet.'
+      ];
+      discriminator: [213, 159, 47, 243, 150, 206, 78, 67];
       accounts: [
         {
           name: 'feePayer';
@@ -1002,14 +1278,14 @@ export type Lazorkit = {
               },
               {
                 kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
               }
             ];
           };
         },
         {
-          name: 'smartWalletData';
+          name: 'smartWalletConfig';
           writable: true;
           pda: {
             seeds: [
@@ -1029,10 +1305,12 @@ export type Lazorkit = {
                   101,
                   116,
                   95,
-                  100,
-                  97,
-                  116,
-                  97
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ];
               },
               {
@@ -1074,14 +1352,15 @@ export type Lazorkit = {
                 ];
               },
               {
-                kind: 'arg';
-                path: 'vaultIndex';
+                kind: 'account';
+                path: 'permission.vault_index';
+                account: 'permission';
               }
             ];
           };
         },
         {
-          name: 'ephemeralAuthorization';
+          name: 'permission';
           docs: [
             'Ephemeral authorization to execute. Closed on success to refund rent.'
           ];
@@ -1106,16 +1385,185 @@ export type Lazorkit = {
         {
           name: 'splitIndex';
           type: 'bytes';
+        }
+      ];
+    },
+    {
+      name: 'grantPermission';
+      docs: [
+        'Grant ephemeral permission to a keypair',
+        '',
+        'Grants time-limited permission to an ephemeral keypair to interact with',
+        'the smart wallet. Ideal for games or applications that need to perform',
+        'multiple operations without repeatedly authenticating with passkey.'
+      ];
+      discriminator: [50, 6, 1, 242, 15, 73, 99, 164];
+      accounts: [
+        {
+          name: 'payer';
+          writable: true;
+          signer: true;
         },
         {
-          name: 'vaultIndex';
-          type: 'u8';
+          name: 'config';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [99, 111, 110, 102, 105, 103];
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWallet';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smart_wallet_config.wallet_id';
+                account: 'smartWalletConfig';
+              }
+            ];
+          };
+        },
+        {
+          name: 'smartWalletConfig';
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              }
+            ];
+          };
+        },
+        {
+          name: 'walletDevice';
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              },
+              {
+                kind: 'arg';
+                path: 'args.passkey_public_key.to_hashed_bytes(smart_wallet';
+              }
+            ];
+          };
+        },
+        {
+          name: 'permission';
+          docs: ['New ephemeral authorization account (rent payer: payer)'];
+          writable: true;
+          pda: {
+            seeds: [
+              {
+                kind: 'const';
+                value: [112, 101, 114, 109, 105, 115, 115, 105, 111, 110];
+              },
+              {
+                kind: 'account';
+                path: 'smartWallet';
+              },
+              {
+                kind: 'arg';
+                path: 'args.ephemeral_public_key';
+              }
+            ];
+          };
+        },
+        {
+          name: 'ixSysvar';
+          address: 'Sysvar1nstructions1111111111111111111111111';
+        },
+        {
+          name: 'systemProgram';
+          address: '11111111111111111111111111111111';
+        }
+      ];
+      args: [
+        {
+          name: 'args';
+          type: {
+            defined: {
+              name: 'grantPermissionArgs';
+            };
+          };
         }
       ];
     },
     {
       name: 'initializeProgram';
-      docs: ['Initialize the program by creating the sequence tracker'];
+      docs: [
+        'Initialize the LazorKit program with essential configuration',
+        '',
+        "Sets up the program's initial state including the sequence tracker for transaction",
+        'ordering and default configuration parameters. This must be called before any',
+        'other operations can be performed.'
+      ];
       discriminator: [176, 107, 205, 168, 24, 157, 175, 103];
       accounts: [
         {
@@ -1185,183 +1633,13 @@ export type Lazorkit = {
       args: [];
     },
     {
-      name: 'invokeWalletPolicy';
-      discriminator: [86, 172, 240, 211, 83, 157, 165, 98];
-      accounts: [
-        {
-          name: 'payer';
-          writable: true;
-          signer: true;
-        },
-        {
-          name: 'config';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [99, 111, 110, 102, 105, 103];
-              }
-            ];
-          };
-        },
-        {
-          name: 'smartWallet';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
-              }
-            ];
-          };
-        },
-        {
-          name: 'smartWalletData';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smartWallet';
-              }
-            ];
-          };
-        },
-        {
-          name: 'referral';
-          writable: true;
-        },
-        {
-          name: 'lazorkitVault';
-          docs: [
-            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
-          ];
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ];
-              },
-              {
-                kind: 'arg';
-                path: 'args.vault_index';
-              }
-            ];
-          };
-        },
-        {
-          name: 'walletDevice';
-        },
-        {
-          name: 'policyProgram';
-        },
-        {
-          name: 'policyProgramRegistry';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ];
-              }
-            ];
-          };
-        },
-        {
-          name: 'ixSysvar';
-          address: 'Sysvar1nstructions1111111111111111111111111';
-        },
-        {
-          name: 'systemProgram';
-          address: '11111111111111111111111111111111';
-        }
-      ];
-      args: [
-        {
-          name: 'args';
-          type: {
-            defined: {
-              name: 'invokeWalletPolicyArgs';
-            };
-          };
-        }
-      ];
-    },
-    {
       name: 'manageVault';
-      docs: ['Withdraw SOL from vault'];
+      docs: [
+        'Manage SOL transfers in the vault system',
+        '',
+        'Handles SOL transfers to and from the LazorKit vault system, supporting',
+        'multiple vault slots for efficient fee distribution and program operations.'
+      ];
       discriminator: [165, 7, 106, 242, 73, 193, 195, 128];
       accounts: [
         {
@@ -1441,62 +1719,15 @@ export type Lazorkit = {
       ];
     },
     {
-      name: 'registerPolicyProgram';
-      docs: ['Add a program to the policy program registry'];
-      discriminator: [15, 54, 85, 112, 89, 180, 121, 13];
-      accounts: [
-        {
-          name: 'authority';
-          writable: true;
-          signer: true;
-          relations: ['config'];
-        },
-        {
-          name: 'config';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [99, 111, 110, 102, 105, 103];
-              }
-            ];
-          };
-        },
-        {
-          name: 'policyProgramRegistry';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ];
-              }
-            ];
-          };
-        }
+      name: 'updateConfig';
+      docs: [
+        'Update program configuration settings',
+        '',
+        'Allows the program authority to modify critical configuration parameters including',
+        'fee structures, default policy programs, and operational settings. This function',
+        'supports updating various configuration types through the UpdateType enum.'
       ];
-      args: [];
-    },
-    {
-      name: 'updateProgramConfig';
-      docs: ['Update the program configuration'];
-      discriminator: [214, 3, 187, 98, 170, 106, 33, 45];
+      discriminator: [29, 158, 252, 191, 10, 83, 219, 99];
       accounts: [
         {
           name: 'authority';
@@ -1524,7 +1755,7 @@ export type Lazorkit = {
           name: 'param';
           type: {
             defined: {
-              name: 'configUpdateType';
+              name: 'updateType';
             };
           };
         },
@@ -1533,207 +1764,28 @@ export type Lazorkit = {
           type: 'u64';
         }
       ];
-    },
-    {
-      name: 'updateWalletPolicy';
-      discriminator: [90, 225, 16, 40, 95, 80, 20, 107];
-      accounts: [
-        {
-          name: 'payer';
-          writable: true;
-          signer: true;
-        },
-        {
-          name: 'config';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [99, 111, 110, 102, 105, 103];
-              }
-            ];
-          };
-        },
-        {
-          name: 'smartWallet';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smart_wallet_data.wallet_id';
-                account: 'smartWalletData';
-              }
-            ];
-          };
-        },
-        {
-          name: 'smartWalletData';
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  100,
-                  97,
-                  116,
-                  97
-                ];
-              },
-              {
-                kind: 'account';
-                path: 'smartWallet';
-              }
-            ];
-          };
-        },
-        {
-          name: 'referral';
-          writable: true;
-        },
-        {
-          name: 'lazorkitVault';
-          docs: [
-            'LazorKit vault (empty PDA that holds SOL) - random vault selected by client'
-          ];
-          writable: true;
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ];
-              },
-              {
-                kind: 'arg';
-                path: 'args.vault_index';
-              }
-            ];
-          };
-        },
-        {
-          name: 'walletDevice';
-        },
-        {
-          name: 'oldPolicyProgram';
-        },
-        {
-          name: 'newPolicyProgram';
-        },
-        {
-          name: 'policyProgramRegistry';
-          pda: {
-            seeds: [
-              {
-                kind: 'const';
-                value: [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ];
-              }
-            ];
-          };
-        },
-        {
-          name: 'ixSysvar';
-          docs: ['CHECK'];
-          address: 'Sysvar1nstructions1111111111111111111111111';
-        },
-        {
-          name: 'systemProgram';
-          address: '11111111111111111111111111111111';
-        }
-      ];
-      args: [
-        {
-          name: 'args';
-          type: {
-            defined: {
-              name: 'updateWalletPolicyArgs';
-            };
-          };
-        }
-      ];
     }
   ];
   accounts: [
     {
-      name: 'ephemeralAuthorization';
-      discriminator: [159, 254, 58, 207, 22, 91, 56, 255];
+      name: 'chunk';
+      discriminator: [134, 67, 80, 65, 135, 143, 156, 196];
+    },
+    {
+      name: 'config';
+      discriminator: [155, 12, 170, 224, 30, 250, 204, 130];
+    },
+    {
+      name: 'permission';
+      discriminator: [224, 83, 28, 79, 10, 253, 161, 28];
     },
     {
       name: 'policyProgramRegistry';
       discriminator: [158, 67, 114, 157, 27, 153, 86, 72];
     },
     {
-      name: 'programConfig';
-      discriminator: [196, 210, 90, 231, 144, 149, 140, 63];
-    },
-    {
-      name: 'smartWalletData';
-      discriminator: [124, 86, 202, 243, 63, 150, 66, 22];
-    },
-    {
-      name: 'transactionSession';
-      discriminator: [169, 116, 227, 43, 10, 34, 251, 2];
+      name: 'smartWalletConfig';
+      discriminator: [138, 211, 3, 80, 65, 100, 207, 142];
     },
     {
       name: 'walletDevice';
@@ -1748,555 +1800,972 @@ export type Lazorkit = {
     },
     {
       code: 6001;
-      name: 'smartWalletDataMismatch';
+      name: 'smartWalletConfigMismatch';
       msg: 'Smart wallet address mismatch with authenticator';
     },
     {
       code: 6002;
-      name: 'authenticatorNotFound';
-      msg: 'Smart wallet authenticator account not found or invalid';
-    },
-    {
-      code: 6003;
       name: 'secp256r1InvalidLength';
       msg: 'Secp256r1 instruction has invalid data length';
     },
     {
-      code: 6004;
+      code: 6003;
       name: 'secp256r1HeaderMismatch';
       msg: 'Secp256r1 instruction header validation failed';
     },
     {
-      code: 6005;
+      code: 6004;
       name: 'secp256r1DataMismatch';
       msg: 'Secp256r1 signature data validation failed';
     },
     {
-      code: 6006;
-      name: 'secp256r1InstructionNotFound';
-      msg: 'Secp256r1 instruction not found at specified index';
-    },
-    {
-      code: 6007;
+      code: 6005;
       name: 'invalidSignature';
       msg: 'Invalid signature provided for passkey verification';
     },
     {
-      code: 6008;
+      code: 6006;
       name: 'clientDataInvalidUtf8';
       msg: 'Client data JSON is not valid UTF-8';
     },
     {
-      code: 6009;
+      code: 6007;
       name: 'clientDataJsonParseError';
       msg: 'Client data JSON parsing failed';
     },
     {
-      code: 6010;
+      code: 6008;
       name: 'challengeMissing';
       msg: 'Challenge field missing from client data JSON';
     },
     {
-      code: 6011;
+      code: 6009;
       name: 'challengeBase64DecodeError';
       msg: 'Challenge base64 decoding failed';
     },
     {
-      code: 6012;
+      code: 6010;
       name: 'challengeDeserializationError';
       msg: 'Challenge message deserialization failed';
     },
     {
-      code: 6013;
+      code: 6011;
       name: 'timestampTooOld';
       msg: 'Message timestamp is too far in the past';
     },
     {
-      code: 6014;
+      code: 6012;
       name: 'timestampTooNew';
       msg: 'Message timestamp is too far in the future';
     },
     {
-      code: 6015;
+      code: 6013;
       name: 'nonceMismatch';
       msg: 'Nonce mismatch: expected different value';
     },
     {
-      code: 6016;
+      code: 6014;
       name: 'nonceOverflow';
       msg: 'Nonce overflow: cannot increment further';
     },
     {
-      code: 6017;
+      code: 6015;
       name: 'policyProgramNotRegistered';
       msg: 'Policy program not found in registry';
     },
     {
-      code: 6018;
+      code: 6016;
       name: 'whitelistFull';
       msg: 'The policy program registry is full.';
     },
     {
-      code: 6019;
-      name: 'policyDataRequired';
-      msg: 'Policy data is required but not provided';
-    },
-    {
-      code: 6020;
+      code: 6017;
       name: 'invalidCheckPolicyDiscriminator';
       msg: 'Invalid instruction discriminator for check_policy';
     },
     {
-      code: 6021;
+      code: 6018;
       name: 'invalidDestroyDiscriminator';
       msg: 'Invalid instruction discriminator for destroy';
     },
     {
-      code: 6022;
+      code: 6019;
       name: 'invalidInitPolicyDiscriminator';
       msg: 'Invalid instruction discriminator for init_policy';
     },
     {
-      code: 6023;
+      code: 6020;
       name: 'policyProgramsIdentical';
       msg: 'Old and new policy programs are identical';
     },
     {
-      code: 6024;
+      code: 6021;
       name: 'noDefaultPolicyProgram';
       msg: 'Neither old nor new policy program is the default';
     },
     {
-      code: 6025;
+      code: 6022;
+      name: 'policyProgramAlreadyRegistered';
+      msg: 'Policy program already registered';
+    },
+    {
+      code: 6023;
       name: 'invalidRemainingAccounts';
       msg: 'Invalid remaining accounts';
     },
     {
-      code: 6026;
+      code: 6024;
       name: 'cpiDataMissing';
       msg: 'CPI data is required but not provided';
     },
     {
-      code: 6027;
-      name: 'invalidCpiData';
-      msg: 'CPI data is invalid or malformed';
-    },
-    {
-      code: 6028;
+      code: 6025;
       name: 'insufficientPolicyAccounts';
       msg: 'Insufficient remaining accounts for policy instruction';
     },
     {
-      code: 6029;
+      code: 6026;
       name: 'insufficientCpiAccounts';
       msg: 'Insufficient remaining accounts for CPI instruction';
     },
     {
-      code: 6030;
+      code: 6027;
       name: 'accountSliceOutOfBounds';
       msg: 'Account slice index out of bounds';
     },
     {
-      code: 6031;
-      name: 'solTransferInsufficientAccounts';
-      msg: 'SOL transfer requires at least 2 remaining accounts';
-    },
-    {
-      code: 6032;
-      name: 'newWalletDeviceMissing';
-      msg: 'New authenticator account is required but not provided';
-    },
-    {
-      code: 6033;
-      name: 'newWalletDevicePasskeyMissing';
-      msg: 'New authenticator passkey is required but not provided';
-    },
-    {
-      code: 6034;
-      name: 'insufficientLamports';
-      msg: 'Insufficient lamports for requested transfer';
-    },
-    {
-      code: 6035;
+      code: 6028;
       name: 'transferAmountOverflow';
       msg: 'Transfer amount would cause arithmetic overflow';
     },
     {
-      code: 6036;
+      code: 6029;
       name: 'invalidBumpSeed';
       msg: 'Invalid bump seed for PDA derivation';
     },
     {
-      code: 6037;
+      code: 6030;
       name: 'invalidAccountOwner';
       msg: 'Account owner verification failed';
     },
     {
-      code: 6038;
-      name: 'invalidAccountDiscriminator';
-      msg: 'Account discriminator mismatch';
-    },
-    {
-      code: 6039;
-      name: 'invalidProgramId';
-      msg: 'Invalid program ID';
-    },
-    {
-      code: 6040;
+      code: 6031;
       name: 'programNotExecutable';
       msg: 'Program not executable';
     },
     {
-      code: 6041;
-      name: 'walletDeviceAlreadyInitialized';
-      msg: 'Wallet device already initialized';
-    },
-    {
-      code: 6042;
-      name: 'credentialIdTooLarge';
-      msg: 'Credential ID exceeds maximum allowed size';
-    },
-    {
-      code: 6043;
-      name: 'credentialIdEmpty';
-      msg: 'Credential ID cannot be empty';
-    },
-    {
-      code: 6044;
-      name: 'policyDataTooLarge';
-      msg: 'Policy data exceeds maximum allowed size';
-    },
-    {
-      code: 6045;
-      name: 'cpiDataTooLarge';
-      msg: 'CPI data exceeds maximum allowed size';
-    },
-    {
-      code: 6046;
-      name: 'tooManyRemainingAccounts';
-      msg: 'Too many remaining accounts provided';
-    },
-    {
-      code: 6047;
-      name: 'invalidPdaDerivation';
-      msg: 'Invalid PDA derivation';
-    },
-    {
-      code: 6048;
-      name: 'transactionTooOld';
-      msg: 'Transaction is too old';
-    },
-    {
-      code: 6049;
-      name: 'rateLimitExceeded';
-      msg: 'Rate limit exceeded';
-    },
-    {
-      code: 6050;
-      name: 'invalidAccountData';
-      msg: 'Invalid account data';
-    },
-    {
-      code: 6051;
-      name: 'unauthorized';
-      msg: 'Unauthorized access attempt';
-    },
-    {
-      code: 6052;
+      code: 6032;
       name: 'programPaused';
       msg: 'Program is paused';
     },
     {
-      code: 6053;
+      code: 6033;
+      name: 'walletDeviceAlreadyInitialized';
+      msg: 'Wallet device already initialized';
+    },
+    {
+      code: 6034;
+      name: 'credentialIdTooLarge';
+      msg: 'Credential ID exceeds maximum allowed size';
+    },
+    {
+      code: 6035;
+      name: 'credentialIdEmpty';
+      msg: 'Credential ID cannot be empty';
+    },
+    {
+      code: 6036;
+      name: 'policyDataTooLarge';
+      msg: 'Policy data exceeds maximum allowed size';
+    },
+    {
+      code: 6037;
+      name: 'cpiDataTooLarge';
+      msg: 'CPI data exceeds maximum allowed size';
+    },
+    {
+      code: 6038;
+      name: 'tooManyRemainingAccounts';
+      msg: 'Too many remaining accounts provided';
+    },
+    {
+      code: 6039;
+      name: 'invalidPdaDerivation';
+      msg: 'Invalid PDA derivation';
+    },
+    {
+      code: 6040;
+      name: 'transactionTooOld';
+      msg: 'Transaction is too old';
+    },
+    {
+      code: 6041;
+      name: 'invalidAccountData';
+      msg: 'Invalid account data';
+    },
+    {
+      code: 6042;
       name: 'invalidInstructionData';
       msg: 'Invalid instruction data';
     },
     {
-      code: 6054;
+      code: 6043;
       name: 'accountAlreadyInitialized';
       msg: 'Account already initialized';
     },
     {
-      code: 6055;
-      name: 'accountNotInitialized';
-      msg: 'Account not initialized';
-    },
-    {
-      code: 6056;
+      code: 6044;
       name: 'invalidAccountState';
       msg: 'Invalid account state';
     },
     {
-      code: 6057;
-      name: 'integerOverflow';
-      msg: 'Operation would cause integer overflow';
-    },
-    {
-      code: 6058;
-      name: 'integerUnderflow';
-      msg: 'Operation would cause integer underflow';
-    },
-    {
-      code: 6059;
+      code: 6045;
       name: 'invalidFeeAmount';
       msg: 'Invalid fee amount';
     },
     {
-      code: 6060;
+      code: 6046;
       name: 'insufficientBalanceForFee';
       msg: 'Insufficient balance for fee';
     },
     {
-      code: 6061;
+      code: 6047;
       name: 'invalidAuthority';
       msg: 'Invalid authority';
     },
     {
-      code: 6062;
+      code: 6048;
       name: 'authorityMismatch';
       msg: 'Authority mismatch';
     },
     {
-      code: 6063;
+      code: 6049;
       name: 'invalidSequenceNumber';
       msg: 'Invalid sequence number';
     },
     {
-      code: 6064;
-      name: 'duplicateTransaction';
-      msg: 'Duplicate transaction detected';
-    },
-    {
-      code: 6065;
-      name: 'invalidTransactionOrdering';
-      msg: 'Invalid transaction ordering';
-    },
-    {
-      code: 6066;
-      name: 'maxWalletLimitReached';
-      msg: 'Maximum wallet limit reached';
-    },
-    {
-      code: 6067;
-      name: 'invalidWalletConfiguration';
-      msg: 'Invalid wallet configuration';
-    },
-    {
-      code: 6068;
-      name: 'walletNotFound';
-      msg: 'Wallet not found';
-    },
-    {
-      code: 6069;
+      code: 6050;
       name: 'invalidPasskeyFormat';
       msg: 'Invalid passkey format';
     },
     {
-      code: 6070;
-      name: 'passkeyAlreadyRegistered';
-      msg: 'Passkey already registered';
-    },
-    {
-      code: 6071;
+      code: 6051;
       name: 'invalidMessageFormat';
       msg: 'Invalid message format';
     },
     {
-      code: 6072;
-      name: 'messageSizeExceedsLimit';
-      msg: 'Message size exceeds limit';
-    },
-    {
-      code: 6073;
+      code: 6052;
       name: 'invalidSplitIndex';
       msg: 'Invalid split index';
     },
     {
-      code: 6074;
-      name: 'cpiExecutionFailed';
-      msg: 'CPI execution failed';
-    },
-    {
-      code: 6075;
+      code: 6053;
       name: 'invalidProgramAddress';
       msg: 'Invalid program address';
     },
     {
-      code: 6076;
-      name: 'whitelistOperationFailed';
-      msg: 'Whitelist operation failed';
-    },
-    {
-      code: 6077;
-      name: 'invalidWhitelistState';
-      msg: 'Invalid whitelist state';
-    },
-    {
-      code: 6078;
-      name: 'emergencyShutdown';
-      msg: 'Emergency shutdown activated';
-    },
-    {
-      code: 6079;
-      name: 'recoveryModeRequired';
-      msg: 'Recovery mode required';
-    },
-    {
-      code: 6080;
-      name: 'invalidRecoveryAttempt';
-      msg: 'Invalid recovery attempt';
-    },
-    {
-      code: 6081;
-      name: 'auditLogFull';
-      msg: 'Audit log full';
-    },
-    {
-      code: 6082;
-      name: 'invalidAuditEntry';
-      msg: 'Invalid audit entry';
-    },
-    {
-      code: 6083;
+      code: 6054;
       name: 'reentrancyDetected';
       msg: 'Reentrancy detected';
     },
     {
-      code: 6084;
-      name: 'invalidCallDepth';
-      msg: 'Invalid call depth';
-    },
-    {
-      code: 6085;
-      name: 'stackOverflowProtection';
-      msg: 'Stack overflow protection triggered';
-    },
-    {
-      code: 6086;
-      name: 'memoryLimitExceeded';
-      msg: 'Memory limit exceeded';
-    },
-    {
-      code: 6087;
-      name: 'computationLimitExceeded';
-      msg: 'Computation limit exceeded';
-    },
-    {
-      code: 6088;
-      name: 'invalidRentExemption';
-      msg: 'Invalid rent exemption';
-    },
-    {
-      code: 6089;
-      name: 'accountClosureFailed';
-      msg: 'Account closure failed';
-    },
-    {
-      code: 6090;
-      name: 'invalidAccountClosure';
-      msg: 'Invalid account closure';
-    },
-    {
-      code: 6091;
-      name: 'refundFailed';
-      msg: 'Refund failed';
-    },
-    {
-      code: 6092;
-      name: 'invalidRefundAmount';
-      msg: 'Invalid refund amount';
-    },
-    {
-      code: 6093;
-      name: 'allVaultsFull';
-      msg: 'All vault slots are full';
-    },
-    {
-      code: 6094;
-      name: 'vaultNotFound';
-      msg: 'Vault not found for the specified mint';
-    },
-    {
-      code: 6095;
-      name: 'insufficientVaultBalance';
-      msg: 'Insufficient balance in vault';
-    },
-    {
-      code: 6096;
-      name: 'vaultOverflow';
-      msg: 'Vault balance overflow';
-    },
-    {
-      code: 6097;
+      code: 6055;
       name: 'invalidVaultIndex';
       msg: 'Invalid vault index';
     },
     {
-      code: 6098;
+      code: 6056;
       name: 'insufficientBalance';
       msg: 'Insufficient balance';
     },
     {
-      code: 6099;
+      code: 6057;
       name: 'invalidAction';
       msg: 'Invalid action';
+    },
+    {
+      code: 6058;
+      name: 'insufficientVaultBalance';
+      msg: 'Insufficient balance in vault';
     }
   ];
   types: [
     {
-      name: 'authorizeEphemeralExecutionArgs';
+      name: 'callPolicyArgs';
+      docs: [
+        'Arguments for calling policy program instructions',
+        '',
+        'Contains WebAuthn authentication data and policy program parameters',
+        'required for executing policy program instructions like adding/removing devices.'
+      ];
       type: {
         kind: 'struct';
         fields: [
           {
             name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
             type: {
               array: ['u8', 33];
             };
           },
           {
             name: 'signature';
+            docs: ['WebAuthn signature for transaction authorization'];
             type: 'bytes';
           },
           {
             name: 'clientDataJsonRaw';
+            docs: ['Raw client data JSON from WebAuthn authentication'];
             type: 'bytes';
           },
           {
             name: 'authenticatorDataRaw';
+            docs: ['Raw authenticator data from WebAuthn authentication'];
             type: 'bytes';
           },
           {
             name: 'verifyInstructionIndex';
+            docs: ['Index of the Secp256r1 verification instruction'];
             type: 'u8';
           },
           {
-            name: 'ephemeralPublicKey';
+            name: 'policyData';
+            docs: ['Policy program instruction data'];
+            type: 'bytes';
+          },
+          {
+            name: 'newWalletDevice';
+            docs: ['Optional new wallet device to add during policy call'];
+            type: {
+              option: {
+                defined: {
+                  name: 'newWalletDeviceArgs';
+                };
+              };
+            };
+          },
+          {
+            name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'changePolicyArgs';
+      docs: [
+        "Arguments for changing a smart wallet's policy program",
+        '',
+        'Contains WebAuthn authentication data and policy program parameters',
+        'required for securely changing the policy program governing a wallet.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'signature';
+            docs: ['WebAuthn signature for transaction authorization'];
+            type: 'bytes';
+          },
+          {
+            name: 'clientDataJsonRaw';
+            docs: ['Raw client data JSON from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'authenticatorDataRaw';
+            docs: ['Raw authenticator data from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'verifyInstructionIndex';
+            docs: ['Index of the Secp256r1 verification instruction'];
+            type: 'u8';
+          },
+          {
+            name: 'splitIndex';
+            docs: [
+              'Index for splitting remaining accounts between policy and CPI'
+            ];
+            type: 'u16';
+          },
+          {
+            name: 'destroyPolicyData';
+            docs: ['Data for destroying the old policy program'];
+            type: 'bytes';
+          },
+          {
+            name: 'initPolicyData';
+            docs: ['Data for initializing the new policy program'];
+            type: 'bytes';
+          },
+          {
+            name: 'newWalletDevice';
+            docs: ['Optional new wallet device to add during policy change'];
+            type: {
+              option: {
+                defined: {
+                  name: 'newWalletDeviceArgs';
+                };
+              };
+            };
+          },
+          {
+            name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'chunk';
+      docs: [
+        'Transaction chunk for deferred execution',
+        '',
+        'Created after full passkey and policy verification. Contains all bindings',
+        'necessary to execute the transaction later without re-verification.',
+        'Used for large transactions that need to be split into manageable chunks.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'ownerWalletAddress';
+            docs: ['Smart wallet address that authorized this chunk session'];
             type: 'pubkey';
           },
           {
+            name: 'instructionDataHash';
+            docs: ['Combined SHA256 hash of all transaction instruction data'];
+            type: {
+              array: ['u8', 32];
+            };
+          },
+          {
+            name: 'accountsMetadataHash';
+            docs: [
+              'Combined SHA256 hash over all ordered remaining account metas plus target programs'
+            ];
+            type: {
+              array: ['u8', 32];
+            };
+          },
+          {
+            name: 'authorizedNonce';
+            docs: [
+              'The nonce that was authorized at chunk creation (bound into data hash)'
+            ];
+            type: 'u64';
+          },
+          {
             name: 'expiresAt';
+            docs: ['Unix timestamp when this chunk expires'];
+            type: 'i64';
+          },
+          {
+            name: 'rentRefundAddress';
+            docs: [
+              'Address to receive rent refund when closing the chunk session'
+            ];
+            type: 'pubkey';
+          },
+          {
+            name: 'vaultIndex';
+            docs: ['Vault index for fee collection during chunk execution'];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'config';
+      docs: [
+        'LazorKit program configuration and settings',
+        '',
+        'Stores global program configuration including fee structures, default policy',
+        'program, and operational settings. Only the program authority can modify',
+        'these settings through the update_config instruction.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'authority';
+            docs: ['Program authority that can modify configuration settings'];
+            type: 'pubkey';
+          },
+          {
+            name: 'createSmartWalletFee';
+            docs: ['Fee charged for creating a new smart wallet (in lamports)'];
+            type: 'u64';
+          },
+          {
+            name: 'feePayerFee';
+            docs: [
+              'Fee charged to the fee payer for transactions (in lamports)'
+            ];
+            type: 'u64';
+          },
+          {
+            name: 'referralFee';
+            docs: ['Fee paid to referral addresses (in lamports)'];
+            type: 'u64';
+          },
+          {
+            name: 'lazorkitFee';
+            docs: ['Fee retained by LazorKit protocol (in lamports)'];
+            type: 'u64';
+          },
+          {
+            name: 'defaultPolicyProgramId';
+            docs: ['Default policy program ID for new smart wallets'];
+            type: 'pubkey';
+          },
+          {
+            name: 'isPaused';
+            docs: ['Whether the program is currently paused'];
+            type: 'bool';
+          }
+        ];
+      };
+    },
+    {
+      name: 'createChunkArgs';
+      docs: [
+        'Arguments for creating a chunk buffer for large transactions',
+        '',
+        'Contains WebAuthn authentication data and parameters required for',
+        'creating chunk buffers when transactions exceed size limits.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'signature';
+            docs: ['WebAuthn signature for transaction authorization'];
+            type: 'bytes';
+          },
+          {
+            name: 'clientDataJsonRaw';
+            docs: ['Raw client data JSON from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'authenticatorDataRaw';
+            docs: ['Raw authenticator data from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'verifyInstructionIndex';
+            docs: ['Index of the Secp256r1 verification instruction'];
+            type: 'u8';
+          },
+          {
+            name: 'policyData';
+            docs: ['Policy program instruction data'];
+            type: 'bytes';
+          },
+          {
+            name: 'expiresAt';
+            docs: ['Unix timestamp when the chunk expires'];
             type: 'i64';
           },
           {
             name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'createSmartWalletArgs';
+      docs: [
+        'Arguments for creating a new smart wallet',
+        '',
+        'Contains all necessary parameters for initializing a new smart wallet',
+        'with WebAuthn passkey authentication and policy program configuration.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'credentialId';
+            docs: ['Unique credential ID from WebAuthn registration'];
+            type: 'bytes';
+          },
+          {
+            name: 'policyData';
+            docs: ['Policy program initialization data'];
+            type: 'bytes';
+          },
+          {
+            name: 'walletId';
+            docs: ['Random wallet ID provided by client for uniqueness'];
+            type: 'u64';
+          },
+          {
+            name: 'amount';
+            docs: ['Initial SOL amount to transfer to the wallet'];
+            type: 'u64';
+          },
+          {
+            name: 'referralAddress';
+            docs: ['Optional referral address for fee sharing'];
+            type: {
+              option: 'pubkey';
+            };
+          },
+          {
+            name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'executeArgs';
+      docs: [
+        'Arguments for executing a transaction through the smart wallet',
+        '',
+        'Contains WebAuthn authentication data and transaction parameters',
+        'required for secure transaction execution with policy validation.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'signature';
+            docs: ['WebAuthn signature for transaction authorization'];
+            type: 'bytes';
+          },
+          {
+            name: 'clientDataJsonRaw';
+            docs: ['Raw client data JSON from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'authenticatorDataRaw';
+            docs: ['Raw authenticator data from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'verifyInstructionIndex';
+            docs: ['Index of the Secp256r1 verification instruction'];
+            type: 'u8';
+          },
+          {
+            name: 'splitIndex';
+            docs: [
+              'Index for splitting remaining accounts between policy and CPI'
+            ];
+            type: 'u16';
+          },
+          {
+            name: 'policyData';
+            docs: ['Policy program instruction data'];
+            type: 'bytes';
+          },
+          {
+            name: 'cpiData';
+            docs: ['Cross-program invocation instruction data'];
+            type: 'bytes';
+          },
+          {
+            name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'grantPermissionArgs';
+      docs: [
+        'Arguments for granting ephemeral permission to a keypair',
+        '',
+        'Contains WebAuthn authentication data and parameters required for',
+        'granting time-limited permission to an ephemeral keypair for',
+        'multiple operations without repeated passkey authentication.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the WebAuthn passkey for authentication'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'signature';
+            docs: ['WebAuthn signature for transaction authorization'];
+            type: 'bytes';
+          },
+          {
+            name: 'clientDataJsonRaw';
+            docs: ['Raw client data JSON from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'authenticatorDataRaw';
+            docs: ['Raw authenticator data from WebAuthn authentication'];
+            type: 'bytes';
+          },
+          {
+            name: 'verifyInstructionIndex';
+            docs: ['Index of the Secp256r1 verification instruction'];
+            type: 'u8';
+          },
+          {
+            name: 'ephemeralPublicKey';
+            docs: ['Ephemeral public key that will receive permission'];
+            type: 'pubkey';
+          },
+          {
+            name: 'expiresAt';
+            docs: ['Unix timestamp when the permission expires'];
+            type: 'i64';
+          },
+          {
+            name: 'vaultIndex';
+            docs: [
+              'Random vault index (0-31) calculated off-chain for fee distribution'
+            ];
             type: 'u8';
           },
           {
             name: 'instructionDataList';
+            docs: ['All instruction data to be authorized for execution'];
             type: {
               vec: 'bytes';
             };
           },
           {
             name: 'splitIndex';
+            docs: ['Split indices for accounts (n-1 for n instructions)'];
             type: 'bytes';
           }
         ];
       };
     },
     {
-      name: 'configUpdateType';
+      name: 'newWalletDeviceArgs';
+      docs: [
+        'Arguments for adding a new wallet device (passkey)',
+        '',
+        'Contains the necessary data for adding a new WebAuthn passkey',
+        'to an existing smart wallet for enhanced security and convenience.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'passkeyPublicKey';
+            docs: ['Public key of the new WebAuthn passkey'];
+            type: {
+              array: ['u8', 33];
+            };
+          },
+          {
+            name: 'credentialId';
+            docs: [
+              'Unique credential ID from WebAuthn registration (max 256 bytes)'
+            ];
+            type: 'bytes';
+          }
+        ];
+      };
+    },
+    {
+      name: 'permission';
+      docs: [
+        'Ephemeral authorization for temporary program access',
+        '',
+        'Created after passkey authentication to allow execution with an ephemeral key',
+        'for a limited time. Enables multiple operations without repeated passkey',
+        'authentication, ideal for games and applications requiring frequent interactions.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'ownerWalletAddress';
+            docs: [
+              'Smart wallet address that authorized this permission session'
+            ];
+            type: 'pubkey';
+          },
+          {
+            name: 'ephemeralPublicKey';
+            docs: [
+              'Ephemeral public key that can sign transactions during this session'
+            ];
+            type: 'pubkey';
+          },
+          {
+            name: 'expiresAt';
+            docs: ['Unix timestamp when this permission session expires'];
+            type: 'i64';
+          },
+          {
+            name: 'feePayerAddress';
+            docs: ['Fee payer address for transactions in this session'];
+            type: 'pubkey';
+          },
+          {
+            name: 'rentRefundAddress';
+            docs: ['Address to receive rent refund when closing the session'];
+            type: 'pubkey';
+          },
+          {
+            name: 'vaultIndex';
+            docs: ['Vault index for fee collection during this session'];
+            type: 'u8';
+          },
+          {
+            name: 'instructionDataHash';
+            docs: [
+              'Combined hash of all instruction data that can be executed'
+            ];
+            type: {
+              array: ['u8', 32];
+            };
+          },
+          {
+            name: 'accountsMetadataHash';
+            docs: [
+              'Combined hash of all accounts that will be used in this session'
+            ];
+            type: {
+              array: ['u8', 32];
+            };
+          }
+        ];
+      };
+    },
+    {
+      name: 'policyProgramRegistry';
+      docs: [
+        'Registry of approved policy programs for smart wallet operations',
+        '',
+        'Maintains a whitelist of policy programs that can be used to govern',
+        'smart wallet transaction validation and security rules.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'registeredPrograms';
+            docs: ['List of registered policy program addresses (max 10)'];
+            type: {
+              vec: 'pubkey';
+            };
+          },
+          {
+            name: 'bump';
+            docs: ['Bump seed for PDA derivation and verification'];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'smartWalletConfig';
+      docs: [
+        'Core data account for a LazorKit smart wallet',
+        '',
+        'Stores the essential state information for a smart wallet including its',
+        'unique identifier, policy program configuration, and authentication nonce',
+        'for replay attack prevention.'
+      ];
+      type: {
+        kind: 'struct';
+        fields: [
+          {
+            name: 'walletId';
+            docs: ['Unique identifier for this smart wallet instance'];
+            type: 'u64';
+          },
+          {
+            name: 'referralAddress';
+            docs: [
+              'Referral address that receives referral fees from this wallet'
+            ];
+            type: 'pubkey';
+          },
+          {
+            name: 'policyProgramId';
+            docs: [
+              "Policy program that governs this wallet's transaction validation rules"
+            ];
+            type: 'pubkey';
+          },
+          {
+            name: 'lastNonce';
+            docs: [
+              'Last nonce used for message verification to prevent replay attacks'
+            ];
+            type: 'u64';
+          },
+          {
+            name: 'bump';
+            docs: ['Bump seed for PDA derivation and verification'];
+            type: 'u8';
+          }
+        ];
+      };
+    },
+    {
+      name: 'updateType';
+      docs: [
+        'Types of configuration parameters that can be updated',
+        '',
+        'Defines all the configuration parameters that can be modified through',
+        'the update_config instruction by the program authority.'
+      ];
       type: {
         kind: 'enum';
         variants: [
@@ -2328,467 +2797,13 @@ export type Lazorkit = {
       };
     },
     {
-      name: 'createDeferredExecutionArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'signature';
-            type: 'bytes';
-          },
-          {
-            name: 'clientDataJsonRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'authenticatorDataRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'verifyInstructionIndex';
-            type: 'u8';
-          },
-          {
-            name: 'policyData';
-            type: 'bytes';
-          },
-          {
-            name: 'expiresAt';
-            type: 'i64';
-          },
-          {
-            name: 'vaultIndex';
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'createSmartWalletArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'credentialId';
-            type: 'bytes';
-          },
-          {
-            name: 'policyData';
-            type: 'bytes';
-          },
-          {
-            name: 'walletId';
-            type: 'u64';
-          },
-          {
-            name: 'amount';
-            type: 'u64';
-          },
-          {
-            name: 'referralAddress';
-            type: {
-              option: 'pubkey';
-            };
-          },
-          {
-            name: 'vaultIndex';
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'ephemeralAuthorization';
-      docs: [
-        'Ephemeral authorization for temporary program access.',
-        'Created after passkey authentication. Allows execution with ephemeral key',
-        'for a limited time to authorized programs with multiple instructions.'
-      ];
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'ownerWalletAddress';
-            docs: ['Smart wallet that authorized this session'];
-            type: 'pubkey';
-          },
-          {
-            name: 'ephemeralPublicKey';
-            docs: ['Ephemeral public key that can sign transactions'];
-            type: 'pubkey';
-          },
-          {
-            name: 'expiresAt';
-            docs: ['Unix timestamp when this session expires'];
-            type: 'i64';
-          },
-          {
-            name: 'feePayerAddress';
-            docs: ['Fee payer for transactions in this session'];
-            type: 'pubkey';
-          },
-          {
-            name: 'rentRefundAddress';
-            docs: ['Where to refund rent when closing the session'];
-            type: 'pubkey';
-          },
-          {
-            name: 'vaultIndex';
-            docs: ['Vault index for fee collection'];
-            type: 'u8';
-          },
-          {
-            name: 'instructionDataHash';
-            docs: [
-              'Combined hash of all instruction data that can be executed'
-            ];
-            type: {
-              array: ['u8', 32];
-            };
-          },
-          {
-            name: 'accountsMetadataHash';
-            docs: ['Combined hash of all accounts that will be used'];
-            type: {
-              array: ['u8', 32];
-            };
-          }
-        ];
-      };
-    },
-    {
-      name: 'executeDirectTransactionArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'signature';
-            type: 'bytes';
-          },
-          {
-            name: 'clientDataJsonRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'authenticatorDataRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'verifyInstructionIndex';
-            type: 'u8';
-          },
-          {
-            name: 'splitIndex';
-            type: 'u16';
-          },
-          {
-            name: 'policyData';
-            type: 'bytes';
-          },
-          {
-            name: 'cpiData';
-            type: 'bytes';
-          },
-          {
-            name: 'vaultIndex';
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'invokeWalletPolicyArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'signature';
-            type: 'bytes';
-          },
-          {
-            name: 'clientDataJsonRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'authenticatorDataRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'verifyInstructionIndex';
-            type: 'u8';
-          },
-          {
-            name: 'policyData';
-            type: 'bytes';
-          },
-          {
-            name: 'newWalletDevice';
-            type: {
-              option: {
-                defined: {
-                  name: 'newWalletDeviceArgs';
-                };
-              };
-            };
-          },
-          {
-            name: 'vaultIndex';
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'newWalletDeviceArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'credentialId';
-            type: 'bytes';
-          }
-        ];
-      };
-    },
-    {
-      name: 'policyProgramRegistry';
-      docs: [
-        'Registry of approved policy programs that can govern smart wallet operations'
-      ];
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'registeredPrograms';
-            docs: ['List of registered policy program addresses'];
-            type: {
-              vec: 'pubkey';
-            };
-          },
-          {
-            name: 'bump';
-            docs: ['Bump seed for PDA derivation'];
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'programConfig';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'authority';
-            type: 'pubkey';
-          },
-          {
-            name: 'createSmartWalletFee';
-            type: 'u64';
-          },
-          {
-            name: 'feePayerFee';
-            type: 'u64';
-          },
-          {
-            name: 'referralFee';
-            type: 'u64';
-          },
-          {
-            name: 'lazorkitFee';
-            type: 'u64';
-          },
-          {
-            name: 'defaultPolicyProgramId';
-            type: 'pubkey';
-          },
-          {
-            name: 'isPaused';
-            type: 'bool';
-          }
-        ];
-      };
-    },
-    {
-      name: 'smartWalletData';
-      docs: ['Data account for a smart wallet'];
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'walletId';
-            docs: ['Unique identifier for this smart wallet'];
-            type: 'u64';
-          },
-          {
-            name: 'referralAddress';
-            docs: ["Referral address that governs this wallet's operations"];
-            type: 'pubkey';
-          },
-          {
-            name: 'policyProgramId';
-            docs: ["Policy program that governs this wallet's operations"];
-            type: 'pubkey';
-          },
-          {
-            name: 'lastNonce';
-            docs: ['Last nonce used for message verification'];
-            type: 'u64';
-          },
-          {
-            name: 'bump';
-            docs: ['Bump seed for PDA derivation'];
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'transactionSession';
-      docs: [
-        'Transaction session for deferred execution.',
-        'Created after full passkey + policy verification. Contains all bindings',
-        'necessary to execute the transaction later without re-verification.'
-      ];
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'ownerWalletAddress';
-            docs: ['Smart wallet that authorized this session'];
-            type: 'pubkey';
-          },
-          {
-            name: 'instructionDataHash';
-            docs: ['Combined sha256 hash of all transaction instruction data'];
-            type: {
-              array: ['u8', 32];
-            };
-          },
-          {
-            name: 'accountsMetadataHash';
-            docs: [
-              'Combined sha256 hash over all ordered remaining account metas plus target programs'
-            ];
-            type: {
-              array: ['u8', 32];
-            };
-          },
-          {
-            name: 'authorizedNonce';
-            docs: [
-              'The nonce that was authorized at session creation (bound into data hash)'
-            ];
-            type: 'u64';
-          },
-          {
-            name: 'expiresAt';
-            docs: ['Unix expiration timestamp'];
-            type: 'i64';
-          },
-          {
-            name: 'rentRefundAddress';
-            docs: ['Where to refund rent when closing the session'];
-            type: 'pubkey';
-          },
-          {
-            name: 'vaultIndex';
-            docs: ['Vault index for fee collection'];
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
-      name: 'updateWalletPolicyArgs';
-      type: {
-        kind: 'struct';
-        fields: [
-          {
-            name: 'passkeyPublicKey';
-            type: {
-              array: ['u8', 33];
-            };
-          },
-          {
-            name: 'signature';
-            type: 'bytes';
-          },
-          {
-            name: 'clientDataJsonRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'authenticatorDataRaw';
-            type: 'bytes';
-          },
-          {
-            name: 'verifyInstructionIndex';
-            type: 'u8';
-          },
-          {
-            name: 'splitIndex';
-            type: 'u16';
-          },
-          {
-            name: 'destroyPolicyData';
-            type: 'bytes';
-          },
-          {
-            name: 'initPolicyData';
-            type: 'bytes';
-          },
-          {
-            name: 'newWalletDevice';
-            type: {
-              option: {
-                defined: {
-                  name: 'newWalletDeviceArgs';
-                };
-              };
-            };
-          },
-          {
-            name: 'vaultIndex';
-            type: 'u8';
-          }
-        ];
-      };
-    },
-    {
       name: 'walletDevice';
       docs: [
-        'Account that stores a wallet device (passkey) used to authenticate to a smart wallet'
+        'Account that stores a wallet device (passkey) for smart wallet authentication',
+        '',
+        'Each wallet device represents a WebAuthn passkey that can be used to authenticate',
+        'transactions for a specific smart wallet. Multiple devices can be associated with',
+        'a single smart wallet for enhanced security and convenience.'
       ];
       type: {
         kind: 'struct';
@@ -2796,7 +2811,7 @@ export type Lazorkit = {
           {
             name: 'passkeyPublicKey';
             docs: [
-              'The public key of the passkey for this wallet device that can authorize transactions'
+              'Public key of the WebAuthn passkey for transaction authorization'
             ];
             type: {
               array: ['u8', 33];
@@ -2804,17 +2819,17 @@ export type Lazorkit = {
           },
           {
             name: 'smartWalletAddress';
-            docs: ['The smart wallet this wallet device belongs to'];
+            docs: ['Smart wallet address this device is associated with'];
             type: 'pubkey';
           },
           {
             name: 'credentialId';
-            docs: ['The credential ID this wallet device belongs to'];
+            docs: ['Unique credential ID from WebAuthn registration'];
             type: 'bytes';
           },
           {
             name: 'bump';
-            docs: ['Bump seed for PDA derivation'];
+            docs: ['Bump seed for PDA derivation and verification'];
             type: 'u8';
           }
         ];

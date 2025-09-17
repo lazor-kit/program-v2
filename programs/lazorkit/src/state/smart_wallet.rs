@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 
 /// Core data account for a LazorKit smart wallet
-/// 
+///
 /// Stores the essential state information for a smart wallet including its
 /// unique identifier, policy program configuration, and authentication nonce
 /// for replay attack prevention.
 #[account]
 #[derive(Default, InitSpace)]
-pub struct SmartWalletData {
+pub struct SmartWalletConfig {
     /// Unique identifier for this smart wallet instance
     pub wallet_id: u64,
     /// Referral address that receives referral fees from this wallet
@@ -20,7 +20,7 @@ pub struct SmartWalletData {
     pub bump: u8,
 }
 
-impl SmartWalletData {
+impl SmartWalletConfig {
     /// Seed prefix used for PDA derivation of smart wallet data accounts
-    pub const PREFIX_SEED: &'static [u8] = b"smart_wallet_data";
+    pub const PREFIX_SEED: &'static [u8] = b"smart_wallet_config";
 }

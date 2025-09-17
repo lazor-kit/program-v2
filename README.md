@@ -162,7 +162,7 @@ const walletId = lazorkitClient.generateWalletId();
 
 // Create smart wallet with passkey
 const { transaction, smartWalletId, smartWallet } =
-  await lazorkitClient.createSmartWalletTransaction({
+  await lazorkitClient.createSmartWalletTxn({
     payer: payer.publicKey,
     passkeyPubkey: [
       /* 33 bytes */
@@ -238,7 +238,7 @@ const invokeTx = await lazorkitClient.invokePolicyWithAuth({
 
 ```typescript
 // Create transaction session
-const sessionTx = await lazorkitClient.createTransactionSessionWithAuth({
+const sessionTx = await lazorkitClient.createChunkWithAuth({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
@@ -350,7 +350,7 @@ The SDK has been completely refactored with:
 - `executeTxnDirectTx` → `executeTransactionWithAuth`
 - `callRuleDirectTx` → `invokePolicyWithAuth`
 - `changeRuleDirectTx` → `updatePolicyWithAuth`
-- `commitCpiTx` → `createTransactionSessionWithAuth`
+- `commitCpiTx` → `createChunkWithAuth`
 - `executeCommitedTx` → `executeSessionTransaction`
 - `MessageArgs` → `SmartWalletActionArgs`
 - `DefaultRuleClient` → `DefaultPolicyClient`

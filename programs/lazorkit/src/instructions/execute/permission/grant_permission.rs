@@ -4,7 +4,7 @@ use anchor_lang::solana_program::hash::Hasher;
 use crate::instructions::GrantPermissionArgs;
 use crate::security::validation;
 use crate::state::{
-    GrantPermissionMessage, Permission, Config, SmartWalletData,
+    GrantPermissionMessage, Permission, Config, SmartWalletConfig,
     WalletDevice,
 };
 use crate::utils::{verify_authorization, PasskeyExt};
@@ -46,7 +46,7 @@ pub fn grant_permission(
             &args.client_data_json_raw,
             &args.authenticator_data_raw,
             args.verify_instruction_index,
-            ctx.accounts.smart_wallet_data.last_nonce,
+            ctx.accounts.smart_wallet_config.last_nonce,
         )?;
 
     // Step 3: Verify message fields match arguments
@@ -153,9 +153,9 @@ pub fn grant_permission(
 
     // Step 10: Update wallet state
     // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_data.last_nonce = ctx
+    ctx.accounts.smart_wallet_config.last_nonce = ctx
         .accounts
-        .smart_wallet_data
+        .smart_wallet_config
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
@@ -174,8 +174,8 @@ pub struct GrantPermission<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_data.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
+        bump = smart_wallet_config.bump,
         
     )]
     /// CHECK: PDA verified
@@ -183,11 +183,11 @@ pub struct GrantPermission<'info> {
 
     #[account(
         mut,
-        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
     #[account(
         seeds = [
@@ -197,7 +197,7 @@ pub struct GrantPermission<'info> {
         ],
         bump = wallet_device.bump,
         owner = ID,
-        constraint = wallet_device.smart_wallet_address == smart_wallet.key() @ LazorKitError::SmartWalletDataMismatch,
+        constraint = wallet_device.smart_wallet_address == smart_wallet.key() @ LazorKitError::SmartWalletConfigMismatch,
         constraint = wallet_device.passkey_public_key == args.passkey_public_key @ LazorKitError::PasskeyMismatch
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,

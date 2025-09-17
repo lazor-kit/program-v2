@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::LazorKitError;
 use crate::security::validation;
-use crate::state::{LazorKitVault, Config, SmartWalletData, Chunk};
+use crate::state::{LazorKitVault, Config, SmartWalletConfig, Chunk};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
@@ -129,12 +129,12 @@ pub fn execute_chunk(
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
             ctx.accounts
-                .smart_wallet_data
+                .smart_wallet_config
                 .wallet_id
                 .to_le_bytes()
                 .to_vec(),
         ],
-        bump: ctx.accounts.smart_wallet_data.bump,
+        bump: ctx.accounts.smart_wallet_config.bump,
     };
 
     // Step 9: Execute all instructions using the account ranges
@@ -186,22 +186,22 @@ pub struct ExecuteChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_data.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
+        bump = smart_wallet_config.bump,
     )]
     /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
-    /// CHECK: referral account (matches smart_wallet_data.referral)
-    #[account(mut, address = smart_wallet_data.referral_address)]
+    /// CHECK: referral account (matches smart_wallet_config.referral)
+    #[account(mut, address = smart_wallet_config.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client

@@ -36,7 +36,7 @@ pub fn execute<'c: 'info, 'info>(
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_data.last_nonce,
+        ctx.accounts.smart_wallet_config.last_nonce,
     )?;
 
     // Step 1: Validate and verify the policy program
@@ -53,7 +53,7 @@ pub fn execute<'c: 'info, 'info>(
 
     // Ensure the policy program matches the wallet's configured policy
     require!(
-        policy_program_info.key() == ctx.accounts.smart_wallet_data.policy_program_id,
+        policy_program_info.key() == ctx.accounts.smart_wallet_config.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
 
@@ -154,12 +154,12 @@ pub fn execute<'c: 'info, 'info>(
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
             ctx.accounts
-                .smart_wallet_data
+                .smart_wallet_config
                 .wallet_id
                 .to_le_bytes()
                 .to_vec(),
         ],
-        bump: ctx.accounts.smart_wallet_data.bump,
+        bump: ctx.accounts.smart_wallet_config.bump,
     };
     // Execute the actual transaction through CPI
     execute_cpi(
@@ -171,9 +171,9 @@ pub fn execute<'c: 'info, 'info>(
 
     // Step 8: Update wallet state and handle fees
     // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_data.last_nonce = ctx
+    ctx.accounts.smart_wallet_config.last_nonce = ctx
         .accounts
-        .smart_wallet_data
+        .smart_wallet_config
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
@@ -208,22 +208,22 @@ pub struct Execute<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_data.bump,
+        seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
+        bump = smart_wallet_config.bump,
     )]
     /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [crate::state::SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [crate::state::SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, crate::state::SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, crate::state::SmartWalletConfig>>,
 
-    /// CHECK: referral account (matches smart_wallet_data.referral)
-    #[account(mut, address = smart_wallet_data.referral_address)]
+    /// CHECK: referral account (matches smart_wallet_config.referral)
+    #[account(mut, address = smart_wallet_config.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client

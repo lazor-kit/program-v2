@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::instructions::{Args as _, ChangePolicyArgs};
 use crate::security::validation;
 use crate::state::{
-    LazorKitVault, PolicyProgramRegistry, Config, SmartWalletData,
+    LazorKitVault, PolicyProgramRegistry, Config, SmartWalletConfig,
     ChangePolicyMessage, WalletDevice,
 };
 use crate::utils::{
@@ -42,7 +42,7 @@ pub fn change_policy<'c: 'info, 'info>(
     
     // Ensure the old policy program matches the wallet's current policy
     require!(
-        ctx.accounts.smart_wallet_data.policy_program_id == ctx.accounts.old_policy_program.key(),
+        ctx.accounts.smart_wallet_config.policy_program_id == ctx.accounts.old_policy_program.key(),
         LazorKitError::InvalidProgramAddress
     );
     
@@ -67,7 +67,7 @@ pub fn change_policy<'c: 'info, 'info>(
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_data.last_nonce,
+        ctx.accounts.smart_wallet_config.last_nonce,
     )?;
 
     // Step 3: Split remaining accounts for destroy and init operations
@@ -205,12 +205,12 @@ pub fn change_policy<'c: 'info, 'info>(
 
     // Step 9: Update wallet state after successful policy transition
     // Update the policy program ID to the new policy program
-    ctx.accounts.smart_wallet_data.policy_program_id = ctx.accounts.new_policy_program.key();
+    ctx.accounts.smart_wallet_config.policy_program_id = ctx.accounts.new_policy_program.key();
 
     // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_data.last_nonce = ctx
+    ctx.accounts.smart_wallet_config.last_nonce = ctx
         .accounts
-        .smart_wallet_data
+        .smart_wallet_config
         .last_nonce
         .checked_add(1)
         .ok_or(LazorKitError::NonceOverflow)?;
@@ -228,12 +228,12 @@ pub fn change_policy<'c: 'info, 'info>(
         seeds: vec![
             crate::constants::SMART_WALLET_SEED.to_vec(),
             ctx.accounts
-                .smart_wallet_data
+                .smart_wallet_config
                 .wallet_id
                 .to_le_bytes()
                 .to_vec(),
         ],
-        bump: ctx.accounts.smart_wallet_data.bump,
+        bump: ctx.accounts.smart_wallet_config.bump,
     };
 
     // Distribute fees to payer, referral, and LazorKit vault
@@ -261,22 +261,22 @@ pub struct ChangePolicy<'info> {
 
     #[account(
         mut,
-        seeds = [crate::constants::SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_data.bump,
+        seeds = [crate::constants::SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
+        bump = smart_wallet_config.bump,
     )]
     /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [SmartWalletData::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
-    pub smart_wallet_data: Box<Account<'info, SmartWalletData>>,
+    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
-    /// CHECK: referral account (matches smart_wallet_data.referral)
-    #[account(mut, address = smart_wallet_data.referral_address)]
+    /// CHECK: referral account (matches smart_wallet_config.referral)
+    #[account(mut, address = smart_wallet_config.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
     /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
