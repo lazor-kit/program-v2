@@ -8,7 +8,7 @@ use crate::{
     error::LazorKitError,
     instructions::CreateSmartWalletArgs,
     security::validation,
-    state::{PolicyProgramRegistry, ProgramConfig, SmartWalletData, WalletDevice},
+    state::{PolicyProgramRegistry, Config, SmartWalletData, WalletDevice},
     utils::{execute_cpi, PasskeyExt, PdaSigner},
     ID,
 };
@@ -32,42 +32,46 @@ pub fn create_smart_wallet(
     ctx: Context<CreateSmartWallet>,
     args: CreateSmartWalletArgs,
 ) -> Result<()> {
-    // Program must not be paused
+    // Step 1: Validate global program state and input parameters
+    // Ensure the program is not paused before processing wallet creation
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
-    // === Input Validation ===
+    
+    // Validate all input parameters for security and correctness
     validation::validate_credential_id(&args.credential_id)?;
     validation::validate_policy_data(&args.policy_data)?;
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
 
-    // Validate passkey format (ensure it's a valid compressed public key)
+    // Validate passkey format - must be a valid compressed public key (starts with 0x02 or 0x03)
     require!(
         args.passkey_public_key[0] == 0x02 || args.passkey_public_key[0] == 0x03,
         LazorKitError::InvalidPasskeyFormat
     );
 
-    // Validate wallet ID is not zero (reserved) and not too large
+    // Validate wallet ID is not zero (reserved) and within valid range
     require!(
         args.wallet_id != 0 && args.wallet_id < u64::MAX,
         LazorKitError::InvalidSequenceNumber
     );
 
-    // === Configuration ===
+    // Step 2: Prepare account references and validate policy program
     let wallet_data = &mut ctx.accounts.smart_wallet_data;
     let wallet_device = &mut ctx.accounts.wallet_device;
 
-    // Validate default policy program
+    // Ensure the default policy program is executable (not a data account)
     validation::validate_program_executable(&ctx.accounts.default_policy_program)?;
 
-    // === Initialize Smart Wallet Data ===
+    // Step 3: Initialize the smart wallet data account
+    // This stores the core wallet state including policy program, nonce, and referral info
     wallet_data.set_inner(SmartWalletData {
         policy_program_id: ctx.accounts.config.default_policy_program_id,
         wallet_id: args.wallet_id,
-        last_nonce: 0,
+        last_nonce: 0, // Start with nonce 0 for replay attack prevention
         bump: ctx.bumps.smart_wallet,
         referral_address: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
     });
 
-    // === Initialize Wallet Device Data ===
+    // Step 4: Initialize the wallet device (passkey) account
+    // This stores the WebAuthn passkey data for transaction authentication
     wallet_device.set_inner(WalletDevice {
         passkey_public_key: args.passkey_public_key,
         smart_wallet_address: ctx.accounts.smart_wallet.key(),
@@ -75,7 +79,8 @@ pub fn create_smart_wallet(
         bump: ctx.bumps.wallet_device,
     });
 
-    // === Transfer SOL to smart wallet ===
+    // Step 5: Transfer initial SOL to the smart wallet
+    // This provides the wallet with initial funding for transactions and rent
     transfer(
         CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -87,7 +92,8 @@ pub fn create_smart_wallet(
         args.amount,
     )?;
 
-    // === Create PDA Signer ===
+    // Step 6: Create PDA signer for policy program initialization
+    // This allows the smart wallet to sign calls to the policy program
     let wallet_signer = PdaSigner {
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
@@ -96,7 +102,8 @@ pub fn create_smart_wallet(
         bump: ctx.bumps.smart_wallet,
     };
 
-    // === Execute Policy Program CPI ===
+    // Step 7: Initialize the policy program for this wallet
+    // This sets up the policy program with any required initial state
     execute_cpi(
         &ctx.remaining_accounts,
         &args.policy_data,
@@ -162,11 +169,11 @@ pub struct CreateSmartWallet<'info> {
 
     /// Program configuration account containing global settings
     #[account(
-        seeds = [ProgramConfig::PREFIX_SEED],
+        seeds = [Config::PREFIX_SEED],
         bump,
         owner = ID
     )]
-    pub config: Box<Account<'info, ProgramConfig>>,
+    pub config: Box<Account<'info, Config>>,
 
     /// Default policy program that will govern this smart wallet's transactions
     #[account(

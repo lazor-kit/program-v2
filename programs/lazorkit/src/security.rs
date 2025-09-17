@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 
 /// LazorKit security constants and validation utilities
 /// 
-/// This module contains all security-related constants and validation functions
-/// used throughout the LazorKit program to ensure safe operation and prevent
-/// various attack vectors including DoS, overflow, and unauthorized access.
+/// Contains security-related constants and validation functions used throughout
+/// the LazorKit program to ensure safe operation and prevent various attack
+/// vectors including DoS, overflow, and unauthorized access.
 
 // === Size Limits ===
 /// Maximum allowed size for credential ID to prevent DoS attacks

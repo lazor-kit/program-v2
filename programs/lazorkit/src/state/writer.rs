@@ -2,13 +2,17 @@ use anchor_lang::solana_program::program_memory::sol_memcpy;
 use std::cmp;
 use std::io::{self, Write};
 
-/***
- * Writer
- */
+/// BPF-compatible writer for instruction serialization
+///
+/// Provides a memory-safe writer implementation that works within Solana's
+/// BPF environment for serializing instruction data and account information.
 
+/// BPF-compatible writer for memory-safe data serialization
 #[derive(Debug, Default)]
 pub struct BpfWriter<T> {
+    /// Inner buffer for writing data
     inner: T,
+    /// Current position in the buffer
     pos: u64,
 }
 

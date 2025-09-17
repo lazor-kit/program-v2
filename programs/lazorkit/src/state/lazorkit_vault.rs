@@ -7,11 +7,13 @@ use anchor_lang::{
 /// 
 /// Vaults are empty PDAs owned by the LazorKit program that hold SOL
 /// for fee distribution and protocol operations. The system supports
-/// up to 32 vault slots for efficient load distribution.
+/// up to 32 vault slots for efficient load distribution and scalability.
 pub struct LazorKitVault;
 
 impl LazorKitVault {
+    /// Seed prefix used for PDA derivation of vault accounts
     pub const PREFIX_SEED: &'static [u8] = b"lazorkit_vault";
+    /// Maximum number of vault slots supported
     pub const MAX_VAULTS: u8 = 32;
 
     /// Derive vault PDA for a given index
