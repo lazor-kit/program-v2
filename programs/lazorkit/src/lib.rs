@@ -10,7 +10,7 @@ pub mod utils;
 use instructions::*;
 use state::*;
 
-declare_id!("J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W");
+declare_id!("G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ");
 
 /// LazorKit: Enterprise Smart Wallet with WebAuthn Passkey Authentication
 ///

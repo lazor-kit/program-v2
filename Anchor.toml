@@ -7,22 +7,22 @@ resolution = true
 skip-lint = false
 
 [programs.mainnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ"
+default_policy = "7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381"
 
 [programs.devnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ"
+default_policy = "7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381"
 
 [programs.localnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ"
+default_policy = "7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/default_policy.json`.
  */
 export type DefaultPolicy = {
-  address: 'CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE';
+  address: '7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381';
   metadata: {
     name: 'defaultPolicy';
     version: '0.1.0';
@@ -63,7 +63,7 @@ export type DefaultPolicy = {
         },
         {
           name: 'lazorkit';
-          address: 'J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W';
+          address: 'G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ';
         },
         {
           name: 'systemProgram';
@@ -132,7 +132,7 @@ export type DefaultPolicy = {
         },
         {
           name: 'lazorkit';
-          address: 'J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W';
+          address: 'G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ';
         },
         {
           name: 'systemProgram';
