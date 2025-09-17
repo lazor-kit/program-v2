@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use lazorkit::{
-    constants::{PASSKEY_SIZE, SMART_WALLET_SEED},
+    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
     state::WalletDevice,
     utils::PasskeyExt as _,
     ID as LAZORKIT_ID,
@@ -11,7 +11,7 @@ use crate::{error::PolicyError, state::Policy, ID};
 pub fn check_policy(
     ctx: Context<CheckPolicy>,
     wallet_id: u64,
-    passkey_public_key: [u8; PASSKEY_SIZE],
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
 ) -> Result<()> {
     let wallet_device = &mut ctx.accounts.wallet_device;
     let smart_wallet = &mut ctx.accounts.smart_wallet;

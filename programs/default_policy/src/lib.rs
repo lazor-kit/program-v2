@@ -7,7 +7,7 @@ mod instructions;
 mod state;
 
 use instructions::*;
-use lazorkit::constants::PASSKEY_SIZE;
+use lazorkit::constants::PASSKEY_PUBLIC_KEY_SIZE;
 
 #[program]
 pub mod default_policy {
@@ -17,7 +17,7 @@ pub mod default_policy {
     pub fn init_policy(
         ctx: Context<InitPolicy>,
         wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_SIZE],
+        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     ) -> Result<()> {
         instructions::init_policy(ctx, wallet_id, passkey_public_key)
     }
@@ -25,7 +25,7 @@ pub mod default_policy {
     pub fn check_policy(
         ctx: Context<CheckPolicy>,
         wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_SIZE],
+        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     ) -> Result<()> {
         instructions::check_policy(ctx, wallet_id, passkey_public_key)
     }

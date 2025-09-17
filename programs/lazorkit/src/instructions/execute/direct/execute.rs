@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{Args as _, ExecuteDirectTransactionArgs};
+use crate::instructions::{Args as _, ExecuteArgs};
 use crate::security::validation;
 use crate::state::{ExecuteMessage, LazorKitVault};
 use crate::utils::{
@@ -10,9 +10,9 @@ use crate::utils::{
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn execute_direct_transaction<'c: 'info, 'info>(
-    ctx: Context<'_, '_, 'c, 'info, ExecuteDirectTransaction<'info>>,
-    args: ExecuteDirectTransactionArgs,
+pub fn execute<'c: 'info, 'info>(
+    ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
+    args: ExecuteArgs,
 ) -> Result<()> {
     // 0. Validate args and global state
     args.validate()?;
@@ -181,8 +181,8 @@ pub fn execute_direct_transaction<'c: 'info, 'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(args: ExecuteDirectTransactionArgs)]
-pub struct ExecuteDirectTransaction<'info> {
+#[instruction(args: ExecuteArgs)]
+pub struct Execute<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 

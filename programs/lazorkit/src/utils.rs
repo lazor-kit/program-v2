@@ -1,4 +1,4 @@
-use crate::constants::{PASSKEY_SIZE, SECP256R1_ID};
+use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
 use crate::state::{ExecuteMessage, InvokeWalletPolicyMessage, UpdateWalletPolicyMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
@@ -7,7 +7,7 @@ use anchor_lang::{prelude::*, solana_program::hash::hash};
 // Constants for Secp256r1 signature verification
 const SECP_HEADER_SIZE: u16 = 14;
 const SECP_DATA_START: u16 = 2 + SECP_HEADER_SIZE;
-const SECP_PUBKEY_SIZE: u16 = 33;
+const SECP_PUBKEY_SIZE: u16 = PASSKEY_PUBLIC_KEY_SIZE as u16;
 const SECP_SIGNATURE_SIZE: u16 = 64;
 const SECP_HEADER_TOTAL: usize = 16;
 
@@ -94,7 +94,7 @@ pub fn verify_secp256r1_instruction(
 ) -> Result<()> {
     let expected_len =
         (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
-    if ix.program_id != SECP256R1_ID || !ix.accounts.is_empty() || ix.data.len() != expected_len {
+    if ix.program_id != SECP256R1_PROGRAM_ID || !ix.accounts.is_empty() || ix.data.len() != expected_len {
         return Err(LazorKitError::Secp256r1InvalidLength.into());
     }
     verify_secp256r1_data(&ix.data, pubkey, msg, sig)
@@ -168,7 +168,7 @@ pub trait PasskeyExt {
     fn to_hashed_bytes(&self, wallet: Pubkey) -> [u8; 32];
 }
 
-impl PasskeyExt for [u8; SECP_PUBKEY_SIZE as usize] {
+impl PasskeyExt for [u8; PASSKEY_PUBLIC_KEY_SIZE] {
     #[inline]
     fn to_hashed_bytes(&self, wallet: Pubkey) -> [u8; 32] {
         let mut buf = [0u8; 65];
@@ -201,7 +201,7 @@ pub fn get_account_slice<'a>(
 
 /// Helper: Create a PDA signer struct
 pub fn get_wallet_device_signer(
-    passkey: &[u8; PASSKEY_SIZE],
+    passkey: &[u8; PASSKEY_PUBLIC_KEY_SIZE],
     wallet: Pubkey,
     bump: u8,
 ) -> PdaSigner {
@@ -233,7 +233,7 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     ix_sysvar: &AccountInfo,
     device: &crate::state::WalletDevice,
     smart_wallet_key: Pubkey,
-    passkey_public_key: [u8; PASSKEY_SIZE],
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     signature: Vec<u8>,
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],

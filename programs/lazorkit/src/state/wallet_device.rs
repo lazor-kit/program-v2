@@ -1,5 +1,5 @@
 use crate::{
-    constants::PASSKEY_SIZE, error::LazorKitError, state::BpfWriter, utils::PasskeyExt as _, ID,
+    constants::PASSKEY_PUBLIC_KEY_SIZE, error::LazorKitError, state::BpfWriter, utils::PasskeyExt as _, ID,
 };
 use anchor_lang::{
     prelude::*,
@@ -11,7 +11,7 @@ use anchor_lang::{
 #[derive(Debug, InitSpace)]
 pub struct WalletDevice {
     /// The public key of the passkey for this wallet device that can authorize transactions
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     /// The smart wallet this wallet device belongs to
     pub smart_wallet_address: Pubkey,
 
@@ -41,7 +41,7 @@ impl WalletDevice {
         payer: AccountInfo<'info>,
         system_program: AccountInfo<'info>,
         smart_wallet_address: Pubkey,
-        passkey_public_key: [u8; PASSKEY_SIZE],
+        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
         credential_id: Vec<u8>,
     ) -> Result<()> {
         let a = passkey_public_key.to_hashed_bytes(smart_wallet_address);

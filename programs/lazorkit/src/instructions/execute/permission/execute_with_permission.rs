@@ -6,8 +6,8 @@ use crate::state::{EphemeralAuthorization, LazorKitVault, ProgramConfig, SmartWa
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
-pub fn execute_ephemeral_authorization(
-    ctx: Context<ExecuteEphemeralAuthorization>,
+pub fn execute_with_permission(
+    ctx: Context<ExecuteWithPermission>,
     instruction_data_list: Vec<Vec<u8>>, // Multiple instruction data
     split_index: Vec<u8>,                // Split indices for accounts (n-1 for n instructions)
     _vault_index: u8,                     // Random vault index (0-31) calculated off-chain
@@ -175,7 +175,7 @@ pub fn execute_ephemeral_authorization(
 
 #[derive(Accounts)]
 #[instruction(instruction_data_list: Vec<Vec<u8>>, split_index: Vec<u8>, vault_index: u8)]
-pub struct ExecuteEphemeralAuthorization<'info> {
+pub struct ExecuteWithPermission<'info> {
     /// Fee payer for the transaction (stored in authorization)
     #[account(mut, address = ephemeral_authorization.fee_payer_address)]
     pub fee_payer: Signer<'info>,

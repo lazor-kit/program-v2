@@ -5,7 +5,7 @@ use crate::{
     state::{PolicyProgramRegistry, ProgramConfig},
 };
 
-pub fn register_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
+pub fn add_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
     let program_info = ctx
         .remaining_accounts
         .first()

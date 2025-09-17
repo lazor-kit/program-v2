@@ -1,4 +1,4 @@
-use crate::{constants::PASSKEY_SIZE, error::LazorKitError};
+use crate::{constants::PASSKEY_PUBLIC_KEY_SIZE, error::LazorKitError};
 use anchor_lang::prelude::*;
 
 pub trait Args {
@@ -7,7 +7,7 @@ pub trait Args {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateSmartWalletArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub credential_id: Vec<u8>,
     pub policy_data: Vec<u8>,
     pub wallet_id: u64, // Random ID provided by client,
@@ -17,8 +17,8 @@ pub struct CreateSmartWalletArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ExecuteDirectTransactionArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+pub struct ExecuteArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -30,8 +30,8 @@ pub struct ExecuteDirectTransactionArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct UpdateWalletPolicyArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+pub struct ChangePolicyArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -44,8 +44,8 @@ pub struct UpdateWalletPolicyArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct InvokeWalletPolicyArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+pub struct CallPolicyArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -56,8 +56,8 @@ pub struct InvokeWalletPolicyArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CreateDeferredExecutionArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+pub struct CreateChunkArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -69,14 +69,14 @@ pub struct CreateDeferredExecutionArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct NewWalletDeviceArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     #[max_len(256)]
     pub credential_id: Vec<u8>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct AuthorizeEphemeralExecutionArgs {
-    pub passkey_public_key: [u8; PASSKEY_SIZE],
+pub struct GrantPermissionArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: Vec<u8>,
     pub client_data_json_raw: Vec<u8>,
     pub authenticator_data_raw: Vec<u8>,
@@ -88,7 +88,7 @@ pub struct AuthorizeEphemeralExecutionArgs {
     pub split_index: Vec<u8>, // Split indices for accounts (n-1 for n instructions)
 }
 
-impl Args for CreateDeferredExecutionArgs {
+impl Args for CreateChunkArgs {
     fn validate(&self) -> Result<()> {
         // Common passkey/signature/client/auth checks
         require!(
@@ -126,8 +126,8 @@ impl Args for CreateDeferredExecutionArgs {
     }
 }
 
-// Only ExecuteTransactionArgs has vault_index, so we need separate validation
-impl Args for ExecuteDirectTransactionArgs {
+// Only ExecuteArgs has vault_index, so we need separate validation
+impl Args for ExecuteArgs {
     fn validate(&self) -> Result<()> {
         // Validate passkey format
         require!(
@@ -199,6 +199,6 @@ macro_rules! impl_args_validate {
     };
 }
 
-impl_args_validate!(UpdateWalletPolicyArgs);
-impl_args_validate!(InvokeWalletPolicyArgs);
-impl_args_validate!(AuthorizeEphemeralExecutionArgs);
+impl_args_validate!(ChangePolicyArgs);
+impl_args_validate!(CallPolicyArgs);
+impl_args_validate!(GrantPermissionArgs);

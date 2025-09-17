@@ -1,37 +1,49 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{Args as _, InvokeWalletPolicyArgs};
+use crate::instructions::{Args as _, ChangePolicyArgs};
 use crate::security::validation;
 use crate::state::{
-    InvokeWalletPolicyMessage, LazorKitVault, PolicyProgramRegistry, ProgramConfig,
-    SmartWalletData, WalletDevice,
+    LazorKitVault, PolicyProgramRegistry, ProgramConfig, SmartWalletData,
+    UpdateWalletPolicyMessage, WalletDevice,
 };
-use crate::utils::{check_whitelist, execute_cpi, get_wallet_device_signer, verify_authorization};
+use crate::utils::{
+    check_whitelist, execute_cpi, get_wallet_device_signer, sighash, verify_authorization,
+};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
-pub fn invoke_wallet_policy<'c: 'info, 'info>(
-    ctx: Context<'_, '_, 'c, 'info, InvokeWalletPolicy<'info>>,
-    args: InvokeWalletPolicyArgs,
+pub fn change_policy<'c: 'info, 'info>(
+    ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
+    args: ChangePolicyArgs,
 ) -> Result<()> {
     // 0. Validate args and global state
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    validation::validate_program_executable(&ctx.accounts.policy_program)?;
-    // Policy program must be the configured one and registered
-    require!(
-        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_data.policy_program_id,
-        LazorKitError::InvalidProgramAddress
-    );
+    validation::validate_program_executable(&ctx.accounts.old_policy_program)?;
+    validation::validate_program_executable(&ctx.accounts.new_policy_program)?;
+    // Registry and config checks
     check_whitelist(
         &ctx.accounts.policy_program_registry,
-        &ctx.accounts.policy_program.key(),
+        &ctx.accounts.old_policy_program.key(),
     )?;
-    validation::validate_policy_data(&args.policy_data)?;
+    check_whitelist(
+        &ctx.accounts.policy_program_registry,
+        &ctx.accounts.new_policy_program.key(),
+    )?;
+    require!(
+        ctx.accounts.smart_wallet_data.policy_program_id == ctx.accounts.old_policy_program.key(),
+        LazorKitError::InvalidProgramAddress
+    );
+    // Ensure different programs
+    require!(
+        ctx.accounts.old_policy_program.key() != ctx.accounts.new_policy_program.key(),
+        LazorKitError::PolicyProgramsIdentical
+    );
+    validation::validate_policy_data(&args.destroy_policy_data)?;
+    validation::validate_policy_data(&args.init_policy_data)?;
 
-    // Verify and deserialize message purpose-built for policy invocation
-    let msg: InvokeWalletPolicyMessage = verify_authorization(
+    let msg: UpdateWalletPolicyMessage = verify_authorization(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -43,46 +55,89 @@ pub fn invoke_wallet_policy<'c: 'info, 'info>(
         ctx.accounts.smart_wallet_data.last_nonce,
     )?;
 
-    // Compare inline policy_data hash
+    // accounts layout: Use split_index from args to separate destroy and init accounts
+    let split = args.split_index as usize;
     require!(
-        hash(&args.policy_data).to_bytes() == msg.policy_data_hash,
-        LazorKitError::InvalidInstructionData
+        split <= ctx.remaining_accounts.len(),
+        LazorKitError::AccountSliceOutOfBounds
     );
 
-    // Hash policy accounts (skip optional new wallet_device at index 0)
-    let start_idx = if args.new_wallet_device.is_some() {
-        1
+    // If new authenticator is provided, adjust the account slices
+    let (destroy_accounts, init_accounts) = if args.new_wallet_device.is_some() {
+        let (destroy, init) = ctx.remaining_accounts[1..].split_at(split);
+        (destroy, init)
     } else {
-        0
+        ctx.remaining_accounts.split_at(split)
     };
-    let policy_accs = &ctx.remaining_accounts[start_idx..];
-    let mut hasher = Hasher::default();
-    hasher.hash(ctx.accounts.policy_program.key().as_ref());
-    for acc in policy_accs.iter() {
-        hasher.hash(acc.key.as_ref());
-        hasher.hash(&[acc.is_signer as u8]);
-        hasher.hash(&[acc.is_writable as u8]);
+
+    // Hash checks
+    let mut h1 = Hasher::default();
+    h1.hash(ctx.accounts.old_policy_program.key().as_ref());
+    for a in destroy_accounts.iter() {
+        h1.hash(a.key.as_ref());
+        h1.hash(&[a.is_signer as u8]);
+        h1.hash(&[a.is_writable as u8]);
     }
     require!(
-        hasher.result().to_bytes() == msg.policy_accounts_hash,
+        h1.result().to_bytes() == msg.old_policy_accounts_hash,
         LazorKitError::InvalidAccountData
     );
 
-    // PDA signer for policy CPI
+    let mut h2 = Hasher::default();
+    h2.hash(ctx.accounts.new_policy_program.key().as_ref());
+    for a in init_accounts.iter() {
+        h2.hash(a.key.as_ref());
+        h2.hash(&[a.is_signer as u8]);
+        h2.hash(&[a.is_writable as u8]);
+    }
+    require!(
+        h2.result().to_bytes() == msg.new_policy_accounts_hash,
+        LazorKitError::InvalidAccountData
+    );
+
+    // discriminators
+    require!(
+        args.destroy_policy_data.get(0..8) == Some(&sighash("global", "destroy")),
+        LazorKitError::InvalidDestroyDiscriminator
+    );
+    require!(
+        args.init_policy_data.get(0..8) == Some(&sighash("global", "init_policy")),
+        LazorKitError::InvalidInitPolicyDiscriminator
+    );
+
+    // Compare policy data hashes from message
+    require!(
+        hash(&args.destroy_policy_data).to_bytes() == msg.old_policy_data_hash,
+        LazorKitError::InvalidInstructionData
+    );
+    require!(
+        hash(&args.init_policy_data).to_bytes() == msg.new_policy_data_hash,
+        LazorKitError::InvalidInstructionData
+    );
+
+    // signer for CPI
     let policy_signer = get_wallet_device_signer(
         &args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
     );
 
-    // Optionally create new wallet_device if requested
+    // enforce default policy transition if desired
+    let default_policy = ctx.accounts.config.default_policy_program_id;
+    require!(
+        ctx.accounts.old_policy_program.key() == default_policy
+            || ctx.accounts.new_policy_program.key() == default_policy,
+        LazorKitError::NoDefaultPolicyProgram
+    );
+
+    // Optionally create new authenticator if requested
     if let Some(new_wallet_device) = args.new_wallet_device {
         require!(
             new_wallet_device.passkey_public_key[0] == 0x02
                 || new_wallet_device.passkey_public_key[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
-        // Get the new wallet_device account from remaining accounts
+        // Get the new authenticator account from remaining accounts
         let new_device = ctx
             .remaining_accounts
             .first()
@@ -102,15 +157,26 @@ pub fn invoke_wallet_policy<'c: 'info, 'info>(
         )?;
     }
 
-    // Execute policy CPI
+    // destroy old rule
     execute_cpi(
-        policy_accs,
-        &args.policy_data,
-        &ctx.accounts.policy_program,
+        destroy_accounts,
+        &args.destroy_policy_data,
+        &ctx.accounts.old_policy_program,
+        policy_signer.clone(),
+    )?;
+
+    // init new rule
+    execute_cpi(
+        init_accounts,
+        &args.init_policy_data,
+        &ctx.accounts.new_policy_program,
         policy_signer,
     )?;
 
-    // increment nonce
+    // After both CPIs succeed, update the policy program for the smart wallet
+    ctx.accounts.smart_wallet_data.policy_program_id = ctx.accounts.new_policy_program.key();
+
+    // bump nonce
     ctx.accounts.smart_wallet_data.last_nonce = ctx
         .accounts
         .smart_wallet_data
@@ -153,8 +219,8 @@ pub fn invoke_wallet_policy<'c: 'info, 'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(args: InvokeWalletPolicyArgs)]
-pub struct InvokeWalletPolicy<'info> {
+#[instruction(args: ChangePolicyArgs)]
+pub struct ChangePolicy<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -166,7 +232,7 @@ pub struct InvokeWalletPolicy<'info> {
         seeds = [crate::constants::SMART_WALLET_SEED, smart_wallet_data.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_data.bump,
     )]
-    /// CHECK: smart wallet PDA verified by seeds
+    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -193,9 +259,12 @@ pub struct InvokeWalletPolicy<'info> {
     #[account(owner = ID)]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    /// CHECK: executable policy program
+    /// CHECK: old policy program (executable)
     #[account(executable)]
-    pub policy_program: UncheckedAccount<'info>,
+    pub old_policy_program: UncheckedAccount<'info>,
+    /// CHECK: new policy program (executable)
+    #[account(executable)]
+    pub new_policy_program: UncheckedAccount<'info>,
 
     #[account(
         seeds = [PolicyProgramRegistry::PREFIX_SEED],
@@ -204,9 +273,8 @@ pub struct InvokeWalletPolicy<'info> {
     )]
     pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
-    /// CHECK: instruction sysvar
+    /// CHECK
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
-
     pub system_program: Program<'info, System>,
 }
