@@ -15,23 +15,19 @@ pub fn update_config(ctx: Context<UpdateConfig>, param: UpdateType, value: u64) 
 
     match param {
         UpdateType::CreateWalletFee => {
-            // Validate fee is reasonable (max 1 SOL = 1,000,000,000 lamports)
-            require!(value <= 1_000_000_000, LazorKitError::InvalidFeeAmount);
+            require!(value <= crate::constants::MAX_CREATE_WALLET_FEE, LazorKitError::InvalidFeeAmount);
             config.create_smart_wallet_fee = value;
         }
         UpdateType::FeePayerFee => {
-            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
-            require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
+            require!(value <= crate::constants::MAX_TRANSACTION_FEE, LazorKitError::InvalidFeeAmount);
             config.fee_payer_fee = value;
         }
         UpdateType::ReferralFee => {
-            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
-            require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
+            require!(value <= crate::constants::MAX_TRANSACTION_FEE, LazorKitError::InvalidFeeAmount);
             config.referral_fee = value;
         }
         UpdateType::LazorkitFee => {
-            // Validate fee is reasonable (max 0.1 SOL = 100,000,000 lamports)
-            require!(value <= 100_000_000, LazorKitError::InvalidFeeAmount);
+            require!(value <= crate::constants::MAX_TRANSACTION_FEE, LazorKitError::InvalidFeeAmount);
             config.lazorkit_fee = value;
         }
         UpdateType::DefaultPolicyProgram => {

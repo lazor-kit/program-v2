@@ -8,16 +8,11 @@ use crate::utils::{
     get_wallet_device_signer, sighash, verify_authorization_hash, PasskeyExt,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
-// Hash and Hasher imports no longer needed with new verification approach
 
-/// Create a chunk buffer for large transactions
-///
-/// Creates a buffer for chunked transactions when the main execute transaction
-/// exceeds size limits. Splits large transactions into smaller, manageable
-/// chunks that can be processed separately while maintaining security.
 pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<()> {
     // Step 1: Validate input parameters and global program state
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
     validation::validate_policy_data(&args.policy_data)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
@@ -52,6 +47,8 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         policy_hash,
         args.cpi_hash,
     )?;
+
+    msg!("Expected message hash: {:?}", expected_message_hash);
 
     // Step 5: Verify WebAuthn signature and message hash
     verify_authorization_hash(
@@ -89,15 +86,24 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     )?;
 
     // Step 6: Create the chunk buffer with authorization data
-    // Store the hashes and metadata for later execution
-    let session: &mut Account<'_, Chunk> = &mut ctx.accounts.chunk;
-    session.owner_wallet_address = ctx.accounts.smart_wallet.key();
-    session.cpi_hash = args.cpi_hash;
-    session.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;
-    session.authorized_timestamp = args.timestamp;
-    session.rent_refund_address = ctx.accounts.payer.key();
-    session.vault_index = args.vault_index;
+    let chunk: &mut Account<'_, Chunk> = &mut ctx.accounts.chunk;
+    chunk.owner_wallet_address = ctx.accounts.smart_wallet.key();
+    chunk.cpi_hash = args.cpi_hash;
+    chunk.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;
+    chunk.authorized_timestamp = args.timestamp;
+    chunk.rent_refund_address = ctx.accounts.payer.key();
+    chunk.vault_index = args.vault_index;
 
+    // Step 7: Update nonce after successful chunk creation
+    ctx.accounts.smart_wallet_config.last_nonce =
+        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
+
+    msg!(
+        "Successfully created chunk: wallet={}, nonce={}, cpi_hash={:?}",
+        ctx.accounts.smart_wallet.key(),
+        chunk.authorized_nonce,
+        args.cpi_hash
+    );
     Ok(())
 }
 
@@ -115,7 +121,7 @@ pub struct CreateChunk<'info> {
         seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_config.bump,
     )]
-    /// CHECK: PDA verified
+    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -144,12 +150,10 @@ pub struct CreateChunk<'info> {
     )]
     pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
-    /// Policy program for optional policy enforcement at session creation
-    /// CHECK: validated via executable + registry
+    /// CHECK: executable policy program
     #[account(executable)]
     pub policy_program: UncheckedAccount<'info>,
 
-    /// New transaction session account (rent payer: payer)
     #[account(
         init_if_needed,
         payer = payer,
@@ -160,7 +164,7 @@ pub struct CreateChunk<'info> {
     )]
     pub chunk: Account<'info, Chunk>,
 
-    /// CHECK: instructions sysvar
+    /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
 

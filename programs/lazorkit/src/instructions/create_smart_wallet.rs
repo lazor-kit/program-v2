@@ -13,21 +13,6 @@ use crate::{
     ID,
 };
 
-/// Create a new smart wallet with WebAuthn passkey authentication
-///
-/// This function initializes a new smart wallet with the following steps:
-/// 1. Validates input parameters and program state
-/// 2. Creates the smart wallet data account
-/// 3. Creates the associated wallet device (passkey) account
-/// 4. Transfers initial SOL to the smart wallet
-/// 5. Executes the policy program initialization
-///
-/// # Arguments
-/// * `ctx` - The instruction context containing all required accounts
-/// * `args` - The creation arguments including passkey, policy data, and wallet ID
-///
-/// # Returns
-/// * `Result<()>` - Success if the wallet is created successfully
 pub fn create_smart_wallet(
     ctx: Context<CreateSmartWallet>,
     args: CreateSmartWalletArgs,
@@ -40,10 +25,12 @@ pub fn create_smart_wallet(
     validation::validate_credential_id(&args.credential_id)?;
     validation::validate_policy_data(&args.policy_data)?;
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
-    // Validate passkey format - must be a valid compressed public key (starts with 0x02 or 0x03)
+    // Validate passkey format - must be a valid compressed public key
     require!(
-        args.passkey_public_key[0] == 0x02 || args.passkey_public_key[0] == 0x03,
+        args.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN 
+            || args.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
         LazorKitError::InvalidPasskeyFormat
     );
 
@@ -63,20 +50,22 @@ pub fn create_smart_wallet(
     // Step 3: Initialize the smart wallet data account
     // This stores the core wallet state including policy program, nonce, and referral info
     wallet_data.set_inner(SmartWalletConfig {
-        policy_program_id: ctx.accounts.config.default_policy_program_id,
+        bump: ctx.bumps.smart_wallet,
+        _padding: [0u8; 7],
         wallet_id: args.wallet_id,
         last_nonce: 0, // Start with nonce 0 for replay attack prevention
-        bump: ctx.bumps.smart_wallet,
         referral_address: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
+        policy_program_id: ctx.accounts.config.default_policy_program_id,
     });
 
     // Step 4: Initialize the wallet device (passkey) account
     // This stores the WebAuthn passkey data for transaction authentication
     wallet_device.set_inner(WalletDevice {
+        bump: ctx.bumps.wallet_device,
+        _padding: [0u8; 7],
         passkey_public_key: args.passkey_public_key,
         smart_wallet_address: ctx.accounts.smart_wallet.key(),
         credential_id: args.credential_id.clone(),
-        bump: ctx.bumps.wallet_device,
     });
 
     // Step 5: Transfer initial SOL to the smart wallet
@@ -140,10 +129,9 @@ pub struct CreateSmartWallet<'info> {
         seeds = [SMART_WALLET_SEED, args.wallet_id.to_le_bytes().as_ref()],
         bump,
     )]
-    /// CHECK: This account is only used for its public key and seeds.
+    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
-    /// Smart wallet data account that stores wallet state and configuration
     #[account(
         init,
         payer = payer,
@@ -153,7 +141,6 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
 
-    /// Wallet device account that stores the passkey authentication data
     #[account(
         init,
         payer = payer,
@@ -167,7 +154,6 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    /// Program configuration account containing global settings
     #[account(
         seeds = [Config::PREFIX_SEED],
         bump,
@@ -175,7 +161,6 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub config: Box<Account<'info, Config>>,
 
-    /// Default policy program that will govern this smart wallet's transactions
     #[account(
         address = config.default_policy_program_id,
         executable,

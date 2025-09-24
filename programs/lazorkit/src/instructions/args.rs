@@ -1,3 +1,4 @@
+use crate::validate_webauthn_args;
 use crate::{constants::PASSKEY_PUBLIC_KEY_SIZE, error::LazorKitError};
 use anchor_lang::prelude::*;
 
@@ -189,7 +190,9 @@ impl Args for CreateChunkArgs {
     fn validate(&self) -> Result<()> {
         // Common passkey/signature/client/auth checks
         require!(
-            self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
+            self.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || self.passkey_public_key[0]
+                    == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
             LazorKitError::InvalidPasskeyFormat
         );
         require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
@@ -202,7 +205,7 @@ impl Args for CreateChunkArgs {
             LazorKitError::InvalidInstructionData
         );
         require!(
-            self.verify_instruction_index < 255,
+            self.verify_instruction_index <= crate::constants::MAX_VERIFY_INSTRUCTION_INDEX,
             LazorKitError::InvalidInstructionData
         );
         // Split index bounds check left to runtime with account len; ensure policy_data present
@@ -210,15 +213,10 @@ impl Args for CreateChunkArgs {
             !self.policy_data.is_empty(),
             LazorKitError::InvalidInstructionData
         );
-        // Validate vault index
-        require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
-        // Validate timestamp is within reasonable range (not too old, not in future)
-        // Timestamp must be within 30s window of on-chain time
-        let now = Clock::get()?.unix_timestamp;
-        require!(
-            self.timestamp >= now - 30 && self.timestamp <= now + 30,
-            LazorKitError::TransactionTooOld
-        );
+        // Validate vault index with enhanced validation
+        crate::security::validation::validate_vault_index_enhanced(self.vault_index)?;
+        // Validate timestamp using standardized validation
+        crate::security::validation::validate_instruction_timestamp(self.timestamp)?;
         Ok(())
     }
 }
@@ -226,41 +224,7 @@ impl Args for CreateChunkArgs {
 // Only ExecuteArgs has vault_index, so we need separate validation
 impl Args for ExecuteArgs {
     fn validate(&self) -> Result<()> {
-        // Validate passkey format
-        require!(
-            self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
-            LazorKitError::InvalidPasskeyFormat
-        );
-
-        // Validate signature length (Secp256r1 signature should be 64 bytes)
-        require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
-
-        // Validate client data and authenticator data are not empty
-        require!(
-            !self.client_data_json_raw.is_empty(),
-            LazorKitError::InvalidInstructionData
-        );
-        require!(
-            !self.authenticator_data_raw.is_empty(),
-            LazorKitError::InvalidInstructionData
-        );
-
-        // Validate verify instruction index
-        require!(
-            self.verify_instruction_index < 255,
-            LazorKitError::InvalidInstructionData
-        );
-
-        // Validate vault index
-        require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
-
-        // Validate timestamp is within reasonable range (not too old, not in future)
-        let now = Clock::get()?.unix_timestamp;
-        require!(
-            self.timestamp >= now - 300 && self.timestamp <= now + 60,
-            LazorKitError::TransactionTooOld
-        );
-
+        validate_webauthn_args!(self);
         Ok(())
     }
 }
@@ -269,41 +233,7 @@ macro_rules! impl_args_validate {
     ($t:ty) => {
         impl Args for $t {
             fn validate(&self) -> Result<()> {
-                // Validate passkey format
-                require!(
-                    self.passkey_public_key[0] == 0x02 || self.passkey_public_key[0] == 0x03,
-                    LazorKitError::InvalidPasskeyFormat
-                );
-
-                // Validate signature length (Secp256r1 signature should be 64 bytes)
-                require!(self.signature.len() == 64, LazorKitError::InvalidSignature);
-
-                // Validate client data and authenticator data are not empty
-                require!(
-                    !self.client_data_json_raw.is_empty(),
-                    LazorKitError::InvalidInstructionData
-                );
-                require!(
-                    !self.authenticator_data_raw.is_empty(),
-                    LazorKitError::InvalidInstructionData
-                );
-
-                // Validate verify instruction index
-                require!(
-                    self.verify_instruction_index < 255,
-                    LazorKitError::InvalidInstructionData
-                );
-
-                // Validate vault index
-                require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
-
-                // Validate timestamp is within reasonable range (not too old, not in future)
-                let now = Clock::get()?.unix_timestamp;
-                require!(
-                    self.timestamp >= now - 300 && self.timestamp <= now + 60,
-                    LazorKitError::TransactionTooOld
-                );
-
+                validate_webauthn_args!(self);
                 Ok(())
             }
         }

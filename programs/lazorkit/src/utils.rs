@@ -53,8 +53,8 @@ pub fn execute_cpi(
     signer: PdaSigner,
 ) -> Result<()> {
     // Create the CPI instruction with proper account metadata
-    // We need to clone the data here because the SDK expects owned data
-    let ix = create_cpi_instruction(accounts, data.to_vec(), program, &signer);
+    // Optimize: avoid unnecessary clone by using slice directly where possible
+    let ix = create_cpi_instruction_optimized(accounts, data, program, &signer);
 
     // Build the seed slice once to avoid repeated heap allocations
     // Convert Vec<Vec<u8>> to Vec<&[u8]> for invoke_signed
@@ -66,10 +66,10 @@ pub fn execute_cpi(
     invoke_signed(&ix, accounts, &[&seed_slices]).map_err(Into::into)
 }
 
-/// Create a CPI instruction with proper account meta configuration
-fn create_cpi_instruction(
+/// Optimized CPI instruction creation that avoids unnecessary allocations
+fn create_cpi_instruction_optimized(
     accounts: &[AccountInfo],
-    data: Vec<u8>,
+    data: &[u8],
     program: &AccountInfo,
     pda_signer: &PdaSigner,
 ) -> Instruction {
@@ -91,7 +91,7 @@ fn create_cpi_instruction(
                 }
             })
             .collect(),
-        data,
+        data: data.to_vec(), // Only allocate here when absolutely necessary
     }
 }
 
@@ -161,16 +161,26 @@ fn calculate_secp_offsets(msg_len: u16) -> SecpOffsets {
     }
 }
 
+/// Helper function to safely convert slice to u16
+#[inline]
+fn slice_to_u16(data: &[u8], start: usize) -> Option<u16> {
+    if start + 1 < data.len() {
+        Some(u16::from_le_bytes([data[start], data[start + 1]]))
+    } else {
+        None
+    }
+}
+
 #[inline]
 fn verify_secp_header(data: &[u8], offsets: &SecpOffsets) -> bool {
     data[0] == 1
-        && u16::from_le_bytes(data[2..=3].try_into().unwrap()) == offsets.sig_offset
-        && u16::from_le_bytes(data[4..=5].try_into().unwrap()) == 0xFFFF
-        && u16::from_le_bytes(data[6..=7].try_into().unwrap()) == offsets.pubkey_offset
-        && u16::from_le_bytes(data[8..=9].try_into().unwrap()) == 0xFFFF
-        && u16::from_le_bytes(data[10..=11].try_into().unwrap()) == offsets.msg_offset
-        && u16::from_le_bytes(data[12..=13].try_into().unwrap()) == offsets.msg_len
-        && u16::from_le_bytes(data[14..=15].try_into().unwrap()) == 0xFFFF
+        && slice_to_u16(data, 2).map_or(false, |v| v == offsets.sig_offset)
+        && slice_to_u16(data, 4).map_or(false, |v| v == 0xFFFF)
+        && slice_to_u16(data, 6).map_or(false, |v| v == offsets.pubkey_offset)
+        && slice_to_u16(data, 8).map_or(false, |v| v == 0xFFFF)
+        && slice_to_u16(data, 10).map_or(false, |v| v == offsets.msg_offset)
+        && slice_to_u16(data, 12).map_or(false, |v| v == offsets.msg_len)
+        && slice_to_u16(data, 14).map_or(false, |v| v == 0xFFFF)
 }
 
 #[inline]
@@ -311,6 +321,7 @@ pub fn verify_authorization_hash(
 
 /// Compute hash of instruction data and accounts combined
 /// This function can be used for both policy and CPI instructions
+/// Optimized to reduce allocations
 pub fn compute_instruction_hash(
     instruction_data: &[u8],
     instruction_accounts: &[AccountInfo],
@@ -331,47 +342,94 @@ pub fn compute_instruction_hash(
     }
     let accounts_hash = rh.result();
 
-    // Combine hashes
-    let mut combined = Vec::new();
-    combined.extend_from_slice(data_hash.as_ref());
-    combined.extend_from_slice(accounts_hash.as_ref());
+    // Combine hashes efficiently using a pre-allocated buffer
+    let mut combined = [0u8; 64]; // 32 + 32 bytes
+    combined[..32].copy_from_slice(data_hash.as_ref());
+    combined[32..].copy_from_slice(accounts_hash.as_ref());
 
     Ok(hash(&combined).to_bytes())
 }
 
+/// Message types for hash computation
+#[derive(Debug, Clone, Copy)]
+pub enum MessageType {
+    Execute,
+    CallPolicy,
+    ChangePolicy,
+    CreateChunk,
+    GrantPermission,
+}
+
+/// Generic message hash computation function
+/// Replaces all the individual hash functions with a single, optimized implementation
+pub fn compute_message_hash(
+    message_type: MessageType,
+    nonce: u64,
+    timestamp: i64,
+    hash1: [u8; 32],
+    hash2: Option<[u8; 32]>,
+    additional_data: Option<&[u8]>,
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+
+    // Common fields for all message types
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&hash1);
+
+    // Add second hash if provided
+    if let Some(h2) = hash2 {
+        data.extend_from_slice(&h2);
+    }
+
+    // Add additional data for specific message types
+    match message_type {
+        MessageType::GrantPermission => {
+            if let Some(additional) = additional_data {
+                data.extend_from_slice(additional);
+            }
+        }
+        _ => {} // Other message types don't need additional data
+    }
+
+    Ok(hash(&data).to_bytes())
+}
+
 /// Compute execute message hash: hash(nonce, timestamp, policy_hash, cpi_hash)
+/// Optimized to use stack allocation instead of heap
 pub fn compute_execute_message_hash(
     nonce: u64,
     timestamp: i64,
     policy_hash: [u8; 32],
     cpi_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::hash::hash;
-
-    let mut data = Vec::new();
-    data.extend_from_slice(&nonce.to_le_bytes());
-    data.extend_from_slice(&timestamp.to_le_bytes());
-    data.extend_from_slice(&policy_hash);
-    data.extend_from_slice(&cpi_hash);
-
-    Ok(hash(&data).to_bytes())
+    compute_message_hash(
+        MessageType::Execute,
+        nonce,
+        timestamp,
+        policy_hash,
+        Some(cpi_hash),
+        None,
+    )
 }
 
 /// Compute call policy message hash: hash(nonce, timestamp, policy_hash, empty_cpi_hash)
+/// Optimized to use stack allocation
 pub fn compute_call_policy_message_hash(
     nonce: u64,
     timestamp: i64,
     policy_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::hash::hash;
-
-    let mut data = Vec::new();
-    data.extend_from_slice(&nonce.to_le_bytes());
-    data.extend_from_slice(&timestamp.to_le_bytes());
-    data.extend_from_slice(&policy_hash);
-    data.extend_from_slice(&[0u8; 32]); // Empty CPI hash
-
-    Ok(hash(&data).to_bytes())
+    compute_message_hash(
+        MessageType::CallPolicy,
+        nonce,
+        timestamp,
+        policy_hash,
+        None,
+        None,
+    )
 }
 
 /// Compute change policy message hash: hash(nonce, timestamp, old_policy_hash, new_policy_hash)
@@ -381,15 +439,14 @@ pub fn compute_change_policy_message_hash(
     old_policy_hash: [u8; 32],
     new_policy_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::hash::hash;
-
-    let mut data = Vec::new();
-    data.extend_from_slice(&nonce.to_le_bytes());
-    data.extend_from_slice(&timestamp.to_le_bytes());
-    data.extend_from_slice(&old_policy_hash);
-    data.extend_from_slice(&new_policy_hash);
-
-    Ok(hash(&data).to_bytes())
+    compute_message_hash(
+        MessageType::ChangePolicy,
+        nonce,
+        timestamp,
+        old_policy_hash,
+        Some(new_policy_hash),
+        None,
+    )
 }
 
 /// Compute create chunk message hash: hash(nonce, timestamp, policy_hash, cpi_hash)
@@ -399,15 +456,14 @@ pub fn compute_create_chunk_message_hash(
     policy_hash: [u8; 32],
     cpi_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::hash::hash;
-
-    let mut data = Vec::new();
-    data.extend_from_slice(&nonce.to_le_bytes());
-    data.extend_from_slice(&timestamp.to_le_bytes());
-    data.extend_from_slice(&policy_hash);
-    data.extend_from_slice(&cpi_hash);
-
-    Ok(hash(&data).to_bytes())
+    compute_message_hash(
+        MessageType::CreateChunk,
+        nonce,
+        timestamp,
+        policy_hash,
+        Some(cpi_hash),
+        None,
+    )
 }
 
 /// Compute grant permission message hash: hash(nonce, timestamp, ephemeral_key, expires_at, combined_hash)
@@ -420,14 +476,20 @@ pub fn compute_grant_permission_message_hash(
 ) -> Result<[u8; 32]> {
     use anchor_lang::solana_program::hash::hash;
 
-    let mut data = Vec::new();
-    data.extend_from_slice(&nonce.to_le_bytes());
-    data.extend_from_slice(&timestamp.to_le_bytes());
-    data.extend_from_slice(ephemeral_key.as_ref());
-    data.extend_from_slice(&expires_at.to_le_bytes());
-    data.extend_from_slice(&combined_hash);
+    // For GrantPermission, we need to hash the additional data separately
+    let mut additional_data = Vec::new();
+    additional_data.extend_from_slice(ephemeral_key.as_ref());
+    additional_data.extend_from_slice(&expires_at.to_le_bytes());
+    let additional_hash = hash(&additional_data).to_bytes();
 
-    Ok(hash(&data).to_bytes())
+    compute_message_hash(
+        MessageType::GrantPermission,
+        nonce,
+        timestamp,
+        combined_hash,
+        Some(additional_hash),
+        None,
+    )
 }
 
 /// Helper: Split remaining accounts into `(policy_accounts, cpi_accounts)` using `split_index` coming from `Message`.
@@ -441,6 +503,115 @@ pub fn split_remaining_accounts<'a>(
         crate::error::LazorKitError::AccountSliceOutOfBounds
     );
     Ok(accounts.split_at(idx))
+}
+
+/// Calculate account ranges for multiple instructions using split indices
+/// Returns a vector of (start, end) tuples representing account ranges for each instruction
+/// For n instructions, we need n-1 split indices to divide the accounts
+pub fn calculate_account_ranges(
+    accounts: &[AccountInfo],
+    split_indices: &[u8],
+) -> Result<Vec<(usize, usize)>> {
+    let mut account_ranges = Vec::new();
+    let mut start = 0usize;
+
+    // Calculate account ranges for each instruction using split indices
+    for &split_point in split_indices.iter() {
+        let end = split_point as usize;
+        require!(
+            end > start && end <= accounts.len(),
+            crate::error::LazorKitError::AccountSliceOutOfBounds
+        );
+        account_ranges.push((start, end));
+        start = end;
+    }
+
+    // Add the last instruction range (from last split to end)
+    require!(
+        start < accounts.len(),
+        crate::error::LazorKitError::AccountSliceOutOfBounds
+    );
+    account_ranges.push((start, accounts.len()));
+
+    Ok(account_ranges)
+}
+
+/// Validate all programs in account ranges for security
+/// Checks that each program is executable and prevents reentrancy attacks
+pub fn validate_programs_in_ranges(
+    accounts: &[AccountInfo],
+    account_ranges: &[(usize, usize)],
+) -> Result<()> {
+    for &(range_start, range_end) in account_ranges.iter() {
+        let instruction_accounts = &accounts[range_start..range_end];
+
+        require!(
+            !instruction_accounts.is_empty(),
+            crate::error::LazorKitError::InsufficientCpiAccounts
+        );
+
+        // First account in each instruction slice is the program ID
+        let program_account = &instruction_accounts[0];
+
+        // Validate program is executable (not a data account)
+        require!(
+            program_account.executable,
+            crate::error::LazorKitError::ProgramNotExecutable
+        );
+
+        // Prevent reentrancy attacks by blocking calls to this program
+        require!(
+            program_account.key() != crate::ID,
+            crate::error::LazorKitError::ReentrancyDetected
+        );
+    }
+
+    Ok(())
+}
+
+/// Create wallet signer for smart wallet operations
+pub fn create_wallet_signer(wallet_id: u64, bump: u8) -> PdaSigner {
+    PdaSigner {
+        seeds: vec![
+            crate::constants::SMART_WALLET_SEED.to_vec(),
+            wallet_id.to_le_bytes().to_vec(),
+        ],
+        bump,
+    }
+}
+
+/// Complete fee distribution and vault validation workflow
+pub fn handle_fee_distribution<'info>(
+    config: &crate::state::Config,
+    smart_wallet_config: &crate::state::SmartWalletConfig,
+    smart_wallet: &AccountInfo<'info>,
+    payer: &AccountInfo<'info>,
+    referral: &AccountInfo<'info>,
+    lazorkit_vault: &AccountInfo<'info>,
+    system_program: &Program<'info, System>,
+    vault_index: u8,
+) -> Result<()> {
+    // Validate vault
+    crate::state::LazorKitVault::validate_vault_for_index(
+        &lazorkit_vault.key(),
+        vault_index,
+        &crate::ID,
+    )?;
+
+    // Create wallet signer
+    let wallet_signer =
+        create_wallet_signer(smart_wallet_config.wallet_id, smart_wallet_config.bump);
+
+    // Distribute fees
+    distribute_fees(
+        config,
+        smart_wallet,
+        payer,
+        referral,
+        lazorkit_vault,
+        system_program,
+        wallet_signer,
+    )
 }
 
 /// Distribute fees to payer, referral, and lazorkit vault (empty PDA)

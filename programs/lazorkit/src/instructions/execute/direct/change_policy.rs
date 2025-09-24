@@ -8,13 +8,7 @@ use crate::utils::{
     get_wallet_device_signer, sighash, verify_authorization_hash,
 };
 use crate::{error::LazorKitError, ID};
-// Hash and Hasher imports no longer needed with new verification approach
 
-/// Change the policy program for a smart wallet
-///
-/// Allows changing the policy program that governs a smart wallet's transaction
-/// validation rules. Requires proper WebAuthn authentication and validates that
-/// both old and new policy programs are registered in the whitelist.
 pub fn change_policy<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
     args: ChangePolicyArgs,
@@ -23,6 +17,7 @@ pub fn change_policy<'c: 'info, 'info>(
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
     // Ensure both old and new policy programs are executable
     validation::validate_program_executable(&ctx.accounts.old_policy_program)?;
@@ -136,8 +131,8 @@ pub fn change_policy<'c: 'info, 'info>(
     if let Some(new_wallet_device) = args.new_wallet_device {
         // Validate the new passkey format
         require!(
-            new_wallet_device.passkey_public_key[0] == 0x02
-                || new_wallet_device.passkey_public_key[0] == 0x03,
+            new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
             LazorKitError::InvalidPasskeyFormat
         );
 
@@ -182,47 +177,20 @@ pub fn change_policy<'c: 'info, 'info>(
     )?;
 
     // Step 9: Update wallet state after successful policy transition
-    // Update the policy program ID to the new policy program
     ctx.accounts.smart_wallet_config.policy_program_id = ctx.accounts.new_policy_program.key();
-
-    // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
-        .accounts
-        .smart_wallet_config
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
+    ctx.accounts.smart_wallet_config.last_nonce = 
+        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
 
     // Step 10: Handle fee distribution and vault validation
-    // Validate that the provided vault matches the vault index from args
-    crate::state::LazorKitVault::validate_vault_for_index(
-        &ctx.accounts.lazorkit_vault.key(),
-        args.vault_index,
-        &crate::ID,
-    )?;
-
-    // Create wallet signer for fee distribution
-    let wallet_signer = crate::utils::PdaSigner {
-        seeds: vec![
-            crate::constants::SMART_WALLET_SEED.to_vec(),
-            ctx.accounts
-                .smart_wallet_config
-                .wallet_id
-                .to_le_bytes()
-                .to_vec(),
-        ],
-        bump: ctx.accounts.smart_wallet_config.bump,
-    };
-
-    // Distribute fees to payer, referral, and LazorKit vault
-    crate::utils::distribute_fees(
+    crate::utils::handle_fee_distribution(
         &ctx.accounts.config,
+        &ctx.accounts.smart_wallet_config,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.referral.to_account_info(),
         &ctx.accounts.lazorkit_vault.to_account_info(),
         &ctx.accounts.system_program,
-        wallet_signer,
+        args.vault_index,
     )?;
 
     Ok(())
@@ -257,7 +225,6 @@ pub struct ChangePolicy<'info> {
     #[account(mut, address = smart_wallet_config.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
-    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
     #[account(
         mut,
         seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
@@ -283,7 +250,7 @@ pub struct ChangePolicy<'info> {
     )]
     pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
-    /// CHECK
+    /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,

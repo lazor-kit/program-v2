@@ -1,5 +1,5 @@
 {
-  "address": "7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381",
+  "address": "BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7",
   "metadata": {
     "name": "default_policy",
     "version": "0.1.0",
@@ -9,7 +9,16 @@
   "instructions": [
     {
       "name": "add_device",
-      "discriminator": [21, 27, 66, 42, 18, 30, 14, 18],
+      "discriminator": [
+        21,
+        27,
+        66,
+        42,
+        18,
+        30,
+        14,
+        18
+      ],
       "accounts": [
         {
           "name": "smart_wallet",
@@ -30,7 +39,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [112, 111, 108, 105, 99, 121]
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
               },
               {
                 "kind": "account",
@@ -46,7 +62,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [112, 111, 108, 105, 99, 121]
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
               },
               {
                 "kind": "account",
@@ -54,10 +77,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "lazorkit",
-          "address": "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ"
         },
         {
           "name": "system_program",
@@ -68,7 +87,16 @@
     },
     {
       "name": "check_policy",
-      "discriminator": [28, 88, 170, 179, 239, 136, 25, 35],
+      "discriminator": [
+        28,
+        88,
+        170,
+        179,
+        239,
+        136,
+        25,
+        35
+      ],
       "accounts": [
         {
           "name": "wallet_device",
@@ -78,8 +106,7 @@
           "name": "smart_wallet"
         },
         {
-          "name": "policy",
-          "writable": true
+          "name": "policy"
         }
       ],
       "args": [
@@ -90,14 +117,26 @@
         {
           "name": "passkey_public_key",
           "type": {
-            "array": ["u8", 33]
+            "array": [
+              "u8",
+              33
+            ]
           }
         }
       ]
     },
     {
       "name": "init_policy",
-      "discriminator": [45, 234, 110, 100, 209, 146, 191, 86],
+      "discriminator": [
+        45,
+        234,
+        110,
+        100,
+        209,
+        146,
+        191,
+        86
+      ],
       "accounts": [
         {
           "name": "smart_wallet",
@@ -115,7 +154,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [112, 111, 108, 105, 99, 121]
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
               },
               {
                 "kind": "account",
@@ -123,10 +169,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "lazorkit",
-          "address": "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ"
         },
         {
           "name": "system_program",
@@ -141,7 +183,10 @@
         {
           "name": "passkey_public_key",
           "type": {
-            "array": ["u8", 33]
+            "array": [
+              "u8",
+              33
+            ]
           }
         }
       ]
@@ -150,11 +195,29 @@
   "accounts": [
     {
       "name": "Policy",
-      "discriminator": [222, 135, 7, 163, 235, 177, 33, 68]
+      "discriminator": [
+        222,
+        135,
+        7,
+        163,
+        235,
+        177,
+        33,
+        68
+      ]
     },
     {
       "name": "WalletDevice",
-      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
+      ]
     }
   ],
   "errors": [
@@ -193,34 +256,60 @@
         "",
         "Each wallet device represents a WebAuthn passkey that can be used to authenticate",
         "transactions for a specific smart wallet. Multiple devices can be associated with",
-        "a single smart wallet for enhanced security and convenience."
+        "a single smart wallet for enhanced security and convenience.",
+        "",
+        "Memory layout optimized for better cache performance:",
+        "- Group related fields together",
+        "- Align fields to natural boundaries",
+        "- Minimize padding"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_public_key",
+            "name": "bump",
             "docs": [
-              "Public key of the WebAuthn passkey for transaction authorization"
+              "Bump seed for PDA derivation and verification (1 byte)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "docs": [
+              "Padding to align next fields (7 bytes)"
             ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "passkey_public_key",
+            "docs": [
+              "Public key of the WebAuthn passkey for transaction authorization (33 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "smart_wallet_address",
-            "docs": ["Smart wallet address this device is associated with"],
+            "docs": [
+              "Smart wallet address this device is associated with (32 bytes)"
+            ],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["Unique credential ID from WebAuthn registration"],
+            "docs": [
+              "Unique credential ID from WebAuthn registration (variable length, max 256 bytes)"
+            ],
             "type": "bytes"
-          },
-          {
-            "name": "bump",
-            "docs": ["Bump seed for PDA derivation and verification"],
-            "type": "u8"
           }
         ]
       }

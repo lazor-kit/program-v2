@@ -1,8 +1,9 @@
 import * as anchor from '@coral-xyz/anchor';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { Lazorkit } from './anchor/types/lazorkit';
 
 // ============================================================================
-// Account Types (from on-chain state)
+// Core Types (from on-chain)
 // ============================================================================
 export type SmartWalletConfig = anchor.IdlTypes<Lazorkit>['smartWalletConfig'];
 export type WalletDevice = anchor.IdlTypes<Lazorkit>['walletDevice'];
@@ -12,9 +13,7 @@ export type PolicyProgramRegistry =
 export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
 export type Permission = anchor.IdlTypes<Lazorkit>['permission'];
 
-// ============================================================================
-// Instruction Argument Types (from on-chain instructions)
-// ============================================================================
+// Instruction Args
 export type CreateSmartWalletArgs =
   anchor.IdlTypes<Lazorkit>['createSmartWalletArgs'];
 export type ExecuteArgs = anchor.IdlTypes<Lazorkit>['executeArgs'];
@@ -25,19 +24,15 @@ export type GrantPermissionArgs =
   anchor.IdlTypes<Lazorkit>['grantPermissionArgs'];
 export type NewWalletDeviceArgs =
   anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
-
-// ============================================================================
-// Configuration Types
-// ============================================================================
 export type UpdateType = anchor.IdlTypes<Lazorkit>['updateType'];
 
 // ============================================================================
-// Smart Wallet Action Types
+// Smart Wallet Actions
 // ============================================================================
 export enum SmartWalletAction {
-  ChangePolicy = 'change_policy',
-  CallPolicy = 'call_policy',
   Execute = 'execute',
+  CallPolicy = 'call_policy',
+  ChangePolicy = 'change_policy',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
   GrantPermission = 'grant_permission',
@@ -51,18 +46,12 @@ export type ArgsByAction = {
   };
   [SmartWalletAction.CallPolicy]: {
     policyInstruction: anchor.web3.TransactionInstruction;
-    newWalletDevice: {
-      passkeyPublicKey: number[];
-      credentialIdBase64: string;
-    } | null;
+    newWalletDevice: NewPasskeyDevice | null;
   };
   [SmartWalletAction.ChangePolicy]: {
     destroyPolicyIns: anchor.web3.TransactionInstruction;
     initPolicyIns: anchor.web3.TransactionInstruction;
-    newWalletDevice: {
-      passkeyPublicKey: number[];
-      credentialIdBase64: string;
-    } | null;
+    newWalletDevice: NewPasskeyDevice | null;
   };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
@@ -82,11 +71,6 @@ export type ArgsByAction = {
   };
 };
 
-/**
- * Generic type for smart wallet action arguments.
- * Can be used for message building, SDK operations, or any other context
- * where you need to specify a smart wallet action with its arguments.
- */
 export type SmartWalletActionArgs<
   K extends SmartWalletAction = SmartWalletAction
 > = {
@@ -95,7 +79,7 @@ export type SmartWalletActionArgs<
 };
 
 // ============================================================================
-// Authentication Types
+// Authentication & Transaction Types
 // ============================================================================
 export interface PasskeySignature {
   passkeyPublicKey: number[];
@@ -109,8 +93,33 @@ export interface NewPasskeyDevice {
   credentialIdBase64: string;
 }
 
+export interface TransactionBuilderOptions {
+  useVersionedTransaction?: boolean;
+  addressLookupTable?: anchor.web3.AddressLookupTableAccount;
+  recentBlockhash?: string;
+}
+
+export interface TransactionBuilderResult {
+  transaction: Transaction | VersionedTransaction;
+  isVersioned: boolean;
+  recentBlockhash: string;
+}
+
 // ============================================================================
-// Transaction Builder Types
+// Base Parameter Types
+// ============================================================================
+interface BaseParams {
+  payer: anchor.web3.PublicKey;
+  smartWallet: anchor.web3.PublicKey;
+  vaultIndex?: number;
+}
+
+interface AuthParams extends BaseParams {
+  passkeySignature: PasskeySignature;
+}
+
+// ============================================================================
+// Parameter Types
 // ============================================================================
 export interface ManageVaultParams {
   payer: anchor.web3.PublicKey;
@@ -130,58 +139,41 @@ export interface CreateSmartWalletParams {
   amount: anchor.BN;
 }
 
-export interface ExecuteParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  passkeySignature: PasskeySignature;
+export interface ExecuteParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction | null;
   cpiInstruction: anchor.web3.TransactionInstruction;
-  vaultIndex?: number;
+  timestamp: anchor.BN;
 }
 
-export interface CallPolicyParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  passkeySignature: PasskeySignature;
+export interface CallPolicyParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction;
   newWalletDevice?: NewPasskeyDevice | null;
-  vaultIndex?: number;
 }
 
-export interface ChangePolicyParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  passkeySignature: PasskeySignature;
+export interface ChangePolicyParams extends AuthParams {
   destroyPolicyInstruction: anchor.web3.TransactionInstruction;
   initPolicyInstruction: anchor.web3.TransactionInstruction;
   newWalletDevice?: NewPasskeyDevice | null;
-  vaultIndex?: number;
 }
 
-export interface CreateChunkParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  passkeySignature: PasskeySignature;
+export interface CreateChunkParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction | null;
   cpiInstructions: anchor.web3.TransactionInstruction[];
-  expiresAt: number;
-  vaultIndex?: number;
+  timestamp: anchor.BN;
 }
 
-export interface ExecuteChunkParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
+export interface ExecuteChunkParams extends BaseParams {
   cpiInstructions: anchor.web3.TransactionInstruction[];
 }
 
-export interface GrantPermissionParams {
-  payer: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  passkeySignature: PasskeySignature;
+export interface CloseChunkParams extends BaseParams {
+  nonce: anchor.BN;
+}
+
+export interface GrantPermissionParams extends AuthParams {
   ephemeral_public_key: anchor.web3.PublicKey;
   expiresAt: number;
   cpiInstructions: anchor.web3.TransactionInstruction[];
-  vaultIndex?: number;
 }
 
 export interface ExecuteWithPermissionParams {

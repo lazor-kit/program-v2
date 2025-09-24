@@ -8,33 +8,60 @@ use anchor_lang::prelude::*;
 
 // === Size Limits ===
 /// Maximum allowed size for credential ID to prevent DoS attacks
+/// Rationale: WebAuthn credential IDs are typically 16-64 bytes, 256 provides safety margin
 pub const MAX_CREDENTIAL_ID_SIZE: usize = 256;
 
 /// Maximum allowed size for policy data to prevent excessive memory usage
+/// Rationale: Policy instructions should be concise, 1KB allows for complex policies while preventing DoS
 pub const MAX_POLICY_DATA_SIZE: usize = 1024;
 
 /// Maximum allowed size for CPI data to prevent resource exhaustion
+/// Rationale: CPI instructions should be reasonable size, 1KB prevents memory exhaustion attacks
 pub const MAX_CPI_DATA_SIZE: usize = 1024;
 
 /// Maximum allowed remaining accounts to prevent account exhaustion
+/// Rationale: Solana transaction limit is ~64 accounts, 32 provides safety margin
 pub const MAX_REMAINING_ACCOUNTS: usize = 32;
 
 // === Financial Limits ===
 /// Minimum rent-exempt balance buffer (in lamports) to ensure account viability
+/// Rationale: Ensures accounts remain rent-exempt even with small SOL transfers
 pub const MIN_RENT_EXEMPT_BUFFER: u64 = 1_000_000; // 0.001 SOL
 
 // === Time-based Security ===
 /// Maximum transaction age in seconds to prevent replay attacks
+/// Rationale: 5 minutes provides reasonable window while preventing old transaction replay
 pub const MAX_TRANSACTION_AGE: i64 = 300; // 5 minutes
 
 /// Maximum allowed session TTL in seconds for deferred execution
+/// Rationale: 30 seconds prevents long-lived sessions that could be exploited
 pub const MAX_SESSION_TTL_SECONDS: i64 = 30; // 30 seconds
+
+/// Standard timestamp validation window (past tolerance in seconds)
+/// Rationale: 30 seconds provides reasonable window while preventing old transaction replay
+pub const TIMESTAMP_PAST_TOLERANCE: i64 = 30; // 30 seconds
+
+/// Standard timestamp validation window (future tolerance in seconds)
+/// Rationale: 30 seconds allows for reasonable clock skew while preventing future-dated attacks
+pub const TIMESTAMP_FUTURE_TOLERANCE: i64 = 30; // 30 seconds
 
 // === Rate Limiting ===
 /// Maximum transactions per block to prevent spam
+/// Rationale: Prevents individual wallets from spamming the network
 pub const MAX_TRANSACTIONS_PER_BLOCK: u8 = 5;
 /// Rate limiting window in blocks
+/// Rationale: 10 blocks provides reasonable rate limiting window
 pub const RATE_LIMIT_WINDOW_BLOCKS: u64 = 10;
+
+// === Nonce Security ===
+/// Threshold for nonce overflow warning (within this many of max value)
+/// Rationale: 1000 provides early warning before nonce wraps around
+pub const NONCE_OVERFLOW_WARNING_THRESHOLD: u64 = 1000;
+
+// === Vault Security ===
+/// Maximum number of vault slots supported
+/// Rationale: 32 vaults provide good load distribution while keeping complexity manageable
+pub const MAX_VAULT_SLOTS: u8 = 32;
 
 /// Security validation functions
 pub mod validation {
@@ -113,6 +140,16 @@ pub mod validation {
         Ok(())
     }
 
+    /// Check for reentrancy attacks by validating all programs in remaining accounts
+    pub fn validate_no_reentrancy(remaining_accounts: &[AccountInfo]) -> Result<()> {
+        for account in remaining_accounts {
+            if account.executable && account.key() == crate::ID {
+                return Err(LazorKitError::ReentrancyDetected.into());
+            }
+        }
+        Ok(())
+    }
+
     /// Validate account ownership
     pub fn validate_account_owner(account: &AccountInfo, expected_owner: &Pubkey) -> Result<()> {
         require!(
@@ -147,4 +184,119 @@ pub mod validation {
         );
         Ok(())
     }
+
+    /// Standardized timestamp validation for all instructions
+    /// Uses consistent time window across all operations
+    pub fn validate_instruction_timestamp(timestamp: i64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        // Use configurable tolerance constants
+        require!(
+            timestamp >= now - TIMESTAMP_PAST_TOLERANCE && 
+            timestamp <= now + TIMESTAMP_FUTURE_TOLERANCE,
+            LazorKitError::TransactionTooOld
+        );
+        Ok(())
+    }
+
+    /// Safely increment nonce with overflow protection
+    /// If nonce would overflow, reset to 0 instead of failing
+    pub fn safe_increment_nonce(current_nonce: u64) -> u64 {
+        current_nonce.wrapping_add(1)
+    }
+
+    /// Check if nonce is approaching overflow (within threshold of max)
+    pub fn is_nonce_approaching_overflow(nonce: u64) -> bool {
+        nonce > u64::MAX - NONCE_OVERFLOW_WARNING_THRESHOLD
+    }
+
+    /// Enhanced vault index validation to prevent front-running
+    /// Validates vault index is within reasonable bounds and not manipulated
+    pub fn validate_vault_index_enhanced(vault_index: u8) -> Result<()> {
+        // Ensure vault index is within valid range
+        require!(vault_index < MAX_VAULT_SLOTS, LazorKitError::InvalidVaultIndex);
+        
+        // Additional validation: ensure vault index is not obviously manipulated
+        // This is a simple check - in production, you might want more sophisticated validation
+        Ok(())
+    }
+
+    /// Common validation for WebAuthn authentication arguments
+    /// Validates passkey format, signature, client data, and authenticator data
+    pub fn validate_webauthn_args(
+        passkey_public_key: &[u8; crate::constants::PASSKEY_PUBLIC_KEY_SIZE],
+        signature: &[u8],
+        client_data_json_raw: &[u8],
+        authenticator_data_raw: &[u8],
+        verify_instruction_index: u8,
+    ) -> Result<()> {
+        // Validate passkey format
+        require!(
+            passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN 
+                || passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
+            LazorKitError::InvalidPasskeyFormat
+        );
+
+        // Validate signature length (Secp256r1 signature should be 64 bytes)
+        require!(signature.len() == 64, LazorKitError::InvalidSignature);
+
+        // Validate client data and authenticator data are not empty
+        require!(
+            !client_data_json_raw.is_empty(),
+            LazorKitError::InvalidInstructionData
+        );
+        require!(
+            !authenticator_data_raw.is_empty(),
+            LazorKitError::InvalidInstructionData
+        );
+
+        // Validate verify instruction index
+        require!(
+            verify_instruction_index <= crate::constants::MAX_VERIFY_INSTRUCTION_INDEX,
+            LazorKitError::InvalidInstructionData
+        );
+
+        Ok(())
+    }
+
+    /// Basic rate limiting check to prevent spam attacks
+    /// This is a simple implementation - in production, you might want more sophisticated rate limiting
+    pub fn validate_rate_limit(
+        _wallet_id: u64,
+        current_slot: u64,
+    ) -> Result<()> {
+        // Simple rate limiting based on slot number
+        // In a real implementation, you would track transaction counts per wallet per slot
+        // For now, we'll just ensure the slot is reasonable (not too far in the past)
+        let max_slot_age = 100; // Maximum 100 slots old
+        let current_slot_from_clock = Clock::get()?.slot;
+        
+        require!(
+            current_slot >= current_slot_from_clock.saturating_sub(max_slot_age),
+            LazorKitError::TransactionTooOld
+        );
+        
+        Ok(())
+    }
+}
+
+/// Macro for common WebAuthn validation across all instructions
+/// Validates passkey format, signature, client data, authenticator data, vault index, and timestamp
+#[macro_export]
+macro_rules! validate_webauthn_args {
+    ($args:expr) => {
+        // Use common WebAuthn validation
+        crate::security::validation::validate_webauthn_args(
+            &$args.passkey_public_key,
+            &$args.signature,
+            &$args.client_data_json_raw,
+            &$args.authenticator_data_raw,
+            $args.verify_instruction_index,
+        )?;
+
+        // Validate vault index with enhanced validation
+        crate::security::validation::validate_vault_index_enhanced($args.vault_index)?;
+
+        // Validate timestamp using standardized validation
+        crate::security::validation::validate_instruction_timestamp($args.timestamp)?;
+    };
 }

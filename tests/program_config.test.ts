@@ -55,10 +55,11 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: 0,
       });
 
-      txn.sign([payer]);
-
-      const sig = await connection.sendTransaction(txn);
-      await connection.confirmTransaction(sig);
+      const sig = await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        txn as anchor.web3.Transaction,
+        [payer]
+      );
 
       console.log('Manage vault: ', sig);
     });
@@ -72,10 +73,12 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: lazorkitProgram.generateVaultIndex(),
       });
 
-      txn.sign([payer]);
-
       try {
-        await connection.sendTransaction(txn);
+        await anchor.web3.sendAndConfirmTransaction(
+          connection,
+          txn as anchor.web3.Transaction,
+          [payer]
+        );
       } catch (error) {
         expect(String(error).includes('InsufficientBalanceForFee')).to.be.true;
       }
@@ -92,10 +95,11 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: vaultIndex,
       });
 
-      depositTxn.sign([payer]);
-
-      const depositSig = await connection.sendTransaction(depositTxn);
-      await connection.confirmTransaction(depositSig);
+      await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        depositTxn as anchor.web3.Transaction,
+        [payer]
+      );
 
       const withdrawTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
@@ -105,10 +109,11 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: vaultIndex,
       });
 
-      withdrawTxn.sign([payer]);
-
-      const sig = await connection.sendTransaction(withdrawTxn);
-      await connection.confirmTransaction(sig);
+      const sig = await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        withdrawTxn as anchor.web3.Transaction,
+        [payer]
+      );
 
       console.log('Manage vault: ', sig);
     });
@@ -123,10 +128,11 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: vaultIndex,
       });
 
-      depositTxn.sign([payer]);
-
-      const depositSig = await connection.sendTransaction(depositTxn);
-      await connection.confirmTransaction(depositSig);
+      await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        depositTxn as anchor.web3.Transaction,
+        [payer]
+      );
 
       const withdrawTxn = await lazorkitProgram.manageVaultTxn({
         payer: payer.publicKey,
@@ -136,10 +142,12 @@ describe.skip('Test smart wallet with default policy', () => {
         vaultIndex: vaultIndex,
       });
 
-      withdrawTxn.sign([payer]);
-
       try {
-        await connection.sendTransaction(withdrawTxn);
+        await anchor.web3.sendAndConfirmTransaction(
+          connection,
+          withdrawTxn as anchor.web3.Transaction,
+          [payer]
+        );
       } catch (error) {
         expect(String(error).includes('InsufficientVaultBalance')).to.be.true;
       }

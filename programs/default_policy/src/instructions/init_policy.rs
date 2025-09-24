@@ -2,7 +2,6 @@ use crate::{error::PolicyError, state::Policy};
 use anchor_lang::prelude::*;
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
-    program::Lazorkit,
     state::WalletDevice,
     utils::PasskeyExt as _,
     ID as LAZORKIT_ID,
@@ -69,8 +68,6 @@ pub struct InitPolicy<'info> {
         bump,
     )]
     pub policy: Account<'info, Policy>,
-
-    pub lazorkit: Program<'info, Lazorkit>,
 
     pub system_program: Program<'info, System>,
 }

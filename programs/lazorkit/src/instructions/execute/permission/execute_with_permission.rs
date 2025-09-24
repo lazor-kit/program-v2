@@ -19,24 +19,24 @@ pub fn execute_with_permission(
     // Step 1: Prepare and validate input parameters
     let cpi_accounts = &ctx.remaining_accounts[..];
 
-    // Validate remaining accounts format (graceful abort on failure)
-    if validation::validate_remaining_accounts(&cpi_accounts).is_err() {
-        return Ok(());
-    }
+    // Validate remaining accounts format
+    validation::validate_remaining_accounts(&cpi_accounts)?;
 
     let authorization = &mut ctx.accounts.permission;
 
     // Step 2: Validate permission state and authorization
     // Check if the permission has expired
     let now = Clock::get()?.unix_timestamp;
-    if authorization.expires_at < now {
-        return Ok(());
-    }
+    require!(
+        authorization.expires_at >= now,
+        LazorKitError::TransactionTooOld
+    );
 
     // Verify the permission belongs to the correct smart wallet
-    if authorization.owner_wallet_address != ctx.accounts.smart_wallet.key() {
-        return Ok(());
-    }
+    require!(
+        authorization.owner_wallet_address == ctx.accounts.smart_wallet.key(),
+        LazorKitError::InvalidAccountOwner
+    );
 
     // Verify the ephemeral key matches the permission's authorized key
     require!(
@@ -61,9 +61,10 @@ pub fn execute_with_permission(
         .try_to_vec()
         .map_err(|_| LazorKitError::InvalidInstructionData)?;
     let data_hash = anchor_lang::solana_program::hash::hash(&serialized_cpi_data).to_bytes();
-    if data_hash != authorization.instruction_data_hash {
-        return Ok(());
-    }
+    require!(
+        data_hash == authorization.instruction_data_hash,
+        LazorKitError::HashMismatch
+    );
 
     // Step 5: Verify accounts metadata integrity
     // Hash all accounts to ensure they match the permission
@@ -73,54 +74,16 @@ pub fn execute_with_permission(
         all_accounts_hasher.hash(&[acc.is_signer as u8]);
         all_accounts_hasher.hash(&[acc.is_writable as u8]);
     }
-    if all_accounts_hasher.result().to_bytes() != authorization.accounts_metadata_hash {
-        return Ok(());
-    }
+    require!(
+        all_accounts_hasher.result().to_bytes() == authorization.accounts_metadata_hash,
+        LazorKitError::HashMismatch
+    );
 
     // Step 6: Split accounts based on split indices
-    let mut account_ranges = Vec::new();
-    let mut start = 0usize;
-
-    // Calculate account ranges for each instruction using split indices
-    for &split_point in split_index.iter() {
-        let end = split_point as usize;
-        require!(
-            end > start && end <= cpi_accounts.len(),
-            LazorKitError::AccountSliceOutOfBounds
-        );
-        account_ranges.push((start, end));
-        start = end;
-    }
-
-    // Add the last instruction range (from last split to end)
-    require!(
-        start < cpi_accounts.len(),
-        LazorKitError::AccountSliceOutOfBounds
-    );
-    account_ranges.push((start, cpi_accounts.len()));
+    let account_ranges = crate::utils::calculate_account_ranges(cpi_accounts, &split_index)?;
 
     // Step 7: Validate each instruction's programs for security
-    for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
-        let instruction_accounts = &cpi_accounts[range_start..range_end];
-
-        require!(
-            !instruction_accounts.is_empty(),
-            LazorKitError::InsufficientCpiAccounts
-        );
-
-        // First account in each instruction slice is the program ID
-        let program_account = &instruction_accounts[0];
-
-        // Validate program is executable (not a data account)
-        if !program_account.executable {
-            return Ok(());
-        }
-
-        // Prevent reentrancy attacks by blocking calls to this program
-        if program_account.key() == crate::ID {
-            return Ok(());
-        }
-    }
+    crate::utils::validate_programs_in_ranges(cpi_accounts, &account_ranges)?;
 
     // Step 8: Create wallet signer for CPI execution
     let wallet_signer = PdaSigner {
@@ -147,40 +110,31 @@ pub fn execute_with_permission(
         let program_account = &instruction_accounts[0];
         let instruction_accounts = &instruction_accounts[1..];
 
-        // Execute the CPI instruction (graceful abort on failure)
-        let exec_res = execute_cpi(
+        // Execute the CPI instruction
+        execute_cpi(
             instruction_accounts,
             cpi_data,
             program_account,
             wallet_signer.clone(),
-        );
-
-        if exec_res.is_err() {
-            return Ok(());
-        }
-    }
-
-    // Step 10: Handle fee distribution and vault validation
-    // Validate that the provided vault matches the vault index from the session
-    let vault_validation = crate::state::LazorKitVault::validate_vault_for_index(
-        &ctx.accounts.lazorkit_vault.key(),
-        authorization.vault_index,
-        &crate::ID,
-    );
-
-    // Distribute fees gracefully (don't fail if fees can't be paid or vault validation fails)
-    if vault_validation.is_ok() {
-        crate::utils::distribute_fees(
-            &ctx.accounts.config,
-            &ctx.accounts.smart_wallet.to_account_info(),
-            &ctx.accounts.fee_payer.to_account_info(),
-            &ctx.accounts.referral.to_account_info(),
-            &ctx.accounts.lazorkit_vault.to_account_info(),
-            &ctx.accounts.system_program,
-            wallet_signer,
         )?;
     }
 
+    // Step 10: Handle fee distribution and vault validation
+    crate::utils::handle_fee_distribution(
+        &ctx.accounts.config,
+        &ctx.accounts.smart_wallet_config,
+        &ctx.accounts.smart_wallet.to_account_info(),
+        &ctx.accounts.fee_payer.to_account_info(),
+        &ctx.accounts.referral.to_account_info(),
+        &ctx.accounts.lazorkit_vault.to_account_info(),
+        &ctx.accounts.system_program,
+        authorization.vault_index,
+    )?;
+
+    msg!("Successfully executed permission transaction: wallet={}, ephemeral_key={}, instructions={}", 
+         ctx.accounts.smart_wallet.key(), 
+         authorization.ephemeral_public_key,
+         instruction_data_list.len());
     Ok(())
 }
 

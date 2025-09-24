@@ -11,30 +11,38 @@ use anchor_lang::{
 /// Each wallet device represents a WebAuthn passkey that can be used to authenticate
 /// transactions for a specific smart wallet. Multiple devices can be associated with
 /// a single smart wallet for enhanced security and convenience.
+///
+/// Memory layout optimized for better cache performance:
+/// - Group related fields together
+/// - Align fields to natural boundaries
+/// - Minimize padding
 #[account]
 #[derive(Debug, InitSpace)]
 pub struct WalletDevice {
-    /// Public key of the WebAuthn passkey for transaction authorization
+    /// Bump seed for PDA derivation and verification (1 byte)
+    pub bump: u8,
+    /// Padding to align next fields (7 bytes)
+    pub _padding: [u8; 7],
+    /// Public key of the WebAuthn passkey for transaction authorization (33 bytes)
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    /// Smart wallet address this device is associated with
+    /// Smart wallet address this device is associated with (32 bytes)
     pub smart_wallet_address: Pubkey,
-    /// Unique credential ID from WebAuthn registration
+    /// Unique credential ID from WebAuthn registration (variable length, max 256 bytes)
     #[max_len(256)]
     pub credential_id: Vec<u8>,
-    /// Bump seed for PDA derivation and verification
-    pub bump: u8,
 }
 
 impl WalletDevice {
     /// Seed prefix used for PDA derivation of wallet device accounts
     pub const PREFIX_SEED: &'static [u8] = b"wallet_device";
 
-    fn from<'info>(x: &'info AccountInfo<'info>) -> Account<'info, Self> {
-        Account::try_from_unchecked(x).unwrap()
+    fn from<'info>(x: &'info AccountInfo<'info>) -> Result<Account<'info, Self>> {
+        Account::try_from_unchecked(x).map_err(|_| crate::error::LazorKitError::InvalidAccountData.into())
     }
 
     fn serialize(&self, info: AccountInfo) -> anchor_lang::Result<()> {
-        let dst: &mut [u8] = &mut info.try_borrow_mut_data().unwrap();
+        let dst: &mut [u8] = &mut info.try_borrow_mut_data()
+            .map_err(|_| crate::error::LazorKitError::InvalidAccountData)?;
         let mut writer: BpfWriter<&mut [u8]> = BpfWriter::new(dst);
         WalletDevice::try_serialize(self, &mut writer)
     }
@@ -72,18 +80,20 @@ impl WalletDevice {
                     },
                 )
                 .with_signer(&[seeds_signer]),
-                Rent::get()?.minimum_balance(space.try_into().unwrap()),
+                Rent::get()?.minimum_balance(space.try_into()
+                    .map_err(|_| crate::error::LazorKitError::InvalidAccountData)?),
                 space,
                 &ID,
             )?;
 
-            let mut auth = WalletDevice::from(wallet_device);
+            let mut auth = WalletDevice::from(wallet_device)?;
 
             auth.set_inner(WalletDevice {
+                bump,
+                _padding: [0u8; 7],
                 passkey_public_key,
                 smart_wallet_address,
                 credential_id,
-                bump,
             });
             auth.serialize(auth.to_account_info())
         } else {

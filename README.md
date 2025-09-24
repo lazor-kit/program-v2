@@ -40,7 +40,7 @@ The core smart wallet program that handles:
 - `add_policy_program` - Add programs to the policy registry
 - `update_config` - Update program configuration
 
-#### 2. Default Policy Program (`7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381`)
+#### 2. Default Policy Program (`BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7`)
 
 A reference implementation of transaction policies that provides:
 
@@ -120,20 +120,20 @@ anchor deploy --provider.cluster devnet --program-name default_policy
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl init -f ./target/idl/lazorkit.json G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ
+anchor idl init -f ./target/idl/lazorkit.json Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh
 
 # Initialize IDL for Default Policy
-anchor idl init -f ./target/idl/default_policy.json 7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381
+anchor idl init -f ./target/idl/default_policy.json BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7
 ```
 
 ### Upgrade IDL
 
 ```bash
 # Initialize IDL for LazorKit
-anchor idl upgrade G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ -f ./target/idl/lazorkit.json
+anchor idl upgrade Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh -f ./target/idl/lazorkit.json
 
 # Initialize IDL for Default Policy
-anchor idl upgrade 7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381 -f ./target/idl/default_policy.json
+anchor idl upgrade BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7 -f ./target/idl/default_policy.json
 ```
 
 ## SDK Usage
@@ -325,8 +325,8 @@ The test suite includes:
 
 | Program        | Devnet                                         | Mainnet                                        |
 | -------------- | ---------------------------------------------- | ---------------------------------------------- |
-| LazorKit       | `G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ` | `G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ` |
-| Default Policy | `7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381` | `7Zu8pnhB5cUpDx98TvbC9RafgkD8qoqMRa1sfLu6B381` |
+| LazorKit       | `Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh` | `Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh` |
+| Default Policy | `BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7` | `BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7` |
 
 ## Address Lookup Table
 

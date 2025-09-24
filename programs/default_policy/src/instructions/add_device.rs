@@ -1,6 +1,6 @@
 use crate::{state::Policy, ID};
 use anchor_lang::prelude::*;
-use lazorkit::{program::Lazorkit, state::WalletDevice};
+use lazorkit::{state::WalletDevice, ID as LAZORKIT_ID};
 
 pub fn add_device(ctx: Context<AddDevice>) -> Result<()> {
     let new_policy = &mut ctx.accounts.new_policy;
@@ -17,7 +17,7 @@ pub struct AddDevice<'info> {
     pub smart_wallet: Signer<'info>,
 
     #[account(
-        owner = lazorkit.key(),
+        owner = LAZORKIT_ID,
         signer,
     )]
     pub wallet_device: Account<'info, WalletDevice>,
@@ -42,8 +42,6 @@ pub struct AddDevice<'info> {
         bump,
     )]
     pub new_policy: Account<'info, Policy>,
-
-    pub lazorkit: Program<'info, Lazorkit>,
 
     pub system_program: Program<'info, System>,
 }

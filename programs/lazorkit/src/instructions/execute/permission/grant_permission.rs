@@ -10,17 +10,13 @@ use crate::state::{
 use crate::utils::{verify_authorization_hash, PasskeyExt, compute_grant_permission_message_hash};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
-/// Grant ephemeral permission to a keypair
-///
-/// Grants time-limited permission to an ephemeral keypair to interact with
-/// the smart wallet. Ideal for games or applications that need to perform
-/// multiple operations without repeatedly authenticating with passkey.
 pub fn grant_permission(
     ctx: Context<GrantPermission>,
     args: GrantPermissionArgs,
 ) -> Result<()> {
     // Step 1: Validate input parameters and global program state
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
     // Validate instruction data and split indices format
@@ -86,51 +82,15 @@ pub fn grant_permission(
         args.expires_at <= now + 3600, // Maximum 1 hour from now
         LazorKitError::InvalidInstructionData
     );
+    
+    // Validate timestamp using standardized validation
+    validation::validate_instruction_timestamp(args.timestamp)?;
 
     // Step 7: Validate account ranges using split indices
-    let mut account_ranges = Vec::new();
-    let mut start = 0usize;
-
-    // Calculate account ranges for each instruction using split indices
-    for &split_point in args.split_index.iter() {
-        let end = split_point as usize;
-        require!(
-            end > start && end <= ctx.remaining_accounts.len(),
-            LazorKitError::AccountSliceOutOfBounds
-        );
-        account_ranges.push((start, end));
-        start = end;
-    }
-
-    // Add the last instruction range (from last split to end)
-    require!(
-        start < ctx.remaining_accounts.len(),
-        LazorKitError::AccountSliceOutOfBounds
-    );
-    account_ranges.push((start, ctx.remaining_accounts.len()));
+    let account_ranges = crate::utils::calculate_account_ranges(&ctx.remaining_accounts, &args.split_index)?;
 
     // Step 8: Validate each instruction's programs for security
-    for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
-        let instruction_accounts = &ctx.remaining_accounts[range_start..range_end];
-
-        require!(
-            !instruction_accounts.is_empty(),
-            LazorKitError::InsufficientCpiAccounts
-        );
-
-        // First account in each instruction slice is the program ID
-        let program_account = &instruction_accounts[0];
-
-        // Validate program is executable (not a data account)
-        if !program_account.executable {
-            return Err(LazorKitError::ProgramNotExecutable.into());
-        }
-
-        // Prevent reentrancy attacks by blocking calls to this program
-        if program_account.key() == crate::ID {
-            return Err(LazorKitError::ReentrancyDetected.into());
-        }
-    }
+    crate::utils::validate_programs_in_ranges(&ctx.remaining_accounts, &account_ranges)?;
 
     // Step 9: Create the ephemeral permission account
     // Store the authorization data for later use by execute_with_permission
@@ -145,14 +105,14 @@ pub fn grant_permission(
     authorization.accounts_metadata_hash = accounts_hash;
 
     // Step 10: Update wallet state
-    // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
-        .accounts
-        .smart_wallet_config
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
+    ctx.accounts.smart_wallet_config.last_nonce = 
+        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
 
+    msg!("Successfully granted permission: wallet={}, ephemeral_key={}, expires_at={}, instructions={}", 
+         ctx.accounts.smart_wallet.key(), 
+         args.ephemeral_public_key,
+         args.expires_at,
+         args.instruction_data_list.len());
     Ok(())
 }
 

@@ -1,5 +1,5 @@
 {
-  "address": "G5SuNc9zcsxi2ANAy13XweXaczWxq2vzJCFz3pmVEqNJ",
+  "address": "Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh",
   "metadata": {
     "name": "lazorkit",
     "version": "0.1.0",
@@ -7,38 +7,29 @@
     "description": "Created with Anchor"
   },
   "docs": [
-    "LazorKit: Enterprise Smart Wallet with WebAuthn Passkey Authentication",
-    "",
-    "LazorKit is a comprehensive smart wallet solution that enables secure, user-friendly",
-    "transaction execution using WebAuthn passkey authentication. The program provides:",
-    "",
-    "- **Passkey-based Authentication**: Secure transaction signing using WebAuthn standards",
-    "- **Policy-driven Security**: Configurable transaction validation through policy programs",
-    "- **Chunked Transactions**: Support for large transactions via chunked execution",
-    "- **Permission System**: Ephemeral key grants for enhanced user experience",
-    "- **Vault Management**: Multi-slot fee distribution and SOL management",
-    "- **Admin Controls**: Program configuration and policy program registration",
-    "",
-    "The program is designed for enterprise use cases requiring high security, scalability,",
-    "and user experience while maintaining compatibility with existing Solana infrastructure."
+    "LazorKit: Smart Wallet with WebAuthn Passkey Authentication"
   ],
   "instructions": [
     {
       "name": "add_policy_program",
-      "docs": [
-        "Register a new policy program in the whitelist",
-        "",
-        "Allows the program authority to add new policy programs to the registry.",
-        "These policy programs can then be used by smart wallets for transaction",
-        "validation and security enforcement."
+      "discriminator": [
+        172,
+        91,
+        65,
+        142,
+        231,
+        42,
+        251,
+        227
       ],
-      "discriminator": [172, 91, 65, 142, 231, 42, 251, 227],
       "accounts": [
         {
           "name": "authority",
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
@@ -46,7 +37,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -59,8 +57,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -74,14 +85,16 @@
     },
     {
       "name": "call_policy",
-      "docs": [
-        "Execute policy program instructions",
-        "",
-        "Calls the policy program to perform operations like adding/removing devices",
-        "or other policy-specific actions. Requires proper passkey authentication",
-        "and validates the policy program is registered."
+      "discriminator": [
+        57,
+        50,
+        158,
+        108,
+        226,
+        148,
+        41,
+        221
       ],
-      "discriminator": [57, 50, 158, 108, 226, 148, 41, 221],
       "accounts": [
         {
           "name": "payer",
@@ -94,7 +107,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -107,7 +127,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -126,8 +157,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -143,16 +191,25 @@
         },
         {
           "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -176,8 +233,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -205,14 +275,16 @@
     },
     {
       "name": "change_policy",
-      "docs": [
-        "Change the policy program for a smart wallet",
-        "",
-        "Allows changing the policy program that governs a smart wallet's transaction",
-        "validation rules. Requires proper passkey authentication and validates that",
-        "the new policy program is registered in the whitelist."
+      "discriminator": [
+        105,
+        129,
+        139,
+        210,
+        10,
+        152,
+        183,
+        3
       ],
-      "discriminator": [105, 129, 139, 210, 10, 152, 183, 3],
       "accounts": [
         {
           "name": "payer",
@@ -225,7 +297,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -238,7 +317,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -257,8 +347,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -274,16 +381,25 @@
         },
         {
           "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -310,8 +426,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -319,7 +448,6 @@
         },
         {
           "name": "ix_sysvar",
-          "docs": ["CHECK"],
           "address": "Sysvar1nstructions1111111111111111111111111"
         },
         {
@@ -339,15 +467,137 @@
       ]
     },
     {
-      "name": "create_chunk",
-      "docs": [
-        "Create a chunk buffer for large transactions",
-        "",
-        "Creates a buffer for chunked transactions when the main execute transaction",
-        "exceeds size limits. Splits large transactions into smaller, manageable",
-        "chunks that can be processed separately while maintaining security."
+      "name": "close_chunk",
+      "discriminator": [
+        150,
+        183,
+        213,
+        198,
+        0,
+        74,
+        14,
+        170
       ],
-      "discriminator": [83, 226, 15, 219, 9, 19, 186, 90],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet_config.wallet_id",
+                "account": "SmartWalletConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "chunk",
+          "docs": [
+            "Expired chunk to close and refund rent"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  117,
+                  110,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "account",
+                "path": "chunk.authorized_nonce",
+                "account": "Chunk"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_refund",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_chunk",
+      "discriminator": [
+        83,
+        226,
+        15,
+        219,
+        9,
+        19,
+        186,
+        90
+      ],
       "accounts": [
         {
           "name": "payer",
@@ -360,7 +610,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -373,7 +630,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -392,8 +660,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -410,7 +695,19 @@
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -431,28 +728,43 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
           }
         },
         {
-          "name": "policy_program",
-          "docs": [
-            "Policy program for optional policy enforcement at session creation"
-          ]
+          "name": "policy_program"
         },
         {
           "name": "chunk",
-          "docs": ["New transaction session account (rent payer: payer)"],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 104, 117, 110, 107]
+                "value": [
+                  99,
+                  104,
+                  117,
+                  110,
+                  107
+                ]
               },
               {
                 "kind": "account",
@@ -488,14 +800,16 @@
     },
     {
       "name": "create_smart_wallet",
-      "docs": [
-        "Create a new smart wallet with WebAuthn passkey authentication",
-        "",
-        "Creates a new smart wallet account with associated passkey device for secure",
-        "authentication. The wallet is initialized with the specified policy program",
-        "for transaction validation and can receive initial SOL funding."
+      "discriminator": [
+        129,
+        39,
+        235,
+        18,
+        132,
+        68,
+        203,
+        19
       ],
-      "discriminator": [129, 39, 235, 18, 132, 68, 203, 19],
       "accounts": [
         {
           "name": "payer",
@@ -515,8 +829,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -533,7 +860,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -545,17 +883,31 @@
         },
         {
           "name": "smart_wallet_config",
-          "docs": [
-            "Smart wallet data account that stores wallet state and configuration"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -567,16 +919,25 @@
         },
         {
           "name": "wallet_device",
-          "docs": [
-            "Wallet device account that stores the passkey authentication data"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -592,25 +953,30 @@
         },
         {
           "name": "config",
-          "docs": ["Program configuration account containing global settings"],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
         },
         {
-          "name": "default_policy_program",
-          "docs": [
-            "Default policy program that will govern this smart wallet's transactions"
-          ]
+          "name": "default_policy_program"
         },
         {
           "name": "system_program",
-          "docs": ["System program for account creation and SOL transfers"],
+          "docs": [
+            "System program for account creation and SOL transfers"
+          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -627,14 +993,16 @@
     },
     {
       "name": "execute",
-      "docs": [
-        "Execute a transaction through the smart wallet",
-        "",
-        "The main transaction execution function that validates the transaction through",
-        "the policy program before executing the target program instruction. Supports",
-        "complex multi-instruction transactions with proper authentication."
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
       ],
-      "discriminator": [130, 221, 242, 154, 13, 193, 189, 29],
       "accounts": [
         {
           "name": "payer",
@@ -649,7 +1017,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -668,8 +1047,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -685,16 +1081,25 @@
         },
         {
           "name": "lazorkit_vault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -706,7 +1111,37 @@
           }
         },
         {
-          "name": "wallet_device"
+          "name": "wallet_device",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
         },
         {
           "name": "policy_program_registry",
@@ -715,8 +1150,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -734,7 +1182,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -761,14 +1216,16 @@
     },
     {
       "name": "execute_chunk",
-      "docs": [
-        "Execute a chunk from the chunk buffer",
-        "",
-        "Executes a chunk from the previously created buffer. Used when the main",
-        "execute transaction is too large and needs to be split into smaller,",
-        "manageable pieces for processing."
+      "discriminator": [
+        106,
+        83,
+        113,
+        47,
+        89,
+        243,
+        39,
+        220
       ],
-      "discriminator": [106, 83, 113, 47, 89, 243, 39, 220],
       "accounts": [
         {
           "name": "payer",
@@ -781,7 +1238,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -794,7 +1258,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -813,8 +1288,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -839,7 +1331,19 @@
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -854,14 +1358,20 @@
         {
           "name": "chunk",
           "docs": [
-            "Transaction session to execute. Closed on success to refund rent."
+            "Transaction session to execute. Closed to refund rent."
           ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 104, 117, 110, 107]
+                "value": [
+                  99,
+                  104,
+                  117,
+                  110,
+                  107
+                ]
               },
               {
                 "kind": "account",
@@ -899,24 +1409,30 @@
     },
     {
       "name": "execute_with_permission",
-      "docs": [
-        "Execute transactions using ephemeral permission",
-        "",
-        "Executes transactions using a previously granted ephemeral key, allowing",
-        "multiple operations without repeated passkey authentication. Perfect for",
-        "games or applications that require frequent interactions with the wallet."
+      "discriminator": [
+        213,
+        159,
+        47,
+        243,
+        150,
+        206,
+        78,
+        67
       ],
-      "discriminator": [213, 159, 47, 243, 150, 206, 78, 67],
       "accounts": [
         {
           "name": "fee_payer",
-          "docs": ["Fee payer for the transaction (stored in authorization)"],
+          "docs": [
+            "Fee payer for the transaction (stored in authorization)"
+          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "ephemeral_signer",
-          "docs": ["Ephemeral key that can sign transactions (must be signer)"],
+          "docs": [
+            "Ephemeral key that can sign transactions (must be signer)"
+          ],
           "signer": true
         },
         {
@@ -925,7 +1441,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -938,7 +1461,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -957,8 +1491,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -983,7 +1534,19 @@
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -1026,14 +1589,16 @@
     },
     {
       "name": "grant_permission",
-      "docs": [
-        "Grant ephemeral permission to a keypair",
-        "",
-        "Grants time-limited permission to an ephemeral keypair to interact with",
-        "the smart wallet. Ideal for games or applications that need to perform",
-        "multiple operations without repeatedly authenticating with passkey."
+      "discriminator": [
+        50,
+        6,
+        1,
+        242,
+        15,
+        73,
+        99,
+        164
       ],
-      "discriminator": [50, 6, 1, 242, 15, 73, 99, 164],
       "accounts": [
         {
           "name": "payer",
@@ -1046,7 +1611,14 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -1059,7 +1631,18 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
                 ]
               },
               {
@@ -1078,8 +1661,25 @@
               {
                 "kind": "const",
                 "value": [
-                  115, 109, 97, 114, 116, 95, 119, 97, 108, 108, 101, 116, 95,
-                  99, 111, 110, 102, 105, 103
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
                 ]
               },
               {
@@ -1096,7 +1696,19 @@
               {
                 "kind": "const",
                 "value": [
-                  119, 97, 108, 108, 101, 116, 95, 100, 101, 118, 105, 99, 101
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
                 ]
               },
               {
@@ -1112,13 +1724,26 @@
         },
         {
           "name": "permission",
-          "docs": ["New ephemeral authorization account (rent payer: payer)"],
+          "docs": [
+            "New ephemeral authorization account (rent payer: payer)"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [112, 101, 114, 109, 105, 115, 115, 105, 111, 110]
+                "value": [
+                  112,
+                  101,
+                  114,
+                  109,
+                  105,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
               },
               {
                 "kind": "account",
@@ -1153,14 +1778,16 @@
     },
     {
       "name": "initialize_program",
-      "docs": [
-        "Initialize the LazorKit program with essential configuration",
-        "",
-        "Sets up the program's initial state including the sequence tracker for transaction",
-        "ordering and default configuration parameters. This must be called before any",
-        "other operations can be performed."
+      "discriminator": [
+        176,
+        107,
+        205,
+        168,
+        24,
+        157,
+        175,
+        103
       ],
-      "discriminator": [176, 107, 205, 168, 24, 157, 175, 103],
       "accounts": [
         {
           "name": "signer",
@@ -1172,13 +1799,22 @@
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -1194,8 +1830,21 @@
               {
                 "kind": "const",
                 "value": [
-                  112, 111, 108, 105, 99, 121, 95, 114, 101, 103, 105, 115, 116,
-                  114, 121
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
                 ]
               }
             ]
@@ -1209,7 +1858,9 @@
         },
         {
           "name": "system_program",
-          "docs": ["The system program."],
+          "docs": [
+            "The system program."
+          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1217,43 +1868,73 @@
     },
     {
       "name": "manage_vault",
-      "docs": [
-        "Manage SOL transfers in the vault system",
-        "",
-        "Handles SOL transfers to and from the LazorKit vault system, supporting",
-        "multiple vault slots for efficient fee distribution and program operations."
+      "discriminator": [
+        165,
+        7,
+        106,
+        242,
+        73,
+        193,
+        195,
+        128
       ],
-      "discriminator": [165, 7, 106, 242, 73, 193, 195, 128],
       "accounts": [
         {
           "name": "authority",
-          "docs": ["The current authority of the program."],
+          "docs": [
+            "The current authority of the program."
+          ],
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
         },
         {
           "name": "vault",
-          "docs": ["Individual vault PDA (empty account that holds SOL)"],
+          "docs": [
+            "Individual vault PDA (empty account that holds SOL)"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  108, 97, 122, 111, 114, 107, 105, 116, 95, 118, 97, 117, 108,
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
                   116
                 ]
               },
@@ -1270,7 +1951,9 @@
         },
         {
           "name": "system_program",
-          "docs": ["System program"],
+          "docs": [
+            "System program"
+          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1291,31 +1974,46 @@
     },
     {
       "name": "update_config",
-      "docs": [
-        "Update program configuration settings",
-        "",
-        "Allows the program authority to modify critical configuration parameters including",
-        "fee structures, default policy programs, and operational settings. This function",
-        "supports updating various configuration types through the UpdateType enum."
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
       ],
-      "discriminator": [29, 158, 252, 191, 10, 83, 219, 99],
       "accounts": [
         {
           "name": "authority",
-          "docs": ["The current authority of the program."],
+          "docs": [
+            "The current authority of the program."
+          ],
           "writable": true,
           "signer": true,
-          "relations": ["config"]
+          "relations": [
+            "config"
+          ]
         },
         {
           "name": "config",
-          "docs": ["The program's configuration account."],
+          "docs": [
+            "The program's configuration account."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [99, 111, 110, 102, 105, 103]
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -1340,27 +2038,81 @@
   "accounts": [
     {
       "name": "Chunk",
-      "discriminator": [134, 67, 80, 65, 135, 143, 156, 196]
+      "discriminator": [
+        134,
+        67,
+        80,
+        65,
+        135,
+        143,
+        156,
+        196
+      ]
     },
     {
       "name": "Config",
-      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
     },
     {
       "name": "Permission",
-      "discriminator": [224, 83, 28, 79, 10, 253, 161, 28]
+      "discriminator": [
+        224,
+        83,
+        28,
+        79,
+        10,
+        253,
+        161,
+        28
+      ]
     },
     {
       "name": "PolicyProgramRegistry",
-      "discriminator": [158, 67, 114, 157, 27, 153, 86, 72]
+      "discriminator": [
+        158,
+        67,
+        114,
+        157,
+        27,
+        153,
+        86,
+        72
+      ]
     },
     {
       "name": "SmartWalletConfig",
-      "discriminator": [138, 211, 3, 80, 65, 100, 207, 142]
+      "discriminator": [
+        138,
+        211,
+        3,
+        80,
+        65,
+        100,
+        207,
+        142
+      ]
     },
     {
       "name": "WalletDevice",
-      "discriminator": [35, 85, 31, 31, 179, 48, 136, 123]
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
+      ]
     }
   ],
   "errors": [
@@ -1679,39 +2431,56 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "signature",
-            "docs": ["WebAuthn signature for transaction authorization"],
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
-            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": ["Index of the Secp256r1 verification instruction"],
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
             "type": "u8"
           },
           {
             "name": "policy_data",
-            "docs": ["Policy program instruction data"],
+            "docs": [
+              "Policy program instruction data"
+            ],
             "type": "bytes"
           },
           {
             "name": "new_wallet_device",
-            "docs": ["Optional new wallet device to add during policy call"],
+            "docs": [
+              "Optional new wallet device to add during policy call"
+            ],
             "type": {
               "option": {
                 "defined": {
@@ -1729,7 +2498,9 @@
           },
           {
             "name": "timestamp",
-            "docs": ["Unix timestamp for message verification"],
+            "docs": [
+              "Unix timestamp for message verification"
+            ],
             "type": "i64"
           }
         ]
@@ -1748,29 +2519,42 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "signature",
-            "docs": ["WebAuthn signature for transaction authorization"],
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
-            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": ["Index of the Secp256r1 verification instruction"],
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
             "type": "u8"
           },
           {
@@ -1782,17 +2566,23 @@
           },
           {
             "name": "destroy_policy_data",
-            "docs": ["Data for destroying the old policy program"],
+            "docs": [
+              "Data for destroying the old policy program"
+            ],
             "type": "bytes"
           },
           {
             "name": "init_policy_data",
-            "docs": ["Data for initializing the new policy program"],
+            "docs": [
+              "Data for initializing the new policy program"
+            ],
             "type": "bytes"
           },
           {
             "name": "new_wallet_device",
-            "docs": ["Optional new wallet device to add during policy change"],
+            "docs": [
+              "Optional new wallet device to add during policy change"
+            ],
             "type": {
               "option": {
                 "defined": {
@@ -1810,7 +2600,9 @@
           },
           {
             "name": "timestamp",
-            "docs": ["Unix timestamp for message verification"],
+            "docs": [
+              "Unix timestamp for message verification"
+            ],
             "type": "i64"
           }
         ]
@@ -1830,7 +2622,9 @@
         "fields": [
           {
             "name": "owner_wallet_address",
-            "docs": ["Smart wallet address that authorized this chunk session"],
+            "docs": [
+              "Smart wallet address that authorized this chunk session"
+            ],
             "type": "pubkey"
           },
           {
@@ -1839,7 +2633,10 @@
               "Combined SHA256 hash of all cpi transaction instruction data"
             ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -1865,7 +2662,9 @@
           },
           {
             "name": "vault_index",
-            "docs": ["Vault index for fee collection during chunk execution"],
+            "docs": [
+              "Vault index for fee collection during chunk execution"
+            ],
             "type": "u8"
           }
         ]
@@ -1878,51 +2677,76 @@
         "",
         "Stores global program configuration including fee structures, default policy",
         "program, and operational settings. Only the program authority can modify",
-        "these settings through the update_config instruction."
+        "these settings through the update_config instruction.",
+        "",
+        "Memory layout optimized for better cache performance:",
+        "- Group related fields together",
+        "- Align fields to natural boundaries",
+        "- Minimize padding"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "authority",
+            "name": "is_paused",
             "docs": [
-              "Program authority that can modify configuration settings"
+              "Whether the program is currently paused (1 byte)"
             ],
-            "type": "pubkey"
+            "type": "bool"
+          },
+          {
+            "name": "_padding",
+            "docs": [
+              "Padding to align next fields (7 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
           },
           {
             "name": "create_smart_wallet_fee",
             "docs": [
-              "Fee charged for creating a new smart wallet (in lamports)"
+              "Fee charged for creating a new smart wallet (in lamports) (8 bytes)"
             ],
             "type": "u64"
           },
           {
             "name": "fee_payer_fee",
             "docs": [
-              "Fee charged to the fee payer for transactions (in lamports)"
+              "Fee charged to the fee payer for transactions (in lamports) (8 bytes)"
             ],
             "type": "u64"
           },
           {
             "name": "referral_fee",
-            "docs": ["Fee paid to referral addresses (in lamports)"],
+            "docs": [
+              "Fee paid to referral addresses (in lamports) (8 bytes)"
+            ],
             "type": "u64"
           },
           {
             "name": "lazorkit_fee",
-            "docs": ["Fee retained by LazorKit protocol (in lamports)"],
+            "docs": [
+              "Fee retained by LazorKit protocol (in lamports) (8 bytes)"
+            ],
             "type": "u64"
           },
           {
-            "name": "default_policy_program_id",
-            "docs": ["Default policy program ID for new smart wallets"],
+            "name": "authority",
+            "docs": [
+              "Program authority that can modify configuration settings (32 bytes)"
+            ],
             "type": "pubkey"
           },
           {
-            "name": "is_paused",
-            "docs": ["Whether the program is currently paused"],
-            "type": "bool"
+            "name": "default_policy_program_id",
+            "docs": [
+              "Default policy program ID for new smart wallets (32 bytes)"
+            ],
+            "type": "pubkey"
           }
         ]
       }
@@ -1940,34 +2764,49 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "signature",
-            "docs": ["WebAuthn signature for transaction authorization"],
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
-            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": ["Index of the Secp256r1 verification instruction"],
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
             "type": "u8"
           },
           {
             "name": "policy_data",
-            "docs": ["Policy program instruction data"],
+            "docs": [
+              "Policy program instruction data"
+            ],
             "type": "bytes"
           },
           {
@@ -1986,9 +2825,14 @@
           },
           {
             "name": "cpi_hash",
-            "docs": ["Hash of CPI data and accounts (32 bytes)"],
+            "docs": [
+              "Hash of CPI data and accounts (32 bytes)"
+            ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           }
         ]
@@ -2007,34 +2851,49 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "credential_id",
-            "docs": ["Unique credential ID from WebAuthn registration"],
+            "docs": [
+              "Unique credential ID from WebAuthn registration"
+            ],
             "type": "bytes"
           },
           {
             "name": "policy_data",
-            "docs": ["Policy program initialization data"],
+            "docs": [
+              "Policy program initialization data"
+            ],
             "type": "bytes"
           },
           {
             "name": "wallet_id",
-            "docs": ["Random wallet ID provided by client for uniqueness"],
+            "docs": [
+              "Random wallet ID provided by client for uniqueness"
+            ],
             "type": "u64"
           },
           {
             "name": "amount",
-            "docs": ["Initial SOL amount to transfer to the wallet"],
+            "docs": [
+              "Initial SOL amount to transfer to the wallet"
+            ],
             "type": "u64"
           },
           {
             "name": "referral_address",
-            "docs": ["Optional referral address for fee sharing"],
+            "docs": [
+              "Optional referral address for fee sharing"
+            ],
             "type": {
               "option": "pubkey"
             }
@@ -2062,29 +2921,42 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "signature",
-            "docs": ["WebAuthn signature for transaction authorization"],
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
-            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": ["Index of the Secp256r1 verification instruction"],
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
             "type": "u8"
           },
           {
@@ -2096,12 +2968,16 @@
           },
           {
             "name": "policy_data",
-            "docs": ["Policy program instruction data"],
+            "docs": [
+              "Policy program instruction data"
+            ],
             "type": "bytes"
           },
           {
             "name": "cpi_data",
-            "docs": ["Cross-program invocation instruction data"],
+            "docs": [
+              "Cross-program invocation instruction data"
+            ],
             "type": "bytes"
           },
           {
@@ -2113,7 +2989,9 @@
           },
           {
             "name": "timestamp",
-            "docs": ["Unix timestamp for message verification"],
+            "docs": [
+              "Unix timestamp for message verification"
+            ],
             "type": "i64"
           }
         ]
@@ -2133,39 +3011,56 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the WebAuthn passkey for authentication"],
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "signature",
-            "docs": ["WebAuthn signature for transaction authorization"],
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
             "type": "bytes"
           },
           {
             "name": "client_data_json_raw",
-            "docs": ["Raw client data JSON from WebAuthn authentication"],
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": ["Raw authenticator data from WebAuthn authentication"],
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": ["Index of the Secp256r1 verification instruction"],
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
             "type": "u8"
           },
           {
             "name": "ephemeral_public_key",
-            "docs": ["Ephemeral public key that will receive permission"],
+            "docs": [
+              "Ephemeral public key that will receive permission"
+            ],
             "type": "pubkey"
           },
           {
             "name": "expires_at",
-            "docs": ["Unix timestamp when the permission expires"],
+            "docs": [
+              "Unix timestamp when the permission expires"
+            ],
             "type": "i64"
           },
           {
@@ -2177,19 +3072,25 @@
           },
           {
             "name": "instruction_data_list",
-            "docs": ["All instruction data to be authorized for execution"],
+            "docs": [
+              "All instruction data to be authorized for execution"
+            ],
             "type": {
               "vec": "bytes"
             }
           },
           {
             "name": "split_index",
-            "docs": ["Split indices for accounts (n-1 for n instructions)"],
+            "docs": [
+              "Split indices for accounts (n-1 for n instructions)"
+            ],
             "type": "bytes"
           },
           {
             "name": "timestamp",
-            "docs": ["Unix timestamp for message verification"],
+            "docs": [
+              "Unix timestamp for message verification"
+            ],
             "type": "i64"
           }
         ]
@@ -2208,9 +3109,14 @@
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": ["Public key of the new WebAuthn passkey"],
+            "docs": [
+              "Public key of the new WebAuthn passkey"
+            ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
@@ -2251,22 +3157,30 @@
           },
           {
             "name": "expires_at",
-            "docs": ["Unix timestamp when this permission session expires"],
+            "docs": [
+              "Unix timestamp when this permission session expires"
+            ],
             "type": "i64"
           },
           {
             "name": "fee_payer_address",
-            "docs": ["Fee payer address for transactions in this session"],
+            "docs": [
+              "Fee payer address for transactions in this session"
+            ],
             "type": "pubkey"
           },
           {
             "name": "rent_refund_address",
-            "docs": ["Address to receive rent refund when closing the session"],
+            "docs": [
+              "Address to receive rent refund when closing the session"
+            ],
             "type": "pubkey"
           },
           {
             "name": "vault_index",
-            "docs": ["Vault index for fee collection during this session"],
+            "docs": [
+              "Vault index for fee collection during this session"
+            ],
             "type": "u8"
           },
           {
@@ -2275,7 +3189,10 @@
               "Combined hash of all instruction data that can be executed"
             ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -2284,7 +3201,10 @@
               "Combined hash of all accounts that will be used in this session"
             ],
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           }
         ]
@@ -2303,14 +3223,18 @@
         "fields": [
           {
             "name": "registered_programs",
-            "docs": ["List of registered policy program addresses (max 10)"],
+            "docs": [
+              "List of registered policy program addresses (max 10)"
+            ],
             "type": {
               "vec": "pubkey"
             }
           },
           {
             "name": "bump",
-            "docs": ["Bump seed for PDA derivation and verification"],
+            "docs": [
+              "Bump seed for PDA derivation and verification"
+            ],
             "type": "u8"
           }
         ]
@@ -2323,41 +3247,62 @@
         "",
         "Stores the essential state information for a smart wallet including its",
         "unique identifier, policy program configuration, and authentication nonce",
-        "for replay attack prevention."
+        "for replay attack prevention.",
+        "",
+        "Memory layout optimized for better cache performance:",
+        "- Group related fields together",
+        "- Align fields to natural boundaries",
+        "- Minimize padding"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA derivation and verification (1 byte)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "docs": [
+              "Padding to align next fields (7 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
             "name": "wallet_id",
-            "docs": ["Unique identifier for this smart wallet instance"],
+            "docs": [
+              "Unique identifier for this smart wallet instance (8 bytes)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_nonce",
+            "docs": [
+              "Last nonce used for message verification to prevent replay attacks (8 bytes)"
+            ],
             "type": "u64"
           },
           {
             "name": "referral_address",
             "docs": [
-              "Referral address that receives referral fees from this wallet"
+              "Referral address that receives referral fees from this wallet (32 bytes)"
             ],
             "type": "pubkey"
           },
           {
             "name": "policy_program_id",
             "docs": [
-              "Policy program that governs this wallet's transaction validation rules"
+              "Policy program that governs this wallet's transaction validation rules (32 bytes)"
             ],
             "type": "pubkey"
-          },
-          {
-            "name": "last_nonce",
-            "docs": [
-              "Last nonce used for message verification to prevent replay attacks"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "docs": ["Bump seed for PDA derivation and verification"],
-            "type": "u8"
           }
         ]
       }
@@ -2407,34 +3352,60 @@
         "",
         "Each wallet device represents a WebAuthn passkey that can be used to authenticate",
         "transactions for a specific smart wallet. Multiple devices can be associated with",
-        "a single smart wallet for enhanced security and convenience."
+        "a single smart wallet for enhanced security and convenience.",
+        "",
+        "Memory layout optimized for better cache performance:",
+        "- Group related fields together",
+        "- Align fields to natural boundaries",
+        "- Minimize padding"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "passkey_public_key",
+            "name": "bump",
             "docs": [
-              "Public key of the WebAuthn passkey for transaction authorization"
+              "Bump seed for PDA derivation and verification (1 byte)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "docs": [
+              "Padding to align next fields (7 bytes)"
             ],
             "type": {
-              "array": ["u8", 33]
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "passkey_public_key",
+            "docs": [
+              "Public key of the WebAuthn passkey for transaction authorization (33 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
             }
           },
           {
             "name": "smart_wallet_address",
-            "docs": ["Smart wallet address this device is associated with"],
+            "docs": [
+              "Smart wallet address this device is associated with (32 bytes)"
+            ],
             "type": "pubkey"
           },
           {
             "name": "credential_id",
-            "docs": ["Unique credential ID from WebAuthn registration"],
+            "docs": [
+              "Unique credential ID from WebAuthn registration (variable length, max 256 bytes)"
+            ],
             "type": "bytes"
-          },
-          {
-            "name": "bump",
-            "docs": ["Bump seed for PDA derivation and verification"],
-            "type": "u8"
           }
         ]
       }
