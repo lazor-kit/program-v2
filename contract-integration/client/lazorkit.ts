@@ -302,7 +302,9 @@ export class LazorkitClient {
         defaultPolicyProgram: this.defaultPolicyProgram.programId,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
+      .remainingAccounts([
+        ...instructionToAccountMetas(policyInstruction, payer),
+      ])
       .instruction();
   }
 
@@ -337,7 +339,7 @@ export class LazorkitClient {
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction),
-        ...instructionToAccountMetas(cpiInstruction, [payer]),
+        ...instructionToAccountMetas(cpiInstruction, payer),
       ])
       .instruction();
   }
@@ -500,7 +502,7 @@ export class LazorkitClient {
         isSigner: false,
         isWritable: false,
       },
-      ...instructionToAccountMetas(ix, [payer]),
+      ...instructionToAccountMetas(ix, payer),
     ]);
 
     return await this.program.methods
@@ -531,7 +533,7 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix, [payer])
+      instructionToAccountMetas(ix, payer)
     );
 
     return await this.program.methods
@@ -578,7 +580,7 @@ export class LazorkitClient {
 
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix, [feePayer])
+      instructionToAccountMetas(ix, feePayer)
     );
 
     return await this.program.methods
@@ -690,9 +692,7 @@ export class LazorkitClient {
   /**
    * Executes a direct transaction with passkey authentication
    */
-  async executeTxn(
-    params: types.ExecuteParams
-  ): Promise<VersionedTransaction> {
+  async executeTxn(params: types.ExecuteParams): Promise<VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
@@ -728,6 +728,7 @@ export class LazorkitClient {
         splitIndex: policyInstruction.keys.length,
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
+        timestamp: new BN(Math.floor(Date.now() / 1000)),
         vaultIndex:
           params.vaultIndex !== undefined
             ? params.vaultIndex
@@ -779,6 +780,7 @@ export class LazorkitClient {
           : null,
         policyData: params.policyInstruction.data,
         verifyInstructionIndex: 0,
+        timestamp: new BN(Math.floor(Date.now() / 1000)),
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
         ),
@@ -832,6 +834,7 @@ export class LazorkitClient {
               ),
             }
           : null,
+        timestamp: new BN(Math.floor(Date.now() / 1000)),
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
         ),
@@ -882,14 +885,37 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
+    // Calculate cpiHash from empty CPI instructions (since create chunk doesn't have CPI instructions)
+    const { computeMultipleCpiHashes } = await import('../messages');
+    const cpiHashes = computeMultipleCpiHashes(
+      params.payer,
+      params.cpiInstructions,
+      params.smartWallet
+    );
+
+    console.log('client.ts - cpiDataHash', Array.from(cpiHashes.cpiDataHash));
+    console.log(
+      'client.ts - cpiAccountsHash',
+      Array.from(cpiHashes.cpiAccountsHash)
+    );
+
+    // Create combined hash of CPI hashes
+    const cpiCombined = new Uint8Array(64); // 32 + 32 bytes
+    cpiCombined.set(cpiHashes.cpiDataHash, 0);
+    cpiCombined.set(cpiHashes.cpiAccountsHash, 32);
+    const cpiHash = new Uint8Array(
+      require('js-sha256').arrayBuffer(cpiCombined)
+    );
+
     const sessionInstruction = await this.buildCreateChunkIns(
       params.payer,
       params.smartWallet,
       {
         ...signatureArgs,
-        expiresAt: new BN(params.expiresAt),
         policyData: policyInstruction.data,
         verifyInstructionIndex: 0,
+        timestamp: new BN(Math.floor(Date.now() / 1000)),
+        cpiHash: Array.from(cpiHash),
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
         ),
@@ -965,13 +991,14 @@ export class LazorkitClient {
           smartWallet
         );
 
+        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildExecuteMessage(
+          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
-          new BN(Math.floor(Date.now() / 1000)),
+          timestamp,
           policyInstruction,
-          cpiInstruction,
-          [payer]
+          cpiInstruction
         );
         break;
       }
@@ -983,12 +1010,13 @@ export class LazorkitClient {
           smartWallet
         );
 
+        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildCallPolicyMessage(
+          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
-          new BN(Math.floor(Date.now() / 1000)),
-          policyInstruction,
-          [payer]
+          timestamp,
+          policyInstruction
         );
         break;
       }
@@ -1000,10 +1028,12 @@ export class LazorkitClient {
           smartWallet
         );
 
+        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildChangePolicyMessage(
+          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
-          new BN(Math.floor(Date.now() / 1000)),
+          timestamp,
           destroyPolicyIns,
           initPolicyIns
         );
@@ -1017,14 +1047,14 @@ export class LazorkitClient {
           smartWallet
         );
 
+        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildCreateChunkMessage(
+          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
-          new BN(Math.floor(Date.now() / 1000)),
+          timestamp,
           policyInstruction,
-          cpiInstructions,
-          new BN(expiresAt),
-          [payer]
+          cpiInstructions
         );
         break;
       }

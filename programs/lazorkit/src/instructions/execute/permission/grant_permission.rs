@@ -4,10 +4,10 @@ use anchor_lang::solana_program::hash::Hasher;
 use crate::instructions::GrantPermissionArgs;
 use crate::security::validation;
 use crate::state::{
-    GrantPermissionMessage, Permission, Config, SmartWalletConfig,
+    Permission, Config, SmartWalletConfig,
     WalletDevice,
 };
-use crate::utils::{verify_authorization, PasskeyExt};
+use crate::utils::{verify_authorization_hash, PasskeyExt, compute_grant_permission_message_hash};
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
 /// Grant ephemeral permission to a keypair
@@ -34,32 +34,7 @@ pub fn grant_permission(
         LazorKitError::InvalidInstructionData
     );
 
-    // Step 2: Verify WebAuthn signature and parse authorization message
-    // This validates the passkey signature and extracts the typed message
-    let msg: GrantPermissionMessage =
-        verify_authorization::<GrantPermissionMessage>(
-            &ctx.accounts.ix_sysvar,
-            &ctx.accounts.wallet_device,
-            ctx.accounts.smart_wallet.key(),
-            args.passkey_public_key,
-            args.signature.clone(),
-            &args.client_data_json_raw,
-            &args.authenticator_data_raw,
-            args.verify_instruction_index,
-            ctx.accounts.smart_wallet_config.last_nonce,
-        )?;
-
-    // Step 3: Verify message fields match arguments
-    require!(
-        msg.ephemeral_key == args.ephemeral_public_key,
-        LazorKitError::InvalidInstructionData
-    );
-    require!(
-        msg.expires_at == args.expires_at,
-        LazorKitError::InvalidInstructionData
-    );
-
-    // Step 4: Create combined hashes for verification
+    // Step 2: Create combined hashes for verification
     // Hash all instruction data to verify integrity
     let serialized_cpi_data = args
         .instruction_data_list
@@ -76,15 +51,33 @@ pub fn grant_permission(
     }
     let accounts_hash = all_accounts_hasher.result().to_bytes();
 
-    // Step 5: Verify hashes match the authorization message
-    require!(
-        data_hash == msg.data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-    require!(
-        accounts_hash == msg.accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
+    // Combine hashes
+    let mut combined = Vec::new();
+    combined.extend_from_slice(&data_hash);
+    combined.extend_from_slice(&accounts_hash);
+    let combined_hash = anchor_lang::solana_program::hash::hash(&combined).to_bytes();
+
+    // Step 3: Compute expected message hash
+    let expected_message_hash = compute_grant_permission_message_hash(
+        ctx.accounts.smart_wallet_config.last_nonce,
+        args.timestamp,
+        args.ephemeral_public_key,
+        args.expires_at,
+        combined_hash,
+    )?;
+
+    // Step 4: Verify WebAuthn signature and message hash
+    verify_authorization_hash(
+        &ctx.accounts.ix_sysvar,
+        &ctx.accounts.wallet_device,
+        ctx.accounts.smart_wallet.key(),
+        args.passkey_public_key,
+        args.signature.clone(),
+        &args.client_data_json_raw,
+        &args.authenticator_data_raw,
+        args.verify_instruction_index,
+        expected_message_hash,
+    )?;
 
     // Step 6: Validate expiration time constraints
     let now = Clock::get()?.unix_timestamp;

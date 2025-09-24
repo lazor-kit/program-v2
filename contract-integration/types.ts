@@ -163,6 +163,7 @@ export interface CreateChunkParams {
   smartWallet: anchor.web3.PublicKey;
   passkeySignature: PasskeySignature;
   policyInstruction: anchor.web3.TransactionInstruction | null;
+  cpiInstructions: anchor.web3.TransactionInstruction[];
   expiresAt: number;
   vaultIndex?: number;
 }

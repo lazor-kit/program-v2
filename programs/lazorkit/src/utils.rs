@@ -1,5 +1,5 @@
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
-use crate::state::{ExecuteMessage, CallPolicyMessage, ChangePolicyMessage};
+use crate::state::message::{Message, SimpleMessage};
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
@@ -61,7 +61,7 @@ pub fn execute_cpi(
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
     let bump_slice = [signer.bump];
     seed_slices.push(&bump_slice);
-    
+
     // Execute the CPI with PDA signing
     invoke_signed(&ix, accounts, &[&seed_slices]).map_err(Into::into)
 }
@@ -105,12 +105,15 @@ pub fn verify_secp256r1_instruction(
     // Calculate expected instruction data length based on Secp256r1 format
     let expected_len =
         (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
-    
+
     // Validate the instruction format matches Secp256r1 requirements
-    if ix.program_id != SECP256R1_PROGRAM_ID || !ix.accounts.is_empty() || ix.data.len() != expected_len {
+    if ix.program_id != SECP256R1_PROGRAM_ID
+        || !ix.accounts.is_empty()
+        || ix.data.len() != expected_len
+    {
         return Err(LazorKitError::Secp256r1InvalidLength.into());
     }
-    
+
     // Verify the actual signature data
     verify_secp256r1_data(&ix.data, pubkey, msg, sig)
 }
@@ -247,9 +250,8 @@ pub fn check_whitelist(
     Ok(())
 }
 
-/// Same as `verify_authorization` but deserializes the challenge payload into the
-/// caller-provided type `T`.
-pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
+/// Verify authorization using hash comparison instead of deserializing message data
+pub fn verify_authorization_hash(
     ix_sysvar: &AccountInfo,
     device: &crate::state::WalletDevice,
     smart_wallet_key: Pubkey,
@@ -258,8 +260,8 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,
-    last_nonce: u64,
-) -> Result<M> {
+    expected_hash: [u8; 32],
+) -> Result<()> {
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
@@ -297,46 +299,135 @@ pub fn verify_authorization<M: crate::state::Message + AnchorDeserialize>(
         .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
 
     verify_secp256r1_instruction(&secp_ix, device.passkey_public_key, message, signature)?;
-    // Verify header and return the typed message
-    M::verify(challenge_bytes.clone(), last_nonce)?;
-    let t: M = AnchorDeserialize::deserialize(&mut &challenge_bytes[..])
-        .map_err(|_| crate::error::LazorKitError::ChallengeDeserializationError)?;
-    Ok(t)
+    // Verify hash instead of deserializing message data
+    SimpleMessage::verify_hash(challenge_bytes, expected_hash)?;
+    Ok(())
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
-pub struct HeaderView {
-    pub nonce: u64,
-    pub current_timestamp: i64,
+// HeaderView and HasHeader trait are no longer needed with simplified message structure
+
+/// Hash computation functions for on-chain verification
+/// These functions replicate the same hashing logic used off-chain
+
+/// Compute hash of instruction data and accounts combined
+/// This function can be used for both policy and CPI instructions
+pub fn compute_instruction_hash(
+    instruction_data: &[u8],
+    instruction_accounts: &[AccountInfo],
+    program_id: Pubkey,
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::{hash, Hasher};
+
+    // Hash instruction data
+    let data_hash = hash(instruction_data);
+
+    // Hash instruction accounts using Hasher (including program_id)
+    let mut rh = Hasher::default();
+    rh.hash(program_id.as_ref());
+    for account in instruction_accounts.iter() {
+        rh.hash(account.key().as_ref());
+        rh.hash(&[account.is_signer as u8]);
+        rh.hash(&[account.is_writable as u8]);
+    }
+    let accounts_hash = rh.result();
+
+    // Combine hashes
+    let mut combined = Vec::new();
+    combined.extend_from_slice(data_hash.as_ref());
+    combined.extend_from_slice(accounts_hash.as_ref());
+
+    Ok(hash(&combined).to_bytes())
 }
 
-pub trait HasHeader {
-    fn header(&self) -> HeaderView;
+/// Compute execute message hash: hash(nonce, timestamp, policy_hash, cpi_hash)
+pub fn compute_execute_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; 32],
+    cpi_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&policy_hash);
+    data.extend_from_slice(&cpi_hash);
+
+    Ok(hash(&data).to_bytes())
 }
 
-impl HasHeader for ExecuteMessage {
-    fn header(&self) -> HeaderView {
-        HeaderView {
-            nonce: self.nonce,
-            current_timestamp: self.current_timestamp,
-        }
-    }
+/// Compute call policy message hash: hash(nonce, timestamp, policy_hash, empty_cpi_hash)
+pub fn compute_call_policy_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&policy_hash);
+    data.extend_from_slice(&[0u8; 32]); // Empty CPI hash
+
+    Ok(hash(&data).to_bytes())
 }
-impl HasHeader for CallPolicyMessage {
-    fn header(&self) -> HeaderView {
-        HeaderView {
-            nonce: self.nonce,
-            current_timestamp: self.current_timestamp,
-        }
-    }
+
+/// Compute change policy message hash: hash(nonce, timestamp, old_policy_hash, new_policy_hash)
+pub fn compute_change_policy_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    old_policy_hash: [u8; 32],
+    new_policy_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&old_policy_hash);
+    data.extend_from_slice(&new_policy_hash);
+
+    Ok(hash(&data).to_bytes())
 }
-impl HasHeader for ChangePolicyMessage {
-    fn header(&self) -> HeaderView {
-        HeaderView {
-            nonce: self.nonce,
-            current_timestamp: self.current_timestamp,
-        }
-    }
+
+/// Compute create chunk message hash: hash(nonce, timestamp, policy_hash, cpi_hash)
+pub fn compute_create_chunk_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; 32],
+    cpi_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(&policy_hash);
+    data.extend_from_slice(&cpi_hash);
+
+    Ok(hash(&data).to_bytes())
+}
+
+/// Compute grant permission message hash: hash(nonce, timestamp, ephemeral_key, expires_at, combined_hash)
+pub fn compute_grant_permission_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    ephemeral_key: Pubkey,
+    expires_at: i64,
+    combined_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    use anchor_lang::solana_program::hash::hash;
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(ephemeral_key.as_ref());
+    data.extend_from_slice(&expires_at.to_le_bytes());
+    data.extend_from_slice(&combined_hash);
+
+    Ok(hash(&data).to_bytes())
 }
 
 /// Helper: Split remaining accounts into `(policy_accounts, cpi_accounts)` using `split_index` coming from `Message`.
@@ -375,7 +466,6 @@ pub fn distribute_fees<'info>(
             system_program,
             wallet_signer.clone(),
         )?;
-
     }
 
     // 2. Fee to referral
@@ -389,7 +479,6 @@ pub fn distribute_fees<'info>(
             system_program,
             wallet_signer.clone(),
         )?;
-
     }
 
     // 3. Fee to lazorkit vault (empty PDA)
@@ -406,7 +495,6 @@ pub fn distribute_fees<'info>(
             system_program,
             wallet_signer.clone(),
         )?;
-
     }
 
     Ok(())

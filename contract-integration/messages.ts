@@ -3,45 +3,12 @@ import { sha256 } from 'js-sha256';
 import { instructionToAccountMetas } from './utils';
 import { Buffer } from 'buffer';
 
-// Type definitions for better type safety
-interface MessageBase {
-  nonce: anchor.BN;
-  currentTimestamp: anchor.BN;
-}
-
-interface PolicyHashes {
-  policyDataHash: Uint8Array;
-  policyAccountsHash: Uint8Array;
-}
-
-interface CpiHashes {
-  cpiDataHash: Uint8Array;
-  cpiAccountsHash: Uint8Array;
-}
-
-interface ExecuteMessageData extends MessageBase, PolicyHashes, CpiHashes {}
-
-interface CreateChunkMessageData extends MessageBase, PolicyHashes, CpiHashes {
-  expiresAt: anchor.BN;
-}
-
-interface CallPolicyMessageData extends MessageBase, PolicyHashes {}
-
-interface ChangePolicyMessageData extends MessageBase {
-  oldPolicyDataHash: Uint8Array;
-  oldPolicyAccountsHash: Uint8Array;
-  newPolicyDataHash: Uint8Array;
-  newPolicyAccountsHash: Uint8Array;
-}
-
-interface GrantPermissionMessageData extends MessageBase {
-  ephemeralKey: anchor.web3.PublicKey;
-  expiresAt: anchor.BN;
+// Simplified message structure - all messages are now just 32-byte hashes
+interface SimpleMessageData {
   dataHash: Uint8Array;
-  accountsHash: Uint8Array;
 }
 
-// Optimized IDL definition with proper typing
+// Simplified IDL definition - all messages are now just 32-byte hashes
 const createMessageIdl = (): any => ({
   version: '0.1.0',
   name: 'lazorkit_msgs',
@@ -49,72 +16,10 @@ const createMessageIdl = (): any => ({
   accounts: [],
   types: [
     {
-      name: 'ExecuteMessage',
+      name: 'SimpleMessage',
       type: {
         kind: 'struct',
-        fields: [
-          { name: 'nonce', type: 'u64' },
-          { name: 'currentTimestamp', type: 'i64' },
-          { name: 'policyDataHash', type: { array: ['u8', 32] } },
-          { name: 'policyAccountsHash', type: { array: ['u8', 32] } },
-          { name: 'cpiDataHash', type: { array: ['u8', 32] } },
-          { name: 'cpiAccountsHash', type: { array: ['u8', 32] } },
-        ],
-      },
-    },
-    {
-      name: 'CreateChunkMessage',
-      type: {
-        kind: 'struct',
-        fields: [
-          { name: 'nonce', type: 'u64' },
-          { name: 'currentTimestamp', type: 'i64' },
-          { name: 'policyDataHash', type: { array: ['u8', 32] } },
-          { name: 'policyAccountsHash', type: { array: ['u8', 32] } },
-          { name: 'cpiDataHash', type: { array: ['u8', 32] } },
-          { name: 'cpiAccountsHash', type: { array: ['u8', 32] } },
-          { name: 'expiresAt', type: 'i64' },
-        ],
-      },
-    },
-    {
-      name: 'CallPolicyMessage',
-      type: {
-        kind: 'struct',
-        fields: [
-          { name: 'nonce', type: 'u64' },
-          { name: 'currentTimestamp', type: 'i64' },
-          { name: 'policyDataHash', type: { array: ['u8', 32] } },
-          { name: 'policyAccountsHash', type: { array: ['u8', 32] } },
-        ],
-      },
-    },
-    {
-      name: 'ChangePolicyMessage',
-      type: {
-        kind: 'struct',
-        fields: [
-          { name: 'nonce', type: 'u64' },
-          { name: 'currentTimestamp', type: 'i64' },
-          { name: 'oldPolicyDataHash', type: { array: ['u8', 32] } },
-          { name: 'oldPolicyAccountsHash', type: { array: ['u8', 32] } },
-          { name: 'newPolicyDataHash', type: { array: ['u8', 32] } },
-          { name: 'newPolicyAccountsHash', type: { array: ['u8', 32] } },
-        ],
-      },
-    },
-    {
-      name: 'GrantPermissionMessage',
-      type: {
-        kind: 'struct',
-        fields: [
-          { name: 'nonce', type: 'u64' },
-          { name: 'currentTimestamp', type: 'i64' },
-          { name: 'ephemeralKey', type: 'pubkey' },
-          { name: 'expiresAt', type: 'i64' },
-          { name: 'dataHash', type: { array: ['u8', 32] } },
-          { name: 'accountsHash', type: { array: ['u8', 32] } },
-        ],
+        fields: [{ name: 'dataHash', type: { array: ['u8', 32] } }],
       },
     },
   ],
@@ -215,11 +120,11 @@ const computeAllInsAccountsHash = (
 
 // Helper function to compute policy hashes
 const computePolicyHashes = (
+  feePayer: anchor.web3.PublicKey,
   policyIns: anchor.web3.TransactionInstruction,
-  smartWallet: anchor.web3.PublicKey,
-  allowSigner?: anchor.web3.PublicKey[]
-): PolicyHashes => {
-  const policyMetas = instructionToAccountMetas(policyIns, allowSigner);
+  smartWallet: anchor.web3.PublicKey
+): { policyDataHash: Uint8Array; policyAccountsHash: Uint8Array } => {
+  const policyMetas = instructionToAccountMetas(policyIns, feePayer);
   const policyAccountsHash = computeSingleInsAccountsHash(
     policyIns.programId,
     policyMetas,
@@ -232,11 +137,11 @@ const computePolicyHashes = (
 
 // Helper function to compute CPI hashes for single instruction
 const computeCpiHashes = (
+  feePayer: anchor.web3.PublicKey,
   cpiIns: anchor.web3.TransactionInstruction,
-  smartWallet: anchor.web3.PublicKey,
-  allowSigner?: anchor.web3.PublicKey[]
-): CpiHashes => {
-  const cpiMetas = instructionToAccountMetas(cpiIns, allowSigner);
+  smartWallet: anchor.web3.PublicKey
+): { cpiDataHash: Uint8Array; cpiAccountsHash: Uint8Array } => {
+  const cpiMetas = instructionToAccountMetas(cpiIns, feePayer);
   const cpiAccountsHash = computeSingleInsAccountsHash(
     cpiIns.programId,
     cpiMetas,
@@ -248,11 +153,11 @@ const computeCpiHashes = (
 };
 
 // Helper function to compute CPI hashes for multiple instructions
-const computeMultipleCpiHashes = (
+export const computeMultipleCpiHashes = (
+  feePayer: anchor.web3.PublicKey,
   cpiInstructions: anchor.web3.TransactionInstruction[],
-  smartWallet: anchor.web3.PublicKey,
-  allowSigner?: anchor.web3.PublicKey[]
-): CpiHashes => {
+  smartWallet: anchor.web3.PublicKey
+): { cpiDataHash: Uint8Array; cpiAccountsHash: Uint8Array } => {
   // Optimized serialization without unnecessary Buffer allocations
   const lengthBuffer = Buffer.alloc(4);
   lengthBuffer.writeUInt32LE(cpiInstructions.length, 0);
@@ -271,7 +176,7 @@ const computeMultipleCpiHashes = (
 
   const allMetas = cpiInstructions.flatMap((ix) => [
     { pubkey: ix.programId, isSigner: false, isWritable: false },
-    ...instructionToAccountMetas(ix, allowSigner),
+    ...instructionToAccountMetas(ix, feePayer),
   ]);
 
   const cpiAccountsHash = computeAllInsAccountsHash(allMetas, smartWallet);
@@ -293,135 +198,203 @@ const encodeMessage = <T>(messageType: string, data: T): Buffer => {
   }
 };
 
-// Main message building functions with optimized implementations
-
+// Main message building functions with simplified 32-byte hash structure
 export function buildExecuteMessage(
+  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
-  now: anchor.BN,
+  timestamp: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiIns: anchor.web3.TransactionInstruction,
-  allowSigner?: anchor.web3.PublicKey[]
+  cpiIns: anchor.web3.TransactionInstruction
 ): Buffer {
-  const policyHashes = computePolicyHashes(policyIns, smartWallet, allowSigner);
-  const cpiHashes = computeCpiHashes(cpiIns, smartWallet, allowSigner);
+  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
+  const cpiHashes = computeCpiHashes(feePayer, cpiIns, smartWallet);
 
-  const messageData: ExecuteMessageData = {
-    nonce,
-    currentTimestamp: now,
-    ...policyHashes,
-    ...cpiHashes,
-  };
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64); // 32 + 32 bytes
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
 
-  return encodeMessage('ExecuteMessage', {
-    ...messageData,
-    policyDataHash: Array.from(messageData.policyDataHash),
-    policyAccountsHash: Array.from(messageData.policyAccountsHash),
-    cpiDataHash: Array.from(messageData.cpiDataHash),
-    cpiAccountsHash: Array.from(messageData.cpiAccountsHash),
+  // Create combined hash of CPI hashes
+  const cpiCombined = new Uint8Array(64); // 32 + 32 bytes
+  cpiCombined.set(cpiHashes.cpiDataHash, 0);
+  cpiCombined.set(cpiHashes.cpiAccountsHash, 32);
+  const cpiHash = computeHash(cpiCombined);
+
+  // Create final hash: hash(nonce, timestamp, policyHash, cpiHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
+    Buffer.from(cpiHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
   });
 }
 
 export function buildCallPolicyMessage(
+  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
-  now: anchor.BN,
-  policyIns: anchor.web3.TransactionInstruction,
-  allowSigner?: anchor.web3.PublicKey[]
+  timestamp: anchor.BN,
+  policyIns: anchor.web3.TransactionInstruction
 ): Buffer {
-  const policyHashes = computePolicyHashes(policyIns, smartWallet, allowSigner);
+  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
 
-  const messageData: CallPolicyMessageData = {
-    nonce,
-    currentTimestamp: now,
-    ...policyHashes,
-  };
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64); // 32 + 32 bytes
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
 
-  return encodeMessage('CallPolicyMessage', {
-    ...messageData,
-    policyDataHash: Array.from(messageData.policyDataHash),
-    policyAccountsHash: Array.from(messageData.policyAccountsHash),
+  // Create final hash: hash(nonce, timestamp, policyHash, empty_cpi_hash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  // Empty CPI hash for call policy (32 zero bytes)
+  const emptyCpiHash = new Uint8Array(32);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
+    Buffer.from(emptyCpiHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
   });
 }
 
 export function buildChangePolicyMessage(
+  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
-  now: anchor.BN,
+  timestamp: anchor.BN,
   destroyPolicyIns: anchor.web3.TransactionInstruction,
-  initPolicyIns: anchor.web3.TransactionInstruction,
-  allowSigner?: anchor.web3.PublicKey[]
+  initPolicyIns: anchor.web3.TransactionInstruction
 ): Buffer {
   const oldHashes = computePolicyHashes(
+    feePayer,
     destroyPolicyIns,
-    smartWallet,
-    allowSigner
+    smartWallet
   );
-  const newHashes = computePolicyHashes(
-    initPolicyIns,
-    smartWallet,
-    allowSigner
-  );
+  const newHashes = computePolicyHashes(feePayer, initPolicyIns, smartWallet);
 
-  const messageData: ChangePolicyMessageData = {
-    nonce,
-    currentTimestamp: now,
-    oldPolicyDataHash: oldHashes.policyDataHash,
-    oldPolicyAccountsHash: oldHashes.policyAccountsHash,
-    newPolicyDataHash: newHashes.policyDataHash,
-    newPolicyAccountsHash: newHashes.policyAccountsHash,
-  };
+  // Create combined hash of old policy hashes
+  const oldPolicyCombined = new Uint8Array(64); // 32 + 32 bytes
+  oldPolicyCombined.set(oldHashes.policyDataHash, 0);
+  oldPolicyCombined.set(oldHashes.policyAccountsHash, 32);
+  const oldPolicyHash = computeHash(oldPolicyCombined);
 
-  return encodeMessage('ChangePolicyMessage', {
-    ...messageData,
-    oldPolicyDataHash: Array.from(messageData.oldPolicyDataHash),
-    oldPolicyAccountsHash: Array.from(messageData.oldPolicyAccountsHash),
-    newPolicyDataHash: Array.from(messageData.newPolicyDataHash),
-    newPolicyAccountsHash: Array.from(messageData.newPolicyAccountsHash),
+  // Create combined hash of new policy hashes
+  const newPolicyCombined = new Uint8Array(64); // 32 + 32 bytes
+  newPolicyCombined.set(newHashes.policyDataHash, 0);
+  newPolicyCombined.set(newHashes.policyAccountsHash, 32);
+  const newPolicyHash = computeHash(newPolicyCombined);
+
+  // Create final hash: hash(nonce, timestamp, oldPolicyHash, newPolicyHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(oldPolicyHash),
+    Buffer.from(newPolicyHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
   });
 }
 
 export function buildCreateChunkMessage(
+  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
-  now: anchor.BN,
+  timestamp: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiInstructions: anchor.web3.TransactionInstruction[],
-  expiresAt: anchor.BN,
-  allowSigner?: anchor.web3.PublicKey[]
+  cpiInstructions: anchor.web3.TransactionInstruction[]
 ): Buffer {
-  const policyHashes = computePolicyHashes(policyIns, smartWallet, allowSigner);
+  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
   const cpiHashes = computeMultipleCpiHashes(
+    feePayer,
     cpiInstructions,
-    smartWallet,
-    allowSigner
+    smartWallet
   );
 
-  const messageData: CreateChunkMessageData = {
-    nonce,
-    currentTimestamp: now,
-    expiresAt,
-    ...policyHashes,
-    ...cpiHashes,
-  };
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64); // 32 + 32 bytes
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
 
-  return encodeMessage('CreateChunkMessage', {
-    ...messageData,
-    policyDataHash: Array.from(messageData.policyDataHash),
-    policyAccountsHash: Array.from(messageData.policyAccountsHash),
-    cpiDataHash: Array.from(messageData.cpiDataHash),
-    cpiAccountsHash: Array.from(messageData.cpiAccountsHash),
+  // Create combined hash of CPI hashes
+  const cpiCombined = new Uint8Array(64); // 32 + 32 bytes
+  cpiCombined.set(cpiHashes.cpiDataHash, 0);
+  cpiCombined.set(cpiHashes.cpiAccountsHash, 32);
+
+  console.log('messages.ts - cpiDataHash', Array.from(cpiHashes.cpiDataHash));
+  console.log(
+    'messages.ts - cpiAccountsHash',
+    Array.from(cpiHashes.cpiAccountsHash)
+  );
+  console.log('messages.ts - cpiCombined', Array.from(cpiCombined));
+
+  const cpiHash = computeHash(cpiCombined);
+  console.log('messages.ts - cpiHash', Array.from(cpiHash));
+
+  // Create final hash: hash(nonce, timestamp, policyHash, cpiHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
+    Buffer.from(cpiHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
   });
 }
 
 export function buildGrantPermissionMessage(
+  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
-  now: anchor.BN,
+  timestamp: anchor.BN,
   ephemeralKey: anchor.web3.PublicKey,
   expiresAt: anchor.BN,
-  cpiInstructions: anchor.web3.TransactionInstruction[],
-  allowSigner?: anchor.web3.PublicKey[]
+  cpiInstructions: anchor.web3.TransactionInstruction[]
 ): Buffer {
   // Optimized data hashing
   const allCpiData = new Uint8Array(
@@ -438,22 +411,37 @@ export function buildGrantPermissionMessage(
 
   // Optimized account metas processing
   const allMetas = cpiInstructions.flatMap((ix) =>
-    instructionToAccountMetas(ix, allowSigner)
+    instructionToAccountMetas(ix, feePayer)
   );
   const accountsHash = computeAllInsAccountsHash(allMetas, smartWallet);
 
-  const messageData: GrantPermissionMessageData = {
-    nonce,
-    currentTimestamp: now,
-    ephemeralKey,
-    expiresAt,
-    dataHash,
-    accountsHash,
-  };
+  // Create combined hash of data and accounts
+  const combined = new Uint8Array(64); // 32 + 32 bytes
+  combined.set(dataHash, 0);
+  combined.set(accountsHash, 32);
+  const combinedHash = computeHash(combined);
 
-  return encodeMessage('GrantPermissionMessage', {
-    ...messageData,
-    dataHash: Array.from(messageData.dataHash),
-    accountsHash: Array.from(messageData.accountsHash),
+  // Create final hash: hash(nonce, timestamp, ephemeralKey, expiresAt, combinedHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const expiresAtBuffer = Buffer.alloc(8);
+  expiresAtBuffer.writeBigInt64LE(BigInt(expiresAt.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    ephemeralKey.toBuffer(),
+    expiresAtBuffer,
+    Buffer.from(combinedHash),
+  ]);
+
+  const finalHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(finalHash),
   });
 }

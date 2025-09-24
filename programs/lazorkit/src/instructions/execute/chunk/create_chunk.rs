@@ -2,14 +2,13 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::CreateChunkArgs;
 use crate::security::validation;
-use crate::state::{
-    Chunk, CreateChunkMessage, PolicyProgramRegistry, Config, SmartWalletConfig, WalletDevice,
-};
+use crate::state::{Chunk, Config, PolicyProgramRegistry, SmartWalletConfig, WalletDevice};
 use crate::utils::{
-    execute_cpi, get_wallet_device_signer, sighash, verify_authorization, PasskeyExt,
+    compute_create_chunk_message_hash, compute_instruction_hash, execute_cpi,
+    get_wallet_device_signer, sighash, verify_authorization_hash, PasskeyExt,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
-use anchor_lang::solana_program::hash::{hash, Hasher};
+// Hash and Hasher imports no longer needed with new verification approach
 
 /// Create a chunk buffer for large transactions
 ///
@@ -22,9 +21,44 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     validation::validate_policy_data(&args.policy_data)?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
-    // Step 2: Verify WebAuthn signature and parse authorization message
-    // This validates the passkey signature and extracts the typed message
-    let msg: CreateChunkMessage = verify_authorization::<CreateChunkMessage>(
+    // Step 2: Prepare policy program validation
+    // In chunk mode, all remaining accounts are for policy checking
+    let policy_accounts = &ctx.remaining_accounts[..];
+
+    // Step 3: Validate policy program and verify data integrity
+    // Ensure policy program is executable and matches wallet configuration
+    validation::validate_program_executable(&ctx.accounts.policy_program)?;
+    require!(
+        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_config.policy_program_id,
+        LazorKitError::InvalidProgramAddress
+    );
+
+    // Verify policy program is registered in the whitelist
+    crate::utils::check_whitelist(
+        &ctx.accounts.policy_program_registry,
+        &ctx.accounts.policy_program.key(),
+    )?;
+
+    // Step 4: Compute hashes for verification
+    let policy_hash = compute_instruction_hash(
+        &args.policy_data,
+        policy_accounts,
+        ctx.accounts.policy_program.key(),
+    )?;
+
+    msg!("policy_hash: {:?}", policy_hash);
+
+    let expected_message_hash = compute_create_chunk_message_hash(
+        ctx.accounts.smart_wallet_config.last_nonce,
+        args.timestamp,
+        policy_hash,
+        args.cpi_hash,
+    )?;
+
+    msg!("expected_message_hash: {:?}", expected_message_hash);
+
+    // Step 5: Verify WebAuthn signature and message hash
+    verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -33,45 +67,8 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_config.last_nonce,
+        expected_message_hash,
     )?;
-
-    // Step 3: Prepare policy program validation
-    // In chunk mode, all remaining accounts are for policy checking
-    let policy_accounts = &ctx.remaining_accounts[..];
-
-    // Step 4: Validate policy program and verify data integrity
-    // Ensure policy program is executable and matches wallet configuration
-    validation::validate_program_executable(&ctx.accounts.policy_program)?;
-    require!(
-        ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_config.policy_program_id,
-        LazorKitError::InvalidProgramAddress
-    );
-    
-    // Verify policy program is registered in the whitelist
-    crate::utils::check_whitelist(
-        &ctx.accounts.policy_program_registry,
-        &ctx.accounts.policy_program.key(),
-    )?;
-
-    // Verify policy data hash matches the authorization message
-    require!(
-        hash(&args.policy_data).to_bytes() == msg.policy_data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-    
-    // Verify policy accounts hash matches the authorization message
-    let mut rh = Hasher::default();
-    rh.hash(ctx.accounts.policy_program.key.as_ref());
-    for a in policy_accounts.iter() {
-        rh.hash(a.key.as_ref());
-        rh.hash(&[a.is_signer as u8]);
-        rh.hash(&[a.is_writable as u8]);
-    }
-    require!(
-        rh.result().to_bytes() == msg.policy_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
 
     // Step 5: Execute policy program validation
     // Create signer for policy program CPI
@@ -80,13 +77,13 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.bump,
     );
-    
+
     // Verify policy instruction discriminator
     require!(
         args.policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
         LazorKitError::InvalidCheckPolicyDiscriminator
     );
-    
+
     // Execute policy program to validate the chunked transaction
     execute_cpi(
         policy_accounts,
@@ -99,10 +96,9 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     // Store the hashes and metadata for later execution
     let session: &mut Account<'_, Chunk> = &mut ctx.accounts.chunk;
     session.owner_wallet_address = ctx.accounts.smart_wallet.key();
-    session.instruction_data_hash = msg.cpi_data_hash;
-    session.accounts_metadata_hash = msg.cpi_accounts_hash;
+    session.cpi_hash = args.cpi_hash;
     session.authorized_nonce = ctx.accounts.smart_wallet_config.last_nonce;
-    session.expires_at = args.expires_at;
+    session.authorized_timestamp = args.timestamp;
     session.rent_refund_address = ctx.accounts.payer.key();
     session.vault_index = args.vault_index;
 
