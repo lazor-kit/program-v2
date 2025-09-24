@@ -2,13 +2,14 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::{Args as _, ExecuteArgs};
 use crate::security::validation;
-use crate::state::{ExecuteMessage, LazorKitVault};
+use crate::state::LazorKitVault;
 use crate::utils::{
-    check_whitelist, execute_cpi, get_wallet_device_signer, sighash, split_remaining_accounts,
-    verify_authorization, PdaSigner,
+    check_whitelist, compute_execute_message_hash, compute_instruction_hash, execute_cpi,
+    get_wallet_device_signer, sighash, split_remaining_accounts, verify_authorization_hash,
+    PdaSigner,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
-use anchor_lang::solana_program::hash::{hash, Hasher};
+// Hash and Hasher imports no longer needed with new verification approach
 
 /// Execute a transaction through the smart wallet
 ///
@@ -24,10 +25,39 @@ pub fn execute<'c: 'info, 'info>(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
 
-    // Step 0.1: Verify WebAuthn signature and parse the authorization message
-    // This validates the passkey signature against the stored device and extracts
-    // the typed message containing transaction hashes and metadata
-    let msg: ExecuteMessage = verify_authorization(
+    // Step 0.1: Split remaining accounts between policy and CPI instructions
+    // The split_index determines where to divide the accounts
+    let (policy_accounts, cpi_accounts) =
+        split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
+
+    // Ensure we have accounts for the policy program
+    require!(
+        !policy_accounts.is_empty(),
+        LazorKitError::InsufficientPolicyAccounts
+    );
+
+    // Step 0.2: Compute hashes for verification
+    let policy_hash = compute_instruction_hash(
+        &args.policy_data,
+        policy_accounts,
+        ctx.accounts.policy_program.key(),
+    )?;
+
+    let cpi_hash = compute_instruction_hash(
+        &args.cpi_data,
+        cpi_accounts,
+        ctx.accounts.cpi_program.key(),
+    )?;
+
+    let expected_message_hash = compute_execute_message_hash(
+        ctx.accounts.smart_wallet_config.last_nonce,
+        args.timestamp,
+        policy_hash,
+        cpi_hash,
+    )?;
+
+    // Step 0.3: Verify WebAuthn signature and message hash
+    verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -36,7 +66,7 @@ pub fn execute<'c: 'info, 'info>(
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_config.last_nonce,
+        expected_message_hash,
     )?;
 
     // Step 1: Validate and verify the policy program
@@ -65,18 +95,7 @@ pub fn execute<'c: 'info, 'info>(
         ctx.accounts.wallet_device.bump,
     );
 
-    // Step 3: Split remaining accounts between policy and CPI instructions
-    // The split_index determines where to divide the accounts
-    let (policy_accounts, cpi_accounts) =
-        split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
-
-    // Ensure we have accounts for the policy program
-    require!(
-        !policy_accounts.is_empty(),
-        LazorKitError::InsufficientPolicyAccounts
-    );
-
-    // Step 4: Verify policy instruction discriminator and data integrity
+    // Step 3: Verify policy instruction discriminator and data integrity
     let policy_data = &args.policy_data;
     // Ensure the policy data starts with the correct instruction discriminator
     require!(
@@ -84,26 +103,8 @@ pub fn execute<'c: 'info, 'info>(
         LazorKitError::InvalidCheckPolicyDiscriminator
     );
 
-    // Step 4.1: Validate policy data size and verify hash matches the message
+    // Step 3.1: Validate policy data size
     validation::validate_policy_data(policy_data)?;
-    require!(
-        hash(policy_data).to_bytes() == msg.policy_data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-
-    // Step 4.2: Verify policy accounts hash matches the authorization message
-    // This ensures the accounts haven't been tampered with since authorization
-    let mut rh = Hasher::default();
-    rh.hash(policy_program_info.key.as_ref());
-    for acc in policy_accounts.iter() {
-        rh.hash(acc.key.as_ref());
-        rh.hash(&[acc.is_signer as u8]);
-        rh.hash(&[acc.is_writable as u8]);
-    }
-    require!(
-        rh.result().to_bytes() == msg.policy_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
 
     // Step 5: Execute policy program CPI to validate the transaction
     // The policy program will check if this transaction is allowed based on
@@ -115,25 +116,8 @@ pub fn execute<'c: 'info, 'info>(
         policy_signer,
     )?;
 
-    // Step 6: Validate CPI instruction data and account integrity
+    // Step 6: Validate CPI instruction data
     validation::validate_cpi_data(&args.cpi_data)?;
-    // Verify CPI data hash matches the authorization message
-    require!(
-        hash(&args.cpi_data).to_bytes() == msg.cpi_data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-    // Verify CPI accounts hash matches the authorization message
-    let mut ch = Hasher::default();
-    ch.hash(ctx.accounts.cpi_program.key.as_ref());
-    for acc in cpi_accounts.iter() {
-        ch.hash(acc.key.as_ref());
-        ch.hash(&[acc.is_signer as u8]);
-        ch.hash(&[acc.is_writable as u8]);
-    }
-    require!(
-        ch.result().to_bytes() == msg.cpi_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
 
     // Step 7: Execute the actual CPI instruction
     // Validate the target program is executable

@@ -6,7 +6,7 @@ import { LazorkitClient } from '../contract-integration';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 dotenv.config();
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'

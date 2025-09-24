@@ -5,6 +5,7 @@ import {
 } from '@solana/spl-token';
 import { Connection, Keypair, PublicKey, Signer } from '@solana/web3.js';
 import { sha256 } from 'js-sha256';
+import { getRandomBytes } from '../contract-integration';
 
 export const fundAccountSOL = async (
   connection: Connection,
@@ -92,7 +93,8 @@ export async function buildFakeMessagePasskey(data: Buffer<ArrayBufferLike>) {
     )
   );
 
-  const authenticatorDataRaw = Buffer.from([1, 2, 3]);
+  // random authenticator data 37 bytes
+  const authenticatorDataRaw = Buffer.from(getRandomBytes(36));
 
   const message = Buffer.concat([
     authenticatorDataRaw,

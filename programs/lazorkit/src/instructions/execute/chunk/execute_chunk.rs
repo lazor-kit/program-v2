@@ -29,10 +29,10 @@ pub fn execute_chunk(
     let session = &mut ctx.accounts.chunk;
 
     // Step 2: Validate session state and authorization
-    // Check if the chunk session has expired
+    // Check if the chunk session has expired based on timestamp
     let now = Clock::get()?.unix_timestamp;
-    if session.expires_at < now {
-        msg!("Failed validation: session expired. expires_at: {}, now: {}", session.expires_at, now);
+    if session.authorized_timestamp < now - 30 {
+        msg!("Failed validation: session expired. authorized_timestamp: {}, now: {}", session.authorized_timestamp, now);
         return Ok(());
     }
 
@@ -54,14 +54,36 @@ pub fn execute_chunk(
     );
 
     // Step 4: Verify instruction data integrity
-    // Serialize and hash the instruction data to match the session
-    let serialized_cpi_data = instruction_data_list
-        .try_to_vec()
-        .map_err(|_| LazorKitError::InvalidInstructionData)?;
-
-    let data_hash = hash(&serialized_cpi_data).to_bytes();
-    if data_hash != session.instruction_data_hash {
-        msg!("Failed validation: instruction data hash mismatch. computed: {:?}, session: {:?}", data_hash, session.instruction_data_hash);
+    // Serialize CPI data to match client-side format (length + data for each instruction)
+    let mut serialized_cpi_data = Vec::new();
+    serialized_cpi_data.extend_from_slice(&(instruction_data_list.len() as u32).to_le_bytes());
+    
+    for instruction_data in &instruction_data_list {
+        serialized_cpi_data.extend_from_slice(&(instruction_data.len() as u32).to_le_bytes());
+        serialized_cpi_data.extend_from_slice(instruction_data);
+    }
+    
+    let cpi_data_hash = hash(&serialized_cpi_data).to_bytes();
+    
+    // Hash CPI accounts to match client-side format
+    // Client-side includes program_id for each instruction, so we need to account for that
+    let mut rh = Hasher::default();
+    for account in cpi_accounts.iter() {
+        rh.hash(account.key().as_ref());
+        rh.hash(&[account.is_signer as u8]);
+        rh.hash(&[account.is_writable as u8]);
+    }
+    let cpi_accounts_hash = rh.result().to_bytes();
+    
+    // Combine CPI hashes
+    let mut cpi_combined = Vec::new();
+    cpi_combined.extend_from_slice(&cpi_data_hash);
+    cpi_combined.extend_from_slice(&cpi_accounts_hash);
+    let cpi_hash = hash(&cpi_combined).to_bytes();
+    
+    // Verify the combined CPI hash matches the session
+    if cpi_hash != session.cpi_hash {
+        msg!("Failed validation: CPI hash mismatch. computed: {:?}, session: {:?}", cpi_hash, session.cpi_hash);
         return Ok(());
     }
 
@@ -87,17 +109,7 @@ pub fn execute_chunk(
     );
     account_ranges.push((start, cpi_accounts.len()));
 
-    // Step 6: Verify accounts metadata hash matches session
-    let mut all_accounts_hasher = Hasher::default();
-    for acc in cpi_accounts.iter() {
-        all_accounts_hasher.hash(acc.key.as_ref());
-        all_accounts_hasher.hash(&[acc.is_signer as u8]);
-        all_accounts_hasher.hash(&[acc.is_writable as u8]);
-    }
-    if all_accounts_hasher.result().to_bytes() != session.accounts_metadata_hash {
-        msg!("Failed validation: accounts metadata hash mismatch");
-        return Ok(());
-    }
+    // Step 6: Accounts metadata validation is now covered by CPI hash validation above
 
     // Step 7: Validate each instruction's programs for security
     for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {

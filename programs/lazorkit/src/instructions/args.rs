@@ -55,6 +55,8 @@ pub struct ExecuteArgs {
     pub cpi_data: Vec<u8>,
     /// Random vault index (0-31) calculated off-chain for fee distribution
     pub vault_index: u8,
+    /// Unix timestamp for message verification
+    pub timestamp: i64,
 }
 
 /// Arguments for changing a smart wallet's policy program
@@ -83,6 +85,8 @@ pub struct ChangePolicyArgs {
     pub new_wallet_device: Option<NewWalletDeviceArgs>,
     /// Random vault index (0-31) calculated off-chain for fee distribution
     pub vault_index: u8,
+    /// Unix timestamp for message verification
+    pub timestamp: i64,
 }
 
 /// Arguments for calling policy program instructions
@@ -107,6 +111,8 @@ pub struct CallPolicyArgs {
     pub new_wallet_device: Option<NewWalletDeviceArgs>,
     /// Random vault index (0-31) calculated off-chain for fee distribution
     pub vault_index: u8,
+    /// Unix timestamp for message verification
+    pub timestamp: i64,
 }
 
 /// Arguments for creating a chunk buffer for large transactions
@@ -127,10 +133,12 @@ pub struct CreateChunkArgs {
     pub verify_instruction_index: u8,
     /// Policy program instruction data
     pub policy_data: Vec<u8>,
-    /// Unix timestamp when the chunk expires
-    pub expires_at: i64,
     /// Random vault index (0-31) calculated off-chain for fee distribution
     pub vault_index: u8,
+    /// Unix timestamp for message verification (must be <= on-chain time + 30s)
+    pub timestamp: i64,
+    /// Hash of CPI data and accounts (32 bytes)
+    pub cpi_hash: [u8; 32],
 }
 
 /// Arguments for adding a new wallet device (passkey)
@@ -173,6 +181,8 @@ pub struct GrantPermissionArgs {
     pub instruction_data_list: Vec<Vec<u8>>,
     /// Split indices for accounts (n-1 for n instructions)
     pub split_index: Vec<u8>,
+    /// Unix timestamp for message verification
+    pub timestamp: i64,
 }
 
 impl Args for CreateChunkArgs {
@@ -200,15 +210,15 @@ impl Args for CreateChunkArgs {
             !self.policy_data.is_empty(),
             LazorKitError::InvalidInstructionData
         );
-        // Validate expires_at within 30s window of now
-        let now = Clock::get()?.unix_timestamp;
-        require!(
-            self.expires_at >= now
-                && self.expires_at <= now + crate::security::MAX_SESSION_TTL_SECONDS,
-            LazorKitError::TransactionTooOld
-        );
         // Validate vault index
         require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
+        // Validate timestamp is within reasonable range (not too old, not in future)
+        // Timestamp must be within 30s window of on-chain time
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            self.timestamp >= now - 30 && self.timestamp <= now + 30,
+            LazorKitError::TransactionTooOld
+        );
         Ok(())
     }
 }
@@ -243,6 +253,13 @@ impl Args for ExecuteArgs {
 
         // Validate vault index
         require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
+
+        // Validate timestamp is within reasonable range (not too old, not in future)
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            self.timestamp >= now - 300 && self.timestamp <= now + 60,
+            LazorKitError::TransactionTooOld
+        );
 
         Ok(())
     }
@@ -279,6 +296,13 @@ macro_rules! impl_args_validate {
 
                 // Validate vault index
                 require!(self.vault_index < 32, LazorKitError::InvalidVaultIndex);
+
+                // Validate timestamp is within reasonable range (not too old, not in future)
+                let now = Clock::get()?.unix_timestamp;
+                require!(
+                    self.timestamp >= now - 300 && self.timestamp <= now + 60,
+                    LazorKitError::TransactionTooOld
+                );
 
                 Ok(())
             }

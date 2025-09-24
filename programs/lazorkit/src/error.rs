@@ -44,6 +44,8 @@ pub enum LazorKitError {
     NonceMismatch,
     #[msg("Nonce overflow: cannot increment further")]
     NonceOverflow,
+    #[msg("Message hash mismatch: expected different value")]
+    HashMismatch,
 
     // === Policy Program Errors ===
     #[msg("Policy program not found in registry")]

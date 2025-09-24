@@ -2,15 +2,13 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::{Args as _, ChangePolicyArgs};
 use crate::security::validation;
-use crate::state::{
-    LazorKitVault, PolicyProgramRegistry, Config, SmartWalletConfig,
-    ChangePolicyMessage, WalletDevice,
-};
+use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, SmartWalletConfig, WalletDevice};
 use crate::utils::{
-    check_whitelist, execute_cpi, get_wallet_device_signer, sighash, verify_authorization,
+    check_whitelist, compute_change_policy_message_hash, compute_instruction_hash, execute_cpi,
+    get_wallet_device_signer, sighash, verify_authorization_hash,
 };
 use crate::{error::LazorKitError, ID};
-use anchor_lang::solana_program::hash::{hash, Hasher};
+// Hash and Hasher imports no longer needed with new verification approach
 
 /// Change the policy program for a smart wallet
 ///
@@ -25,11 +23,11 @@ pub fn change_policy<'c: 'info, 'info>(
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    
+
     // Ensure both old and new policy programs are executable
     validation::validate_program_executable(&ctx.accounts.old_policy_program)?;
     validation::validate_program_executable(&ctx.accounts.new_policy_program)?;
-    
+
     // Verify both policy programs are registered in the whitelist
     check_whitelist(
         &ctx.accounts.policy_program_registry,
@@ -39,38 +37,24 @@ pub fn change_policy<'c: 'info, 'info>(
         &ctx.accounts.policy_program_registry,
         &ctx.accounts.new_policy_program.key(),
     )?;
-    
+
     // Ensure the old policy program matches the wallet's current policy
     require!(
         ctx.accounts.smart_wallet_config.policy_program_id == ctx.accounts.old_policy_program.key(),
         LazorKitError::InvalidProgramAddress
     );
-    
+
     // Ensure we're actually changing to a different policy program
     require!(
         ctx.accounts.old_policy_program.key() != ctx.accounts.new_policy_program.key(),
         LazorKitError::PolicyProgramsIdentical
     );
-    
+
     // Validate policy instruction data sizes
     validation::validate_policy_data(&args.destroy_policy_data)?;
     validation::validate_policy_data(&args.init_policy_data)?;
 
-    // Step 2: Verify WebAuthn signature and parse authorization message
-    // This validates the passkey signature and extracts the typed message
-    let msg: ChangePolicyMessage = verify_authorization(
-        &ctx.accounts.ix_sysvar,
-        &ctx.accounts.wallet_device,
-        ctx.accounts.smart_wallet.key(),
-        args.passkey_public_key,
-        args.signature.clone(),
-        &args.client_data_json_raw,
-        &args.authenticator_data_raw,
-        args.verify_instruction_index,
-        ctx.accounts.smart_wallet_config.last_nonce,
-    )?;
-
-    // Step 3: Split remaining accounts for destroy and init operations
+    // Step 2: Split remaining accounts for destroy and init operations
     // Use split_index to separate accounts for the old and new policy programs
     let split = args.split_index as usize;
     require!(
@@ -88,34 +72,38 @@ pub fn change_policy<'c: 'info, 'info>(
         ctx.remaining_accounts.split_at(split)
     };
 
-    // Step 4: Verify account hashes match the authorization message
-    // This ensures the accounts haven't been tampered with since authorization
-    
-    // Verify old policy program accounts hash
-    let mut h1 = Hasher::default();
-    h1.hash(ctx.accounts.old_policy_program.key().as_ref());
-    for a in destroy_accounts.iter() {
-        h1.hash(a.key.as_ref());
-        h1.hash(&[a.is_signer as u8]);
-        h1.hash(&[a.is_writable as u8]);
-    }
-    require!(
-        h1.result().to_bytes() == msg.old_policy_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
+    // Step 3: Compute hashes for verification
+    let old_policy_hash = compute_instruction_hash(
+        &args.destroy_policy_data,
+        destroy_accounts,
+        ctx.accounts.old_policy_program.key(),
+    )?;
 
-    // Verify new policy program accounts hash
-    let mut h2 = Hasher::default();
-    h2.hash(ctx.accounts.new_policy_program.key().as_ref());
-    for a in init_accounts.iter() {
-        h2.hash(a.key.as_ref());
-        h2.hash(&[a.is_signer as u8]);
-        h2.hash(&[a.is_writable as u8]);
-    }
-    require!(
-        h2.result().to_bytes() == msg.new_policy_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
+    let new_policy_hash = compute_instruction_hash(
+        &args.init_policy_data,
+        init_accounts,
+        ctx.accounts.new_policy_program.key(),
+    )?;
+
+    let expected_message_hash = compute_change_policy_message_hash(
+        ctx.accounts.smart_wallet_config.last_nonce,
+        args.timestamp,
+        old_policy_hash,
+        new_policy_hash,
+    )?;
+
+    // Step 4: Verify WebAuthn signature and message hash
+    verify_authorization_hash(
+        &ctx.accounts.ix_sysvar,
+        &ctx.accounts.wallet_device,
+        ctx.accounts.smart_wallet.key(),
+        args.passkey_public_key,
+        args.signature.clone(),
+        &args.client_data_json_raw,
+        &args.authenticator_data_raw,
+        args.verify_instruction_index,
+        expected_message_hash,
+    )?;
 
     // Step 5: Verify instruction discriminators and data integrity
     // Ensure the policy data starts with the correct instruction discriminators
@@ -126,16 +114,6 @@ pub fn change_policy<'c: 'info, 'info>(
     require!(
         args.init_policy_data.get(0..8) == Some(&sighash("global", "init_policy")),
         LazorKitError::InvalidInitPolicyDiscriminator
-    );
-
-    // Verify policy data hashes match the authorization message
-    require!(
-        hash(&args.destroy_policy_data).to_bytes() == msg.old_policy_data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-    require!(
-        hash(&args.init_policy_data).to_bytes() == msg.new_policy_data_hash,
-        LazorKitError::InvalidInstructionData
     );
 
     // Step 6: Prepare policy program signer and validate policy transition
@@ -162,7 +140,7 @@ pub fn change_policy<'c: 'info, 'info>(
                 || new_wallet_device.passkey_public_key[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
-        
+
         // Get the new device account from remaining accounts
         let new_device = ctx
             .remaining_accounts
@@ -174,7 +152,7 @@ pub fn change_policy<'c: 'info, 'info>(
             new_device.data_is_empty(),
             LazorKitError::AccountAlreadyInitialized
         );
-        
+
         // Initialize the new wallet device
         crate::state::WalletDevice::init(
             new_device,

@@ -1870,221 +1870,226 @@ export type Lazorkit = {
     },
     {
       code: 6015;
+      name: 'hashMismatch';
+      msg: 'Message hash mismatch: expected different value';
+    },
+    {
+      code: 6016;
       name: 'policyProgramNotRegistered';
       msg: 'Policy program not found in registry';
     },
     {
-      code: 6016;
+      code: 6017;
       name: 'whitelistFull';
       msg: 'The policy program registry is full.';
     },
     {
-      code: 6017;
+      code: 6018;
       name: 'invalidCheckPolicyDiscriminator';
       msg: 'Invalid instruction discriminator for check_policy';
     },
     {
-      code: 6018;
+      code: 6019;
       name: 'invalidDestroyDiscriminator';
       msg: 'Invalid instruction discriminator for destroy';
     },
     {
-      code: 6019;
+      code: 6020;
       name: 'invalidInitPolicyDiscriminator';
       msg: 'Invalid instruction discriminator for init_policy';
     },
     {
-      code: 6020;
+      code: 6021;
       name: 'policyProgramsIdentical';
       msg: 'Old and new policy programs are identical';
     },
     {
-      code: 6021;
+      code: 6022;
       name: 'noDefaultPolicyProgram';
       msg: 'Neither old nor new policy program is the default';
     },
     {
-      code: 6022;
+      code: 6023;
       name: 'policyProgramAlreadyRegistered';
       msg: 'Policy program already registered';
     },
     {
-      code: 6023;
+      code: 6024;
       name: 'invalidRemainingAccounts';
       msg: 'Invalid remaining accounts';
     },
     {
-      code: 6024;
+      code: 6025;
       name: 'cpiDataMissing';
       msg: 'CPI data is required but not provided';
     },
     {
-      code: 6025;
+      code: 6026;
       name: 'insufficientPolicyAccounts';
       msg: 'Insufficient remaining accounts for policy instruction';
     },
     {
-      code: 6026;
+      code: 6027;
       name: 'insufficientCpiAccounts';
       msg: 'Insufficient remaining accounts for CPI instruction';
     },
     {
-      code: 6027;
+      code: 6028;
       name: 'accountSliceOutOfBounds';
       msg: 'Account slice index out of bounds';
     },
     {
-      code: 6028;
+      code: 6029;
       name: 'transferAmountOverflow';
       msg: 'Transfer amount would cause arithmetic overflow';
     },
     {
-      code: 6029;
+      code: 6030;
       name: 'invalidBumpSeed';
       msg: 'Invalid bump seed for PDA derivation';
     },
     {
-      code: 6030;
+      code: 6031;
       name: 'invalidAccountOwner';
       msg: 'Account owner verification failed';
     },
     {
-      code: 6031;
+      code: 6032;
       name: 'programNotExecutable';
       msg: 'Program not executable';
     },
     {
-      code: 6032;
+      code: 6033;
       name: 'programPaused';
       msg: 'Program is paused';
     },
     {
-      code: 6033;
+      code: 6034;
       name: 'walletDeviceAlreadyInitialized';
       msg: 'Wallet device already initialized';
     },
     {
-      code: 6034;
+      code: 6035;
       name: 'credentialIdTooLarge';
       msg: 'Credential ID exceeds maximum allowed size';
     },
     {
-      code: 6035;
+      code: 6036;
       name: 'credentialIdEmpty';
       msg: 'Credential ID cannot be empty';
     },
     {
-      code: 6036;
+      code: 6037;
       name: 'policyDataTooLarge';
       msg: 'Policy data exceeds maximum allowed size';
     },
     {
-      code: 6037;
+      code: 6038;
       name: 'cpiDataTooLarge';
       msg: 'CPI data exceeds maximum allowed size';
     },
     {
-      code: 6038;
+      code: 6039;
       name: 'tooManyRemainingAccounts';
       msg: 'Too many remaining accounts provided';
     },
     {
-      code: 6039;
+      code: 6040;
       name: 'invalidPdaDerivation';
       msg: 'Invalid PDA derivation';
     },
     {
-      code: 6040;
+      code: 6041;
       name: 'transactionTooOld';
       msg: 'Transaction is too old';
     },
     {
-      code: 6041;
+      code: 6042;
       name: 'invalidAccountData';
       msg: 'Invalid account data';
     },
     {
-      code: 6042;
+      code: 6043;
       name: 'invalidInstructionData';
       msg: 'Invalid instruction data';
     },
     {
-      code: 6043;
+      code: 6044;
       name: 'accountAlreadyInitialized';
       msg: 'Account already initialized';
     },
     {
-      code: 6044;
+      code: 6045;
       name: 'invalidAccountState';
       msg: 'Invalid account state';
     },
     {
-      code: 6045;
+      code: 6046;
       name: 'invalidFeeAmount';
       msg: 'Invalid fee amount';
     },
     {
-      code: 6046;
+      code: 6047;
       name: 'insufficientBalanceForFee';
       msg: 'Insufficient balance for fee';
     },
     {
-      code: 6047;
+      code: 6048;
       name: 'invalidAuthority';
       msg: 'Invalid authority';
     },
     {
-      code: 6048;
+      code: 6049;
       name: 'authorityMismatch';
       msg: 'Authority mismatch';
     },
     {
-      code: 6049;
+      code: 6050;
       name: 'invalidSequenceNumber';
       msg: 'Invalid sequence number';
     },
     {
-      code: 6050;
+      code: 6051;
       name: 'invalidPasskeyFormat';
       msg: 'Invalid passkey format';
     },
     {
-      code: 6051;
+      code: 6052;
       name: 'invalidMessageFormat';
       msg: 'Invalid message format';
     },
     {
-      code: 6052;
+      code: 6053;
       name: 'invalidSplitIndex';
       msg: 'Invalid split index';
     },
     {
-      code: 6053;
+      code: 6054;
       name: 'invalidProgramAddress';
       msg: 'Invalid program address';
     },
     {
-      code: 6054;
+      code: 6055;
       name: 'reentrancyDetected';
       msg: 'Reentrancy detected';
     },
     {
-      code: 6055;
+      code: 6056;
       name: 'invalidVaultIndex';
       msg: 'Invalid vault index';
     },
     {
-      code: 6056;
+      code: 6057;
       name: 'insufficientBalance';
       msg: 'Insufficient balance';
     },
     {
-      code: 6057;
+      code: 6058;
       name: 'invalidAction';
       msg: 'Invalid action';
     },
     {
-      code: 6058;
+      code: 6059;
       name: 'insufficientVaultBalance';
       msg: 'Insufficient balance in vault';
     }
@@ -2150,6 +2155,11 @@ export type Lazorkit = {
               'Random vault index (0-31) calculated off-chain for fee distribution'
             ];
             type: 'u8';
+          },
+          {
+            name: 'timestamp';
+            docs: ['Unix timestamp for message verification'];
+            type: 'i64';
           }
         ];
       };
@@ -2226,6 +2236,11 @@ export type Lazorkit = {
               'Random vault index (0-31) calculated off-chain for fee distribution'
             ];
             type: 'u8';
+          },
+          {
+            name: 'timestamp';
+            docs: ['Unix timestamp for message verification'];
+            type: 'i64';
           }
         ];
       };
@@ -2248,16 +2263,9 @@ export type Lazorkit = {
             type: 'pubkey';
           },
           {
-            name: 'instructionDataHash';
-            docs: ['Combined SHA256 hash of all transaction instruction data'];
-            type: {
-              array: ['u8', 32];
-            };
-          },
-          {
-            name: 'accountsMetadataHash';
+            name: 'cpiHash';
             docs: [
-              'Combined SHA256 hash over all ordered remaining account metas plus target programs'
+              'Combined SHA256 hash of all cpi transaction instruction data'
             ];
             type: {
               array: ['u8', 32];
@@ -2271,8 +2279,10 @@ export type Lazorkit = {
             type: 'u64';
           },
           {
-            name: 'expiresAt';
-            docs: ['Unix timestamp when this chunk expires'];
+            name: 'authorizedTimestamp';
+            docs: [
+              'Timestamp from the original message hash for expiration validation'
+            ];
             type: 'i64';
           },
           {
@@ -2386,16 +2396,25 @@ export type Lazorkit = {
             type: 'bytes';
           },
           {
-            name: 'expiresAt';
-            docs: ['Unix timestamp when the chunk expires'];
-            type: 'i64';
-          },
-          {
             name: 'vaultIndex';
             docs: [
               'Random vault index (0-31) calculated off-chain for fee distribution'
             ];
             type: 'u8';
+          },
+          {
+            name: 'timestamp';
+            docs: [
+              'Unix timestamp for message verification (must be <= on-chain time + 30s)'
+            ];
+            type: 'i64';
+          },
+          {
+            name: 'cpiHash';
+            docs: ['Hash of CPI data and accounts (32 bytes)'];
+            type: {
+              array: ['u8', 32];
+            };
           }
         ];
       };
@@ -2516,6 +2535,11 @@ export type Lazorkit = {
               'Random vault index (0-31) calculated off-chain for fee distribution'
             ];
             type: 'u8';
+          },
+          {
+            name: 'timestamp';
+            docs: ['Unix timestamp for message verification'];
+            type: 'i64';
           }
         ];
       };
@@ -2587,6 +2611,11 @@ export type Lazorkit = {
             name: 'splitIndex';
             docs: ['Split indices for accounts (n-1 for n instructions)'];
             type: 'bytes';
+          },
+          {
+            name: 'timestamp';
+            docs: ['Unix timestamp for message verification'];
+            type: 'i64';
           }
         ];
       };

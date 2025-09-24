@@ -2,13 +2,13 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::{Args as _, CallPolicyArgs};
 use crate::security::validation;
-use crate::state::{
-    CallPolicyMessage, LazorKitVault, PolicyProgramRegistry, Config,
-    SmartWalletConfig, WalletDevice,
+use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, SmartWalletConfig, WalletDevice};
+use crate::utils::{
+    check_whitelist, compute_call_policy_message_hash, compute_instruction_hash, execute_cpi,
+    get_wallet_device_signer, verify_authorization_hash,
 };
-use crate::utils::{check_whitelist, execute_cpi, get_wallet_device_signer, verify_authorization};
 use crate::{error::LazorKitError, ID};
-use anchor_lang::solana_program::hash::{hash, Hasher};
+// Hash and Hasher imports no longer needed with new verification approach
 
 /// Execute policy program instructions
 ///
@@ -23,28 +23,49 @@ pub fn call_policy<'c: 'info, 'info>(
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    
+
     // Ensure the policy program is executable (not a data account)
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
-    
+
     // Verify the policy program matches the wallet's configured policy
     require!(
         ctx.accounts.policy_program.key() == ctx.accounts.smart_wallet_config.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
-    
+
     // Verify the policy program is registered in the whitelist
     check_whitelist(
         &ctx.accounts.policy_program_registry,
         &ctx.accounts.policy_program.key(),
     )?;
-    
+
     // Validate policy instruction data size
     validation::validate_policy_data(&args.policy_data)?;
 
-    // Step 2: Verify WebAuthn signature and parse authorization message
-    // This validates the passkey signature and extracts the typed message
-    let msg: CallPolicyMessage = verify_authorization(
+    // Step 2: Prepare policy accounts for verification
+    // Skip the first account if a new wallet device is being added
+    let start_idx = if args.new_wallet_device.is_some() {
+        1
+    } else {
+        0
+    };
+    let policy_accs = &ctx.remaining_accounts[start_idx..];
+
+    // Step 3: Compute hashes for verification
+    let policy_hash = compute_instruction_hash(
+        &args.policy_data,
+        policy_accs,
+        ctx.accounts.policy_program.key(),
+    )?;
+
+    let expected_message_hash = compute_call_policy_message_hash(
+        ctx.accounts.smart_wallet_config.last_nonce,
+        args.timestamp,
+        policy_hash,
+    )?;
+
+    // Step 4: Verify WebAuthn signature and message hash
+    verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         &ctx.accounts.wallet_device,
         ctx.accounts.smart_wallet.key(),
@@ -53,34 +74,8 @@ pub fn call_policy<'c: 'info, 'info>(
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
-        ctx.accounts.smart_wallet_config.last_nonce,
+        expected_message_hash,
     )?;
-
-    // Step 3: Verify policy data hash matches the authorization message
-    require!(
-        hash(&args.policy_data).to_bytes() == msg.policy_data_hash,
-        LazorKitError::InvalidInstructionData
-    );
-
-    // Step 4: Verify policy accounts hash matches the authorization message
-    // Skip the first account if a new wallet device is being added
-    let start_idx = if args.new_wallet_device.is_some() {
-        1
-    } else {
-        0
-    };
-    let policy_accs = &ctx.remaining_accounts[start_idx..];
-    let mut hasher = Hasher::default();
-    hasher.hash(ctx.accounts.policy_program.key().as_ref());
-    for acc in policy_accs.iter() {
-        hasher.hash(acc.key.as_ref());
-        hasher.hash(&[acc.is_signer as u8]);
-        hasher.hash(&[acc.is_writable as u8]);
-    }
-    require!(
-        hasher.result().to_bytes() == msg.policy_accounts_hash,
-        LazorKitError::InvalidAccountData
-    );
 
     // Step 5: Prepare policy program signer
     // Create a signer that can authorize calls to the policy program
@@ -98,7 +93,7 @@ pub fn call_policy<'c: 'info, 'info>(
                 || new_wallet_device.passkey_public_key[0] == 0x03,
             LazorKitError::InvalidPasskeyFormat
         );
-        
+
         // Get the new device account from remaining accounts
         let new_device = ctx
             .remaining_accounts
@@ -110,7 +105,7 @@ pub fn call_policy<'c: 'info, 'info>(
             new_device.data_is_empty(),
             LazorKitError::AccountAlreadyInitialized
         );
-        
+
         // Initialize the new wallet device
         crate::state::WalletDevice::init(
             new_device,
