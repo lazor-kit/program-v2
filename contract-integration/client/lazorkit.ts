@@ -893,12 +893,6 @@ export class LazorkitClient {
       params.smartWallet
     );
 
-    console.log('client.ts - cpiDataHash', Array.from(cpiHashes.cpiDataHash));
-    console.log(
-      'client.ts - cpiAccountsHash',
-      Array.from(cpiHashes.cpiAccountsHash)
-    );
-
     // Create combined hash of CPI hashes
     const cpiCombined = new Uint8Array(64); // 32 + 32 bytes
     cpiCombined.set(cpiHashes.cpiDataHash, 0);

@@ -356,15 +356,7 @@ export function buildCreateChunkMessage(
   cpiCombined.set(cpiHashes.cpiDataHash, 0);
   cpiCombined.set(cpiHashes.cpiAccountsHash, 32);
 
-  console.log('messages.ts - cpiDataHash', Array.from(cpiHashes.cpiDataHash));
-  console.log(
-    'messages.ts - cpiAccountsHash',
-    Array.from(cpiHashes.cpiAccountsHash)
-  );
-  console.log('messages.ts - cpiCombined', Array.from(cpiCombined));
-
   const cpiHash = computeHash(cpiCombined);
-  console.log('messages.ts - cpiHash', Array.from(cpiHash));
 
   // Create final hash: hash(nonce, timestamp, policyHash, cpiHash)
   const nonceBuffer = Buffer.alloc(8);
