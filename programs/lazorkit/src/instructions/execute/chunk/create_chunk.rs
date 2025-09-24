@@ -46,16 +46,12 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         ctx.accounts.policy_program.key(),
     )?;
 
-    msg!("policy_hash: {:?}", policy_hash);
-
     let expected_message_hash = compute_create_chunk_message_hash(
         ctx.accounts.smart_wallet_config.last_nonce,
         args.timestamp,
         policy_hash,
         args.cpi_hash,
     )?;
-
-    msg!("expected_message_hash: {:?}", expected_message_hash);
 
     // Step 5: Verify WebAuthn signature and message hash
     verify_authorization_hash(
