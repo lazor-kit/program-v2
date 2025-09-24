@@ -8,13 +8,7 @@ use crate::utils::{
     get_wallet_device_signer, verify_authorization_hash,
 };
 use crate::{error::LazorKitError, ID};
-// Hash and Hasher imports no longer needed with new verification approach
 
-/// Execute policy program instructions
-///
-/// Calls the policy program to perform operations like adding/removing devices
-/// or other policy-specific actions. Requires proper WebAuthn authentication
-/// and validates the policy program is registered and matches the wallet's policy.
 pub fn call_policy<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
     args: CallPolicyArgs,
@@ -23,6 +17,7 @@ pub fn call_policy<'c: 'info, 'info>(
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
     // Ensure the policy program is executable (not a data account)
     validation::validate_program_executable(&ctx.accounts.policy_program)?;
@@ -89,8 +84,8 @@ pub fn call_policy<'c: 'info, 'info>(
     if let Some(new_wallet_device) = args.new_wallet_device {
         // Validate the new passkey format
         require!(
-            new_wallet_device.passkey_public_key[0] == 0x02
-                || new_wallet_device.passkey_public_key[0] == 0x03,
+            new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
             LazorKitError::InvalidPasskeyFormat
         );
 
@@ -126,43 +121,19 @@ pub fn call_policy<'c: 'info, 'info>(
     )?;
 
     // Step 8: Update wallet state and handle fees
-    // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
-        .accounts
-        .smart_wallet_config
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
+    ctx.accounts.smart_wallet_config.last_nonce = 
+        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
 
-    // Validate that the provided vault matches the vault index from args
-    crate::state::LazorKitVault::validate_vault_for_index(
-        &ctx.accounts.lazorkit_vault.key(),
-        args.vault_index,
-        &crate::ID,
-    )?;
-
-    // Create wallet signer for fee distribution
-    let wallet_signer = crate::utils::PdaSigner {
-        seeds: vec![
-            crate::constants::SMART_WALLET_SEED.to_vec(),
-            ctx.accounts
-                .smart_wallet_config
-                .wallet_id
-                .to_le_bytes()
-                .to_vec(),
-        ],
-        bump: ctx.accounts.smart_wallet_config.bump,
-    };
-
-    // Distribute fees to payer, referral, and LazorKit vault
-    crate::utils::distribute_fees(
+    // Handle fee distribution and vault validation
+    crate::utils::handle_fee_distribution(
         &ctx.accounts.config,
+        &ctx.accounts.smart_wallet_config,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.referral.to_account_info(),
         &ctx.accounts.lazorkit_vault.to_account_info(),
         &ctx.accounts.system_program,
-        wallet_signer,
+        args.vault_index,
     )?;
 
     Ok(())
@@ -182,7 +153,7 @@ pub struct CallPolicy<'info> {
         seeds = [crate::constants::SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_config.bump,
     )]
-    /// CHECK: smart wallet PDA verified by seeds
+    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -197,7 +168,6 @@ pub struct CallPolicy<'info> {
     #[account(mut, address = smart_wallet_config.referral_address)]
     pub referral: UncheckedAccount<'info>,
 
-    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
     #[account(
         mut,
         seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],

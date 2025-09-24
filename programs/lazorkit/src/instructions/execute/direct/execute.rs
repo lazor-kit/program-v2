@@ -6,10 +6,9 @@ use crate::state::LazorKitVault;
 use crate::utils::{
     check_whitelist, compute_execute_message_hash, compute_instruction_hash, execute_cpi,
     get_wallet_device_signer, sighash, split_remaining_accounts, verify_authorization_hash,
-    PdaSigner,
+    PasskeyExt as _, PdaSigner,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
-// Hash and Hasher imports no longer needed with new verification approach
 
 /// Execute a transaction through the smart wallet
 ///
@@ -24,6 +23,13 @@ pub fn execute<'c: 'info, 'info>(
     args.validate()?;
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
+    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
+
+    // Basic rate limiting check
+    validation::validate_rate_limit(
+        ctx.accounts.smart_wallet_config.wallet_id,
+        Clock::get()?.slot,
+    )?;
 
     // Step 0.1: Split remaining accounts between policy and CPI instructions
     // The split_index determines where to divide the accounts
@@ -43,11 +49,8 @@ pub fn execute<'c: 'info, 'info>(
         ctx.accounts.policy_program.key(),
     )?;
 
-    let cpi_hash = compute_instruction_hash(
-        &args.cpi_data,
-        cpi_accounts,
-        ctx.accounts.cpi_program.key(),
-    )?;
+    let cpi_hash =
+        compute_instruction_hash(&args.cpi_data, cpi_accounts, ctx.accounts.cpi_program.key())?;
 
     let expected_message_hash = compute_execute_message_hash(
         ctx.accounts.smart_wallet_config.last_nonce,
@@ -154,33 +157,28 @@ pub fn execute<'c: 'info, 'info>(
     )?;
 
     // Step 8: Update wallet state and handle fees
-    // Increment nonce to prevent replay attacks
-    ctx.accounts.smart_wallet_config.last_nonce = ctx
-        .accounts
-        .smart_wallet_config
-        .last_nonce
-        .checked_add(1)
-        .ok_or(LazorKitError::NonceOverflow)?;
+    ctx.accounts.smart_wallet_config.last_nonce =
+        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
 
-    // Validate that the provided vault matches the vault index from args
-    crate::state::LazorKitVault::validate_vault_for_index(
-        &ctx.accounts.lazorkit_vault.key(),
-        args.vault_index,
-        &crate::ID,
-    )?;
-
-    // Distribute fees to payer, referral, and LazorKit vault
-    // This handles the fee distribution according to the configured rates
-    crate::utils::distribute_fees(
+    // Handle fee distribution and vault validation
+    crate::utils::handle_fee_distribution(
         &ctx.accounts.config,
+        &ctx.accounts.smart_wallet_config,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.referral.to_account_info(),
         &ctx.accounts.lazorkit_vault.to_account_info(),
         &ctx.accounts.system_program,
-        wallet_signer,
+        args.vault_index,
     )?;
 
+    msg!(
+        "Successfully executed transaction: wallet={}, nonce={}, policy={}, cpi={}",
+        ctx.accounts.smart_wallet.key(),
+        ctx.accounts.smart_wallet_config.last_nonce,
+        ctx.accounts.policy_program.key(),
+        ctx.accounts.cpi_program.key()
+    );
     Ok(())
 }
 
@@ -195,7 +193,6 @@ pub struct Execute<'info> {
         seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
         bump = smart_wallet_config.bump,
     )]
-    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -206,41 +203,48 @@ pub struct Execute<'info> {
     )]
     pub smart_wallet_config: Box<Account<'info, crate::state::SmartWalletConfig>>,
 
-    /// CHECK: referral account (matches smart_wallet_config.referral)
     #[account(mut, address = smart_wallet_config.referral_address)]
+    /// CHECK: referral account (matches smart_wallet_config.referral)
     pub referral: UncheckedAccount<'info>,
 
-    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
     #[account(
         mut,
         seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
         bump,
     )]
-    /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
     pub lazorkit_vault: SystemAccount<'info>,
 
-    #[account(owner = crate::ID)]
+    #[account(
+        owner = crate::ID,
+        seeds = [crate::state::WalletDevice::PREFIX_SEED, smart_wallet.key().as_ref(), args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()],
+        bump,
+    )]
     pub wallet_device: Box<Account<'info, crate::state::WalletDevice>>,
+
     #[account(
         seeds = [crate::state::PolicyProgramRegistry::PREFIX_SEED],
         bump,
         owner = crate::ID
     )]
     pub policy_program_registry: Box<Account<'info, crate::state::PolicyProgramRegistry>>,
+
+    #[account(executable)]
     /// CHECK: must be executable (policy program)
-    #[account(executable)]
     pub policy_program: UncheckedAccount<'info>,
-    /// CHECK: must be executable (target program)
+
     #[account(executable)]
+    /// CHECK: must be executable (target program)
     pub cpi_program: UncheckedAccount<'info>,
+
     #[account(
         seeds = [crate::state::Config::PREFIX_SEED],
         bump,
         owner = crate::ID
     )]
     pub config: Box<Account<'info, crate::state::Config>>,
-    /// CHECK: instruction sysvar
+
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instruction sysvar
     pub ix_sysvar: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,

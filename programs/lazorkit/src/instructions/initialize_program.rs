@@ -23,14 +23,13 @@ pub fn initialize_program(ctx: Context<InitializeProgram>) -> Result<()> {
     policy_program_registry.registered_programs = vec![ctx.accounts.default_policy_program.key()];
 
     // Step 3: Initialize the program configuration
-    // Set up default fees, authority, and operational parameters
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.signer.key();
-    config.fee_payer_fee = 30000; // 0.00003 SOL - fee charged to transaction payers
-    config.referral_fee = 10000;  // 0.00001 SOL - fee paid to referral addresses
-    config.lazorkit_fee = 10000;  // 0.00001 SOL - fee retained by LazorKit protocol
+    config.fee_payer_fee = crate::constants::DEFAULT_FEE_PAYER_FEE;
+    config.referral_fee = crate::constants::DEFAULT_REFERRAL_FEE;
+    config.lazorkit_fee = crate::constants::DEFAULT_LAZORKIT_FEE;
     config.default_policy_program_id = ctx.accounts.default_policy_program.key();
-    config.is_paused = false; // Program starts in active state
+    config.is_paused = false;
 
     Ok(())
 }

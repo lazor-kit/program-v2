@@ -2,14 +2,17 @@ import * as anchor from '@coral-xyz/anchor';
 
 export function instructionToAccountMetas(
   ix: anchor.web3.TransactionInstruction,
-  feePayer?: anchor.web3.PublicKey
+  signers?: anchor.web3.PublicKey | anchor.web3.PublicKey[]
 ): anchor.web3.AccountMeta[] {
+  const signerArray = signers
+    ? Array.isArray(signers)
+      ? signers
+      : [signers]
+    : [];
   return ix.keys.map((k) => ({
     pubkey: k.pubkey,
     isWritable: k.isWritable,
-    isSigner:
-      feePayer &&
-      ix.keys.some((k) => k.pubkey.toString() === feePayer.toString()),
+    isSigner: signerArray.some((s) => s.toString() === k.pubkey.toString()),
   }));
 }
 export function getRandomBytes(len: number): Uint8Array {

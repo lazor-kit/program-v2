@@ -5,19 +5,26 @@ use anchor_lang::prelude::*;
 /// Stores the essential state information for a smart wallet including its
 /// unique identifier, policy program configuration, and authentication nonce
 /// for replay attack prevention.
+///
+/// Memory layout optimized for better cache performance:
+/// - Group related fields together
+/// - Align fields to natural boundaries
+/// - Minimize padding
 #[account]
 #[derive(Default, InitSpace)]
 pub struct SmartWalletConfig {
-    /// Unique identifier for this smart wallet instance
-    pub wallet_id: u64,
-    /// Referral address that receives referral fees from this wallet
-    pub referral_address: Pubkey,
-    /// Policy program that governs this wallet's transaction validation rules
-    pub policy_program_id: Pubkey,
-    /// Last nonce used for message verification to prevent replay attacks
-    pub last_nonce: u64,
-    /// Bump seed for PDA derivation and verification
+    /// Bump seed for PDA derivation and verification (1 byte)
     pub bump: u8,
+    /// Padding to align next fields (7 bytes)
+    pub _padding: [u8; 7],
+    /// Unique identifier for this smart wallet instance (8 bytes)
+    pub wallet_id: u64,
+    /// Last nonce used for message verification to prevent replay attacks (8 bytes)
+    pub last_nonce: u64,
+    /// Referral address that receives referral fees from this wallet (32 bytes)
+    pub referral_address: Pubkey,
+    /// Policy program that governs this wallet's transaction validation rules (32 bytes)
+    pub policy_program_id: Pubkey,
 }
 
 impl SmartWalletConfig {

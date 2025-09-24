@@ -20,27 +20,24 @@ pub fn execute_chunk(
     // Step 1: Prepare and validate input parameters
     let cpi_accounts = &ctx.remaining_accounts[..];
 
-    // Validate remaining accounts format (graceful abort on failure)
-    if validation::validate_remaining_accounts(&cpi_accounts).is_err() {
-        msg!("Failed validation: remaining accounts validation failed");
-        return Ok(());
-    }
+    // Validate remaining accounts format
+    validation::validate_remaining_accounts(&cpi_accounts)?;
 
-    let session = &mut ctx.accounts.chunk;
+    let chunk = &mut ctx.accounts.chunk;
 
     // Step 2: Validate session state and authorization
     // Check if the chunk session has expired based on timestamp
     let now = Clock::get()?.unix_timestamp;
-    if session.authorized_timestamp < now - 30 {
-        msg!("Failed validation: session expired. authorized_timestamp: {}, now: {}", session.authorized_timestamp, now);
-        return Ok(());
-    }
+    require!(
+        chunk.authorized_timestamp >= now - crate::security::MAX_SESSION_TTL_SECONDS,
+        LazorKitError::TransactionTooOld
+    );
 
     // Verify the chunk belongs to the correct smart wallet
-    if session.owner_wallet_address != ctx.accounts.smart_wallet.key() {
-        msg!("Failed validation: wallet address mismatch. session: {}, smart_wallet: {}", session.owner_wallet_address, ctx.accounts.smart_wallet.key());
-        return Ok(());
-    }
+    require!(
+        chunk.owner_wallet_address == ctx.accounts.smart_wallet.key(),
+        LazorKitError::InvalidAccountOwner
+    );
 
     // Step 3: Validate instruction data and split indices
     // For n instructions, we need n-1 split indices to divide the accounts
@@ -81,60 +78,19 @@ pub fn execute_chunk(
     cpi_combined.extend_from_slice(&cpi_accounts_hash);
     let cpi_hash = hash(&cpi_combined).to_bytes();
     
-    // Verify the combined CPI hash matches the session
-    if cpi_hash != session.cpi_hash {
-        msg!("Failed validation: CPI hash mismatch. computed: {:?}, session: {:?}", cpi_hash, session.cpi_hash);
-        return Ok(());
-    }
+    // Verify the combined CPI hash matches the chunk
+    require!(
+        cpi_hash == chunk.cpi_hash,
+        LazorKitError::HashMismatch
+    );
 
     // Step 5: Split accounts based on split indices
-    let mut account_ranges = Vec::new();
-    let mut start = 0usize;
-
-    // Calculate account ranges for each instruction using split indices
-    for &split_point in split_index.iter() {
-        let end = split_point as usize;
-        require!(
-            end > start && end <= cpi_accounts.len(),
-            LazorKitError::AccountSliceOutOfBounds
-        );
-        account_ranges.push((start, end));
-        start = end;
-    }
-
-    // Add the last instruction range (from last split to end)
-    require!(
-        start < cpi_accounts.len(),
-        LazorKitError::AccountSliceOutOfBounds
-    );
-    account_ranges.push((start, cpi_accounts.len()));
+    let account_ranges = crate::utils::calculate_account_ranges(cpi_accounts, &split_index)?;
 
     // Step 6: Accounts metadata validation is now covered by CPI hash validation above
 
     // Step 7: Validate each instruction's programs for security
-    for (_i, &(range_start, range_end)) in account_ranges.iter().enumerate() {
-        let instruction_accounts = &cpi_accounts[range_start..range_end];
-
-        require!(
-            !instruction_accounts.is_empty(),
-            LazorKitError::InsufficientCpiAccounts
-        );
-
-        // First account in each instruction slice is the program ID
-        let program_account = &instruction_accounts[0];
-
-        // Validate program is executable (not a data account)
-        if !program_account.executable {
-            msg!("Failed validation: program not executable. program: {}", program_account.key());
-            return Ok(());
-        }
-
-        // Prevent reentrancy attacks by blocking calls to this program
-        if program_account.key() == crate::ID {
-            msg!("Failed validation: reentrancy attempt detected. program: {}", program_account.key());
-            return Ok(());
-        }
-    }
+    crate::utils::validate_programs_in_ranges(cpi_accounts, &account_ranges)?;
 
     // Step 8: Create wallet signer for CPI execution
     let wallet_signer = PdaSigner {
@@ -159,32 +115,31 @@ pub fn execute_chunk(
         let program_account = &instruction_accounts[0];
         let instruction_accounts = &instruction_accounts[1..];
 
-        // Execute the CPI instruction (graceful abort on failure)
-        let exec_res = execute_cpi(
+        // Execute the CPI instruction
+        execute_cpi(
             instruction_accounts,
             cpi_data,
             program_account,
             wallet_signer.clone(),
-        );
-
-        if exec_res.is_err() {
-            msg!("Failed execution: CPI instruction failed. error: {:?}", exec_res.err());
-            return Ok(());
-        }
+        )?;
     }
 
-    crate::utils::distribute_fees(
+    crate::utils::handle_fee_distribution(
         &ctx.accounts.config,
+        &ctx.accounts.smart_wallet_config,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.referral.to_account_info(),
         &ctx.accounts.lazorkit_vault.to_account_info(),
         &ctx.accounts.system_program,
-        wallet_signer,
+        chunk.vault_index,
     )?;
 
 
-    msg!("Successfully executed deferred transaction");
+    msg!("Successfully executed chunk transaction: wallet={}, nonce={}, instructions={}", 
+         ctx.accounts.smart_wallet.key(), 
+         chunk.authorized_nonce,
+         instruction_data_list.len());
     Ok(())
 }
 
@@ -225,7 +180,7 @@ pub struct ExecuteChunk<'info> {
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
     pub lazorkit_vault: SystemAccount<'info>,
 
-    /// Transaction session to execute. Closed on success to refund rent.
+    /// Transaction session to execute. Closed to refund rent.
     #[account(
         mut,
         seeds = [
@@ -233,7 +188,7 @@ pub struct ExecuteChunk<'info> {
             smart_wallet.key.as_ref(),
             &chunk.authorized_nonce.to_le_bytes(),
         ], 
-        close = session_refund, 
+        close = session_refund,
         owner = ID,
         bump,
     )]

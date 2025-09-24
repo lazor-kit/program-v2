@@ -39,15 +39,9 @@ describe('Test smart wallet with default policy', () => {
       );
       const txn = new anchor.web3.Transaction().add(ix);
 
-      const sig = await anchor.web3.sendAndConfirmTransaction(
-        connection,
-        txn,
-        [payer],
-        {
-          commitment: 'confirmed',
-          skipPreflight: true,
-        }
-      );
+      const sig = await anchor.web3.sendAndConfirmTransaction(connection, txn, [
+        payer,
+      ]);
 
       console.log('Initialize txn: ', sig);
     }
@@ -83,7 +77,7 @@ describe('Test smart wallet with default policy', () => {
 
     const sig = await anchor.web3.sendAndConfirmTransaction(
       connection,
-      createSmartWalletTxn,
+      createSmartWalletTxn as anchor.web3.Transaction,
       [payer],
       {
         commitment: 'confirmed',
@@ -112,7 +106,7 @@ describe('Test smart wallet with default policy', () => {
     );
   });
 
-  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
+  it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -144,7 +138,7 @@ describe('Test smart wallet with default policy', () => {
 
     await anchor.web3.sendAndConfirmTransaction(
       connection,
-      createSmartWalletTxn,
+      createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
     );
 
@@ -161,11 +155,13 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
+    const timestamp = new anchor.BN(Math.floor(Date.now() / 1000));
+
     const plainMessage = buildExecuteMessage(
       payer.publicKey,
       smartWallet,
       new anchor.BN(0),
-      new anchor.BN(Math.floor(Date.now() / 1000)),
+      timestamp,
       checkPolicyIns,
       transferFromSmartWalletIns
     );
@@ -184,16 +180,17 @@ describe('Test smart wallet with default policy', () => {
         clientDataJsonRaw64: clientDataJsonRaw64,
         authenticatorDataRaw64: authenticatorDataRaw64,
       },
-      policyInstruction: null,
+      policyInstruction: checkPolicyIns,
       cpiInstruction: transferFromSmartWalletIns,
       vaultIndex: 0,
+      timestamp,
     });
 
-    executeDirectTransactionTxn.sign([payer]);
-
-    const sig2 = await connection.sendTransaction(executeDirectTransactionTxn);
-
-    await connection.confirmTransaction(sig2);
+    const sig2 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      executeDirectTransactionTxn as anchor.web3.Transaction,
+      [payer]
+    );
 
     console.log('Execute direct transaction: ', sig2);
   });
@@ -230,7 +227,7 @@ describe('Test smart wallet with default policy', () => {
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
       connection,
-      createSmartWalletTxn,
+      createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
     );
 
@@ -272,11 +269,13 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
+    const timestamp = new anchor.BN(Math.floor(Date.now() / 1000));
+
     const plainMessage = buildCreateChunkMessage(
       payer.publicKey,
       smartWallet,
       new anchor.BN(0),
-      new anchor.BN(Math.floor(Date.now() / 1000)),
+      timestamp,
       checkPolicyIns,
       [transferTokenIns]
     );
@@ -297,24 +296,29 @@ describe('Test smart wallet with default policy', () => {
       },
       policyInstruction: null,
       cpiInstructions: [transferTokenIns],
-      expiresAt: Math.floor(Date.now() / 1000) + 1000,
+      timestamp,
       vaultIndex: 0,
     });
 
-    createDeferredExecutionTxn.sign([payer]);
-
-    const sig2 = await connection.sendTransaction(createDeferredExecutionTxn);
-    await connection.confirmTransaction(sig2);
+    const sig2 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createDeferredExecutionTxn as anchor.web3.Transaction,
+      [payer]
+    );
 
     console.log('Create deferred execution: ', sig2);
 
-    const executeDeferredTransactionTxn = await lazorkitProgram.executeChunkTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        cpiInstructions: [transferTokenIns],
-      }
-    );
+    const executeDeferredTransactionTxn =
+      (await lazorkitProgram.executeChunkTxn(
+        {
+          payer: payer.publicKey,
+          smartWallet: smartWallet,
+          cpiInstructions: [transferTokenIns],
+        },
+        {
+          useVersionedTransaction: true,
+        }
+      )) as anchor.web3.VersionedTransaction;
 
     executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
@@ -325,7 +329,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -357,7 +361,7 @@ describe('Test smart wallet with default policy', () => {
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
       connection,
-      createSmartWalletTxn,
+      createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
     );
 
@@ -405,11 +409,13 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
+    const timestamp = new anchor.BN(Math.floor(Date.now() / 1000));
+
     const plainMessage = buildCreateChunkMessage(
       payer.publicKey,
       smartWallet,
       new anchor.BN(0),
-      new anchor.BN(Math.floor(Date.now() / 1000)),
+      timestamp,
       checkPolicyIns,
       [transferTokenIns, transferFromSmartWalletIns]
     );
@@ -430,24 +436,29 @@ describe('Test smart wallet with default policy', () => {
       },
       policyInstruction: null,
       cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
-      expiresAt: Math.floor(Date.now() / 1000) + 1000,
       vaultIndex: 0,
+      timestamp,
     });
 
-    createDeferredExecutionTxn.sign([payer]);
-
-    const sig2 = await connection.sendTransaction(createDeferredExecutionTxn);
-    await connection.confirmTransaction(sig2);
+    const sig2 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createDeferredExecutionTxn as anchor.web3.Transaction,
+      [payer]
+    );
 
     console.log('Create deferred execution: ', sig2);
 
-    const executeDeferredTransactionTxn = await lazorkitProgram.executeChunkTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
-      }
-    );
+    const executeDeferredTransactionTxn =
+      (await lazorkitProgram.executeChunkTxn(
+        {
+          payer: payer.publicKey,
+          smartWallet: smartWallet,
+          cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
+        },
+        {
+          useVersionedTransaction: true,
+        }
+      )) as anchor.web3.VersionedTransaction;
 
     executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
@@ -458,7 +469,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -490,7 +501,7 @@ describe('Test smart wallet with default policy', () => {
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
       connection,
-      createSmartWalletTxn,
+      createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
     );
 
@@ -559,22 +570,27 @@ describe('Test smart wallet with default policy', () => {
       },
       policyInstruction: null,
       cpiInstructions: [transferTokenIns, transferTokenIns],
-      expiresAt: Math.floor(Date.now() / 1000) + 1000,
+      timestamp,
       vaultIndex: 0,
     });
 
-    createDeferredExecutionTxn.sign([payer]);
-
-    const sig2 = await connection.sendTransaction(createDeferredExecutionTxn);
-    await connection.confirmTransaction(sig2);
-
-    const executeDeferredTransactionTxn = await lazorkitProgram.executeChunkTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        cpiInstructions: [transferTokenIns, transferTokenIns],
-      }
+    const sig2 = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createDeferredExecutionTxn as anchor.web3.Transaction,
+      [payer]
     );
+
+    const executeDeferredTransactionTxn =
+      (await lazorkitProgram.executeChunkTxn(
+        {
+          payer: payer.publicKey,
+          smartWallet: smartWallet,
+          cpiInstructions: [transferTokenIns, transferTokenIns],
+        },
+        {
+          useVersionedTransaction: true,
+        }
+      )) as anchor.web3.VersionedTransaction;
 
     executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
@@ -585,10 +601,6 @@ describe('Test smart wallet with default policy', () => {
     // log execute deferred transaction size
     const executeDeferredTransactionSize =
       executeDeferredTransactionTxn.serialize().length;
-    console.log(
-      'Execute deferred transaction size: ',
-      executeDeferredTransactionSize
-    );
 
     console.log('Execute deferred transaction: ', sig3);
   });

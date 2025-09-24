@@ -5,23 +5,30 @@ use anchor_lang::prelude::*;
 /// Stores global program configuration including fee structures, default policy
 /// program, and operational settings. Only the program authority can modify
 /// these settings through the update_config instruction.
+///
+/// Memory layout optimized for better cache performance:
+/// - Group related fields together
+/// - Align fields to natural boundaries
+/// - Minimize padding
 #[account]
 #[derive(Default, InitSpace)]
 pub struct Config {
-    /// Program authority that can modify configuration settings
-    pub authority: Pubkey,
-    /// Fee charged for creating a new smart wallet (in lamports)
-    pub create_smart_wallet_fee: u64,
-    /// Fee charged to the fee payer for transactions (in lamports)
-    pub fee_payer_fee: u64,
-    /// Fee paid to referral addresses (in lamports)
-    pub referral_fee: u64,
-    /// Fee retained by LazorKit protocol (in lamports)
-    pub lazorkit_fee: u64,
-    /// Default policy program ID for new smart wallets
-    pub default_policy_program_id: Pubkey,
-    /// Whether the program is currently paused
+    /// Whether the program is currently paused (1 byte)
     pub is_paused: bool,
+    /// Padding to align next fields (7 bytes)
+    pub _padding: [u8; 7],
+    /// Fee charged for creating a new smart wallet (in lamports) (8 bytes)
+    pub create_smart_wallet_fee: u64,
+    /// Fee charged to the fee payer for transactions (in lamports) (8 bytes)
+    pub fee_payer_fee: u64,
+    /// Fee paid to referral addresses (in lamports) (8 bytes)
+    pub referral_fee: u64,
+    /// Fee retained by LazorKit protocol (in lamports) (8 bytes)
+    pub lazorkit_fee: u64,
+    /// Program authority that can modify configuration settings (32 bytes)
+    pub authority: Pubkey,
+    /// Default policy program ID for new smart wallets (32 bytes)
+    pub default_policy_program_id: Pubkey,
 }
 
 impl Config {

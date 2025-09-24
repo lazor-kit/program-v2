@@ -41,6 +41,7 @@ import {
   convertPasskeySignatureToInstructionArgs,
 } from '../auth';
 import {
+  buildTransaction,
   buildVersionedTransaction,
   buildLegacyTransaction,
   combineInstructionsWithAuth,
@@ -303,7 +304,7 @@ export class LazorkitClient {
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts([
-        ...instructionToAccountMetas(policyInstruction, payer),
+        ...instructionToAccountMetas(policyInstruction, [payer]),
       ])
       .instruction();
   }
@@ -339,7 +340,7 @@ export class LazorkitClient {
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction),
-        ...instructionToAccountMetas(cpiInstruction, payer),
+        ...instructionToAccountMetas(cpiInstruction, [payer]),
       ])
       .instruction();
   }
@@ -485,7 +486,10 @@ export class LazorkitClient {
     cpiInstructions: TransactionInstruction[]
   ): Promise<TransactionInstruction> {
     const cfg = await this.getSmartWalletConfigData(smartWallet);
-    const chunk = this.getChunkPubkey(smartWallet, cfg.lastNonce);
+    const chunk = this.getChunkPubkey(
+      smartWallet,
+      cfg.lastNonce.sub(new BN(1))
+    );
 
     const vaultIndex = await this.getChunkData(chunk).then((d) => d.vaultIndex);
 
@@ -502,7 +506,7 @@ export class LazorkitClient {
         isSigner: false,
         isWritable: false,
       },
-      ...instructionToAccountMetas(ix, payer),
+      ...instructionToAccountMetas(ix, [payer]),
     ]);
 
     return await this.program.methods
@@ -523,6 +527,34 @@ export class LazorkitClient {
   }
 
   /**
+   * Builds the close chunk instruction
+   */
+  async buildCloseChunkIns(
+    payer: PublicKey,
+    smartWallet: PublicKey,
+    nonce: BN
+  ): Promise<TransactionInstruction> {
+    const chunk = this.getChunkPubkey(smartWallet, nonce);
+
+    const sessionRefund = await this.getChunkData(chunk).then(
+      (d) => d.rentRefundAddress
+    );
+
+    const smartWalletConfig = this.getSmartWalletConfigDataPubkey(smartWallet);
+
+    return await this.program.methods
+      .closeChunk()
+      .accountsPartial({
+        payer,
+        smartWallet,
+        smartWalletConfig,
+        chunk,
+        sessionRefund,
+      })
+      .instruction();
+  }
+
+  /**
    * Builds the authorize ephemeral execution instruction
    */
   async buildGrantPermissionIns(
@@ -533,7 +565,7 @@ export class LazorkitClient {
   ): Promise<TransactionInstruction> {
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix, payer)
+      instructionToAccountMetas(ix, [payer])
     );
 
     return await this.program.methods
@@ -580,7 +612,7 @@ export class LazorkitClient {
 
     // Combine all account metas from all instructions
     const allAccountMetas = cpiInstructions.flatMap((ix) =>
-      instructionToAccountMetas(ix, feePayer)
+      instructionToAccountMetas(ix, [feePayer])
     );
 
     return await this.program.methods
@@ -609,8 +641,9 @@ export class LazorkitClient {
   // ============================================================================
 
   async manageVaultTxn(
-    params: types.ManageVaultParams
-  ): Promise<VersionedTransaction> {
+    params: types.ManageVaultParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const manageVaultInstruction = await this.program.methods
       .manageVault(
         params.action === 'deposit' ? 0 : 1,
@@ -625,16 +658,25 @@ export class LazorkitClient {
         systemProgram: SystemProgram.programId,
       })
       .instruction();
-    return buildVersionedTransaction(this.connection, params.payer, [
-      manageVaultInstruction,
-    ]);
+
+    const result = await buildTransaction(
+      this.connection,
+      params.payer,
+      [manageVaultInstruction],
+      options
+    );
+
+    return result.transaction;
   }
 
   /**
    * Creates a smart wallet with passkey authentication
    */
-  async createSmartWalletTxn(params: types.CreateSmartWalletParams): Promise<{
-    transaction: Transaction;
+  async createSmartWalletTxn(
+    params: types.CreateSmartWalletParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<{
+    transaction: Transaction | VersionedTransaction;
     smartWalletId: BN;
     smartWallet: PublicKey;
   }> {
@@ -676,11 +718,13 @@ export class LazorkitClient {
       args
     );
 
-    const transaction = await buildLegacyTransaction(
+    const result = await buildTransaction(
       this.connection,
       params.payer,
-      [instruction]
+      [instruction],
+      options
     );
+    const transaction = result.transaction;
 
     return {
       transaction,
@@ -692,7 +736,10 @@ export class LazorkitClient {
   /**
    * Executes a direct transaction with passkey authentication
    */
-  async executeTxn(params: types.ExecuteParams): Promise<VersionedTransaction> {
+  async executeTxn(
+    params: types.ExecuteParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
@@ -728,7 +775,7 @@ export class LazorkitClient {
         splitIndex: policyInstruction.keys.length,
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
-        timestamp: new BN(Math.floor(Date.now() / 1000)),
+        timestamp: params.timestamp,
         vaultIndex:
           params.vaultIndex !== undefined
             ? params.vaultIndex
@@ -741,19 +788,24 @@ export class LazorkitClient {
     const instructions = combineInstructionsWithAuth(authInstruction, [
       execInstruction,
     ]);
-    return buildVersionedTransaction(
+
+    const result = await buildTransaction(
       this.connection,
       params.payer,
-      instructions
+      instructions,
+      options
     );
+
+    return result.transaction;
   }
 
   /**
    * Invokes a wallet policy with passkey authentication
    */
   async callPolicyTxn(
-    params: types.CallPolicyParams
-  ): Promise<VersionedTransaction> {
+    params: types.CallPolicyParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
@@ -791,19 +843,24 @@ export class LazorkitClient {
     const instructions = combineInstructionsWithAuth(authInstruction, [
       invokeInstruction,
     ]);
-    return buildVersionedTransaction(
+
+    const result = await buildTransaction(
       this.connection,
       params.payer,
-      instructions
+      instructions,
+      options
     );
+
+    return result.transaction;
   }
 
   /**
    * Updates a wallet policy with passkey authentication
    */
   async changePolicyTxn(
-    params: types.ChangePolicyParams
-  ): Promise<VersionedTransaction> {
+    params: types.ChangePolicyParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
@@ -846,19 +903,24 @@ export class LazorkitClient {
     const instructions = combineInstructionsWithAuth(authInstruction, [
       updateInstruction,
     ]);
-    return buildVersionedTransaction(
+
+    const result = await buildTransaction(
       this.connection,
       params.payer,
-      instructions
+      instructions,
+      options
     );
+
+    return result.transaction;
   }
 
   /**
    * Creates a deferred execution with passkey authentication
    */
   async createChunkTxn(
-    params: types.CreateChunkParams
-  ): Promise<VersionedTransaction> {
+    params: types.CreateChunkParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const authInstruction = buildPasskeyVerificationInstruction(
       params.passkeySignature
     );
@@ -906,9 +968,9 @@ export class LazorkitClient {
       params.smartWallet,
       {
         ...signatureArgs,
-        policyData: policyInstruction.data,
+        policyData: policyInstruction?.data || Buffer.alloc(0),
         verifyInstructionIndex: 0,
-        timestamp: new BN(Math.floor(Date.now() / 1000)),
+        timestamp: params.timestamp || new BN(Math.floor(Date.now() / 1000)),
         cpiHash: Array.from(cpiHash),
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
@@ -920,28 +982,61 @@ export class LazorkitClient {
     const instructions = combineInstructionsWithAuth(authInstruction, [
       sessionInstruction,
     ]);
-    return buildVersionedTransaction(
+
+    const result = await buildTransaction(
       this.connection,
       params.payer,
-      instructions
+      instructions,
+      options
     );
+
+    return result.transaction;
   }
 
   /**
    * Executes a deferred transaction (no authentication needed)
    */
   async executeChunkTxn(
-    params: types.ExecuteChunkParams
-  ): Promise<VersionedTransaction> {
+    params: types.ExecuteChunkParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
     const instruction = await this.buildExecuteChunkIns(
       params.payer,
       params.smartWallet,
       params.cpiInstructions
     );
 
-    return buildVersionedTransaction(this.connection, params.payer, [
-      instruction,
-    ]);
+    const result = await buildTransaction(
+      this.connection,
+      params.payer,
+      [instruction],
+      options
+    );
+
+    return result.transaction;
+  }
+
+  /**
+   * Closes a deferred transaction (no authentication needed)
+   */
+  async closeChunkTxn(
+    params: types.CloseChunkParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
+    const instruction = await this.buildCloseChunkIns(
+      params.payer,
+      params.smartWallet,
+      params.nonce
+    );
+
+    const result = await buildTransaction(
+      this.connection,
+      params.payer,
+      [instruction],
+      options
+    );
+
+    return result.transaction;
   }
 
   // ============================================================================

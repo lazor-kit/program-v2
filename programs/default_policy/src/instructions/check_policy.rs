@@ -53,7 +53,6 @@ pub struct CheckPolicy<'info> {
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
-        mut,
         owner = ID,
         constraint = wallet_device.key() == policy.wallet_device @ PolicyError::Unauthorized,
         constraint = policy.smart_wallet == smart_wallet.key() @ PolicyError::Unauthorized,
