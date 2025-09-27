@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{PolicyProgramRegistry, Config},
+    state::{Config, PolicyProgramRegistry},
 };
 
 /// Initialize the LazorKit program with essential configuration
@@ -42,7 +42,7 @@ pub struct InitializeProgram<'info> {
 
     /// The program's configuration account.
     #[account(
-        init_if_needed,
+        init,
         payer = signer,
         space = 8 + Config::INIT_SPACE,
         seeds = [Config::PREFIX_SEED],
@@ -56,7 +56,7 @@ pub struct InitializeProgram<'info> {
         payer = signer,
         space = 8 + PolicyProgramRegistry::INIT_SPACE,
         seeds = [PolicyProgramRegistry::PREFIX_SEED],
-        bump
+        bump,
     )]
     pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
