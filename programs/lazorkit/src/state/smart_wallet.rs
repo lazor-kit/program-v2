@@ -15,8 +15,6 @@ use anchor_lang::prelude::*;
 pub struct SmartWalletConfig {
     /// Bump seed for PDA derivation and verification (1 byte)
     pub bump: u8,
-    /// Padding to align next fields (7 bytes)
-    pub _padding: [u8; 7],
     /// Unique identifier for this smart wallet instance (8 bytes)
     pub wallet_id: u64,
     /// Last nonce used for message verification to prevent replay attacks (8 bytes)

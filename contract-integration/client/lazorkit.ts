@@ -832,7 +832,7 @@ export class LazorkitClient {
           : null,
         policyData: params.policyInstruction.data,
         verifyInstructionIndex: 0,
-        timestamp: new BN(Math.floor(Date.now() / 1000)),
+        timestamp: params.timestamp,
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
         ),

@@ -280,18 +280,6 @@ export type DefaultPolicy = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "passkeyPublicKey",
             "docs": [
               "Public key of the WebAuthn passkey for transaction authorization (33 bytes)"

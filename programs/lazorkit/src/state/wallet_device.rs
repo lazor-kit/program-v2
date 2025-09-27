@@ -1,5 +1,6 @@
 use crate::{
-    constants::PASSKEY_PUBLIC_KEY_SIZE, error::LazorKitError, state::BpfWriter, utils::PasskeyExt as _, ID,
+    constants::PASSKEY_PUBLIC_KEY_SIZE, error::LazorKitError, state::BpfWriter,
+    utils::PasskeyExt as _, ID,
 };
 use anchor_lang::{
     prelude::*,
@@ -21,8 +22,6 @@ use anchor_lang::{
 pub struct WalletDevice {
     /// Bump seed for PDA derivation and verification (1 byte)
     pub bump: u8,
-    /// Padding to align next fields (7 bytes)
-    pub _padding: [u8; 7],
     /// Public key of the WebAuthn passkey for transaction authorization (33 bytes)
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     /// Smart wallet address this device is associated with (32 bytes)
@@ -37,11 +36,13 @@ impl WalletDevice {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_device";
 
     fn from<'info>(x: &'info AccountInfo<'info>) -> Result<Account<'info, Self>> {
-        Account::try_from_unchecked(x).map_err(|_| crate::error::LazorKitError::InvalidAccountData.into())
+        Account::try_from_unchecked(x)
+            .map_err(|_| crate::error::LazorKitError::InvalidAccountData.into())
     }
 
     fn serialize(&self, info: AccountInfo) -> anchor_lang::Result<()> {
-        let dst: &mut [u8] = &mut info.try_borrow_mut_data()
+        let dst: &mut [u8] = &mut info
+            .try_borrow_mut_data()
             .map_err(|_| crate::error::LazorKitError::InvalidAccountData)?;
         let mut writer: BpfWriter<&mut [u8]> = BpfWriter::new(dst);
         WalletDevice::try_serialize(self, &mut writer)
@@ -62,7 +63,11 @@ impl WalletDevice {
         let a = passkey_public_key.to_hashed_bytes(smart_wallet_address);
         if wallet_device.data_is_empty() {
             // Create the seeds and bump for PDA address calculation
-            let seeds: &[&[u8]] = &[WalletDevice::PREFIX_SEED, smart_wallet_address.as_ref(), a.as_ref()];
+            let seeds: &[&[u8]] = &[
+                WalletDevice::PREFIX_SEED,
+                smart_wallet_address.as_ref(),
+                a.as_ref(),
+            ];
             let (_, bump) = Pubkey::find_program_address(&seeds, &ID);
             let seeds_signer = &mut seeds.to_vec();
             let binding = [bump];
@@ -80,8 +85,11 @@ impl WalletDevice {
                     },
                 )
                 .with_signer(&[seeds_signer]),
-                Rent::get()?.minimum_balance(space.try_into()
-                    .map_err(|_| crate::error::LazorKitError::InvalidAccountData)?),
+                Rent::get()?.minimum_balance(
+                    space
+                        .try_into()
+                        .map_err(|_| crate::error::LazorKitError::InvalidAccountData)?,
+                ),
                 space,
                 &ID,
             )?;
@@ -90,7 +98,6 @@ impl WalletDevice {
 
             auth.set_inner(WalletDevice {
                 bump,
-                _padding: [0u8; 7],
                 passkey_public_key,
                 smart_wallet_address,
                 credential_id,

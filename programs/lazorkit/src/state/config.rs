@@ -15,8 +15,6 @@ use anchor_lang::prelude::*;
 pub struct Config {
     /// Whether the program is currently paused (1 byte)
     pub is_paused: bool,
-    /// Padding to align next fields (7 bytes)
-    pub _padding: [u8; 7],
     /// Fee charged for creating a new smart wallet (in lamports) (8 bytes)
     pub create_smart_wallet_fee: u64,
     /// Fee charged to the fee payer for transactions (in lamports) (8 bytes)

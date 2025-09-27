@@ -51,7 +51,6 @@ pub fn create_smart_wallet(
     // This stores the core wallet state including policy program, nonce, and referral info
     wallet_data.set_inner(SmartWalletConfig {
         bump: ctx.bumps.smart_wallet,
-        _padding: [0u8; 7],
         wallet_id: args.wallet_id,
         last_nonce: 0, // Start with nonce 0 for replay attack prevention
         referral_address: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
@@ -62,7 +61,6 @@ pub fn create_smart_wallet(
     // This stores the WebAuthn passkey data for transaction authentication
     wallet_device.set_inner(WalletDevice {
         bump: ctx.bumps.wallet_device,
-        _padding: [0u8; 7],
         passkey_public_key: args.passkey_public_key,
         smart_wallet_address: ctx.accounts.smart_wallet.key(),
         credential_id: args.credential_id.clone(),

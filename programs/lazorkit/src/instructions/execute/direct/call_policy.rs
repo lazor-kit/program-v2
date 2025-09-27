@@ -46,6 +46,8 @@ pub fn call_policy<'c: 'info, 'info>(
     };
     let policy_accs = &ctx.remaining_accounts[start_idx..];
 
+    msg!("policy_accs: {:?}", policy_accs);
+
     // Step 3: Compute hashes for verification
     let policy_hash = compute_instruction_hash(
         &args.policy_data,
@@ -84,8 +86,10 @@ pub fn call_policy<'c: 'info, 'info>(
     if let Some(new_wallet_device) = args.new_wallet_device {
         // Validate the new passkey format
         require!(
-            new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
-                || new_wallet_device.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
+            new_wallet_device.passkey_public_key[0]
+                == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || new_wallet_device.passkey_public_key[0]
+                    == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
             LazorKitError::InvalidPasskeyFormat
         );
 
@@ -121,7 +125,7 @@ pub fn call_policy<'c: 'info, 'info>(
     )?;
 
     // Step 8: Update wallet state and handle fees
-    ctx.accounts.smart_wallet_config.last_nonce = 
+    ctx.accounts.smart_wallet_config.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
 
     // Handle fee distribution and vault validation

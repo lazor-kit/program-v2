@@ -2701,18 +2701,6 @@ export type Lazorkit = {
             "type": "bool"
           },
           {
-            "name": "padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "createSmartWalletFee",
             "docs": [
               "Fee charged for creating a new smart wallet (in lamports) (8 bytes)"
@@ -3271,18 +3259,6 @@ export type Lazorkit = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "walletId",
             "docs": [
               "Unique identifier for this smart wallet instance (8 bytes)"
@@ -3374,18 +3350,6 @@ export type Lazorkit = {
               "Bump seed for PDA derivation and verification (1 byte)"
             ],
             "type": "u8"
-          },
-          {
-            "name": "padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
           },
           {
             "name": "passkeyPublicKey",
