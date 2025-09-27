@@ -25,12 +25,6 @@ pub fn execute<'c: 'info, 'info>(
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
-    // Basic rate limiting check
-    validation::validate_rate_limit(
-        ctx.accounts.smart_wallet_config.wallet_id,
-        Clock::get()?.slot,
-    )?;
-
     // Step 0.1: Split remaining accounts between policy and CPI instructions
     // The split_index determines where to divide the accounts
     let (policy_accounts, cpi_accounts) =

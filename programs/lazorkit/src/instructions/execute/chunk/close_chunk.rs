@@ -19,11 +19,11 @@ pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
     );
 
     // Check if the chunk session has expired based on timestamp
+    // A chunk is considered expired if it's outside the valid timestamp range
     let now = Clock::get()?.unix_timestamp;
-    require!(
-        chunk.authorized_timestamp < now - crate::security::MAX_SESSION_TTL_SECONDS,
-        LazorKitError::TransactionTooOld
-    );
+    let is_expired = chunk.authorized_timestamp < now - crate::security::TIMESTAMP_PAST_TOLERANCE
+        || chunk.authorized_timestamp > now + crate::security::TIMESTAMP_FUTURE_TOLERANCE;
+    require!(is_expired, LazorKitError::TransactionTooOld);
 
     msg!("Closing expired chunk: wallet={}, nonce={}, expired_at={}", 
          ctx.accounts.smart_wallet.key(), 
