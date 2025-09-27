@@ -2695,18 +2695,6 @@
             "type": "bool"
           },
           {
-            "name": "_padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "create_smart_wallet_fee",
             "docs": [
               "Fee charged for creating a new smart wallet (in lamports) (8 bytes)"
@@ -3265,18 +3253,6 @@
             "type": "u8"
           },
           {
-            "name": "_padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "wallet_id",
             "docs": [
               "Unique identifier for this smart wallet instance (8 bytes)"
@@ -3368,18 +3344,6 @@
               "Bump seed for PDA derivation and verification (1 byte)"
             ],
             "type": "u8"
-          },
-          {
-            "name": "_padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
           },
           {
             "name": "passkey_public_key",

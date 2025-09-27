@@ -274,18 +274,6 @@
             "type": "u8"
           },
           {
-            "name": "_padding",
-            "docs": [
-              "Padding to align next fields (7 bytes)"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "passkey_public_key",
             "docs": [
               "Public key of the WebAuthn passkey for transaction authorization (33 bytes)"
