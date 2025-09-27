@@ -16,7 +16,6 @@ use anchor_lang::{
 /// Memory layout optimized for better cache performance:
 /// - Group related fields together
 /// - Align fields to natural boundaries
-/// - Minimize padding
 #[account]
 #[derive(Debug, InitSpace)]
 pub struct WalletDevice {

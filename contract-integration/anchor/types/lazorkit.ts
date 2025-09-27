@@ -2687,8 +2687,7 @@ export type Lazorkit = {
         "",
         "Memory layout optimized for better cache performance:",
         "- Group related fields together",
-        "- Align fields to natural boundaries",
-        "- Minimize padding"
+        "- Align fields to natural boundaries"
       ],
       "type": {
         "kind": "struct",
@@ -3245,8 +3244,7 @@ export type Lazorkit = {
         "",
         "Memory layout optimized for better cache performance:",
         "- Group related fields together",
-        "- Align fields to natural boundaries",
-        "- Minimize padding"
+        "- Align fields to natural boundaries"
       ],
       "type": {
         "kind": "struct",
@@ -3338,8 +3336,7 @@ export type Lazorkit = {
         "",
         "Memory layout optimized for better cache performance:",
         "- Group related fields together",
-        "- Align fields to natural boundaries",
-        "- Minimize padding"
+        "- Align fields to natural boundaries"
       ],
       "type": {
         "kind": "struct",

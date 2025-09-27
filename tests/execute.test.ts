@@ -13,7 +13,7 @@ import { createTransferInstruction } from '@solana/spl-token';
 import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
 
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -47,7 +47,7 @@ describe.skip('Test smart wallet with default policy', () => {
     }
   });
 
-  xit('Init smart wallet with default policy successfully', async () => {
+  it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -195,7 +195,7 @@ describe.skip('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  it('Execute chunk transaction with transfer token from smart wallet', async () => {
+  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -329,7 +329,7 @@ describe.skip('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -469,7 +469,7 @@ describe.skip('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();

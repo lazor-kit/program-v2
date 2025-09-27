@@ -9,7 +9,6 @@ use anchor_lang::prelude::*;
 /// Memory layout optimized for better cache performance:
 /// - Group related fields together
 /// - Align fields to natural boundaries
-/// - Minimize padding
 #[account]
 #[derive(Default, InitSpace)]
 pub struct SmartWalletConfig {

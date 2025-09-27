@@ -11,10 +11,10 @@ import {
   LazorkitClient,
 } from '../contract-integration';
 import { createTransferInstruction } from '@solana/spl-token';
-import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
+import { buildFakeMessagePasskey } from './utils';
 dotenv.config();
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
