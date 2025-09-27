@@ -26,12 +26,8 @@ pub fn execute_chunk(
     let chunk = &mut ctx.accounts.chunk;
 
     // Step 2: Validate session state and authorization
-    // Check if the chunk session has expired based on timestamp
-    let now = Clock::get()?.unix_timestamp;
-    require!(
-        chunk.authorized_timestamp >= now - crate::security::MAX_SESSION_TTL_SECONDS,
-        LazorKitError::TransactionTooOld
-    );
+    // Validate timestamp using standardized validation
+    validation::validate_instruction_timestamp(chunk.authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS)?;
 
     // Verify the chunk belongs to the correct smart wallet
     require!(

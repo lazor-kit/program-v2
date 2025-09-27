@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 /// LazorKit security constants and validation utilities
-/// 
+///
 /// Contains security-related constants and validation functions used throughout
 /// the LazorKit program to ensure safe operation and prevent various attack
 /// vectors including DoS, overflow, and unauthorized access.
@@ -191,8 +191,8 @@ pub mod validation {
         let now = Clock::get()?.unix_timestamp;
         // Use configurable tolerance constants
         require!(
-            timestamp >= now - TIMESTAMP_PAST_TOLERANCE && 
-            timestamp <= now + TIMESTAMP_FUTURE_TOLERANCE,
+            timestamp >= now - TIMESTAMP_PAST_TOLERANCE
+                && timestamp <= now + TIMESTAMP_FUTURE_TOLERANCE,
             LazorKitError::TransactionTooOld
         );
         Ok(())
@@ -213,8 +213,11 @@ pub mod validation {
     /// Validates vault index is within reasonable bounds and not manipulated
     pub fn validate_vault_index_enhanced(vault_index: u8) -> Result<()> {
         // Ensure vault index is within valid range
-        require!(vault_index < MAX_VAULT_SLOTS, LazorKitError::InvalidVaultIndex);
-        
+        require!(
+            vault_index < MAX_VAULT_SLOTS,
+            LazorKitError::InvalidVaultIndex
+        );
+
         // Additional validation: ensure vault index is not obviously manipulated
         // This is a simple check - in production, you might want more sophisticated validation
         Ok(())
@@ -231,8 +234,9 @@ pub mod validation {
     ) -> Result<()> {
         // Validate passkey format
         require!(
-            passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN 
-                || passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
+            passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || passkey_public_key[0]
+                    == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
             LazorKitError::InvalidPasskeyFormat
         );
 
@@ -255,26 +259,6 @@ pub mod validation {
             LazorKitError::InvalidInstructionData
         );
 
-        Ok(())
-    }
-
-    /// Basic rate limiting check to prevent spam attacks
-    /// This is a simple implementation - in production, you might want more sophisticated rate limiting
-    pub fn validate_rate_limit(
-        _wallet_id: u64,
-        current_slot: u64,
-    ) -> Result<()> {
-        // Simple rate limiting based on slot number
-        // In a real implementation, you would track transaction counts per wallet per slot
-        // For now, we'll just ensure the slot is reasonable (not too far in the past)
-        let max_slot_age = 100; // Maximum 100 slots old
-        let current_slot_from_clock = Clock::get()?.slot;
-        
-        require!(
-            current_slot >= current_slot_from_clock.saturating_sub(max_slot_age),
-            LazorKitError::TransactionTooOld
-        );
-        
         Ok(())
     }
 }
