@@ -48,8 +48,6 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         args.cpi_hash,
     )?;
 
-    msg!("Expected message hash: {:?}", expected_message_hash);
-
     // Step 5: Verify WebAuthn signature and message hash
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,

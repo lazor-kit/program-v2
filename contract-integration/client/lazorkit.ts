@@ -238,12 +238,12 @@ export class LazorkitClient {
 
     const accounts = await this.connection.getProgramAccounts(this.programId, {
       dataSlice: {
-        offset: 8,
+        offset: 9,
         length: 33,
       },
       filters: [
         { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
-        { memcmp: { offset: 8, bytes: bs58.encode(passkeyPublicKey) } },
+        { memcmp: { offset: 9, bytes: bs58.encode(passkeyPublicKey) } },
       ],
     });
 
