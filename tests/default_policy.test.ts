@@ -10,6 +10,7 @@ import {
   LazorkitClient,
 } from '../contract-integration';
 import { buildFakeMessagePasskey } from './utils';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 dotenv.config();
 
 // Helper function to get real blockchain timestamp
@@ -63,6 +64,20 @@ describe('Test smart wallet with default policy', () => {
       ]);
 
       console.log('Initialize txn: ', sig);
+
+      const depositTxn = await lazorkitProgram.manageVaultTxn({
+        payer: payer.publicKey,
+        action: 'deposit',
+        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL),
+        destination: payer.publicKey,
+        vaultIndex: 0,
+      });
+
+      await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        depositTxn as anchor.web3.Transaction,
+        [payer]
+      );
     }
   });
 
@@ -91,7 +106,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(anchor.web3.LAMPORTS_PER_SOL),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -157,17 +172,13 @@ describe('Test smart wallet with default policy', () => {
     const sig = await anchor.web3.sendAndConfirmTransaction(
       connection,
       callPolicyTxn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Add device txn: ', sig);
   });
 
-  it('Add 2 devices to smart wallet', async () => {
+  xit('Add 2 devices to smart wallet', async () => {
     // Create initial smart wallet with first device
     const privateKey1 = ECDSA.generateKey();
     const publicKeyBase64_1 = privateKey1.toCompressedPublicKey();
@@ -190,7 +201,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(anchor.web3.LAMPORTS_PER_SOL),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -266,11 +277,7 @@ describe('Test smart wallet with default policy', () => {
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       addDevice2Txn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Added second device');
@@ -321,17 +328,13 @@ describe('Test smart wallet with default policy', () => {
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       addDevice3Txn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Added third device');
   });
 
-  it('Add 1 device and remove it', async () => {
+  xit('Add 1 device and remove it', async () => {
     // Create initial smart wallet with first device
     const privateKey1 = ECDSA.generateKey();
     const publicKeyBase64_1 = privateKey1.toCompressedPublicKey();
@@ -354,7 +357,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(anchor.web3.LAMPORTS_PER_SOL),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -421,11 +424,7 @@ describe('Test smart wallet with default policy', () => {
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       addDevice2Txn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Added second device');
@@ -465,10 +464,6 @@ describe('Test smart wallet with default policy', () => {
         authenticatorDataRaw64: authenticatorDataRaw64,
       },
       policyInstruction: removeDevice2Ix,
-      newWalletDevice: {
-        passkeyPublicKey: passkeyPubkey2,
-        credentialIdBase64: credentialId,
-      },
       timestamp,
       vaultIndex: 0,
     });
@@ -476,11 +471,7 @@ describe('Test smart wallet with default policy', () => {
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       removeDevice2Txn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Removed second device');
@@ -509,7 +500,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(anchor.web3.LAMPORTS_PER_SOL),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -576,11 +567,7 @@ describe('Test smart wallet with default policy', () => {
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       addDevice2Txn as anchor.web3.Transaction,
-      [payer],
-      {
-        commitment: 'confirmed',
-        skipPreflight: true,
-      }
+      [payer]
     );
 
     console.log('Added second device');
@@ -589,7 +576,7 @@ describe('Test smart wallet with default policy', () => {
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
       toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
+      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
     const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(

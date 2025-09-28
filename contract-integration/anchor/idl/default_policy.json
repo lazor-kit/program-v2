@@ -102,7 +102,26 @@
           "name": "smart_wallet"
         },
         {
-          "name": "policy"
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -164,7 +183,7 @@
               },
               {
                 "kind": "account",
-                "path": "wallet_device"
+                "path": "smart_wallet"
               }
             ]
           }
@@ -295,7 +314,7 @@
               },
               {
                 "kind": "account",
-                "path": "wallet_device"
+                "path": "smart_wallet"
               }
             ]
           }

@@ -62,7 +62,7 @@ pub struct DestroyPolicy<'info> {
 
     #[account(
         mut,
-        seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
+        seeds = [Policy::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
         constraint = policy.list_wallet_device.contains(&wallet_device.key()) @ PolicyError::Unauthorized,

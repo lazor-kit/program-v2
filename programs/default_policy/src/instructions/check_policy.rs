@@ -55,6 +55,8 @@ pub struct CheckPolicy<'info> {
 
     #[account(
         owner = ID,
+        seeds = [Policy::PREFIX_SEED, smart_wallet.key().as_ref()],
+        bump,
         constraint = policy.list_wallet_device.contains(&wallet_device.key()) @ PolicyError::Unauthorized,
         constraint = policy.smart_wallet == smart_wallet.key() @ PolicyError::Unauthorized,
     )]
