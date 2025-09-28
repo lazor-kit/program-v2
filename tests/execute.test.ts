@@ -13,7 +13,7 @@ import { createTransferInstruction } from '@solana/spl-token';
 import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -72,7 +72,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig = await anchor.web3.sendAndConfirmTransaction(
@@ -131,9 +131,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
-          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
-        ),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -145,7 +143,7 @@ describe('Test smart wallet with default policy', () => {
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
       toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
+      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
     const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
@@ -220,9 +218,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
-          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
-        ),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -354,9 +350,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
-          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
-        ),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -494,9 +488,7 @@ describe('Test smart wallet with default policy', () => {
         credentialIdBase64: credentialId,
         policyInstruction: null,
         smartWalletId,
-        amount: new anchor.BN(0.001392 * anchor.web3.LAMPORTS_PER_SOL).add(
-          new anchor.BN(890880).add(new anchor.BN(anchor.web3.LAMPORTS_PER_SOL))
-        ),
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(

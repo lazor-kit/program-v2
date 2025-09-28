@@ -15,6 +15,14 @@ build-and-sync:
 build:
 	anchor build
 
+init-idl:
+	anchor idl init -f ./target/idl/lazorkit.json Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh
+	anchor idl init -f ./target/idl/default_policy.json BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7
+
+upgrade-idl:
+	anchor idl upgrade Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh -f ./target/idl/lazorkit.json
+	anchor idl upgrade BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7 -f ./target/idl/default_policy.json
+
 deploy: 
 	anchor deploy
 

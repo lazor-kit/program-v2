@@ -108,7 +108,26 @@ export type DefaultPolicy = {
           "name": "smartWallet"
         },
         {
-          "name": "policy"
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -170,7 +189,7 @@ export type DefaultPolicy = {
               },
               {
                 "kind": "account",
-                "path": "walletDevice"
+                "path": "smartWallet"
               }
             ]
           }
@@ -301,7 +320,7 @@ export type DefaultPolicy = {
               },
               {
                 "kind": "account",
-                "path": "walletDevice"
+                "path": "smartWallet"
               }
             ]
           }
