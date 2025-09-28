@@ -114,6 +114,8 @@ pub struct CallPolicyArgs {
     pub vault_index: u8,
     /// Unix timestamp for message verification
     pub timestamp: i64,
+    /// Whether the smart wallet is the signer
+    pub smart_wallet_is_signer: bool,
 }
 
 /// Arguments for creating a chunk buffer for large transactions

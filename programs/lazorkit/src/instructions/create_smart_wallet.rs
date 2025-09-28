@@ -29,8 +29,9 @@ pub fn create_smart_wallet(
 
     // Validate passkey format - must be a valid compressed public key
     require!(
-        args.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN 
-            || args.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
+        args.passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+            || args.passkey_public_key[0]
+                == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
         LazorKitError::InvalidPasskeyFormat
     );
 

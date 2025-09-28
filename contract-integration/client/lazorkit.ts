@@ -361,6 +361,7 @@ export class LazorkitClient {
         smartWallet,
         args.newWalletDevice.passkeyPublicKey
       );
+
       remaining.push({
         pubkey: newWalletDevice,
         isWritable: true,
@@ -836,6 +837,7 @@ export class LazorkitClient {
         vaultIndex: getVaultIndex(params.vaultIndex, () =>
           this.generateVaultIndex()
         ),
+        smartWalletIsSigner: params.smartWalletIsSigner === true,
       },
       params.policyInstruction
     );

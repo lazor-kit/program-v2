@@ -1,11 +1,13 @@
 use anchor_lang::prelude::*;
 
+use crate::constants::SMART_WALLET_SEED;
 use crate::instructions::{Args as _, CallPolicyArgs};
 use crate::security::validation;
 use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, SmartWalletConfig, WalletDevice};
 use crate::utils::{
     check_whitelist, compute_call_policy_message_hash, compute_instruction_hash, execute_cpi,
-    get_wallet_device_signer, verify_authorization_hash,
+    execute_cpi_multiple_signers, get_wallet_device_signer, verify_authorization_hash, PasskeyExt,
+    PdaSigner,
 };
 use crate::{error::LazorKitError, ID};
 
@@ -45,8 +47,6 @@ pub fn call_policy<'c: 'info, 'info>(
         0
     };
     let policy_accs = &ctx.remaining_accounts[start_idx..];
-
-    msg!("policy_accs: {:?}", policy_accs);
 
     // Step 3: Compute hashes for verification
     let policy_hash = compute_instruction_hash(
@@ -117,12 +117,32 @@ pub fn call_policy<'c: 'info, 'info>(
     }
 
     // Step 7: Execute the policy program instruction
-    execute_cpi(
-        policy_accs,
-        &args.policy_data,
-        &ctx.accounts.policy_program,
-        policy_signer,
-    )?;
+    if !args.smart_wallet_is_signer {
+        execute_cpi(
+            policy_accs,
+            &args.policy_data,
+            &ctx.accounts.policy_program,
+            policy_signer,
+        )?;
+    } else {
+        let smart_wallet_signer = PdaSigner {
+            seeds: vec![
+                SMART_WALLET_SEED.to_vec(),
+                ctx.accounts
+                    .smart_wallet_config
+                    .wallet_id
+                    .to_le_bytes()
+                    .to_vec(),
+            ],
+            bump: ctx.accounts.smart_wallet_config.bump,
+        };
+        execute_cpi_multiple_signers(
+            policy_accs,
+            &args.policy_data,
+            &ctx.accounts.policy_program,
+            &[smart_wallet_signer, policy_signer],
+        )?;
+    }
 
     // Step 8: Update wallet state and handle fees
     ctx.accounts.smart_wallet_config.last_nonce =
@@ -180,7 +200,11 @@ pub struct CallPolicy<'info> {
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
     pub lazorkit_vault: SystemAccount<'info>,
 
-    #[account(owner = ID)]
+    #[account(
+        owner = ID,
+        seeds = [WalletDevice::PREFIX_SEED, smart_wallet.key().as_ref(), args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()],
+        bump = wallet_device.bump,
+    )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
     /// CHECK: executable policy program

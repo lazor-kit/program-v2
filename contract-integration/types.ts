@@ -149,6 +149,7 @@ export interface CallPolicyParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction;
   timestamp: anchor.BN;
   newWalletDevice?: NewPasskeyDevice | null;
+  smartWalletIsSigner?: boolean;
 }
 
 export interface ChangePolicyParams extends AuthParams {

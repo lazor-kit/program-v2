@@ -221,7 +221,37 @@
           }
         },
         {
-          "name": "wallet_device"
+          "name": "wallet_device",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
         },
         {
           "name": "policy_program"
@@ -2502,6 +2532,13 @@
               "Unix timestamp for message verification"
             ],
             "type": "i64"
+          },
+          {
+            "name": "smart_wallet_is_signer",
+            "docs": [
+              "Whether the smart wallet is the signer"
+            ],
+            "type": "bool"
           }
         ]
       }

@@ -6,4 +6,8 @@ pub enum PolicyError {
     InvalidPasskey,
     #[msg("Unauthorized to access smart wallet")]
     Unauthorized,
+    #[msg("Wallet device already in policy")]
+    WalletDeviceAlreadyInPolicy,
+    #[msg("Wallet device not in policy")]
+    WalletDeviceNotInPolicy,
 }
