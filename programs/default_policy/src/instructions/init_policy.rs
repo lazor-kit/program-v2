@@ -45,7 +45,9 @@ pub fn init_policy(
     let policy = &mut ctx.accounts.policy;
 
     policy.smart_wallet = ctx.accounts.smart_wallet.key();
-    policy.wallet_device = ctx.accounts.wallet_device.key();
+    policy
+        .list_wallet_device
+        .push(ctx.accounts.wallet_device.key());
 
     Ok(())
 }
@@ -64,7 +66,7 @@ pub struct InitPolicy<'info> {
         init,
         payer = smart_wallet,
         space = 8 + Policy::INIT_SPACE,
-        seeds = [Policy::PREFIX_SEED, wallet_device.key().as_ref()],
+        seeds = [Policy::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
     )]
     pub policy: Account<'info, Policy>,

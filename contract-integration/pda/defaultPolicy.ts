@@ -5,10 +5,10 @@ export const POLICY_SEED = Buffer.from('policy');
 
 export function derivePolicyPda(
   programId: PublicKey,
-  walletDevice: PublicKey
+  smartWallet: PublicKey
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [POLICY_SEED, walletDevice.toBuffer()],
+    [POLICY_SEED, smartWallet.toBuffer()],
     programId
   )[0];
 }

@@ -26,8 +26,8 @@ export class DefaultPolicyClient {
     this.programId = this.program.programId;
   }
 
-  policyPda(walletDevice: PublicKey): PublicKey {
-    return derivePolicyPda(this.programId, walletDevice);
+  policyPda(smartWallet: PublicKey): PublicKey {
+    return derivePolicyPda(this.programId, smartWallet);
   }
 
   async buildInitPolicyIx(
@@ -41,7 +41,7 @@ export class DefaultPolicyClient {
       .accountsPartial({
         smartWallet,
         walletDevice,
-        policy: this.policyPda(walletDevice),
+        policy: this.policyPda(smartWallet),
         systemProgram: SystemProgram.programId,
       })
       .instruction();
@@ -56,7 +56,7 @@ export class DefaultPolicyClient {
     return await this.program.methods
       .checkPolicy(walletId, passkeyPublicKey)
       .accountsPartial({
-        policy: this.policyPda(walletDevice),
+        policy: this.policyPda(smartWallet),
         smartWallet,
         walletDevice,
       })
@@ -64,19 +64,55 @@ export class DefaultPolicyClient {
   }
 
   async buildAddDeviceIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
+    newPasskeyPublicKey: number[],
     smartWallet: PublicKey,
     walletDevice: PublicKey,
     newWalletDevice: PublicKey
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .addDevice()
+      .addDevice(walletId, passkeyPublicKey, newPasskeyPublicKey)
       .accountsPartial({
         smartWallet,
         walletDevice,
         newWalletDevice,
-        policy: this.policyPda(walletDevice),
-        newPolicy: this.policyPda(newWalletDevice),
-        systemProgram: SystemProgram.programId,
+        policy: this.policyPda(smartWallet),
+      })
+      .instruction();
+  }
+
+  async buildRemoveDeviceIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
+    removePasskeyPublicKey: number[],
+    smartWallet: PublicKey,
+    walletDevice: PublicKey,
+    rmWalletDevice: PublicKey
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .removeDevice(walletId, passkeyPublicKey, removePasskeyPublicKey)
+      .accountsPartial({
+        smartWallet,
+        walletDevice,
+        rmWalletDevice,
+        policy: this.policyPda(smartWallet),
+      })
+      .instruction();
+  }
+
+  async buildDestroyPolicyIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
+    smartWallet: PublicKey,
+    walletDevice: PublicKey
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .destroyPolicy(walletId, passkeyPublicKey)
+      .accountsPartial({
+        smartWallet,
+        walletDevice,
+        policy: this.policyPda(smartWallet),
       })
       .instruction();
   }

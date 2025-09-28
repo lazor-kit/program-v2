@@ -227,7 +227,37 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "walletDevice"
+          "name": "walletDevice",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              },
+              {
+                "kind": "arg",
+                "path": "args.passkey_public_key.to_hashed_bytes(smart_wallet"
+              }
+            ]
+          }
         },
         {
           "name": "policyProgram"
@@ -2508,6 +2538,13 @@ export type Lazorkit = {
               "Unix timestamp for message verification"
             ],
             "type": "i64"
+          },
+          {
+            "name": "smartWalletIsSigner",
+            "docs": [
+              "Whether the smart wallet is the signer"
+            ],
+            "type": "bool"
           }
         ]
       }

@@ -28,8 +28,7 @@ export type DefaultPolicy = {
       "accounts": [
         {
           "name": "smartWallet",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "walletDevice",
@@ -41,28 +40,6 @@ export type DefaultPolicy = {
         },
         {
           "name": "policy",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "walletDevice"
-              }
-            ]
-          }
-        },
-        {
-          "name": "newPolicy",
           "writable": true,
           "pda": {
             "seeds": [
@@ -79,17 +56,36 @@ export type DefaultPolicy = {
               },
               {
                 "kind": "account",
-                "path": "newWalletDevice"
+                "path": "smartWallet"
               }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
             ]
           }
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "newPasskeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
         }
-      ],
-      "args": []
+      ]
     },
     {
       "name": "checkPolicy",
@@ -113,6 +109,71 @@ export type DefaultPolicy = {
         },
         {
           "name": "policy"
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "destroyPolicy",
+      "discriminator": [
+        254,
+        234,
+        136,
+        124,
+        90,
+        28,
+        94,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletDevice",
+          "signer": true
+        },
+        {
+          "name": "newWalletDevice",
+          "writable": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "walletDevice"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -171,7 +232,7 @@ export type DefaultPolicy = {
               },
               {
                 "kind": "account",
-                "path": "walletDevice"
+                "path": "smartWallet"
               }
             ]
           }
@@ -188,6 +249,80 @@ export type DefaultPolicy = {
         },
         {
           "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "removeDevice",
+      "discriminator": [
+        42,
+        19,
+        175,
+        5,
+        67,
+        100,
+        238,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletDevice",
+          "signer": true
+        },
+        {
+          "name": "rmWalletDevice",
+          "writable": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "walletDevice"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "removePasskeyPublicKey",
           "type": {
             "array": [
               "u8",
@@ -236,6 +371,16 @@ export type DefaultPolicy = {
       "code": 6001,
       "name": "unauthorized",
       "msg": "Unauthorized to access smart wallet"
+    },
+    {
+      "code": 6002,
+      "name": "walletDeviceAlreadyInPolicy",
+      "msg": "Wallet device already in policy"
+    },
+    {
+      "code": 6003,
+      "name": "walletDeviceNotInPolicy",
+      "msg": "Wallet device not in policy"
     }
   ],
   "types": [
@@ -249,8 +394,13 @@ export type DefaultPolicy = {
             "type": "pubkey"
           },
           {
-            "name": "walletDevice",
-            "type": "pubkey"
+            "name": "listWalletDevice",
+            "docs": [
+              "List of wallet devices associated with the smart wallet"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
           }
         ]
       }

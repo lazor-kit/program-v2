@@ -189,6 +189,7 @@ pub mod validation {
     /// Uses consistent time window across all operations
     pub fn validate_instruction_timestamp(timestamp: i64) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
+
         // Use configurable tolerance constants
         require!(
             timestamp >= now - TIMESTAMP_PAST_TOLERANCE

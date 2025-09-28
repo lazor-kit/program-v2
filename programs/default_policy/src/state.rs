@@ -4,7 +4,9 @@ use anchor_lang::prelude::*;
 #[derive(Debug, InitSpace)]
 pub struct Policy {
     pub smart_wallet: Pubkey,
-    pub wallet_device: Pubkey,
+    /// List of wallet devices associated with the smart wallet
+    #[max_len(10)]
+    pub list_wallet_device: Vec<Pubkey>,
 }
 
 impl Policy {

@@ -22,8 +22,7 @@
       "accounts": [
         {
           "name": "smart_wallet",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "wallet_device",
@@ -35,28 +34,6 @@
         },
         {
           "name": "policy",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_device"
-              }
-            ]
-          }
-        },
-        {
-          "name": "new_policy",
           "writable": true,
           "pda": {
             "seeds": [
@@ -73,17 +50,36 @@
               },
               {
                 "kind": "account",
-                "path": "new_wallet_device"
+                "path": "smart_wallet"
               }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_id",
+          "type": "u64"
+        },
+        {
+          "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
             ]
           }
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "new_passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
         }
-      ],
-      "args": []
+      ]
     },
     {
       "name": "check_policy",
@@ -107,6 +103,71 @@
         },
         {
           "name": "policy"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_id",
+          "type": "u64"
+        },
+        {
+          "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "destroy_policy",
+      "discriminator": [
+        254,
+        234,
+        136,
+        124,
+        90,
+        28,
+        94,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_device",
+          "signer": true
+        },
+        {
+          "name": "new_wallet_device",
+          "writable": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_device"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -165,7 +226,7 @@
               },
               {
                 "kind": "account",
-                "path": "wallet_device"
+                "path": "smart_wallet"
               }
             ]
           }
@@ -182,6 +243,80 @@
         },
         {
           "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "remove_device",
+      "discriminator": [
+        42,
+        19,
+        175,
+        5,
+        67,
+        100,
+        238,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_device",
+          "signer": true
+        },
+        {
+          "name": "rm_wallet_device",
+          "writable": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_device"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_id",
+          "type": "u64"
+        },
+        {
+          "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "remove_passkey_public_key",
           "type": {
             "array": [
               "u8",
@@ -230,6 +365,16 @@
       "code": 6001,
       "name": "Unauthorized",
       "msg": "Unauthorized to access smart wallet"
+    },
+    {
+      "code": 6002,
+      "name": "WalletDeviceAlreadyInPolicy",
+      "msg": "Wallet device already in policy"
+    },
+    {
+      "code": 6003,
+      "name": "WalletDeviceNotInPolicy",
+      "msg": "Wallet device not in policy"
     }
   ],
   "types": [
@@ -243,8 +388,13 @@
             "type": "pubkey"
           },
           {
-            "name": "wallet_device",
-            "type": "pubkey"
+            "name": "list_wallet_device",
+            "docs": [
+              "List of wallet devices associated with the smart wallet"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
           }
         ]
       }

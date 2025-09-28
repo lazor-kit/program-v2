@@ -265,14 +265,10 @@ export function buildCallPolicyMessage(
   const timestampBuffer = Buffer.alloc(8);
   timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
 
-  // Empty CPI hash for call policy (32 zero bytes)
-  const emptyCpiHash = new Uint8Array(32);
-
   const finalData = Buffer.concat([
     nonceBuffer,
     timestampBuffer,
     Buffer.from(policyHash),
-    Buffer.from(emptyCpiHash),
   ]);
 
   const dataHash = computeHash(finalData);
