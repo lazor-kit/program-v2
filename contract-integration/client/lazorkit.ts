@@ -259,6 +259,54 @@ export class LazorkitClient {
     };
   }
 
+  /**
+   * Find smart wallet by credential ID
+   */
+  async getSmartWalletByCredentialId(credentialId: string): Promise<{
+    smartWallet: PublicKey | null;
+    smartWalletAuthenticator: PublicKey | null;
+    passkeyPubkey: string;
+  }> {
+    const discriminator = LazorkitIdl.accounts.find(
+      (a: any) => a.name === 'WalletDevice'
+    )!.discriminator;
+
+    // Convert credential_id to base64 buffer
+    const credentialIdBuffer = Buffer.from(credentialId, 'base64');
+
+    const accounts = await this.connection.getProgramAccounts(this.programId, {
+      dataSlice: {
+        offset: 9 + 33 + 32 + 4,
+        length: credentialIdBuffer.length,
+      },
+      filters: [
+        { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
+        {
+          memcmp: {
+            offset: 9 + 33 + 32 + 4,
+            bytes: bs58.encode(credentialIdBuffer),
+          },
+        },
+      ],
+    });
+
+    if (accounts.length === 0) {
+      return {
+        smartWalletAuthenticator: null,
+        smartWallet: null,
+        passkeyPubkey: '',
+      };
+    }
+
+    const smartWalletData = await this.getWalletDeviceData(accounts[0].pubkey);
+
+    return {
+      smartWalletAuthenticator: accounts[0].pubkey,
+      smartWallet: smartWalletData.smartWalletAddress,
+      passkeyPubkey: bs58.encode(smartWalletData.passkeyPublicKey),
+    };
+  }
+
   // ============================================================================
   // Low-Level Instruction Builders
   // ============================================================================

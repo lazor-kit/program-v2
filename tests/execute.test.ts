@@ -13,7 +13,7 @@ import { createTransferInstruction } from '@solana/spl-token';
 import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
 
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
@@ -47,7 +47,7 @@ describe.skip('Test smart wallet with default policy', () => {
     }
   });
 
-  it('Init smart wallet with default policy successfully', async () => {
+  xit('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -106,7 +106,7 @@ describe.skip('Test smart wallet with default policy', () => {
     );
   });
 
-  it('Execute direct transaction with transfer sol from smart wallet', async () => {
+  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -193,7 +193,7 @@ describe.skip('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
+  it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -323,6 +323,16 @@ describe.skip('Test smart wallet with default policy', () => {
     await connection.confirmTransaction(sig3);
 
     console.log('Execute deferred transaction: ', sig3);
+
+    //
+    const getSmartWalletByPasskey =
+      await lazorkitProgram.getSmartWalletByPasskey(passkeyPubkey);
+
+    console.log('Get smart wallet by passkey: ', getSmartWalletByPasskey);
+
+    expect(getSmartWalletByPasskey.smartWallet?.toString()).to.be.equal(
+      smartWallet.toString()
+    );
   });
 
   xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {

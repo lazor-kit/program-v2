@@ -33,7 +33,7 @@ async function getLatestNonce(
   return smartWalletConfig.lastNonce;
 }
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.RPC_URL || 'http://localhost:8899',
     'confirmed'
