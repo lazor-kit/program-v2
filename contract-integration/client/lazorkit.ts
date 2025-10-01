@@ -238,12 +238,12 @@ export class LazorkitClient {
 
     const accounts = await this.connection.getProgramAccounts(this.programId, {
       dataSlice: {
-        offset: 9,
-        length: 33,
+        offset: 8 + 1, // offset: DISCRIMINATOR + BUMPS
+        length: 33, // length: PASSKEY_PUBLIC_KEY
       },
       filters: [
         { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
-        { memcmp: { offset: 9, bytes: bs58.encode(passkeyPublicKey) } },
+        { memcmp: { offset: 8 + 1, bytes: bs58.encode(passkeyPublicKey) } },
       ],
     });
 
@@ -276,14 +276,14 @@ export class LazorkitClient {
 
     const accounts = await this.connection.getProgramAccounts(this.programId, {
       dataSlice: {
-        offset: 9 + 33 + 32 + 4,
+        offset: 8 + 1 + 33 + 32 + 4, // offset: DISCRIMINATOR + BUMPS + PASSKEY_PUBLIC_KEY + SMART_WALLET_ADDRESS + VECTOR_LENGTH_OFFSET
         length: credentialIdBuffer.length,
       },
       filters: [
         { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
         {
           memcmp: {
-            offset: 9 + 33 + 32 + 4,
+            offset: 8 + 1 + 33 + 32 + 4, // offset: DISCRIMINATOR + BUMPS + PASSKEY_PUBLIC_KEY + SMART_WALLET_ADDRESS + VECTOR_LENGTH_OFFSET
             bytes: bs58.encode(credentialIdBuffer),
           },
         },
