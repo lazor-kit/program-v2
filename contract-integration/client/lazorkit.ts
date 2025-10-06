@@ -540,7 +540,7 @@ export class LazorkitClient {
       cfg.lastNonce.sub(new BN(1))
     );
 
-    const vaultIndex = await this.getChunkData(chunk).then((d) => d.vaultIndex);
+    const chunkData = await this.getChunkData(chunk);
 
     // Prepare CPI data and split indices
     const instructionDataList = cpiInstructions.map((ix) =>
@@ -566,9 +566,9 @@ export class LazorkitClient {
         smartWallet,
         smartWalletConfig: this.getSmartWalletConfigDataPubkey(smartWallet),
         referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVaultPubkey(vaultIndex), // Will be updated based on session
+        lazorkitVault: this.getLazorkitVaultPubkey(chunkData.vaultIndex), // Will be updated based on session
         chunk,
-        sessionRefund: payer,
+        sessionRefund: chunkData.rentRefundAddress,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(allAccountMetas)
