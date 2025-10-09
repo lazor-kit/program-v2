@@ -155,9 +155,9 @@ export class LazorkitClient {
   /**
    * Gets the referral account for a smart wallet
    */
-  private async getReferralAccount(smartWallet: PublicKey): Promise<PublicKey> {
-    const smartWalletConfig = await this.getWalletStateData(smartWallet);
-    return smartWalletConfig.referralAddress;
+  private async getReferralAccount(walletId: BN): Promise<PublicKey> {
+    const smartWalletConfig = await this.getWalletStateData(walletId);
+    return smartWalletConfig.referral;
   }
 
   /**
@@ -198,8 +198,8 @@ export class LazorkitClient {
   /**
    * Fetches smart wallet data for a given smart wallet
    */
-  async getWalletStateData(smartWallet: PublicKey) {
-    const pda = this.getWalletStatePubkey(smartWallet);
+  async getWalletStateData(walletId: BN) {
+    const pda = this.getWalletStatePubkey(walletId);
     return await this.program.account.walletState.fetch(pda);
   }
 
@@ -331,8 +331,6 @@ export class LazorkitClient {
     policyInstruction: TransactionInstruction,
     args: types.CreateSmartWalletArgs
   ): Promise<TransactionInstruction> {
-    console.log(args);
-
     return await this.program.methods
       .createSmartWallet(args)
       .accountsPartial({
@@ -356,6 +354,7 @@ export class LazorkitClient {
   async buildExecuteIns(
     payer: PublicKey,
     smartWallet: PublicKey,
+    smartWalletId: BN,
     args: types.ExecuteArgs,
     policyInstruction: TransactionInstruction,
     cpiInstruction: TransactionInstruction
@@ -365,10 +364,10 @@ export class LazorkitClient {
       .accountsPartial({
         payer,
         smartWallet,
-        smartWalletConfig: this.getWalletStatePubkey(smartWallet),
-        referral: await this.getReferralAccount(smartWallet),
+        walletState: this.getWalletStatePubkey(smartWalletId),
+        referral: await this.getReferralAccount(smartWalletId),
         lazorkitVault: this.getLazorkitVaultPubkey(args.vaultIndex),
-        walletDevice: this.getWalletDevicePubkey(
+        walletSigner: this.getWalletDevicePubkey(
           smartWallet,
           args.passkeyPublicKey
         ),
@@ -728,7 +727,6 @@ export class LazorkitClient {
     const credentialHash = Array.from(
       new Uint8Array(require('js-sha256').arrayBuffer(credentialId))
     );
-    console.log(credentialHash);
 
     let policyInstruction = await this.defaultPolicyProgram.buildInitPolicyIx(
       params.smartWalletId,
@@ -788,18 +786,31 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const smartWalletId = await this.getWalletStateData(
-      params.smartWallet
-    ).then((d) => d.walletId);
+    const walletStateData = await this.getWalletStateData(params.smartWalletId);
+
+    const smartWalletId = walletStateData.walletId;
+
+    const credentialHash = walletStateData.devices.find((device) =>
+      device.passkeyPubkey.every(
+        (byte, index) =>
+          byte === params.passkeySignature.passkeyPublicKey[index]
+      )
+    )?.credentialHash;
+
+    const walletDevice = this.getWalletDevicePubkey(
+      params.smartWallet,
+      params.passkeySignature.passkeyPublicKey
+    );
+
+    console.log('walletDevice', walletDevice.toString());
 
     let policyInstruction = await this.defaultPolicyProgram.buildCheckPolicyIx(
       smartWalletId,
       params.passkeySignature.passkeyPublicKey,
-      this.getWalletDevicePubkey(
-        params.smartWallet,
-        params.passkeySignature.passkeyPublicKey
-      ),
-      params.smartWallet
+      walletDevice,
+      params.smartWallet,
+      credentialHash,
+      walletStateData.policyData
     );
 
     if (params.policyInstruction) {
@@ -813,6 +824,7 @@ export class LazorkitClient {
     const execInstruction = await this.buildExecuteIns(
       params.payer,
       params.smartWallet,
+      smartWalletId,
       {
         ...signatureArgs,
         verifyInstructionIndex: calculateVerifyInstructionIndex(
@@ -830,6 +842,8 @@ export class LazorkitClient {
       policyInstruction,
       params.cpiInstruction
     );
+
+    console.log(1);
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
       execInstruction,

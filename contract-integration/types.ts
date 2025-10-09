@@ -144,6 +144,7 @@ export interface ExecuteParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction | null;
   cpiInstruction: anchor.web3.TransactionInstruction;
   timestamp: anchor.BN;
+  smartWalletId: anchor.BN;
 }
 
 export interface CallPolicyParams extends AuthParams {

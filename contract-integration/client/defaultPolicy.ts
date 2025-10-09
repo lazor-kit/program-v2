@@ -39,28 +39,29 @@ export class DefaultPolicyClient {
   ): Promise<TransactionInstruction> {
     return await this.program.methods
       .initPolicy(walletId, passkeyPublicKey, credentialHash)
-      .accounts({
+      .accountsPartial({
         smartWallet,
         walletState,
       })
       .instruction();
   }
 
-  // async buildCheckPolicyIx(
-  //   walletId: anchor.BN,
-  //   passkeyPublicKey: number[],
-  //   walletDevice: PublicKey,
-  //   smartWallet: PublicKey
-  // ): Promise<TransactionInstruction> {
-  //   return await this.program.methods
-  //     .checkPolicy(walletId, passkeyPublicKey)
-  //     .accountsPartial({
-  //       policy: this.policyPda(smartWallet),
-  //       smartWallet,
-  //       walletDevice,
-  //     })
-  //     .instruction();
-  // }
+  async buildCheckPolicyIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
+    walletDevice: PublicKey,
+    smartWallet: PublicKey,
+    credentialHash: number[],
+    policyData: Buffer<ArrayBufferLike>
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .checkPolicy(walletId, passkeyPublicKey, credentialHash, policyData)
+      .accountsPartial({
+        smartWallet,
+        walletDevice,
+      })
+      .instruction();
+  }
 
   // async buildAddDeviceIx(
   //   walletId: anchor.BN,

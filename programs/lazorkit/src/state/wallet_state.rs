@@ -25,7 +25,7 @@ impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 }
 
-#[derive(Debug, InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
+#[derive(Debug, InitSpace, AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub struct DeviceSlot {
     pub passkey_pubkey: [u8; PASSKEY_PUBLIC_KEY_SIZE], // secp256r1 compressed
     pub credential_hash: [u8; 32],                     // blake3(credential_id) | 0 if not used

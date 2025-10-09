@@ -8,6 +8,56 @@
   },
   "instructions": [
     {
+      "name": "check_policy",
+      "discriminator": [
+        28,
+        88,
+        170,
+        179,
+        239,
+        136,
+        25,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "wallet_device",
+          "signer": true
+        },
+        {
+          "name": "smart_wallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_id",
+          "type": "u64"
+        },
+        {
+          "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credential_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policy_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "init_policy",
       "discriminator": [
         45,

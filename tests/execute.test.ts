@@ -115,7 +115,7 @@ describe('Test smart wallet with default policy', () => {
     // );
   });
 
-  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
+  it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -127,6 +127,12 @@ describe('Test smart wallet with default policy', () => {
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
     const credentialId = base64.encode(Buffer.from('testing')); // random string
+
+    const credentialHash = Array.from(
+      new Uint8Array(
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId))
+      )
+    );
 
     const walletDevice = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
@@ -149,6 +155,10 @@ describe('Test smart wallet with default policy', () => {
       [payer]
     );
 
+    const walletStateData = await lazorkitProgram.getWalletStateData(
+      smartWalletId
+    );
+
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
       toPubkey: anchor.web3.Keypair.generate().publicKey,
@@ -159,7 +169,9 @@ describe('Test smart wallet with default policy', () => {
       smartWalletId,
       passkeyPubkey,
       walletDevice,
-      smartWallet
+      smartWallet,
+      credentialHash,
+      walletStateData.policyData
     );
 
     const timestamp = await getBlockchainTimestamp(connection);
@@ -191,6 +203,7 @@ describe('Test smart wallet with default policy', () => {
       cpiInstruction: transferFromSmartWalletIns,
       vaultIndex: 0,
       timestamp,
+      smartWalletId,
     });
 
     const sig2 = await anchor.web3.sendAndConfirmTransaction(

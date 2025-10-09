@@ -279,23 +279,6 @@ fn verify_secp_data(data: &[u8], public_key: &[u8], signature: &[u8], message: &
         && data[msg_range] == message[..]
 }
 
-/// Extension trait for passkey operations
-pub trait PasskeyExt {
-    fn to_hashed_bytes(&self, wallet: Pubkey) -> [u8; 32];
-}
-
-impl PasskeyExt for [u8; PASSKEY_PUBLIC_KEY_SIZE] {
-    #[inline]
-    fn to_hashed_bytes(&self, wallet: Pubkey) -> [u8; 32] {
-        // Combine passkey public key with wallet address for unique hashing
-        let mut buf = [0u8; 65];
-        buf[..SECP_PUBKEY_SIZE as usize].copy_from_slice(self);
-        buf[SECP_PUBKEY_SIZE as usize..].copy_from_slice(&wallet.to_bytes());
-        // Hash the combined data to create a unique identifier
-        hash(&buf).to_bytes()
-    }
-}
-
 /// Helper to get sighash for anchor instructions
 pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     let preimage = format!("{}:{}", namespace, name);
@@ -304,6 +287,15 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
         &anchor_lang::solana_program::hash::hash(preimage.as_bytes()).to_bytes()[..8],
     );
     out
+}
+
+pub fn hash_seeds(passkey: &[u8; PASSKEY_PUBLIC_KEY_SIZE], wallet: Pubkey) -> [u8; 32] {
+    // Combine passkey public key with wallet address for unique hashing
+    let mut buf = [0u8; 65];
+    buf[..SECP_PUBKEY_SIZE as usize].copy_from_slice(passkey);
+    buf[SECP_PUBKEY_SIZE as usize..].copy_from_slice(&wallet.to_bytes());
+    // Hash the combined data to create a unique identifier
+    hash(&buf).to_bytes()
 }
 
 /// Helper: Get a slice of accounts from remaining_accounts
