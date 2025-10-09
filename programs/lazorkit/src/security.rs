@@ -68,16 +68,6 @@ pub mod validation {
     use super::*;
     use crate::error::LazorKitError;
 
-    /// Validate credential ID size
-    pub fn validate_credential_id(credential_id: &[u8]) -> Result<()> {
-        require!(
-            credential_id.len() <= MAX_CREDENTIAL_ID_SIZE,
-            LazorKitError::CredentialIdTooLarge
-        );
-        require!(!credential_id.is_empty(), LazorKitError::CredentialIdEmpty);
-        Ok(())
-    }
-
     /// Validate policy data size
     pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
         require!(

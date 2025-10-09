@@ -19,9 +19,9 @@ pub struct CreateSmartWalletArgs {
     /// Public key of the WebAuthn passkey for authentication
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     /// Unique credential ID from WebAuthn registration
-    pub credential_id: Vec<u8>,
+    pub credential_hash: [u8; 32],
     /// Policy program initialization data
-    pub policy_data: Vec<u8>,
+    pub init_policy_data: Vec<u8>,
     /// Random wallet ID provided by client for uniqueness
     pub wallet_id: u64,
     /// Initial SOL amount to transfer to the wallet

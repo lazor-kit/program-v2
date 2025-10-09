@@ -8,10 +8,11 @@ dotenv.config();
 
 describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
-    process.env.RPC_URL || 'http://localhost:8899',
+    process.env.CLUSTER != 'localhost'
+      ? process.env.RPC_URL
+      : 'http://localhost:8899',
     'confirmed'
   );
-
   const lazorkitProgram = new LazorkitClient(connection);
 
   const payer = anchor.web3.Keypair.fromSecretKey(

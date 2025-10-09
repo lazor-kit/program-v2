@@ -1,3 +1,5 @@
+use std::vec;
+
 use anchor_lang::{
     prelude::*,
     system_program::{transfer, Transfer},
@@ -8,8 +10,8 @@ use crate::{
     error::LazorKitError,
     instructions::CreateSmartWalletArgs,
     security::validation,
-    state::{Config, PolicyProgramRegistry, SmartWalletConfig, WalletDevice},
-    utils::{execute_cpi, PasskeyExt, PdaSigner},
+    state::{Config, DeviceSlot, PolicyProgramRegistry, WalletState},
+    utils::{execute_cpi, PdaSigner},
     ID,
 };
 
@@ -22,8 +24,7 @@ pub fn create_smart_wallet(
     require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
 
     // Validate all input parameters for security and correctness
-    validation::validate_credential_id(&args.credential_id)?;
-    validation::validate_policy_data(&args.policy_data)?;
+    validation::validate_policy_data(&args.init_policy_data)?;
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
@@ -41,34 +42,40 @@ pub fn create_smart_wallet(
         LazorKitError::InvalidSequenceNumber
     );
 
-    // Step 2: Prepare account references and validate policy program
-    let wallet_data = &mut ctx.accounts.smart_wallet_config;
-    let wallet_device = &mut ctx.accounts.wallet_device;
-
     // Ensure the default policy program is executable (not a data account)
     validation::validate_program_executable(&ctx.accounts.default_policy_program)?;
 
-    // Step 3: Initialize the smart wallet data account
-    // This stores the core wallet state including policy program, nonce, and referral info
-    wallet_data.set_inner(SmartWalletConfig {
+    let wallet_signer = PdaSigner {
+        seeds: vec![
+            SMART_WALLET_SEED.to_vec(),
+            args.wallet_id.to_le_bytes().to_vec(),
+        ],
+        bump: ctx.bumps.smart_wallet,
+    };
+
+    let policy_data = execute_cpi(
+        &ctx.remaining_accounts,
+        &args.init_policy_data.clone(),
+        &ctx.accounts.default_policy_program,
+        wallet_signer.clone(),
+    )?;
+
+    let wallet_state = &mut ctx.accounts.smart_wallet_state;
+    wallet_state.set_inner(WalletState {
         bump: ctx.bumps.smart_wallet,
         wallet_id: args.wallet_id,
-        last_nonce: 0, // Start with nonce 0 for replay attack prevention
-        referral_address: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
-        policy_program_id: ctx.accounts.config.default_policy_program_id,
+        last_nonce: 0,
+        referral: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
+        policy_program: ctx.accounts.default_policy_program.key(),
+        policy_data_len: policy_data.len() as u16,
+        policy_data: policy_data,
+        device_count: 1,
+        devices: vec![DeviceSlot {
+            passkey_pubkey: args.passkey_public_key,
+            credential_hash: args.credential_hash,
+        }],
     });
 
-    // Step 4: Initialize the wallet device (passkey) account
-    // This stores the WebAuthn passkey data for transaction authentication
-    wallet_device.set_inner(WalletDevice {
-        bump: ctx.bumps.wallet_device,
-        passkey_public_key: args.passkey_public_key,
-        smart_wallet_address: ctx.accounts.smart_wallet.key(),
-        credential_id: args.credential_id.clone(),
-    });
-
-    // Step 5: Transfer initial SOL to the smart wallet
-    // This provides the wallet with initial funding for transactions and rent
     transfer(
         CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -79,26 +86,6 @@ pub fn create_smart_wallet(
         ),
         args.amount,
     )?;
-
-    // Step 6: Create PDA signer for policy program initialization
-    // This allows the smart wallet to sign calls to the policy program
-    let wallet_signer = PdaSigner {
-        seeds: vec![
-            SMART_WALLET_SEED.to_vec(),
-            args.wallet_id.to_le_bytes().to_vec(),
-        ],
-        bump: ctx.bumps.smart_wallet,
-    };
-
-    // Step 7: Initialize the policy program for this wallet
-    // This sets up the policy program with any required initial state
-    execute_cpi(
-        &ctx.remaining_accounts,
-        &args.policy_data,
-        &ctx.accounts.default_policy_program,
-        wallet_signer.clone(),
-    )?;
-
     Ok(())
 }
 
@@ -134,24 +121,11 @@ pub struct CreateSmartWallet<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + SmartWalletConfig::INIT_SPACE,
-        seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
+        space = 8 + WalletState::INIT_SPACE,
+        seeds = [WalletState::PREFIX_SEED, args.wallet_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub smart_wallet_config: Box<Account<'info, SmartWalletConfig>>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + WalletDevice::INIT_SPACE,
-        seeds = [
-            WalletDevice::PREFIX_SEED,
-            smart_wallet.key().as_ref(),
-            args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()
-        ],
-        bump
-    )]
-    pub wallet_device: Box<Account<'info, WalletDevice>>,
+    pub smart_wallet_state: Box<Account<'info, WalletState>>,
 
     #[account(
         seeds = [Config::PREFIX_SEED],
@@ -170,4 +144,11 @@ pub struct CreateSmartWallet<'info> {
 
     /// System program for account creation and SOL transfers
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
+pub struct PolicyStruct {
+    bump: u8,
+    smart_wallet: Pubkey,
+    device_slots: Vec<DeviceSlot>,
 }

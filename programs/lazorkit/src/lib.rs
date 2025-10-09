@@ -36,45 +36,45 @@ pub mod lazorkit {
         instructions::add_policy_program(ctx)
     }
 
-    pub fn change_policy<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
-        args: ChangePolicyArgs,
-    ) -> Result<()> {
-        instructions::change_policy(ctx, args)
-    }
+    // pub fn change_policy<'c: 'info, 'info>(
+    //     ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
+    //     args: ChangePolicyArgs,
+    // ) -> Result<()> {
+    //     instructions::change_policy(ctx, args)
+    // }
 
-    pub fn call_policy<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
-        args: CallPolicyArgs,
-    ) -> Result<()> {
-        instructions::call_policy(ctx, args)
-    }
+    // pub fn call_policy<'c: 'info, 'info>(
+    //     ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
+    //     args: CallPolicyArgs,
+    // ) -> Result<()> {
+    //     instructions::call_policy(ctx, args)
+    // }
 
-    pub fn execute<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
-        args: ExecuteArgs,
-    ) -> Result<()> {
-        instructions::execute(ctx, args)
-    }
+    // pub fn execute<'c: 'info, 'info>(
+    //     ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
+    //     args: ExecuteArgs,
+    // ) -> Result<()> {
+    //     instructions::execute(ctx, args)
+    // }
 
-    pub fn create_chunk<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CreateChunk<'info>>,
-        args: CreateChunkArgs,
-    ) -> Result<()> {
-        instructions::create_chunk(ctx, args)
-    }
+    // pub fn create_chunk<'c: 'info, 'info>(
+    //     ctx: Context<'_, '_, 'c, 'info, CreateChunk<'info>>,
+    //     args: CreateChunkArgs,
+    // ) -> Result<()> {
+    //     instructions::create_chunk(ctx, args)
+    // }
 
-    pub fn execute_chunk(
-        ctx: Context<ExecuteChunk>,
-        instruction_data_list: Vec<Vec<u8>>,
-        split_index: Vec<u8>,
-    ) -> Result<()> {
-        instructions::execute_chunk(ctx, instruction_data_list, split_index)
-    }
+    // pub fn execute_chunk(
+    //     ctx: Context<ExecuteChunk>,
+    //     instruction_data_list: Vec<Vec<u8>>,
+    //     split_index: Vec<u8>,
+    // ) -> Result<()> {
+    //     instructions::execute_chunk(ctx, instruction_data_list, split_index)
+    // }
 
-    pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
-        instructions::close_chunk(ctx)
-    }
+    // pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
+    //     instructions::close_chunk(ctx)
+    // }
 
     pub fn manage_vault(
         ctx: Context<ManageVault>,
@@ -83,20 +83,5 @@ pub mod lazorkit {
         index: u8,
     ) -> Result<()> {
         instructions::manage_vault(ctx, action, amount, index)
-    }
-
-    pub fn grant_permission<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, GrantPermission<'info>>,
-        args: GrantPermissionArgs,
-    ) -> Result<()> {
-        instructions::grant_permission(ctx, args)
-    }
-
-    pub fn execute_with_permission(
-        ctx: Context<ExecuteWithPermission>,
-        instruction_data_list: Vec<Vec<u8>>,
-        split_index: Vec<u8>,
-    ) -> Result<()> {
-        instructions::execute_with_permission(ctx, instruction_data_list, split_index)
     }
 }

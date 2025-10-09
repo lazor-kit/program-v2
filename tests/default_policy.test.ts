@@ -27,7 +27,7 @@ async function getLatestNonce(
   lazorkitProgram: LazorkitClient,
   smartWallet: anchor.web3.PublicKey
 ): Promise<anchor.BN> {
-  const smartWalletConfig = await lazorkitProgram.getSmartWalletConfigData(
+  const smartWalletConfig = await lazorkitProgram.getWalletStateData(
     smartWallet
   );
   return smartWalletConfig.lastNonce;
@@ -35,7 +35,9 @@ async function getLatestNonce(
 
 describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
-    process.env.RPC_URL || 'http://localhost:8899',
+    process.env.CLUSTER != 'localhost'
+      ? process.env.RPC_URL
+      : 'http://localhost:8899',
     'confirmed'
   );
 

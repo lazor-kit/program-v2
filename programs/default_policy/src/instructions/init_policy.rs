@@ -1,9 +1,8 @@
-use crate::{error::PolicyError, state::Policy};
+use crate::error::PolicyError;
 use anchor_lang::prelude::*;
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
-    state::WalletDevice,
-    utils::PasskeyExt as _,
+    state::{DeviceSlot, WalletState},
     ID as LAZORKIT_ID,
 };
 
@@ -11,24 +10,18 @@ pub fn init_policy(
     ctx: Context<InitPolicy>,
     wallet_id: u64,
     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-) -> Result<()> {
-    let wallet_device = &mut ctx.accounts.wallet_device;
+    credential_hash: [u8; 32],
+) -> Result<PolicyStruct> {
     let smart_wallet = &mut ctx.accounts.smart_wallet;
+    let wallet_state = &mut ctx.accounts.wallet_state;
 
-    let expected_smart_wallet_pubkey = Pubkey::find_program_address(
+    let (expected_smart_wallet_pubkey, smart_wallet_bump) = Pubkey::find_program_address(
         &[SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
         &LAZORKIT_ID,
-    )
-    .0;
+    );
 
-    let expected_wallet_device_pubkey = Pubkey::find_program_address(
-        &[
-            WalletDevice::PREFIX_SEED,
-            expected_smart_wallet_pubkey.as_ref(),
-            passkey_public_key
-                .to_hashed_bytes(expected_smart_wallet_pubkey)
-                .as_ref(),
-        ],
+    let expected_wallet_state_pubkey = Pubkey::find_program_address(
+        &[WalletState::PREFIX_SEED, wallet_id.to_le_bytes().as_ref()],
         &LAZORKIT_ID,
     )
     .0;
@@ -38,18 +31,20 @@ pub fn init_policy(
         PolicyError::Unauthorized
     );
     require!(
-        wallet_device.key() == expected_wallet_device_pubkey,
+        wallet_state.key() == expected_wallet_state_pubkey,
         PolicyError::Unauthorized
     );
 
-    let policy = &mut ctx.accounts.policy;
+    let return_data: PolicyStruct = PolicyStruct {
+        bump: smart_wallet_bump,
+        smart_wallet: smart_wallet.key(),
+        device_slots: vec![DeviceSlot {
+            passkey_pubkey: passkey_public_key,
+            credential_hash,
+        }],
+    };
 
-    policy.smart_wallet = ctx.accounts.smart_wallet.key();
-    policy
-        .list_wallet_device
-        .push(ctx.accounts.wallet_device.key());
-
-    Ok(())
+    Ok(return_data)
 }
 
 #[derive(Accounts)]
@@ -58,18 +53,14 @@ pub struct InitPolicy<'info> {
     #[account(mut, signer)]
     pub smart_wallet: SystemAccount<'info>,
 
-    /// CHECK:
     #[account(mut)]
-    pub wallet_device: UncheckedAccount<'info>,
+    /// CHECK: bound via constraint to smart_wallet
+    pub wallet_state: UncheckedAccount<'info>,
+}
 
-    #[account(
-        init,
-        payer = smart_wallet,
-        space = 8 + Policy::INIT_SPACE,
-        seeds = [Policy::PREFIX_SEED, smart_wallet.key().as_ref()],
-        bump,
-    )]
-    pub policy: Account<'info, Policy>,
-
-    pub system_program: Program<'info, System>,
+#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
+pub struct PolicyStruct {
+    bump: u8,
+    smart_wallet: Pubkey,
+    device_slots: Vec<DeviceSlot>,
 }

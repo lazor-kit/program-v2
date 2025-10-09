@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::{Args as _, ExecuteArgs};
 use crate::security::validation;
-use crate::state::LazorKitVault;
+use crate::state::{LazorKitVault, WalletState};
 use crate::utils::{
     check_whitelist, compute_execute_message_hash, compute_instruction_hash, execute_cpi,
     get_wallet_device_signer, sighash, split_remaining_accounts, verify_authorization_hash,
@@ -47,7 +47,7 @@ pub fn execute<'c: 'info, 'info>(
         compute_instruction_hash(&args.cpi_data, cpi_accounts, ctx.accounts.cpi_program.key())?;
 
     let expected_message_hash = compute_execute_message_hash(
-        ctx.accounts.smart_wallet_config.last_nonce,
+        ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         policy_hash,
         cpi_hash,
@@ -56,8 +56,6 @@ pub fn execute<'c: 'info, 'info>(
     // Step 0.3: Verify WebAuthn signature and message hash
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
-        &ctx.accounts.wallet_device,
-        ctx.accounts.smart_wallet.key(),
         args.passkey_public_key,
         args.signature.clone(),
         &args.client_data_json_raw,
@@ -80,7 +78,7 @@ pub fn execute<'c: 'info, 'info>(
 
     // Ensure the policy program matches the wallet's configured policy
     require!(
-        policy_program_info.key() == ctx.accounts.smart_wallet_config.policy_program_id,
+        policy_program_info.key() == ctx.accounts.wallet_state.policy_program_id,
         LazorKitError::InvalidProgramAddress
     );
 
@@ -134,13 +132,9 @@ pub fn execute<'c: 'info, 'info>(
     let wallet_signer = PdaSigner {
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
-            ctx.accounts
-                .smart_wallet_config
-                .wallet_id
-                .to_le_bytes()
-                .to_vec(),
+            ctx.accounts.wallet_state.wallet_id.to_le_bytes().to_vec(),
         ],
-        bump: ctx.accounts.smart_wallet_config.bump,
+        bump: ctx.accounts.wallet_state.bump,
     };
     // Execute the actual transaction through CPI
     execute_cpi(
@@ -151,13 +145,13 @@ pub fn execute<'c: 'info, 'info>(
     )?;
 
     // Step 8: Update wallet state and handle fees
-    ctx.accounts.smart_wallet_config.last_nonce =
-        validation::safe_increment_nonce(ctx.accounts.smart_wallet_config.last_nonce);
+    ctx.accounts.wallet_state.last_nonce =
+        validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
 
     // Handle fee distribution and vault validation
     crate::utils::handle_fee_distribution(
         &ctx.accounts.config,
-        &ctx.accounts.smart_wallet_config,
+        &ctx.accounts.wallet_state,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.referral.to_account_info(),
@@ -169,7 +163,7 @@ pub fn execute<'c: 'info, 'info>(
     msg!(
         "Successfully executed transaction: wallet={}, nonce={}, policy={}, cpi={}",
         ctx.accounts.smart_wallet.key(),
-        ctx.accounts.smart_wallet_config.last_nonce,
+        ctx.accounts.wallet_state.last_nonce,
         ctx.accounts.policy_program.key(),
         ctx.accounts.cpi_program.key()
     );
@@ -184,21 +178,21 @@ pub struct Execute<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, smart_wallet_config.wallet_id.to_le_bytes().as_ref()],
-        bump = smart_wallet_config.bump,
+        seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
+        bump = wallet_state.bump,
     )]
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
         mut,
-        seeds = [crate::state::SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
+        seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,
     )]
-    pub smart_wallet_config: Box<Account<'info, crate::state::SmartWalletConfig>>,
+    pub wallet_state: Box<Account<'info, WalletState>>,
 
-    #[account(mut, address = smart_wallet_config.referral_address)]
-    /// CHECK: referral account (matches smart_wallet_config.referral)
+    #[account(mut, address = wallet_state.referral)]
+    /// CHECK: referral account (matches wallet_state.referral)
     pub referral: UncheckedAccount<'info>,
 
     #[account(
@@ -207,13 +201,6 @@ pub struct Execute<'info> {
         bump,
     )]
     pub lazorkit_vault: SystemAccount<'info>,
-
-    #[account(
-        owner = crate::ID,
-        seeds = [crate::state::WalletDevice::PREFIX_SEED, smart_wallet.key().as_ref(), args.passkey_public_key.to_hashed_bytes(smart_wallet.key()).as_ref()],
-        bump,
-    )]
-    pub wallet_device: Box<Account<'info, crate::state::WalletDevice>>,
 
     #[account(
         seeds = [crate::state::PolicyProgramRegistry::PREFIX_SEED],
