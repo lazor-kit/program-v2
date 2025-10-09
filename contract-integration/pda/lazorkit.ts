@@ -5,7 +5,7 @@ import { Buffer } from 'buffer';
 export const CONFIG_SEED = Buffer.from('config');
 export const POLICY_PROGRAM_REGISTRY_SEED = Buffer.from('policy_registry');
 export const SMART_WALLET_SEED = Buffer.from('smart_wallet');
-export const SMART_WALLET_CONFIG_SEED = Buffer.from('smart_wallet_config');
+export const SMART_WALLET_CONFIG_SEED = Buffer.from('wallet_state');
 export const WALLET_DEVICE_SEED = Buffer.from('wallet_device');
 export const CHUNK_SEED = Buffer.from('chunk');
 export const PERMISSION_SEED = Buffer.from('permission');
@@ -46,10 +46,10 @@ export function deriveSmartWalletPda(
 
 export function deriveSmartWalletConfigPda(
   programId: PublicKey,
-  smartWallet: PublicKey
+  walletId: BN
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [SMART_WALLET_CONFIG_SEED, smartWallet.toBuffer()],
+    [SMART_WALLET_CONFIG_SEED, walletId.toArrayLike(Buffer, 'le', 8)],
     programId
   )[0];
 }

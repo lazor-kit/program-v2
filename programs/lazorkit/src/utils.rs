@@ -1,7 +1,11 @@
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
 use crate::state::message::{Message, SimpleMessage};
+use crate::state::DeviceSlot;
 use crate::{error::LazorKitError, ID};
-use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
+use anchor_lang::solana_program::{
+    instruction::Instruction,
+    program::{get_return_data, invoke_signed},
+};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 /// Utility functions for LazorKit smart wallet operations
@@ -46,12 +50,14 @@ pub fn slice_eq(a: &[u8], b: &[u8]) -> bool {
 /// * `program` – account info of the program to invoke.
 /// * `signer` – PDA signer information.  The seeds are appended with the
 ///   bump and the CPI is invoked with `invoke_signed`.
+///
+/// Returns the return data from the invoked program as a `Vec<u8>`.
 pub fn execute_cpi(
     accounts: &[AccountInfo],
     data: &[u8],
     program: &AccountInfo,
     signer: PdaSigner,
-) -> Result<()> {
+) -> Result<Vec<u8>> {
     // Create the CPI instruction with proper account metadata
     // Optimize: avoid unnecessary clone by using slice directly where possible
     let ix = create_cpi_instruction_optimized(accounts, data, program, &signer);
@@ -63,7 +69,15 @@ pub fn execute_cpi(
     seed_slices.push(&bump_slice);
 
     // Execute the CPI with PDA signing
-    invoke_signed(&ix, accounts, &[&seed_slices]).map_err(Into::into)
+    invoke_signed(&ix, accounts, &[&seed_slices])?;
+
+    // Get the return data from the invoked program
+    if let Some((_program_id, return_data)) = get_return_data() {
+        Ok(return_data)
+    } else {
+        // If no return data was set, return empty vector
+        Ok(Vec::new())
+    }
 }
 
 /// Execute a Cross-Program Invocation (CPI) with multiple PDA signers.
@@ -74,12 +88,14 @@ pub fn execute_cpi(
 /// * `program` – account info of the program to invoke.
 /// * `signers` – slice of PDA signer information. Each signer's seeds are appended with the
 ///   bump and the CPI is invoked with `invoke_signed` using all signers.
+///
+/// Returns the return data from the invoked program as a `Vec<u8>`.
 pub fn execute_cpi_multiple_signers(
     accounts: &[AccountInfo],
     data: &[u8],
     program: &AccountInfo,
     signers: &[PdaSigner],
-) -> Result<()> {
+) -> Result<Vec<u8>> {
     // 1) Create the CPI instruction
     let ix = create_cpi_instruction_multiple_signers(accounts, data, program, signers);
 
@@ -110,7 +126,15 @@ pub fn execute_cpi_multiple_signers(
     let seed_slice_refs: Vec<&[&[u8]]> = seed_refs.iter().map(|v| v.as_slice()).collect();
 
     // 4) Call invoke_signed with multiple PDA signers
-    invoke_signed(&ix, accounts, &seed_slice_refs).map_err(Into::into)
+    invoke_signed(&ix, accounts, &seed_slice_refs)?;
+
+    // Get the return data from the invoked program
+    if let Some((_program_id, return_data)) = get_return_data() {
+        Ok(return_data)
+    } else {
+        // If no return data was set, return empty vector
+        Ok(Vec::new())
+    }
 }
 
 /// Optimized CPI instruction creation that avoids unnecessary allocations
@@ -293,36 +317,6 @@ pub fn get_account_slice<'a>(
         .ok_or(crate::error::LazorKitError::AccountSliceOutOfBounds.into())
 }
 
-/// Helper: Create a PDA signer struct
-pub fn get_wallet_device_signer(
-    passkey: &[u8; PASSKEY_PUBLIC_KEY_SIZE],
-    wallet: Pubkey,
-    bump: u8,
-) -> PdaSigner {
-    PdaSigner {
-        seeds: vec![
-            crate::state::WalletDevice::PREFIX_SEED.to_vec(),
-            wallet.to_bytes().to_vec(),
-            passkey.to_hashed_bytes(wallet).to_vec(),
-        ],
-        bump,
-    }
-}
-
-/// Helper: Create multiple PDA signers for a wallet device and smart wallet
-pub fn get_multiple_pda_signers(
-    passkey: &[u8; PASSKEY_PUBLIC_KEY_SIZE],
-    wallet: Pubkey,
-    device_bump: u8,
-    wallet_id: u64,
-    wallet_bump: u8,
-) -> Vec<PdaSigner> {
-    vec![
-        get_wallet_device_signer(passkey, wallet, device_bump),
-        create_wallet_signer(wallet_id, wallet_bump),
-    ]
-}
-
 /// Helper: Create a custom PDA signer with arbitrary seeds
 pub fn create_custom_pda_signer(seeds: Vec<Vec<u8>>, bump: u8) -> PdaSigner {
     PdaSigner { seeds, bump }
@@ -343,8 +337,6 @@ pub fn check_whitelist(
 /// Verify authorization using hash comparison instead of deserializing message data
 pub fn verify_authorization_hash(
     ix_sysvar: &AccountInfo,
-    device: &crate::state::WalletDevice,
-    smart_wallet_key: Pubkey,
     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     signature: Vec<u8>,
     client_data_json_raw: &[u8],
@@ -354,16 +346,6 @@ pub fn verify_authorization_hash(
 ) -> Result<()> {
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-
-    // 1) passkey & wallet checks
-    require!(
-        device.passkey_public_key == passkey_public_key,
-        crate::error::LazorKitError::PasskeyMismatch
-    );
-    require!(
-        device.smart_wallet_address == smart_wallet_key,
-        crate::error::LazorKitError::SmartWalletConfigMismatch
-    );
 
     // 2) locate the secp256r1 verify instruction
     let secp_ix = load_instruction_at_checked(verify_instruction_index as usize, ix_sysvar)?;
@@ -388,7 +370,7 @@ pub fn verify_authorization_hash(
         .decode(challenge_clean)
         .map_err(|_| crate::error::LazorKitError::ChallengeBase64DecodeError)?;
 
-    verify_secp256r1_instruction(&secp_ix, device.passkey_public_key, message, signature)?;
+    verify_secp256r1_instruction(&secp_ix, passkey_public_key, message, signature)?;
     // Verify hash instead of deserializing message data
     SimpleMessage::verify_hash(challenge_bytes, expected_hash)?;
     Ok(())
@@ -663,7 +645,7 @@ pub fn create_wallet_signer(wallet_id: u64, bump: u8) -> PdaSigner {
 /// Complete fee distribution and vault validation workflow
 pub fn handle_fee_distribution<'info>(
     config: &crate::state::Config,
-    smart_wallet_config: &crate::state::SmartWalletConfig,
+    wallet_state: &crate::state::WalletState,
     smart_wallet: &AccountInfo<'info>,
     payer: &AccountInfo<'info>,
     referral: &AccountInfo<'info>,
@@ -679,8 +661,7 @@ pub fn handle_fee_distribution<'info>(
     )?;
 
     // Create wallet signer
-    let wallet_signer =
-        create_wallet_signer(smart_wallet_config.wallet_id, smart_wallet_config.bump);
+    let wallet_signer = create_wallet_signer(wallet_state.wallet_id, wallet_state.bump);
 
     // Distribute fees
     distribute_fees(

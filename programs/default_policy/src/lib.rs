@@ -18,46 +18,47 @@ pub mod default_policy {
         ctx: Context<InitPolicy>,
         wallet_id: u64,
         passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    ) -> Result<()> {
-        instructions::init_policy(ctx, wallet_id, passkey_public_key)
+        credential_hash: [u8; 32],
+    ) -> Result<PolicyStruct> {
+        instructions::init_policy(ctx, wallet_id, passkey_public_key, credential_hash)
     }
 
-    pub fn check_policy(
-        ctx: Context<CheckPolicy>,
-        wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    ) -> Result<()> {
-        instructions::check_policy(ctx, wallet_id, passkey_public_key)
-    }
+    // pub fn check_policy(
+    //     ctx: Context<CheckPolicy>,
+    //     wallet_id: u64,
+    //     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    // ) -> Result<()> {
+    //     instructions::check_policy(ctx, wallet_id, passkey_public_key)
+    // }
 
-    pub fn add_device(
-        ctx: Context<AddDevice>,
-        wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-        new_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    ) -> Result<()> {
-        instructions::add_device(ctx, wallet_id, passkey_public_key, new_passkey_public_key)
-    }
+    // pub fn add_device(
+    //     ctx: Context<AddDevice>,
+    //     wallet_id: u64,
+    //     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    //     new_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    // ) -> Result<()> {
+    //     instructions::add_device(ctx, wallet_id, passkey_public_key, new_passkey_public_key)
+    // }
 
-    pub fn remove_device(
-        ctx: Context<RemoveDevice>,
-        wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-        remove_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    ) -> Result<()> {
-        instructions::remove_device(
-            ctx,
-            wallet_id,
-            passkey_public_key,
-            remove_passkey_public_key,
-        )
-    }
+    // pub fn remove_device(
+    //     ctx: Context<RemoveDevice>,
+    //     wallet_id: u64,
+    //     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    //     remove_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    // ) -> Result<()> {
+    //     instructions::remove_device(
+    //         ctx,
+    //         wallet_id,
+    //         passkey_public_key,
+    //         remove_passkey_public_key,
+    //     )
+    // }
 
-    pub fn destroy_policy(
-        ctx: Context<DestroyPolicy>,
-        wallet_id: u64,
-        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    ) -> Result<()> {
-        instructions::destroy_policy(ctx, wallet_id, passkey_public_key)
-    }
+    // pub fn destroy_policy(
+    //     ctx: Context<DestroyPolicy>,
+    //     wallet_id: u64,
+    //     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    // ) -> Result<()> {
+    //     instructions::destroy_policy(ctx, wallet_id, passkey_public_key)
+    // }
 }

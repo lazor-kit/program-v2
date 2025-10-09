@@ -1,11 +1,10 @@
+mod chunk;
 mod config;
-mod permission;
 mod lazorkit_vault;
 pub mod message;
+mod permission;
 mod policy_program_registry;
-mod smart_wallet;
-mod chunk;
-mod wallet_device;
+mod wallet_state;
 mod writer;
 
 pub use chunk::*;
@@ -14,6 +13,5 @@ pub use lazorkit_vault::*;
 pub use message::*;
 pub use permission::*;
 pub use policy_program_registry::*;
-pub use smart_wallet::*;
-pub use wallet_device::*;
+pub use wallet_state::*;
 pub use writer::*;

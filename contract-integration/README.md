@@ -79,7 +79,7 @@ The main client for interacting with the LazorKit program.
 **Key Methods:**
 
 - **PDA Derivation**: `getConfigPubkey()`, `getSmartWalletPubkey()`, `getWalletDevicePubkey()`, etc.
-- **Account Data**: `getSmartWalletConfigData()`, `getWalletDeviceData()`, etc.
+- **Account Data**: `getWalletStateData()`, `getWalletDeviceData()`, etc.
 - **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, etc.
 - **High-level Transaction Builders**: 
   - `createSmartWalletTxn()` - Create new smart wallet
@@ -271,7 +271,7 @@ Methods that build complete transactions with authentication:
 Helper methods for common operations:
 
 - `generateWalletId()`
-- `getSmartWalletConfigData()`
+- `getWalletStateData()`
 - `buildAuthorizationMessage()`
 - `getSmartWalletByPasskey()`
 
