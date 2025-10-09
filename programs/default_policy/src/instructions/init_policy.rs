@@ -1,4 +1,4 @@
-use crate::error::PolicyError;
+use crate::{error::PolicyError, state::PolicyStruct};
 use anchor_lang::prelude::*;
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
@@ -56,11 +56,4 @@ pub struct InitPolicy<'info> {
     #[account(mut)]
     /// CHECK: bound via constraint to smart_wallet
     pub wallet_state: UncheckedAccount<'info>,
-}
-
-#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
-pub struct PolicyStruct {
-    bump: u8,
-    smart_wallet: Pubkey,
-    device_slots: Vec<DeviceSlot>,
 }

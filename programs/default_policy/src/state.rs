@@ -1,14 +1,9 @@
 use anchor_lang::prelude::*;
+use lazorkit::state::DeviceSlot;
 
-#[account]
-#[derive(Debug, InitSpace)]
-pub struct Policy {
+#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
+pub struct PolicyStruct {
+    pub bump: u8,
     pub smart_wallet: Pubkey,
-    /// List of wallet devices associated with the smart wallet
-    #[max_len(10)]
-    pub list_wallet_device: Vec<Pubkey>,
-}
-
-impl Policy {
-    pub const PREFIX_SEED: &'static [u8] = b"policy";
+    pub device_slots: Vec<DeviceSlot>,
 }

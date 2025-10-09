@@ -14,6 +14,56 @@ export type DefaultPolicy = {
   },
   "instructions": [
     {
+      "name": "checkPolicy",
+      "discriminator": [
+        28,
+        88,
+        170,
+        179,
+        239,
+        136,
+        25,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "walletDevice",
+          "signer": true
+        },
+        {
+          "name": "smartWallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policyData",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "initPolicy",
       "discriminator": [
         45,

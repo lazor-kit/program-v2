@@ -50,12 +50,12 @@ pub mod lazorkit {
     //     instructions::call_policy(ctx, args)
     // }
 
-    // pub fn execute<'c: 'info, 'info>(
-    //     ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
-    //     args: ExecuteArgs,
-    // ) -> Result<()> {
-    //     instructions::execute(ctx, args)
-    // }
+    pub fn execute<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
+        args: ExecuteArgs,
+    ) -> Result<()> {
+        instructions::execute(ctx, args)
+    }
 
     // pub fn create_chunk<'c: 'info, 'info>(
     //     ctx: Context<'_, '_, 'c, 'info, CreateChunk<'info>>,

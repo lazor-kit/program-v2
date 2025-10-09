@@ -242,6 +242,193 @@ export type Lazorkit = {
       ]
     },
     {
+      "name": "execute",
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smartWallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_state.wallet_id",
+                "account": "walletState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_state.wallet_id",
+                "account": "walletState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletSigner"
+        },
+        {
+          "name": "referral",
+          "writable": true
+        },
+        {
+          "name": "lazorkitVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policyProgramRegistry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policyProgram"
+        },
+        {
+          "name": "cpiProgram"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ixSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "executeArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "initializeProgram",
       "discriminator": [
         176,
@@ -1009,6 +1196,95 @@ export type Lazorkit = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "executeArgs",
+      "docs": [
+        "Arguments for executing a transaction through the smart wallet",
+        "",
+        "Contains WebAuthn authentication data and transaction parameters",
+        "required for secure transaction execution with policy validation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "docs": [
+              "Public key of the WebAuthn passkey for authentication"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "docs": [
+              "WebAuthn signature for transaction authorization"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "clientDataJsonRaw",
+            "docs": [
+              "Raw client data JSON from WebAuthn authentication"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "authenticatorDataRaw",
+            "docs": [
+              "Raw authenticator data from WebAuthn authentication"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "verifyInstructionIndex",
+            "docs": [
+              "Index of the Secp256r1 verification instruction"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "splitIndex",
+            "docs": [
+              "Index for splitting remaining accounts between policy and CPI"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "policyData",
+            "docs": [
+              "Policy program instruction data"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "cpiData",
+            "docs": [
+              "Cross-program invocation instruction data"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "vaultIndex",
+            "docs": [
+              "Random vault index (0-31) calculated off-chain for fee distribution"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp for message verification"
+            ],
+            "type": "i64"
           }
         ]
       }
