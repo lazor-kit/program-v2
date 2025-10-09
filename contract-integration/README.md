@@ -1,20 +1,27 @@
 # LazorKit Contract Integration
 
-This directory contains the TypeScript integration code for the LazorKit smart wallet program. The code has been refactored to provide a clean, well-organized API with clear separation of concerns.
+This directory contains the TypeScript integration code for the LazorKit smart wallet program. The code provides a clean, well-organized API with clear separation of concerns and comprehensive transaction building capabilities.
 
 ## 📁 Directory Structure
 
 ```
 contract-integration/
 ├── anchor/           # Generated Anchor types and IDL
+│   ├── idl/         # JSON IDL files
+│   └── types/       # TypeScript type definitions
 ├── client/           # Main client classes
+│   ├── lazorkit.ts  # Main LazorkitClient
+│   └── defaultPolicy.ts # DefaultPolicyClient
 ├── pda/             # PDA derivation functions
+│   ├── lazorkit.ts  # Lazorkit PDA functions
+│   └── defaultPolicy.ts # Default policy PDA functions
 ├── webauthn/        # WebAuthn/Passkey utilities
+│   └── secp256r1.ts # Secp256r1 signature verification
+├── examples/        # Usage examples
 ├── auth.ts          # Authentication utilities
 ├── transaction.ts   # Transaction building utilities
 ├── utils.ts         # General utilities
 ├── messages.ts      # Message building utilities
-├── constants.ts     # Program constants
 ├── types.ts         # TypeScript type definitions
 ├── index.ts         # Main exports
 └── README.md        # This file
@@ -23,22 +30,42 @@ contract-integration/
 ## 🚀 Quick Start
 
 ```typescript
-import { LazorkitClient } from './contract-integration';
+import { LazorkitClient, DefaultPolicyClient } from './contract-integration';
+import { Connection } from '@solana/web3.js';
 
-// Initialize client
+// Initialize clients
 const connection = new Connection('https://api.mainnet-beta.solana.com');
-const client = new LazorkitClient(connection);
+const lazorkitClient = new LazorkitClient(connection);
+const defaultPolicyClient = new DefaultPolicyClient(connection);
 
 // Create a smart wallet
 const { transaction, smartWalletId, smartWallet } =
-  await client.createSmartWalletTxn({
+  await lazorkitClient.createSmartWalletTxn({
     payer: payer.publicKey,
-    passkeyPubkey: [
+    passkeyPublicKey: [
       /* 33 bytes */
     ],
     credentialIdBase64: 'base64-credential-id',
-    isPayForUser: true,
+    amount: new BN(0.01 * LAMPORTS_PER_SOL),
   });
+
+// Execute a transaction with compute unit limit
+const executeTx = await lazorkitClient.executeTxn({
+  payer: payer.publicKey,
+  smartWallet: smartWallet,
+  passkeySignature: {
+    passkeyPublicKey: [/* 33 bytes */],
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  policyInstruction: null,
+  cpiInstruction: transferInstruction,
+  timestamp: new BN(Math.floor(Date.now() / 1000)),
+}, {
+  computeUnitLimit: 200000, // Set compute unit limit
+  useVersionedTransaction: true
+});
 ```
 
 ## 📚 API Overview
@@ -54,7 +81,13 @@ The main client for interacting with the LazorKit program.
 - **PDA Derivation**: `getConfigPubkey()`, `getSmartWalletPubkey()`, `getWalletDevicePubkey()`, etc.
 - **Account Data**: `getSmartWalletConfigData()`, `getWalletDeviceData()`, etc.
 - **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, etc.
-- **High-level Builders**: `createSmartWalletTxn()`, `executeTransactionWithAuth()`, etc.
+- **High-level Transaction Builders**: 
+  - `createSmartWalletTxn()` - Create new smart wallet
+  - `executeTxn()` - Execute transaction with authentication
+  - `callPolicyTxn()` - Call wallet policy
+  - `changePolicyTxn()` - Change wallet policy
+  - `createChunkTxn()` - Create deferred execution chunk
+  - `executeChunkTxn()` - Execute deferred chunk
 
 #### `DefaultPolicyClient`
 
@@ -86,6 +119,7 @@ Utilities for building different types of transactions:
 import {
   buildVersionedTransaction,
   buildLegacyTransaction,
+  buildTransaction,
 } from './contract-integration';
 
 // Build versioned transaction (v0)
@@ -93,7 +127,65 @@ const v0Tx = await buildVersionedTransaction(connection, payer, instructions);
 
 // Build legacy transaction
 const legacyTx = await buildLegacyTransaction(connection, payer, instructions);
+
+// Build transaction with compute unit limit
+const txWithCULimit = await buildTransaction(connection, payer, instructions, {
+  computeUnitLimit: 200000, // Set compute unit limit to 200,000
+  useVersionedTransaction: true
+});
 ```
+
+#### Transaction Builder Options
+
+The `TransactionBuilderOptions` interface supports the following options:
+
+```typescript
+interface TransactionBuilderOptions {
+  useVersionedTransaction?: boolean;           // Use versioned transaction (v0)
+  addressLookupTable?: AddressLookupTableAccount; // Address lookup table for v0
+  recentBlockhash?: string;                    // Custom recent blockhash
+  computeUnitLimit?: number;                   // Set compute unit limit
+}
+```
+
+**Compute Unit Limit**: When specified, a `setComputeUnitLimit` instruction will be automatically prepended to your transaction. This is useful for complex transactions that might exceed the default compute unit limit.
+
+**Important Note**: When using compute unit limits, the `verifyInstructionIndex` in all smart wallet instructions is automatically adjusted. This is because the CU limit instruction is prepended at index 0, shifting the authentication instruction to index 1.
+
+## ⚡ Compute Unit Limit Management
+
+The contract integration automatically handles compute unit limits and instruction indexing:
+
+### Automatic Index Adjustment
+
+When you specify a `computeUnitLimit`, the system automatically:
+1. Prepends a `setComputeUnitLimit` instruction at index 0
+2. Adjusts all `verifyInstructionIndex` values from 0 to 1
+3. Maintains proper instruction ordering
+
+### Usage Examples
+
+```typescript
+// Without compute unit limit
+const tx1 = await client.executeTxn(params, {
+  useVersionedTransaction: true
+});
+// verifyInstructionIndex = 0
+
+// With compute unit limit
+const tx2 = await client.executeTxn(params, {
+  computeUnitLimit: 200000,
+  useVersionedTransaction: true
+});
+// verifyInstructionIndex = 1 (automatically adjusted)
+```
+
+### Recommended CU Limits
+
+- **Simple transfers**: 50,000 - 100,000
+- **Token operations**: 100,000 - 150,000
+- **Complex transactions**: 200,000 - 300,000
+- **Multiple operations**: 300,000+
 
 ## 🔧 Type Definitions
 
@@ -296,11 +388,11 @@ const { transaction, smartWalletId, smartWallet } =
 ### Executing a Transaction with Authentication
 
 ```typescript
-const transaction = await client.executeTransactionWithAuth({
+const transaction = await client.executeTxn({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [
+    passkeyPublicKey: [
       /* 33 bytes */
     ],
     signature64: 'base64-signature',
@@ -309,17 +401,21 @@ const transaction = await client.executeTransactionWithAuth({
   },
   policyInstruction: null,
   cpiInstruction: transferInstruction,
+  timestamp: new BN(Math.floor(Date.now() / 1000)),
+}, {
+  computeUnitLimit: 200000, // Set compute unit limit
+  useVersionedTransaction: true
 });
 ```
 
 ### Creating a Transaction Session
 
 ```typescript
-const sessionTx = await client.createChunkWithAuth({
+const sessionTx = await client.createChunkTxn({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
-    passkeyPubkey: [
+    passkeyPublicKey: [
       /* 33 bytes */
     ],
     signature64: 'base64-signature',
@@ -327,7 +423,11 @@ const sessionTx = await client.createChunkWithAuth({
     authenticatorDataRaw64: 'base64-auth-data',
   },
   policyInstruction: null,
-  expiresAt: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+  cpiInstructions: [transferInstruction1, transferInstruction2],
+  timestamp: new BN(Math.floor(Date.now() / 1000)),
+}, {
+  computeUnitLimit: 300000, // Higher limit for multiple instructions
+  useVersionedTransaction: true
 });
 ```
 

@@ -97,6 +97,7 @@ export interface TransactionBuilderOptions {
   useVersionedTransaction?: boolean;
   addressLookupTable?: anchor.web3.AddressLookupTableAccount;
   recentBlockhash?: string;
+  computeUnitLimit?: number;
 }
 
 export interface TransactionBuilderResult {

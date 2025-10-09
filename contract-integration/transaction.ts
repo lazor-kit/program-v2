@@ -3,9 +3,32 @@ import {
   Transaction,
   TransactionMessage,
   VersionedTransaction,
-  AddressLookupTableAccount,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import { TransactionBuilderOptions, TransactionBuilderResult } from './types';
+
+/**
+ * Creates a compute unit limit instruction
+ */
+export function createComputeUnitLimitInstruction(
+  limit: number
+): anchor.web3.TransactionInstruction {
+  return ComputeBudgetProgram.setComputeUnitLimit({ units: limit });
+}
+
+/**
+ * Prepends compute unit limit instruction to the beginning of instruction array if limit is provided
+ */
+export function prependComputeUnitLimit(
+  instructions: anchor.web3.TransactionInstruction[],
+  computeUnitLimit?: number
+): anchor.web3.TransactionInstruction[] {
+  if (computeUnitLimit === undefined) {
+    return instructions;
+  }
+
+  return [createComputeUnitLimitInstruction(computeUnitLimit), ...instructions];
+}
 
 /**
  * Builds a versioned transaction (v0) from instructions
@@ -46,6 +69,27 @@ export function combineInstructionsWithAuth(
 }
 
 /**
+ * Combines authentication verification instruction with smart wallet instructions and optional compute unit limit
+ */
+export function combineInstructionsWithAuthAndCU(
+  authInstruction: anchor.web3.TransactionInstruction,
+  smartWalletInstructions: anchor.web3.TransactionInstruction[],
+  computeUnitLimit?: number
+): anchor.web3.TransactionInstruction[] {
+  const combinedInstructions = [authInstruction, ...smartWalletInstructions];
+  return prependComputeUnitLimit(combinedInstructions, computeUnitLimit);
+}
+
+/**
+ * Calculates the correct verifyInstructionIndex based on whether compute unit limit is used
+ */
+export function calculateVerifyInstructionIndex(
+  computeUnitLimit?: number
+): number {
+  return computeUnitLimit !== undefined ? 1 : 0;
+}
+
+/**
  * Flexible transaction builder that supports both legacy and versioned transactions
  * with optional address lookup table support
  */
@@ -59,7 +103,14 @@ export async function buildTransaction(
     useVersionedTransaction,
     addressLookupTable,
     recentBlockhash: customBlockhash,
+    computeUnitLimit,
   } = options;
+
+  // Prepend compute unit limit instruction if specified
+  const finalInstructions = prependComputeUnitLimit(
+    instructions,
+    computeUnitLimit
+  );
 
   // Auto-detect: if addressLookupTable is provided, use versioned transaction
   const shouldUseVersioned = useVersionedTransaction ?? !!addressLookupTable;
@@ -75,7 +126,7 @@ export async function buildTransaction(
     const message = new TransactionMessage({
       payerKey: payer,
       recentBlockhash,
-      instructions,
+      instructions: finalInstructions,
     }).compileToV0Message(lookupTables);
 
     const transaction = new VersionedTransaction(message);
@@ -87,7 +138,7 @@ export async function buildTransaction(
     };
   } else {
     // Build legacy transaction
-    const transaction = new Transaction().add(...instructions);
+    const transaction = new Transaction().add(...finalInstructions);
     transaction.feePayer = payer;
     transaction.recentBlockhash = recentBlockhash;
 
