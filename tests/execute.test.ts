@@ -130,7 +130,7 @@ describe('Test smart wallet with default policy', () => {
 
     const credentialHash = Array.from(
       new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId))
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
       )
     );
 
@@ -173,6 +173,9 @@ describe('Test smart wallet with default policy', () => {
       credentialHash,
       walletStateData.policyData
     );
+
+    console.log('credentialHash', credentialHash);
+    console.log('passkeyPubkey', passkeyPubkey);
 
     const timestamp = await getBlockchainTimestamp(connection);
 
