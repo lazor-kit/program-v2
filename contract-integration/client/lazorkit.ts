@@ -736,7 +736,7 @@ export class LazorkitClient {
     );
 
     let policyInstruction = await this.defaultPolicyProgram.buildInitPolicyIx(
-      params.smartWalletId,
+      smartWalletId,
       params.passkeyPublicKey,
       smartWallet,
       walletDevice
