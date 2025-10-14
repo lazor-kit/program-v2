@@ -15,7 +15,7 @@ pub fn check_policy(
     credential_hash: [u8; 32],
     policy_data: Vec<u8>,
 ) -> Result<()> {
-    let wallet_device = &mut ctx.accounts.wallet_device;
+    let policy_signer = &mut ctx.accounts.policy_signer;
     let smart_wallet = &mut ctx.accounts.smart_wallet;
 
     let expected_smart_wallet_pubkey = Pubkey::find_program_address(
@@ -26,14 +26,14 @@ pub fn check_policy(
 
     let hashed = hash_seeds(&passkey_public_key, smart_wallet.key());
 
-    let expected_wallet_device_pubkey = Pubkey::find_program_address(&[&hashed], &LAZORKIT_ID).0;
+    let expected_policy_signer_pubkey = Pubkey::find_program_address(&[&hashed], &LAZORKIT_ID).0;
 
     require!(
         smart_wallet.key() == expected_smart_wallet_pubkey,
         PolicyError::Unauthorized
     );
     require!(
-        wallet_device.key() == expected_wallet_device_pubkey,
+        policy_signer.key() == expected_policy_signer_pubkey,
         PolicyError::Unauthorized
     );
 
@@ -56,7 +56,7 @@ pub fn check_policy(
 
 #[derive(Accounts)]
 pub struct CheckPolicy<'info> {
-    pub wallet_device: Signer<'info>,
+    pub policy_signer: Signer<'info>,
 
     /// CHECK: bound via constraint to policy.smart_wallet
     pub smart_wallet: SystemAccount<'info>,

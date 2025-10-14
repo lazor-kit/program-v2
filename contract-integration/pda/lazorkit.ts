@@ -39,7 +39,6 @@ export function deriveSmartWalletPda(
   programId: PublicKey,
   walletId: BN
 ): PublicKey {
-  
   return PublicKey.findProgramAddressSync(
     [SMART_WALLET_SEED, walletId.toArrayLike(Buffer, 'le', 8)],
     programId
@@ -48,15 +47,15 @@ export function deriveSmartWalletPda(
 
 export function deriveSmartWalletConfigPda(
   programId: PublicKey,
-  walletId: BN
+  smartWallet: PublicKey
 ): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [SMART_WALLET_CONFIG_SEED, walletId.toArrayLike(Buffer, 'le', 8)],
+    [SMART_WALLET_CONFIG_SEED, smartWallet.toBuffer()],
     programId
   )[0];
 }
 
-export function deriveWalletDevicePda(
+export function derivePolicySignerPda(
   programId: PublicKey,
   smartWallet: PublicKey,
   passkeyCompressed33: number[]

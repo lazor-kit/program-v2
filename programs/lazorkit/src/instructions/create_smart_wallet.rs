@@ -11,7 +11,7 @@ use crate::{
     instructions::CreateSmartWalletArgs,
     security::validation,
     state::{Config, DeviceSlot, PolicyProgramRegistry, WalletState},
-    utils::{execute_cpi, PdaSigner},
+    utils::{execute_cpi, get_policy_signer},
     ID,
 };
 
@@ -21,7 +21,10 @@ pub fn create_smart_wallet(
 ) -> Result<()> {
     // Step 1: Validate global program state and input parameters
     // Ensure the program is not paused before processing wallet creation
-    require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
+    require!(
+        !ctx.accounts.lazorkit_config.is_paused,
+        LazorKitError::ProgramPaused
+    );
 
     // Validate all input parameters for security and correctness
     validation::validate_policy_data(&args.init_policy_data)?;
@@ -42,33 +45,28 @@ pub fn create_smart_wallet(
         LazorKitError::InvalidSequenceNumber
     );
 
-    // Ensure the default policy program is executable (not a data account)
-    validation::validate_program_executable(&ctx.accounts.default_policy_program)?;
-
-    let wallet_signer = PdaSigner {
-        seeds: vec![
-            SMART_WALLET_SEED.to_vec(),
-            args.wallet_id.to_le_bytes().to_vec(),
-        ],
-        bump: ctx.bumps.smart_wallet,
-    };
+    let cpi_signer = get_policy_signer(
+        ctx.accounts.policy_signer.key(),
+        args.passkey_public_key,
+        ctx.accounts.smart_wallet.key(),
+    )?;
 
     let policy_data = execute_cpi(
         &ctx.remaining_accounts,
         &args.init_policy_data.clone(),
-        &ctx.accounts.default_policy_program,
-        wallet_signer.clone(),
+        &ctx.accounts.policy_program,
+        cpi_signer.clone(),
     )?;
 
-    let wallet_state = &mut ctx.accounts.smart_wallet_state;
+    let wallet_state = &mut ctx.accounts.wallet_state;
     wallet_state.set_inner(WalletState {
         bump: ctx.bumps.smart_wallet,
         wallet_id: args.wallet_id,
         last_nonce: 0,
         referral: args.referral_address.unwrap_or(ctx.accounts.payer.key()),
-        policy_program: ctx.accounts.default_policy_program.key(),
+        policy_program: ctx.accounts.policy_program.key(),
         policy_data_len: policy_data.len() as u16,
-        policy_data: policy_data,
+        policy_data,
         device_count: 1,
         devices: vec![DeviceSlot {
             passkey_pubkey: args.passkey_public_key,
@@ -86,6 +84,13 @@ pub fn create_smart_wallet(
         ),
         args.amount,
     )?;
+
+    // check that smart-wallet balance >= empty rent exempt balance
+    require!(
+        ctx.accounts.smart_wallet.lamports() >= crate::constants::EMPTY_PDA_RENT_EXEMPT_BALANCE,
+        LazorKitError::InsufficientBalanceForFee
+    );
+
     Ok(())
 }
 
@@ -105,7 +110,6 @@ pub struct CreateSmartWallet<'info> {
         seeds = [PolicyProgramRegistry::PREFIX_SEED],
         bump,
         owner = ID,
-        constraint = policy_program_registry.registered_programs.contains(&default_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
     )]
     pub policy_program_registry: Account<'info, PolicyProgramRegistry>,
 
@@ -122,33 +126,30 @@ pub struct CreateSmartWallet<'info> {
         init,
         payer = payer,
         space = 8 + WalletState::INIT_SPACE,
-        seeds = [WalletState::PREFIX_SEED, args.wallet_id.to_le_bytes().as_ref()],
+        seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump
     )]
-    pub smart_wallet_state: Box<Account<'info, WalletState>>,
+    pub wallet_state: Box<Account<'info, WalletState>>,
+
+    /// CHECK: PDA verified by seeds
+    pub policy_signer: UncheckedAccount<'info>,
 
     #[account(
         seeds = [Config::PREFIX_SEED],
         bump,
         owner = ID
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
-        address = config.default_policy_program_id,
         executable,
-        constraint = default_policy_program.executable @ LazorKitError::ProgramNotExecutable
+        constraint = policy_program.executable @ LazorKitError::ProgramNotExecutable,
+        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+
     )]
     /// CHECK: Validated to be executable and in registry
-    pub default_policy_program: UncheckedAccount<'info>,
+    pub policy_program: UncheckedAccount<'info>,
 
     /// System program for account creation and SOL transfers
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
-pub struct PolicyStruct {
-    bump: u8,
-    smart_wallet: Pubkey,
-    device_slots: Vec<DeviceSlot>,
 }

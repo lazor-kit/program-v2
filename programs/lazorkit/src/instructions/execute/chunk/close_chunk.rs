@@ -1,73 +1,73 @@
-// use anchor_lang::prelude::*;
+use anchor_lang::prelude::*;
 
-// use crate::error::LazorKitError;
-// use crate::state::{Chunk, SmartWalletConfig};
-// use crate::{constants::SMART_WALLET_SEED, ID};
+use crate::error::LazorKitError;
+use crate::state::{Chunk, WalletState};
+use crate::{constants::SMART_WALLET_SEED, ID};
 
-// /// Close an expired chunk to refund rent
-// ///
-// /// This instruction allows closing a chunk that has expired (timestamp too old)
-// /// without executing the CPI instructions. This is useful for cleanup when
-// /// a chunk session has timed out.
-// pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
-//     let chunk = &ctx.accounts.chunk;
+/// Close an expired chunk to refund rent
+///
+/// This instruction allows closing a chunk that has expired (timestamp too old)
+/// without executing the CPI instructions. This is useful for cleanup when
+/// a chunk session has timed out.
+pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
+    let chunk = &ctx.accounts.chunk;
     
-//     // Verify the chunk belongs to the correct smart wallet
-//     require!(
-//         chunk.owner_wallet_address == ctx.accounts.smart_wallet.key(),
-//         LazorKitError::InvalidAccountOwner
-//     );
+    // Verify the chunk belongs to the correct smart wallet
+    require!(
+        chunk.owner_wallet_address == ctx.accounts.smart_wallet.key(),
+        LazorKitError::InvalidAccountOwner
+    );
 
-//     // Check if the chunk session has expired based on timestamp
-//     // A chunk is considered expired if it's outside the valid timestamp range
-//     let now = Clock::get()?.unix_timestamp;
-//     let is_expired = chunk.authorized_timestamp < now - crate::security::TIMESTAMP_PAST_TOLERANCE
-//         || chunk.authorized_timestamp > now + crate::security::TIMESTAMP_FUTURE_TOLERANCE;
-//     require!(is_expired, LazorKitError::TransactionTooOld);
+    // Check if the chunk session has expired based on timestamp
+    // A chunk is considered expired if it's outside the valid timestamp range
+    let now = Clock::get()?.unix_timestamp;
+    let is_expired = chunk.authorized_timestamp < now - crate::security::TIMESTAMP_PAST_TOLERANCE
+        || chunk.authorized_timestamp > now + crate::security::TIMESTAMP_FUTURE_TOLERANCE;
+    require!(is_expired, LazorKitError::TransactionTooOld);
 
-//     msg!("Closing expired chunk: wallet={}, nonce={}, expired_at={}", 
-//          ctx.accounts.smart_wallet.key(), 
-//          chunk.authorized_nonce,
-//          chunk.authorized_timestamp);
+    msg!("Closing expired chunk: wallet={}, nonce={}, expired_at={}", 
+         ctx.accounts.smart_wallet.key(), 
+         chunk.authorized_nonce,
+         chunk.authorized_timestamp);
     
-//     Ok(())
-// }
+    Ok(())
+}
 
-// #[derive(Accounts)]
-// pub struct CloseChunk<'info> {
-//     #[account(mut)]
-//     pub payer: Signer<'info>,
+#[derive(Accounts)]
+pub struct CloseChunk<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
 
-//     #[account(
-//         mut,
-//         seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
-//         bump = wallet_state.bump,
-//     )]
-//     /// CHECK: PDA verified
-//     pub smart_wallet: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
+        bump = wallet_state.bump,
+    )]
+    /// CHECK: PDA verified
+    pub smart_wallet: SystemAccount<'info>,
 
-//     #[account(
-//         seeds = [SmartWalletConfig::PREFIX_SEED, smart_wallet.key().as_ref()],
-//         bump,
-//         owner = ID,
-//     )]
-//     pub wallet_state: Box<Account<'info, SmartWalletConfig>>,
+    #[account(
+        seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
+        bump,
+        owner = ID,
+    )]
+    pub wallet_state: Box<Account<'info, WalletState>>,
 
-//     /// Expired chunk to close and refund rent
-//     #[account(
-//         mut,
-//         seeds = [
-//             Chunk::PREFIX_SEED,
-//             smart_wallet.key.as_ref(),
-//             &chunk.authorized_nonce.to_le_bytes(),
-//         ], 
-//         close = session_refund,
-//         owner = ID,
-//         bump,
-//     )]
-//     pub chunk: Account<'info, Chunk>,
+    /// Expired chunk to close and refund rent
+    #[account(
+        mut,
+        seeds = [
+            Chunk::PREFIX_SEED,
+            smart_wallet.key.as_ref(),
+            &chunk.authorized_nonce.to_le_bytes(),
+        ], 
+        close = session_refund,
+        owner = ID,
+        bump,
+    )]
+    pub chunk: Account<'info, Chunk>,
 
-//     /// CHECK: rent refund destination (stored in session)
-//     #[account(mut, address = chunk.rent_refund_address)]
-//     pub session_refund: UncheckedAccount<'info>,
-// }
+    /// CHECK: rent refund destination (stored in session)
+    #[account(mut, address = chunk.rent_refund_address)]
+    pub session_refund: UncheckedAccount<'info>,
+}
