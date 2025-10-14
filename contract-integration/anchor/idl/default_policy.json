@@ -21,7 +21,7 @@
       ],
       "accounts": [
         {
-          "name": "wallet_device",
+          "name": "policy_signer",
           "signer": true
         },
         {
@@ -71,9 +71,12 @@
       ],
       "accounts": [
         {
-          "name": "smart_wallet",
-          "writable": true,
+          "name": "policy_signer",
           "signer": true
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true
         },
         {
           "name": "wallet_state",

@@ -34,6 +34,7 @@ export class DefaultPolicyClient {
     walletId: anchor.BN,
     passkeyPublicKey: number[],
     credentialHash: number[],
+    policySigner: PublicKey,
     smartWallet: PublicKey,
     walletState: PublicKey
   ): Promise<TransactionInstruction> {
@@ -42,6 +43,7 @@ export class DefaultPolicyClient {
       .accountsPartial({
         smartWallet,
         walletState,
+        policySigner,
       })
       .instruction();
   }
@@ -49,7 +51,7 @@ export class DefaultPolicyClient {
   async buildCheckPolicyIx(
     walletId: anchor.BN,
     passkeyPublicKey: number[],
-    walletDevice: PublicKey,
+    policySigner: PublicKey,
     smartWallet: PublicKey,
     credentialHash: number[],
     policyData: Buffer<ArrayBufferLike>
@@ -58,7 +60,7 @@ export class DefaultPolicyClient {
       .checkPolicy(walletId, passkeyPublicKey, credentialHash, policyData)
       .accountsPartial({
         smartWallet,
-        walletDevice,
+        policySigner,
       })
       .instruction();
   }

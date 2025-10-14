@@ -5,7 +5,7 @@ use crate::security::validation;
 use crate::state::{LazorKitVault, WalletState};
 use crate::utils::{
     check_whitelist, compute_execute_message_hash, compute_instruction_hash, execute_cpi,
-    hash_seeds, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
+    get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 
@@ -83,12 +83,11 @@ pub fn execute<'c: 'info, 'info>(
 
     // Step 2: Prepare PDA signer for policy program CPI
 
-    let seeds = &[&hash_seeds(
-        &args.passkey_public_key.clone(),
+    let policy_signer = get_policy_signer(
+        ctx.accounts.policy_signer.key(),
+        args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
-    )[..]];
-
-    let (_, bump) = Pubkey::find_program_address(seeds, &crate::ID);
+    )?;
 
     // Step 3: Verify policy instruction discriminator and data integrity
     let policy_data = &args.policy_data;
@@ -108,10 +107,7 @@ pub fn execute<'c: 'info, 'info>(
         policy_accounts,
         policy_data,
         policy_program_info,
-        PdaSigner {
-            seeds: vec![seeds[0].to_vec()],
-            bump,
-        },
+        policy_signer,
     )?;
 
     // Step 6: Validate CPI instruction data
@@ -188,14 +184,14 @@ pub struct Execute<'info> {
 
     #[account(
         mut,
-        seeds = [WalletState::PREFIX_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
+        seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
 
     /// CHECK: PDA verified by seeds
-    pub wallet_signer: UncheckedAccount<'info>,
+    pub policy_signer: UncheckedAccount<'info>,
 
     #[account(mut, address = wallet_state.referral)]
     /// CHECK: referral account (matches wallet_state.referral)

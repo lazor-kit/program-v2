@@ -27,7 +27,7 @@ export type DefaultPolicy = {
       ],
       "accounts": [
         {
-          "name": "walletDevice",
+          "name": "policySigner",
           "signer": true
         },
         {
@@ -77,9 +77,12 @@ export type DefaultPolicy = {
       ],
       "accounts": [
         {
-          "name": "smartWallet",
-          "writable": true,
+          "name": "policySigner",
           "signer": true
+        },
+        {
+          "name": "smartWallet",
+          "writable": true
         },
         {
           "name": "walletState",

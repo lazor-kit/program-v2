@@ -1,6 +1,5 @@
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
 use crate::state::message::{Message, SimpleMessage};
-use crate::state::DeviceSlot;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
@@ -32,6 +31,25 @@ pub struct PdaSigner {
     pub seeds: Vec<Vec<u8>>,
     /// The bump associated with the PDA.
     pub bump: u8,
+}
+
+pub fn get_policy_signer(
+    policy_signer: Pubkey,
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    smart_wallet: Pubkey,
+) -> Result<PdaSigner> {
+    let seeds = &[&hash_seeds(&passkey_public_key, smart_wallet)[..]];
+    let (expected_policy_signer, bump) = Pubkey::find_program_address(seeds, &ID);
+
+    require!(
+        policy_signer == expected_policy_signer,
+        LazorKitError::PasskeyMismatch
+    );
+
+    Ok(PdaSigner {
+        seeds: vec![seeds[0].to_vec()],
+        bump,
+    })
 }
 
 /// Helper to check if a slice matches a pattern
