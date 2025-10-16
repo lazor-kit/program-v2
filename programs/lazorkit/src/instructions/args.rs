@@ -28,8 +28,6 @@ pub struct CreateSmartWalletArgs {
     pub amount: u64,
     /// Optional referral address for fee sharing
     pub referral_address: Option<Pubkey>,
-    /// Random vault index (0-31) calculated off-chain for fee distribution
-    pub vault_index: u8,
 }
 
 /// Arguments for executing a transaction through the smart wallet
@@ -152,9 +150,9 @@ pub struct CreateChunkArgs {
 pub struct NewWalletDeviceArgs {
     /// Public key of the new WebAuthn passkey
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+
     /// Unique credential ID from WebAuthn registration (max 256 bytes)
-    #[max_len(256)]
-    pub credential_id: Vec<u8>,
+    pub credential_hash: [u8; 32],
 }
 
 /// Arguments for granting ephemeral permission to a keypair

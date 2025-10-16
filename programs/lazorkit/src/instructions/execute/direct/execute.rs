@@ -2,11 +2,12 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::{Args as _, ExecuteArgs};
 use crate::security::validation;
-use crate::state::{LazorKitVault, WalletState};
+use crate::state::{LazorKitVault, WalletDevice, WalletState};
 use crate::utils::{
-    check_whitelist, compute_execute_message_hash, compute_instruction_hash, execute_cpi,
+    compute_execute_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi,
     get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
 };
+use crate::ID;
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 
 /// Execute a transaction through the smart wallet
@@ -20,9 +21,12 @@ pub fn execute<'c: 'info, 'info>(
 ) -> Result<()> {
     // Step 0: Validate input arguments and global program state
     args.validate()?;
-    require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
+    require!(
+        !ctx.accounts.lazorkit_config.is_paused,
+        LazorKitError::ProgramPaused
+    );
+
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
 
     // Step 0.1: Split remaining accounts between policy and CPI instructions
     // The split_index determines where to divide the accounts
@@ -63,30 +67,10 @@ pub fn execute<'c: 'info, 'info>(
         expected_message_hash,
     )?;
 
-    // Step 1: Validate and verify the policy program
-    let policy_program_info = &ctx.accounts.policy_program;
-
-    // Ensure the policy program is executable (not a data account)
-    validation::validate_program_executable(policy_program_info)?;
-
-    // Verify the policy program is registered in our whitelist
-    check_whitelist(
-        &ctx.accounts.policy_program_registry,
-        &policy_program_info.key(),
-    )?;
-
-    // Ensure the policy program matches the wallet's configured policy
-    require!(
-        policy_program_info.key() == ctx.accounts.wallet_state.policy_program,
-        LazorKitError::InvalidProgramAddress
-    );
-
-    // Step 2: Prepare PDA signer for policy program CPI
-
     let policy_signer = get_policy_signer(
-        ctx.accounts.policy_signer.key(),
-        args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
+        ctx.accounts.wallet_device.key(),
+        ctx.accounts.wallet_device.credential_hash,
     )?;
 
     // Step 3: Verify policy instruction discriminator and data integrity
@@ -106,7 +90,7 @@ pub fn execute<'c: 'info, 'info>(
     execute_cpi(
         policy_accounts,
         policy_data,
-        policy_program_info,
+        &ctx.accounts.policy_program,
         policy_signer,
     )?;
 
@@ -118,7 +102,7 @@ pub fn execute<'c: 'info, 'info>(
     validation::validate_program_executable(&ctx.accounts.cpi_program)?;
     // Prevent reentrancy attacks by blocking calls to ourselves
     require!(
-        ctx.accounts.cpi_program.key() != crate::ID,
+        ctx.accounts.cpi_program.key() != ID,
         LazorKitError::ReentrancyDetected
     );
     // Ensure we have accounts for the CPI
@@ -149,7 +133,7 @@ pub fn execute<'c: 'info, 'info>(
 
     // Handle fee distribution and vault validation
     crate::utils::handle_fee_distribution(
-        &ctx.accounts.config,
+        &ctx.accounts.lazorkit_config,
         &ctx.accounts.wallet_state,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
@@ -159,13 +143,6 @@ pub fn execute<'c: 'info, 'info>(
         args.vault_index,
     )?;
 
-    msg!(
-        "Successfully executed transaction: wallet={}, nonce={}, policy={}, cpi={}",
-        ctx.accounts.smart_wallet.key(),
-        ctx.accounts.wallet_state.last_nonce,
-        ctx.accounts.policy_program.key(),
-        ctx.accounts.cpi_program.key()
-    );
     Ok(())
 }
 
@@ -186,12 +163,16 @@ pub struct Execute<'info> {
         mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
-        owner = crate::ID,
+        owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
 
-    /// CHECK: PDA verified by seeds
-    pub policy_signer: UncheckedAccount<'info>,
+    #[account(
+        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), wallet_device.credential_hash)],
+        bump,
+        owner = ID,
+    )]
+    pub wallet_device: Box<Account<'info, WalletDevice>>,
 
     #[account(mut, address = wallet_state.referral)]
     /// CHECK: referral account (matches wallet_state.referral)
@@ -207,24 +188,32 @@ pub struct Execute<'info> {
     #[account(
         seeds = [crate::state::PolicyProgramRegistry::PREFIX_SEED],
         bump,
-        owner = crate::ID
+        owner = ID
     )]
     pub policy_program_registry: Box<Account<'info, crate::state::PolicyProgramRegistry>>,
 
-    #[account(executable)]
+    #[account(
+        executable,
+        constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
+        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+    )]
     /// CHECK: must be executable (policy program)
     pub policy_program: UncheckedAccount<'info>,
 
-    #[account(executable)]
+    #[account(
+        executable,
+        constraint = !policy_program_registry.registered_programs.contains(&cpi_program.key()) @ LazorKitError::InvalidProgramAddress,
+        constraint = cpi_program.key() != ID @ LazorKitError::ReentrancyDetected
+    )]
     /// CHECK: must be executable (target program)
     pub cpi_program: UncheckedAccount<'info>,
 
     #[account(
         seeds = [crate::state::Config::PREFIX_SEED],
         bump,
-        owner = crate::ID
+        owner = ID
     )]
-    pub config: Box<Account<'info, crate::state::Config>>,
+    pub lazorkit_config: Box<Account<'info, crate::state::Config>>,
 
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instruction sysvar

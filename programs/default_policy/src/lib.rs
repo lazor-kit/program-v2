@@ -40,14 +40,25 @@ pub mod default_policy {
         )
     }
 
-    // pub fn add_device(
-    //     ctx: Context<AddDevice>,
-    //     wallet_id: u64,
-    //     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    //     new_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    // ) -> Result<()> {
-    //     instructions::add_device(ctx, wallet_id, passkey_public_key, new_passkey_public_key)
-    // }
+    pub fn add_device(
+        ctx: Context<AddDevice>,
+        wallet_id: u64,
+        passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+        credential_hash: [u8; 32],
+        policy_data: Vec<u8>,
+        new_device_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+        new_device_credential_hash: [u8; 32],
+    ) -> Result<PolicyStruct> {
+        instructions::add_device(
+            ctx,
+            wallet_id,
+            passkey_public_key,
+            credential_hash,
+            policy_data,
+            new_device_passkey_public_key,
+            new_device_credential_hash,
+        )
+    }
 
     // pub fn remove_device(
     //     ctx: Context<RemoveDevice>,

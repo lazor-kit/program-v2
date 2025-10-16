@@ -121,7 +121,7 @@ pub fn execute_chunk(
     }
 
     crate::utils::handle_fee_distribution(
-        &ctx.accounts.config,
+        &ctx.accounts.lazorkit_config,
         &ctx.accounts.wallet_state,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
@@ -145,18 +145,16 @@ pub struct ExecuteChunk<'info> {
     pub payer: Signer<'info>,
 
     #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, Config>>,
+    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
         seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
         bump = wallet_state.bump,
     )]
-    /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
-        mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = crate::ID,

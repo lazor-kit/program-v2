@@ -1,5 +1,6 @@
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
 use crate::state::message::{Message, SimpleMessage};
+use crate::state::WalletDevice;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::solana_program::{
     instruction::Instruction,
@@ -34,11 +35,14 @@ pub struct PdaSigner {
 }
 
 pub fn get_policy_signer(
-    policy_signer: Pubkey,
-    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     smart_wallet: Pubkey,
+    policy_signer: Pubkey,
+    credential_hash: [u8; 32],
 ) -> Result<PdaSigner> {
-    let seeds = &[&hash_seeds(&passkey_public_key, smart_wallet)[..]];
+    let seeds: &[&[u8]] = &[
+        WalletDevice::PREFIX_SEED,
+        &create_wallet_device_hash(smart_wallet, credential_hash),
+    ];
     let (expected_policy_signer, bump) = Pubkey::find_program_address(seeds, &ID);
 
     require!(
@@ -47,7 +51,7 @@ pub fn get_policy_signer(
     );
 
     Ok(PdaSigner {
-        seeds: vec![seeds[0].to_vec()],
+        seeds: seeds.to_vec().iter().map(|s| s.to_vec()).collect(),
         bump,
     })
 }
@@ -307,11 +311,11 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn hash_seeds(passkey: &[u8; PASSKEY_PUBLIC_KEY_SIZE], wallet: Pubkey) -> [u8; 32] {
+pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]) -> [u8; 32] {
     // Combine passkey public key with wallet address for unique hashing
-    let mut buf = [0u8; 65];
-    buf[..SECP_PUBKEY_SIZE as usize].copy_from_slice(passkey);
-    buf[SECP_PUBKEY_SIZE as usize..].copy_from_slice(&wallet.to_bytes());
+    let mut buf = [0u8; 64];
+    buf[..32 as usize].copy_from_slice(&smart_wallet.to_bytes());
+    buf[32 as usize..].copy_from_slice(&credential_hash);
     // Hash the combined data to create a unique identifier
     hash(&buf).to_bytes()
 }

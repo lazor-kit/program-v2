@@ -102,7 +102,7 @@
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "pda": {
             "seeds": [
               {
@@ -179,6 +179,14 @@
           }
         },
         {
+          "name": "wallet_device"
+        },
+        {
+          "name": "new_wallet_device",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "referral",
           "writable": true
         },
@@ -212,9 +220,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "policy_signer"
         },
         {
           "name": "policy_program"
@@ -285,7 +290,7 @@
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "pda": {
             "seeds": [
               {
@@ -362,7 +367,7 @@
           }
         },
         {
-          "name": "policy_signer"
+          "name": "wallet_device"
         },
         {
           "name": "referral",
@@ -584,7 +589,7 @@
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "pda": {
             "seeds": [
               {
@@ -661,7 +666,7 @@
           }
         },
         {
-          "name": "policy_signer"
+          "name": "wallet_device"
         },
         {
           "name": "policy_program_registry",
@@ -755,17 +760,11 @@
       "accounts": [
         {
           "name": "payer",
-          "docs": [
-            "The account that pays for the wallet creation and initial SOL transfer"
-          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "policy_program_registry",
-          "docs": [
-            "Policy program registry that validates the default policy program"
-          ],
           "pda": {
             "seeds": [
               {
@@ -793,9 +792,6 @@
         },
         {
           "name": "smart_wallet",
-          "docs": [
-            "The smart wallet address PDA being created with the provided wallet ID"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -853,7 +849,8 @@
           }
         },
         {
-          "name": "policy_signer"
+          "name": "wallet_device",
+          "writable": true
         },
         {
           "name": "lazorkit_config",
@@ -878,9 +875,6 @@
         },
         {
           "name": "system_program",
-          "docs": [
-            "System program for account creation and SOL transfers"
-          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -973,7 +967,7 @@
           }
         },
         {
-          "name": "policy_signer"
+          "name": "wallet_device"
         },
         {
           "name": "referral",
@@ -1044,7 +1038,7 @@
           "name": "cpi_program"
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "pda": {
             "seeds": [
               {
@@ -1100,7 +1094,7 @@
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "pda": {
             "seeds": [
               {
@@ -1149,7 +1143,6 @@
         },
         {
           "name": "wallet_state",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1378,11 +1371,11 @@
           "writable": true,
           "signer": true,
           "relations": [
-            "config"
+            "lazorkit_config"
           ]
         },
         {
-          "name": "config",
+          "name": "lazorkit_config",
           "docs": [
             "The program's configuration account."
           ],
@@ -1564,6 +1557,19 @@
         153,
         86,
         72
+      ]
+    },
+    {
+      "name": "WalletDevice",
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
       ]
     },
     {
@@ -2361,39 +2367,6 @@
             "type": {
               "option": "pubkey"
             }
-          },
-          {
-            "name": "vault_index",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DeviceSlot",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkey_pubkey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "credential_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           }
         ]
       }
@@ -2511,11 +2484,16 @@
             }
           },
           {
-            "name": "credential_id",
+            "name": "credential_hash",
             "docs": [
               "Unique credential ID from WebAuthn registration (max 256 bytes)"
             ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -2589,6 +2567,40 @@
       }
     },
     {
+      "name": "WalletDevice",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credential_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "WalletState",
       "type": {
         "kind": "struct",
@@ -2614,26 +2626,8 @@
             "type": "pubkey"
           },
           {
-            "name": "policy_data_len",
-            "type": "u16"
-          },
-          {
             "name": "policy_data",
             "type": "bytes"
-          },
-          {
-            "name": "device_count",
-            "type": "u8"
-          },
-          {
-            "name": "devices",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "DeviceSlot"
-                }
-              }
-            }
           }
         ]
       }

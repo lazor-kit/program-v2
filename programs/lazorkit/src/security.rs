@@ -68,6 +68,26 @@ pub mod validation {
     use super::*;
     use crate::error::LazorKitError;
 
+    pub fn validate_wallet_id(wallet_id: u64) -> Result<()> {
+        require!(
+            wallet_id != 0 && wallet_id < u64::MAX,
+            LazorKitError::InvalidSequenceNumber
+        );
+        Ok(())
+    }
+
+    pub fn validate_passkey_format(
+        passkey_public_key: &[u8; crate::constants::PASSKEY_PUBLIC_KEY_SIZE],
+    ) -> Result<()> {
+        require!(
+            passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
+                || passkey_public_key[0]
+                    == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
+            LazorKitError::InvalidPasskeyFormat
+        );
+        Ok(())
+    }
+
     /// Validate policy data size
     pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
         require!(

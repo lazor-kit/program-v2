@@ -6,6 +6,6 @@ mod remove_device;
 
 pub use add_device::*;
 pub use check_policy::*;
-pub use destroy_policy::*;
+// pub use destroy_policy::*;
 pub use init_policy::*;
-pub use remove_device::*;
+// pub use remove_device::*;
