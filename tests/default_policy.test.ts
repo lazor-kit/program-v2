@@ -25,10 +25,10 @@ async function getBlockchainTimestamp(
 // Helper function to get latest nonce from smart wallet config
 async function getLatestNonce(
   lazorkitProgram: LazorkitClient,
-  smartWalletId: anchor.BN
+  smartWallet: anchor.web3.PublicKey
 ): Promise<anchor.BN> {
   const smartWalletConfig = await lazorkitProgram.getWalletStateData(
-    smartWalletId
+    smartWallet
   );
   return smartWalletConfig.lastNonce;
 }

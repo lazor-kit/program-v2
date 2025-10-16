@@ -106,13 +106,13 @@ describe('Test smart wallet with default policy', () => {
 
     console.log('Create smart-wallet: ', sig);
 
-    // const smartWalletConfig = await lazorkitProgram.getWalletStateData(
-    //   smartWallet
-    // );
+    const smartWalletConfig = await lazorkitProgram.getWalletStateData(
+      smartWallet
+    );
 
-    // expect(smartWalletConfig.walletId.toString()).to.be.equal(
-    //   smartWalletId.toString()
-    // );
+    expect(smartWalletConfig.walletId.toString()).to.be.equal(
+      smartWalletId.toString()
+    );
   });
 
   it('Execute direct transaction with transfer sol from smart wallet', async () => {
@@ -134,9 +134,9 @@ describe('Test smart wallet with default policy', () => {
       )
     );
 
-    const policySigner = lazorkitProgram.getPolicySignerPubkey(
+    const policySigner = lazorkitProgram.getWalletDevicePubkey(
       smartWallet,
-      passkeyPubkey
+      credentialHash
     );
 
     const { transaction: createSmartWalletTxn } =
@@ -204,6 +204,7 @@ describe('Test smart wallet with default policy', () => {
       vaultIndex: 0,
       timestamp,
       smartWalletId,
+      credentialHash,
     });
 
     const sig2 = await anchor.web3.sendAndConfirmTransaction(
@@ -226,17 +227,17 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const policySigner = lazorkitProgram.getPolicySignerPubkey(
-      smartWallet,
-      passkeyPubkey
-    );
-
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const credentialHash = Array.from(
       new Uint8Array(
         require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
       )
+    );
+
+    const policySigner = lazorkitProgram.getWalletDevicePubkey(
+      smartWallet,
+      credentialHash
     );
 
     const { transaction: createSmartWalletTxn } =
@@ -328,6 +329,7 @@ describe('Test smart wallet with default policy', () => {
       cpiInstructions: [transferTokenIns],
       timestamp,
       vaultIndex: 0,
+      credentialHash,
     });
 
     const sig2 = await anchor.web3.sendAndConfirmTransaction(
@@ -359,7 +361,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -370,17 +372,17 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const policySigner = lazorkitProgram.getPolicySignerPubkey(
-      smartWallet,
-      passkeyPubkey
-    );
-
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const credentialHash = Array.from(
       new Uint8Array(
         require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
       )
+    );
+
+    const policySigner = lazorkitProgram.getWalletDevicePubkey(
+      smartWallet,
+      credentialHash
     );
 
     const { transaction: createSmartWalletTxn } =
@@ -469,6 +471,7 @@ describe('Test smart wallet with default policy', () => {
       {
         payer: payer.publicKey,
         smartWallet: smartWallet,
+
         passkeySignature: {
           passkeyPublicKey: passkeyPubkey,
           signature64: signature,
@@ -479,6 +482,7 @@ describe('Test smart wallet with default policy', () => {
         cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
         vaultIndex: 0,
         timestamp,
+        credentialHash,
       },
       {
         computeUnitLimit: 300_000,
@@ -514,7 +518,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  xit('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -525,17 +529,17 @@ describe('Test smart wallet with default policy', () => {
 
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const policySigner = lazorkitProgram.getPolicySignerPubkey(
-      smartWallet,
-      passkeyPubkey
-    );
-
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
     const credentialHash = Array.from(
       new Uint8Array(
         require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
       )
+    );
+
+    const policySigner = lazorkitProgram.getWalletDevicePubkey(
+      smartWallet,
+      credentialHash
     );
 
     const { transaction: createSmartWalletTxn } =
@@ -627,6 +631,7 @@ describe('Test smart wallet with default policy', () => {
       cpiInstructions: [transferTokenIns, transferTokenIns],
       timestamp,
       vaultIndex: 0,
+      credentialHash,
     });
 
     const sig2 = await anchor.web3.sendAndConfirmTransaction(
@@ -669,6 +674,12 @@ describe('Test smart wallet with default policy', () => {
     const smartWalletId = lazorkitProgram.generateWalletId();
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
     const credentialId = base64.encode(Buffer.from('testing-cu-limit'));
+
+    const credentialHash = Array.from(
+      new Uint8Array(
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+      )
+    );
 
     // Create smart wallet
     const { transaction: createSmartWalletTxn } =
@@ -733,6 +744,7 @@ describe('Test smart wallet with default policy', () => {
         cpiInstruction: transferInstruction1,
         timestamp,
         smartWalletId,
+        credentialHash,
       },
       {
         useVersionedTransaction: true,
@@ -781,6 +793,7 @@ describe('Test smart wallet with default policy', () => {
         cpiInstruction: transferInstruction2,
         timestamp,
         smartWalletId,
+        credentialHash,
       },
       {
         computeUnitLimit: 200000,
@@ -848,6 +861,7 @@ describe('Test smart wallet with default policy', () => {
         policyInstruction: mockPolicyInstruction,
         cpiInstructions: [transferInstruction3, transferInstruction4],
         timestamp,
+        credentialHash,
       },
       {
         computeUnitLimit: 300000, // Higher limit for multiple instructions

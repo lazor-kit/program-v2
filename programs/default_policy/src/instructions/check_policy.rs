@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
 use lazorkit::{
-    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
-    state::DeviceSlot,
-    utils::hash_seeds,
-    ID as LAZORKIT_ID,
+    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED}, state::WalletDevice, utils::create_wallet_device_hash, ID as LAZORKIT_ID
 };
 
-use crate::{error::PolicyError, state::PolicyStruct};
+use crate::{
+    error::PolicyError,
+    state::{DeviceSlot, PolicyStruct},
+};
 
 pub fn check_policy(
     ctx: Context<CheckPolicy>,
@@ -24,30 +24,41 @@ pub fn check_policy(
     )
     .0;
 
-    let hashed = hash_seeds(&passkey_public_key, smart_wallet.key());
-
-    let expected_policy_signer_pubkey = Pubkey::find_program_address(&[&hashed], &LAZORKIT_ID).0;
+    let expected_policy_signer_pubkey = Pubkey::find_program_address(
+        &[
+            WalletDevice::PREFIX_SEED,
+            &create_wallet_device_hash(smart_wallet.key(), credential_hash),
+        ],
+        &LAZORKIT_ID,
+    )
+    .0;
 
     require!(
         smart_wallet.key() == expected_smart_wallet_pubkey,
         PolicyError::Unauthorized
     );
+
     require!(
         policy_signer.key() == expected_policy_signer_pubkey,
         PolicyError::Unauthorized
     );
 
     let policy_struct = PolicyStruct::try_from_slice(&policy_data)?;
+
     require!(
         policy_struct.smart_wallet == smart_wallet.key(),
         PolicyError::Unauthorized
     );
 
+    // Check if the passkey public key is in the device slots
+    let device_slots = policy_struct.device_slots;
+    let device_slot = DeviceSlot {
+        passkey_pubkey: passkey_public_key,
+        credential_hash: credential_hash,
+    };
+
     require!(
-        policy_struct.device_slots.contains(&DeviceSlot {
-            passkey_pubkey: passkey_public_key,
-            credential_hash,
-        }),
+        device_slots.contains(&device_slot),
         PolicyError::Unauthorized
     );
 

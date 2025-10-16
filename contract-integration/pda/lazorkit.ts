@@ -1,7 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { Buffer } from 'buffer';
-import { hashSeeds } from '../webauthn/secp256r1';
+import { createWalletDeviceHash } from '../webauthn/secp256r1';
 // Mirror on-chain seeds
 export const CONFIG_SEED = Buffer.from('config');
 export const POLICY_PROGRAM_REGISTRY_SEED = Buffer.from('policy_registry');
@@ -55,13 +55,15 @@ export function deriveSmartWalletConfigPda(
   )[0];
 }
 
-export function derivePolicySignerPda(
+export function deriveWalletDevicePda(
   programId: PublicKey,
   smartWallet: PublicKey,
-  passkeyCompressed33: number[]
+  credentialHash: number[]
 ): [PublicKey, number] {
-  const hashed = hashSeeds(passkeyCompressed33, smartWallet);
-  return PublicKey.findProgramAddressSync([hashed], programId);
+  return PublicKey.findProgramAddressSync(
+    [WALLET_DEVICE_SEED, createWalletDeviceHash(smartWallet, credentialHash)],
+    programId
+  );
 }
 
 export function deriveChunkPda(

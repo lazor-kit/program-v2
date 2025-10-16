@@ -108,7 +108,7 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "pda": {
             "seeds": [
               {
@@ -185,6 +185,14 @@ export type Lazorkit = {
           }
         },
         {
+          "name": "walletDevice"
+        },
+        {
+          "name": "newWalletDevice",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "referral",
           "writable": true
         },
@@ -218,9 +226,6 @@ export type Lazorkit = {
               }
             ]
           }
-        },
-        {
-          "name": "policySigner"
         },
         {
           "name": "policyProgram"
@@ -291,7 +296,7 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "pda": {
             "seeds": [
               {
@@ -368,7 +373,7 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "policySigner"
+          "name": "walletDevice"
         },
         {
           "name": "referral",
@@ -590,7 +595,7 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "pda": {
             "seeds": [
               {
@@ -667,7 +672,7 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "policySigner"
+          "name": "walletDevice"
         },
         {
           "name": "policyProgramRegistry",
@@ -761,17 +766,11 @@ export type Lazorkit = {
       "accounts": [
         {
           "name": "payer",
-          "docs": [
-            "The account that pays for the wallet creation and initial SOL transfer"
-          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "policyProgramRegistry",
-          "docs": [
-            "Policy program registry that validates the default policy program"
-          ],
           "pda": {
             "seeds": [
               {
@@ -799,9 +798,6 @@ export type Lazorkit = {
         },
         {
           "name": "smartWallet",
-          "docs": [
-            "The smart wallet address PDA being created with the provided wallet ID"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -859,7 +855,8 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "policySigner"
+          "name": "walletDevice",
+          "writable": true
         },
         {
           "name": "lazorkitConfig",
@@ -884,9 +881,6 @@ export type Lazorkit = {
         },
         {
           "name": "systemProgram",
-          "docs": [
-            "System program for account creation and SOL transfers"
-          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -979,7 +973,7 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "policySigner"
+          "name": "walletDevice"
         },
         {
           "name": "referral",
@@ -1050,7 +1044,7 @@ export type Lazorkit = {
           "name": "cpiProgram"
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "pda": {
             "seeds": [
               {
@@ -1106,7 +1100,7 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "pda": {
             "seeds": [
               {
@@ -1155,7 +1149,6 @@ export type Lazorkit = {
         },
         {
           "name": "walletState",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1384,11 +1377,11 @@ export type Lazorkit = {
           "writable": true,
           "signer": true,
           "relations": [
-            "config"
+            "lazorkitConfig"
           ]
         },
         {
-          "name": "config",
+          "name": "lazorkitConfig",
           "docs": [
             "The program's configuration account."
           ],
@@ -1570,6 +1563,19 @@ export type Lazorkit = {
         153,
         86,
         72
+      ]
+    },
+    {
+      "name": "walletDevice",
+      "discriminator": [
+        35,
+        85,
+        31,
+        31,
+        179,
+        48,
+        136,
+        123
       ]
     },
     {
@@ -2367,39 +2373,6 @@ export type Lazorkit = {
             "type": {
               "option": "pubkey"
             }
-          },
-          {
-            "name": "vaultIndex",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "deviceSlot",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkeyPubkey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "credentialHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           }
         ]
       }
@@ -2517,11 +2490,16 @@ export type Lazorkit = {
             }
           },
           {
-            "name": "credentialId",
+            "name": "credentialHash",
             "docs": [
               "Unique credential ID from WebAuthn registration (max 256 bytes)"
             ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -2595,6 +2573,40 @@ export type Lazorkit = {
       }
     },
     {
+      "name": "walletDevice",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPubkey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credentialHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "smartWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "walletState",
       "type": {
         "kind": "struct",
@@ -2620,26 +2632,8 @@ export type Lazorkit = {
             "type": "pubkey"
           },
           {
-            "name": "policyDataLen",
-            "type": "u16"
-          },
-          {
             "name": "policyData",
             "type": "bytes"
-          },
-          {
-            "name": "deviceCount",
-            "type": "u8"
-          },
-          {
-            "name": "devices",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "deviceSlot"
-                }
-              }
-            }
           }
         ]
       }

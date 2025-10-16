@@ -5,13 +5,12 @@ import { Lazorkit } from './anchor/types/lazorkit';
 // ============================================================================
 // Core Types (from on-chain)
 // ============================================================================
-export type SmartWalletConfig = anchor.IdlTypes<Lazorkit>['smartWalletConfig'];
+export type WalletState = anchor.IdlTypes<Lazorkit>['walletState'];
 export type WalletDevice = anchor.IdlTypes<Lazorkit>['walletDevice'];
 export type ProgramConfig = anchor.IdlTypes<Lazorkit>['config'];
 export type PolicyProgramRegistry =
   anchor.IdlTypes<Lazorkit>['policyProgramRegistry'];
 export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
-export type Permission = anchor.IdlTypes<Lazorkit>['permission'];
 
 // Instruction Args
 export type CreateSmartWalletArgs =
@@ -20,8 +19,6 @@ export type ExecuteArgs = anchor.IdlTypes<Lazorkit>['executeArgs'];
 export type ChangePolicyArgs = anchor.IdlTypes<Lazorkit>['changePolicyArgs'];
 export type CallPolicyArgs = anchor.IdlTypes<Lazorkit>['callPolicyArgs'];
 export type CreateChunkArgs = anchor.IdlTypes<Lazorkit>['createChunkArgs'];
-export type GrantPermissionArgs =
-  anchor.IdlTypes<Lazorkit>['grantPermissionArgs'];
 export type NewWalletDeviceArgs =
   anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
 export type UpdateType = anchor.IdlTypes<Lazorkit>['updateType'];
@@ -117,6 +114,7 @@ interface BaseParams {
 
 interface AuthParams extends BaseParams {
   passkeySignature: PasskeySignature;
+  credentialHash: number[];
 }
 
 // ============================================================================

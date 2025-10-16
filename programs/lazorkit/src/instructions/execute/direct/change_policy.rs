@@ -3,10 +3,9 @@ use anchor_lang::prelude::*;
 use crate::constants::SMART_WALLET_SEED;
 use crate::instructions::{Args as _, ChangePolicyArgs};
 use crate::security::validation;
-use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletState};
+use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletDevice, WalletState};
 use crate::utils::{
-    check_whitelist, compute_change_policy_message_hash, compute_instruction_hash, execute_cpi,
-    get_policy_signer, sighash, verify_authorization_hash,
+     compute_change_policy_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, verify_authorization_hash
 };
 use crate::{error::LazorKitError, ID};
 
@@ -16,35 +15,12 @@ pub fn change_policy<'c: 'info, 'info>(
 ) -> Result<()> {
     // Step 1: Validate input arguments and global program state
     args.validate()?;
-    require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
+    require!(
+        !ctx.accounts.lazorkit_config.is_paused,
+        LazorKitError::ProgramPaused
+    );
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
     validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
-
-    // Ensure both old and new policy programs are executable
-    validation::validate_program_executable(&ctx.accounts.old_policy_program)?;
-    validation::validate_program_executable(&ctx.accounts.new_policy_program)?;
-
-    // Verify both policy programs are registered in the whitelist
-    check_whitelist(
-        &ctx.accounts.policy_program_registry,
-        &ctx.accounts.old_policy_program.key(),
-    )?;
-    check_whitelist(
-        &ctx.accounts.policy_program_registry,
-        &ctx.accounts.new_policy_program.key(),
-    )?;
-
-    // Ensure the old policy program matches the wallet's current policy
-    require!(
-        ctx.accounts.wallet_state.policy_program == ctx.accounts.old_policy_program.key(),
-        LazorKitError::InvalidProgramAddress
-    );
-
-    // Ensure we're actually changing to a different policy program
-    require!(
-        ctx.accounts.old_policy_program.key() != ctx.accounts.new_policy_program.key(),
-        LazorKitError::PolicyProgramsIdentical
-    );
 
     // Validate policy instruction data sizes
     validation::validate_policy_data(&args.destroy_policy_data)?;
@@ -113,13 +89,13 @@ pub fn change_policy<'c: 'info, 'info>(
     // Step 6: Prepare policy program signer and validate policy transition
     // Create a signer that can authorize calls to the policy programs
     let policy_signer = get_policy_signer(
-        ctx.accounts.policy_signer.key(),
-        args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
+        ctx.accounts.wallet_device.key(),
+        ctx.accounts.wallet_device.credential_hash,
     )?;
 
     // Ensure at least one policy program is the default policy (security requirement)
-    let default_policy = ctx.accounts.config.default_policy_program_id;
+    let default_policy = ctx.accounts.lazorkit_config.default_policy_program_id;
     require!(
         ctx.accounts.old_policy_program.key() == default_policy
             || ctx.accounts.new_policy_program.key() == default_policy,
@@ -150,7 +126,7 @@ pub fn change_policy<'c: 'info, 'info>(
 
     // Step 10: Handle fee distribution and vault validation
     crate::utils::handle_fee_distribution(
-        &ctx.accounts.config,
+        &ctx.accounts.lazorkit_config,
         &ctx.accounts.wallet_state,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
@@ -169,15 +145,18 @@ pub struct ChangePolicy<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, Config>>,
+    #[account(
+        seeds = [Config::PREFIX_SEED],
+        bump, 
+        owner = ID
+    )]
+    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
         seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
         bump = wallet_state.bump,
     )]
-    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -188,8 +167,12 @@ pub struct ChangePolicy<'info> {
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
 
-    /// CHECK: PDA verified by seeds
-    pub policy_signer: UncheckedAccount<'info>,
+    #[account(
+        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), wallet_device.credential_hash)],
+        bump,
+        owner = ID,
+    )]
+    pub wallet_device: Box<Account<'info, WalletDevice>>,
 
     #[account(mut, address = wallet_state.referral)]
     /// CHECK: referral account (matches wallet_state.referral)
@@ -203,11 +186,20 @@ pub struct ChangePolicy<'info> {
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
     pub lazorkit_vault: SystemAccount<'info>,
 
+    #[account(
+        executable,
+        constraint = old_policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
+        constraint = policy_program_registry.registered_programs.contains(&old_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+    )]
     /// CHECK: old policy program (executable)
-    #[account(executable)]
     pub old_policy_program: UncheckedAccount<'info>,
+
+    #[account(
+        executable,
+        constraint = new_policy_program.key() != old_policy_program.key() @ LazorKitError::PolicyProgramsIdentical,
+        constraint = policy_program_registry.registered_programs.contains(&new_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+    )]
     /// CHECK: new policy program (executable)
-    #[account(executable)]
     pub new_policy_program: UncheckedAccount<'info>,
 
     #[account(
@@ -220,5 +212,6 @@ pub struct ChangePolicy<'info> {
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub ix_sysvar: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 }

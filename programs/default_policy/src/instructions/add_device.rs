@@ -1,97 +1,85 @@
-// use crate::{error::PolicyError, state::Policy, ID};
-// use anchor_lang::prelude::*;
-// use lazorkit::{
-//     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
-//     state::WalletDevice,
-//     utils::PasskeyExt as _,
-//     ID as LAZORKIT_ID,
-// };
+use anchor_lang::prelude::*;
+use lazorkit::{
+    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
+    state::WalletDevice,
+    utils::create_wallet_device_hash,
+    ID as LAZORKIT_ID,
+};
 
-// pub fn add_device(
-//     ctx: Context<AddDevice>,
-//     wallet_id: u64,
-//     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-//     new_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-// ) -> Result<()> {
-//     let wallet_device = &mut ctx.accounts.wallet_device;
-//     let smart_wallet = &mut ctx.accounts.smart_wallet;
-//     let new_wallet_device = &mut ctx.accounts.new_wallet_device;
+use crate::{
+    error::PolicyError,
+    state::{DeviceSlot, PolicyStruct},
+};
 
-//     let expected_smart_wallet_pubkey = Pubkey::find_program_address(
-//         &[SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
-//         &LAZORKIT_ID,
-//     )
-//     .0;
+pub fn add_device(
+    ctx: Context<AddDevice>,
+    wallet_id: u64,
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    credential_hash: [u8; 32],
+    policy_data: Vec<u8>,
+    new_device_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    new_device_credential_hash: [u8; 32],
+) -> Result<PolicyStruct> {
+    let policy_signer = &mut ctx.accounts.policy_signer;
+    let smart_wallet = &mut ctx.accounts.smart_wallet;
 
-//     let expected_wallet_device_pubkey = Pubkey::find_program_address(
-//         &[
-//             WalletDevice::PREFIX_SEED,
-//             expected_smart_wallet_pubkey.as_ref(),
-//             passkey_public_key
-//                 .to_hashed_bytes(expected_smart_wallet_pubkey)
-//                 .as_ref(),
-//         ],
-//         &LAZORKIT_ID,
-//     )
-//     .0;
+    let expected_smart_wallet_pubkey = Pubkey::find_program_address(
+        &[SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
+        &LAZORKIT_ID,
+    )
+    .0;
 
-//     let expected_new_wallet_device_pubkey = Pubkey::find_program_address(
-//         &[
-//             WalletDevice::PREFIX_SEED,
-//             expected_smart_wallet_pubkey.as_ref(),
-//             new_passkey_public_key
-//                 .to_hashed_bytes(expected_smart_wallet_pubkey)
-//                 .as_ref(),
-//         ],
-//         &LAZORKIT_ID,
-//     )
-//     .0;
+    let expected_policy_signer_pubkey = Pubkey::find_program_address(
+        &[
+            WalletDevice::PREFIX_SEED,
+            &create_wallet_device_hash(smart_wallet.key(), credential_hash),
+        ],
+        &LAZORKIT_ID,
+    )
+    .0;
 
-//     require!(
-//         smart_wallet.key() == expected_smart_wallet_pubkey,
-//         PolicyError::Unauthorized
-//     );
-//     require!(
-//         wallet_device.key() == expected_wallet_device_pubkey,
-//         PolicyError::Unauthorized
-//     );
+    require!(
+        smart_wallet.key() == expected_smart_wallet_pubkey,
+        PolicyError::Unauthorized
+    );
 
-//     require!(
-//         new_wallet_device.key() == expected_new_wallet_device_pubkey,
-//         PolicyError::Unauthorized
-//     );
+    require!(
+        policy_signer.key() == expected_policy_signer_pubkey,
+        PolicyError::Unauthorized
+    );
 
-//     let policy = &mut ctx.accounts.policy;
-//     // check if the new wallet device is already in the list
-//     if policy.list_wallet_device.contains(&new_wallet_device.key()) {
-//         return err!(PolicyError::WalletDeviceAlreadyInPolicy);
-//     }
-//     policy.list_wallet_device.push(new_wallet_device.key());
+    let mut policy_struct = PolicyStruct::try_from_slice(&policy_data)?;
 
-//     Ok(())
-// }
+    require!(
+        policy_struct.smart_wallet == smart_wallet.key(),
+        PolicyError::Unauthorized
+    );
 
-// #[derive(Accounts)]
-// pub struct AddDevice<'info> {
-//     #[account(mut)]
-//     pub smart_wallet: SystemAccount<'info>,
+    // Check if the passkey public key is in the device slots
+    let device_slot = DeviceSlot {
+        passkey_pubkey: passkey_public_key,
+        credential_hash: credential_hash,
+    };
 
-//     #[account(
-//         owner = LAZORKIT_ID,
-//         signer,
-//     )]
-//     pub wallet_device: Account<'info, WalletDevice>,
+    require!(
+        policy_struct.device_slots.contains(&device_slot),
+        PolicyError::Unauthorized
+    );
 
-//     /// CHECK:
-//     #[account(mut)]
-//     pub new_wallet_device: UncheckedAccount<'info>,
+    // Add the new device to the device slots
+    policy_struct.device_slots.push(DeviceSlot {
+        passkey_pubkey: new_device_passkey_public_key,
+        credential_hash: new_device_credential_hash,
+    });
 
-//     #[account(
-//         mut,
-//         seeds = [Policy::PREFIX_SEED, smart_wallet.key().as_ref()],
-//         bump,
-//         owner = ID,
-//         constraint = policy.list_wallet_device.contains(&wallet_device.key()) @ PolicyError::Unauthorized,
-//     )]
-//     pub policy: Account<'info, Policy>,
-// }
+    // Return the policy data
+    Ok(policy_struct)
+}
+
+#[derive(Accounts)]
+pub struct AddDevice<'info> {
+    pub policy_signer: Signer<'info>,
+
+    /// CHECK: bound via constraint to policy.smart_wallet
+    pub smart_wallet: SystemAccount<'info>,
+}

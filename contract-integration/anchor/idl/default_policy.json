@@ -8,6 +8,79 @@
   },
   "instructions": [
     {
+      "name": "add_device",
+      "discriminator": [
+        21,
+        27,
+        66,
+        42,
+        18,
+        30,
+        14,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "policy_signer",
+          "signer": true
+        },
+        {
+          "name": "smart_wallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_id",
+          "type": "u64"
+        },
+        {
+          "name": "passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credential_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policy_data",
+          "type": "bytes"
+        },
+        {
+          "name": "new_device_passkey_public_key",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "new_device_credential_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "PolicyStruct"
+        }
+      }
+    },
+    {
       "name": "check_policy",
       "discriminator": [
         28,

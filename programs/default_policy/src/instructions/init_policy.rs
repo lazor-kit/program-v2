@@ -1,9 +1,12 @@
-use crate::{error::PolicyError, state::PolicyStruct};
+use crate::{
+    error::PolicyError,
+    state::{DeviceSlot, PolicyStruct},
+};
 use anchor_lang::prelude::*;
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
-    state::{DeviceSlot, WalletState},
-    utils::hash_seeds,
+    state::{WalletDevice, WalletState},
+    utils::create_wallet_device_hash,
     ID as LAZORKIT_ID,
 };
 
@@ -17,8 +20,6 @@ pub fn init_policy(
     let wallet_state = &mut ctx.accounts.wallet_state;
     let policy_signer = &mut ctx.accounts.policy_signer;
 
-    let hashed = hash_seeds(&passkey_public_key, smart_wallet.key());
-
     let (expected_smart_wallet_pubkey, smart_wallet_bump) = Pubkey::find_program_address(
         &[SMART_WALLET_SEED, wallet_id.to_le_bytes().as_ref()],
         &LAZORKIT_ID,
@@ -30,7 +31,14 @@ pub fn init_policy(
     )
     .0;
 
-    let exepected_policy_signer_pubkey = Pubkey::find_program_address(&[&hashed], &LAZORKIT_ID).0;
+    let expected_policy_signer_pubkey = Pubkey::find_program_address(
+        &[
+            WalletDevice::PREFIX_SEED,
+            &create_wallet_device_hash(smart_wallet.key(), credential_hash),
+        ],
+        &LAZORKIT_ID,
+    )
+    .0;
 
     require!(
         smart_wallet.key() == expected_smart_wallet_pubkey,
@@ -42,7 +50,7 @@ pub fn init_policy(
     );
 
     require!(
-        policy_signer.key() == exepected_policy_signer_pubkey,
+        policy_signer.key() == expected_policy_signer_pubkey,
         PolicyError::Unauthorized
     );
 

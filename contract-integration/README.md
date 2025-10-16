@@ -80,6 +80,7 @@ The main client for interacting with the LazorKit program.
 
 - **PDA Derivation**: `getConfigPubkey()`, `getSmartWalletPubkey()`, `getWalletDevicePubkey()`, etc.
 - **Account Data**: `getWalletStateData()`, `getWalletDeviceData()`, etc.
+- **Wallet Search**: `getSmartWalletByPasskey()`, `getSmartWalletByCredentialHash()`, `findSmartWallet()`
 - **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, etc.
 - **High-level Transaction Builders**: 
   - `createSmartWalletTxn()` - Create new smart wallet
@@ -274,6 +275,93 @@ Helper methods for common operations:
 - `getWalletStateData()`
 - `buildAuthorizationMessage()`
 - `getSmartWalletByPasskey()`
+- `getSmartWalletByCredentialHash()`
+- `findSmartWallet()`
+
+## 🔍 Wallet Search Functionality
+
+The LazorKit client provides powerful search capabilities to find smart wallets using only passkey public keys or credential hashes. This solves the common problem of not knowing the smart wallet address when you only have authentication credentials.
+
+### Search Methods
+
+#### `getSmartWalletByPasskey(passkeyPublicKey: number[])`
+
+Finds a smart wallet by searching through all WalletState accounts for one containing the specified passkey public key.
+
+```typescript
+const result = await lazorkitClient.getSmartWalletByPasskey(passkeyPublicKey);
+if (result.smartWallet) {
+  console.log('Found wallet:', result.smartWallet.toString());
+  console.log('Wallet state:', result.walletState.toString());
+  console.log('Device slot:', result.deviceSlot);
+}
+```
+
+#### `getSmartWalletByCredentialHash(credentialHash: number[])`
+
+Finds a smart wallet by searching through all WalletState accounts for one containing the specified credential hash.
+
+```typescript
+const result = await lazorkitClient.getSmartWalletByCredentialHash(credentialHash);
+if (result.smartWallet) {
+  console.log('Found wallet:', result.smartWallet.toString());
+}
+```
+
+#### `findSmartWallet(passkeyPublicKey?: number[], credentialHash?: number[])`
+
+Convenience method that tries both passkey and credential hash search approaches.
+
+```typescript
+const result = await lazorkitClient.findSmartWallet(passkeyPublicKey, credentialHash);
+if (result.smartWallet) {
+  console.log('Found wallet:', result.smartWallet.toString());
+  console.log('Found by:', result.foundBy); // 'passkey' | 'credential'
+}
+```
+
+### Return Types
+
+All search methods return an object with:
+
+```typescript
+{
+  smartWallet: PublicKey | null;           // The smart wallet address
+  walletState: PublicKey | null;           // The wallet state PDA address  
+  deviceSlot: {                            // The matching device information
+    passkeyPubkey: number[];
+    credentialHash: number[];
+  } | null;
+  foundBy?: 'passkey' | 'credential' | null; // How the wallet was found (findSmartWallet only)
+}
+```
+
+### Performance Considerations
+
+- **Efficiency**: These methods scan all WalletState accounts on-chain, so performance depends on the total number of wallets
+- **Caching**: Consider caching results for frequently accessed wallets
+- **Error Handling**: Methods gracefully handle corrupted or invalid account data
+
+### Example Usage
+
+```typescript
+// Find wallet by passkey
+const walletByPasskey = await lazorkitClient.getSmartWalletByPasskey(passkeyBytes);
+if (walletByPasskey.smartWallet) {
+  // Execute transaction with found wallet
+  const tx = await lazorkitClient.executeTxn({
+    smartWallet: walletByPasskey.smartWallet,
+    passkeySignature: signature,
+    // ... other params
+  });
+}
+
+// Find wallet by credential hash
+const walletByCredential = await lazorkitClient.getSmartWalletByCredentialHash(credentialHashBytes);
+
+// Try both approaches
+const wallet = await lazorkitClient.findSmartWallet(passkeyBytes, credentialHashBytes);
+```
 
 ## 🔄 Migration Guide
 

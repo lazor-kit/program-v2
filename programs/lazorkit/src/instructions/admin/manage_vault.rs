@@ -35,7 +35,7 @@ pub struct ManageVault<'info> {
     /// The current authority of the program.
     #[account(
         mut,
-        constraint = authority.key() == config.authority @ LazorKitError::AuthorityMismatch
+        constraint = authority.key() == lazorkit_config.authority @ LazorKitError::AuthorityMismatch
     )]
     pub authority: Signer<'info>,
 
@@ -45,7 +45,7 @@ pub struct ManageVault<'info> {
         bump,
         has_one = authority @ LazorKitError::InvalidAuthority
     )]
-    pub config: Box<Account<'info, Config>>,
+    pub lazorkit_config: Box<Account<'info, Config>>,
 
     /// Individual vault PDA (empty account that holds SOL)
     #[account(

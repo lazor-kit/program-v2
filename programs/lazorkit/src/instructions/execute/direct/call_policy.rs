@@ -3,10 +3,9 @@ use anchor_lang::prelude::*;
 use crate::constants::SMART_WALLET_SEED;
 use crate::instructions::{Args as _, CallPolicyArgs};
 use crate::security::validation;
-use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletState};
+use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletDevice, WalletState};
 use crate::utils::{
-    check_whitelist, compute_call_policy_message_hash, compute_instruction_hash, execute_cpi,
-    get_policy_signer, handle_fee_distribution, verify_authorization_hash,
+    compute_call_policy_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi, get_policy_signer, verify_authorization_hash
 };
 use crate::{error::LazorKitError, ID};
 
@@ -14,40 +13,13 @@ pub fn call_policy<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
     args: CallPolicyArgs,
 ) -> Result<()> {
-    // Step 1: Validate input arguments and global program state
     args.validate()?;
-    require!(!ctx.accounts.config.is_paused, LazorKitError::ProgramPaused);
+    require!(!ctx.accounts.lazorkit_config.is_paused, LazorKitError::ProgramPaused);
     validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    validation::validate_no_reentrancy(&ctx.remaining_accounts)?;
-
-    // Ensure the policy program is executable (not a data account)
-    validation::validate_program_executable(&ctx.accounts.policy_program)?;
-
-    // Verify the policy program matches the wallet's configured policy
-    require!(
-        ctx.accounts.policy_program.key() == ctx.accounts.wallet_state.policy_program,
-        LazorKitError::InvalidProgramAddress
-    );
-
-    // Verify the policy program is registered in the whitelist
-    check_whitelist(
-        &ctx.accounts.policy_program_registry,
-        &ctx.accounts.policy_program.key(),
-    )?;
-
-    // Validate policy instruction data size
     validation::validate_policy_data(&args.policy_data)?;
 
-    // Step 2: Prepare policy accounts for verification
-    // Skip the first account if a new wallet device is being added
-    let start_idx = if args.new_wallet_device.is_some() {
-        1
-    } else {
-        0
-    };
-    let policy_accs = &ctx.remaining_accounts[start_idx..];
+    let policy_accs = &ctx.remaining_accounts;
 
-    // Step 3: Compute hashes for verification
     let policy_hash = compute_instruction_hash(
         &args.policy_data,
         policy_accs,
@@ -74,12 +46,12 @@ pub fn call_policy<'c: 'info, 'info>(
     // Step 5: Prepare policy program signer
     // Create a signer that can authorize calls to the policy program
     let policy_signer = get_policy_signer(
-        ctx.accounts.policy_signer.key(),
-        args.passkey_public_key,
         ctx.accounts.smart_wallet.key(),
+        ctx.accounts.wallet_device.key(),
+        ctx.accounts.wallet_device.credential_hash,
     )?;
 
-    execute_cpi(
+    let policy_data = execute_cpi(
         policy_accs,
         &args.policy_data,
         &ctx.accounts.policy_program,
@@ -89,10 +61,21 @@ pub fn call_policy<'c: 'info, 'info>(
     // Step 8: Update wallet state and handle fees
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
+    ctx.accounts.wallet_state.policy_data = policy_data;
 
-    // Handle fee distribution and vault validation
-    handle_fee_distribution(
-        &ctx.accounts.config,
+    match args.new_wallet_device {
+        Some(new_wallet_device) => {
+            // Initialize the new wallet device account with the provided data
+            ctx.accounts.new_wallet_device.as_mut().unwrap().passkey_pubkey = new_wallet_device.passkey_public_key;
+            ctx.accounts.new_wallet_device.as_mut().unwrap().credential_hash = new_wallet_device.credential_hash;
+            ctx.accounts.new_wallet_device.as_mut().unwrap().smart_wallet = ctx.accounts.smart_wallet.key();
+            ctx.accounts.new_wallet_device.as_mut().unwrap().bump = ctx.bumps.new_wallet_device.unwrap();
+        }
+        _ => {}
+    }
+
+    crate::utils::handle_fee_distribution(
+        &ctx.accounts.lazorkit_config,
         &ctx.accounts.wallet_state,
         &ctx.accounts.smart_wallet.to_account_info(),
         &ctx.accounts.payer.to_account_info(),
@@ -101,6 +84,7 @@ pub fn call_policy<'c: 'info, 'info>(
         &ctx.accounts.system_program,
         args.vault_index,
     )?;
+    
 
     Ok(())
 }
@@ -111,15 +95,18 @@ pub struct CallPolicy<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub config: Box<Account<'info, Config>>,
+    #[account(
+        seeds = [Config::PREFIX_SEED], 
+        bump, 
+        owner = ID
+    )]
+    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
         seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
         bump = wallet_state.bump,
     )]
-    /// CHECK: PDA verified by seeds
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -129,6 +116,22 @@ pub struct CallPolicy<'info> {
         owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
+
+    #[account(
+        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), wallet_device.credential_hash)],
+        bump,
+        owner = ID,
+    )]
+    pub wallet_device: Box<Account<'info, WalletDevice>>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + WalletDevice::INIT_SPACE,
+        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), args.new_wallet_device.clone().unwrap().credential_hash)],
+        bump
+    )]
+    pub new_wallet_device: Option<Box<Account<'info, WalletDevice>>>,
 
     #[account(mut, address = wallet_state.referral)]
     /// CHECK: referral account (matches wallet_state.referral)
@@ -142,11 +145,12 @@ pub struct CallPolicy<'info> {
     /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
     pub lazorkit_vault: SystemAccount<'info>,
 
-    /// CHECK: PDA verified by seeds
-    pub policy_signer: UncheckedAccount<'info>,
-
     /// CHECK: executable policy program
-    #[account(executable)]
+    #[account(
+        executable,
+        constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
+        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+    )]
     pub policy_program: UncheckedAccount<'info>,
 
     #[account(

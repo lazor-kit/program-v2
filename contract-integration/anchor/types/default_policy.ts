@@ -14,6 +14,79 @@ export type DefaultPolicy = {
   },
   "instructions": [
     {
+      "name": "addDevice",
+      "discriminator": [
+        21,
+        27,
+        66,
+        42,
+        18,
+        30,
+        14,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "policySigner",
+          "signer": true
+        },
+        {
+          "name": "smartWallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policyData",
+          "type": "bytes"
+        },
+        {
+          "name": "newDevicePasskeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "newDeviceCredentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "policyStruct"
+        }
+      }
+    },
+    {
       "name": "checkPolicy",
       "discriminator": [
         28,
