@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     error::LazorKitError,
-    state::{Config, UpdateType},
+    state::{Config, UpdateType}, ID,
 };
 
 /// Update program configuration settings
@@ -55,7 +55,7 @@ pub fn update_config(ctx: Context<UpdateConfig>, param: UpdateType, value: u64) 
             // Prevent setting system program or this program as admin (security measure)
             require!(
                 new_admin_info.key() != anchor_lang::system_program::ID
-                    && new_admin_info.key() != crate::ID,
+                    && new_admin_info.key() != ID,
                 LazorKitError::InvalidAuthority
             );
 

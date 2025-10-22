@@ -370,6 +370,11 @@
           "name": "wallet_device"
         },
         {
+          "name": "new_wallet_device",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "referral",
           "writable": true
         },
@@ -871,6 +876,36 @@
           }
         },
         {
+          "name": "lazorkit_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
           "name": "policy_program"
         },
         {
@@ -1275,17 +1310,11 @@
       "accounts": [
         {
           "name": "signer",
-          "docs": [
-            "The signer of the transaction, who will be the initial authority."
-          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -1305,9 +1334,6 @@
         },
         {
           "name": "policy_program_registry",
-          "docs": [
-            "The registry of policy programs that can be used with smart wallets."
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -1335,16 +1361,10 @@
           }
         },
         {
-          "name": "default_policy_program",
-          "docs": [
-            "The default policy program to be used for new smart wallets."
-          ]
+          "name": "default_policy_program"
         },
         {
           "name": "system_program",
-          "docs": [
-            "The system program."
-          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1891,20 +1911,11 @@
   "types": [
     {
       "name": "CallPolicyArgs",
-      "docs": [
-        "Arguments for calling policy program instructions",
-        "",
-        "Contains WebAuthn authentication data and policy program parameters",
-        "required for executing policy program instructions like adding/removing devices."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -1914,44 +1925,31 @@
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "client_data_json_raw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "policy_data",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "new_wallet_device",
-            "docs": [
-              "Optional new wallet device to add during policy call"
-            ],
             "type": {
               "option": {
                 "defined": {
@@ -1962,23 +1960,14 @@
           },
           {
             "name": "vault_index",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
             "type": "i64"
           },
           {
             "name": "smart_wallet_is_signer",
-            "docs": [
-              "Whether the smart wallet is the signer"
-            ],
             "type": "bool"
           }
         ]
@@ -1986,20 +1975,11 @@
     },
     {
       "name": "ChangePolicyArgs",
-      "docs": [
-        "Arguments for changing a smart wallet's policy program",
-        "",
-        "Contains WebAuthn authentication data and policy program parameters",
-        "required for securely changing the policy program governing a wallet."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2009,58 +1989,47 @@
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "client_data_json_raw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "split_index",
-            "docs": [
-              "Index for splitting remaining accounts between policy and CPI"
-            ],
             "type": "u16"
           },
           {
             "name": "destroy_policy_data",
-            "docs": [
-              "Data for destroying the old policy program"
-            ],
             "type": "bytes"
           },
           {
             "name": "init_policy_data",
-            "docs": [
-              "Data for initializing the new policy program"
-            ],
             "type": "bytes"
           },
           {
+            "name": "vault_index",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
             "name": "new_wallet_device",
-            "docs": [
-              "Optional new wallet device to add during policy change"
-            ],
             "type": {
               "option": {
                 "defined": {
@@ -2068,20 +2037,6 @@
                 }
               }
             }
-          },
-          {
-            "name": "vault_index",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
-            "type": "i64"
           }
         ]
       }
@@ -2166,51 +2121,30 @@
         "fields": [
           {
             "name": "is_paused",
-            "docs": [
-              "Whether the program is currently paused (1 byte)"
-            ],
             "type": "bool"
           },
           {
             "name": "create_smart_wallet_fee",
-            "docs": [
-              "Fee charged for creating a new smart wallet (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "fee_payer_fee",
-            "docs": [
-              "Fee charged to the fee payer for transactions (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "referral_fee",
-            "docs": [
-              "Fee paid to referral addresses (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "lazorkit_fee",
-            "docs": [
-              "Fee retained by LazorKit protocol (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "authority",
-            "docs": [
-              "Program authority that can modify configuration settings (32 bytes)"
-            ],
             "type": "pubkey"
           },
           {
             "name": "default_policy_program_id",
-            "docs": [
-              "Default policy program ID for new smart wallets (32 bytes)"
-            ],
             "type": "pubkey"
           }
         ]
@@ -2218,20 +2152,11 @@
     },
     {
       "name": "CreateChunkArgs",
-      "docs": [
-        "Arguments for creating a chunk buffer for large transactions",
-        "",
-        "Contains WebAuthn authentication data and parameters required for",
-        "creating chunk buffers when transactions exceed size limits."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2241,58 +2166,39 @@
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "client_data_json_raw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "policy_data",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "vault_index",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification (must be <= on-chain time + 30s)"
-            ],
             "type": "i64"
           },
           {
             "name": "cpi_hash",
-            "docs": [
-              "Hash of CPI data and accounts (32 bytes)"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2305,20 +2211,11 @@
     },
     {
       "name": "CreateSmartWalletArgs",
-      "docs": [
-        "Arguments for creating a new smart wallet",
-        "",
-        "Contains all necessary parameters for initializing a new smart wallet",
-        "with WebAuthn passkey authentication and policy program configuration."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2328,9 +2225,6 @@
           },
           {
             "name": "credential_hash",
-            "docs": [
-              "Unique credential ID from WebAuthn registration"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2340,53 +2234,38 @@
           },
           {
             "name": "init_policy_data",
-            "docs": [
-              "Policy program initialization data"
-            ],
             "type": "bytes"
           },
           {
             "name": "wallet_id",
-            "docs": [
-              "Random wallet ID provided by client for uniqueness"
-            ],
             "type": "u64"
           },
           {
             "name": "amount",
-            "docs": [
-              "Initial SOL amount to transfer to the wallet"
-            ],
             "type": "u64"
           },
           {
             "name": "referral_address",
-            "docs": [
-              "Optional referral address for fee sharing"
-            ],
-            "type": {
-              "option": "pubkey"
-            }
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_index",
+            "type": "u8"
+          },
+          {
+            "name": "policy_data_size",
+            "type": "u16"
           }
         ]
       }
     },
     {
       "name": "ExecuteArgs",
-      "docs": [
-        "Arguments for executing a transaction through the smart wallet",
-        "",
-        "Contains WebAuthn authentication data and transaction parameters",
-        "required for secure transaction execution with policy validation."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2396,65 +2275,43 @@
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "client_data_json_raw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticator_data_raw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verify_instruction_index",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "split_index",
-            "docs": [
-              "Index for splitting remaining accounts between policy and CPI"
-            ],
             "type": "u16"
           },
           {
             "name": "policy_data",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "cpi_data",
-            "docs": [
-              "Cross-program invocation instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "vault_index",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
             "type": "i64"
           }
         ]
@@ -2462,20 +2319,11 @@
     },
     {
       "name": "NewWalletDeviceArgs",
-      "docs": [
-        "Arguments for adding a new wallet device (passkey)",
-        "",
-        "Contains the necessary data for adding a new WebAuthn passkey",
-        "to an existing smart wallet for enhanced security and convenience."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_public_key",
-            "docs": [
-              "Public key of the new WebAuthn passkey"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2485,9 +2333,6 @@
           },
           {
             "name": "credential_hash",
-            "docs": [
-              "Unique credential ID from WebAuthn registration (max 256 bytes)"
-            ],
             "type": {
               "array": [
                 "u8",

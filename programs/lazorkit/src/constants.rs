@@ -1,10 +1,5 @@
 use anchor_lang::prelude::*;
 
-/// LazorKit program constants and configuration values
-///
-/// Contains all constant values used throughout the LazorKit program including
-/// program IDs, seed values, size constraints, and configuration parameters.
-
 /// Solana's built-in Secp256r1 signature verification program ID
 pub const SECP256R1_PROGRAM_ID: Pubkey = pubkey!("Secp256r1SigVerify1111111111111111111111111");
 
@@ -21,7 +16,8 @@ pub const EMPTY_PDA_RENT_EXEMPT_BALANCE: u64 = 890880;
 /// Default fee configuration constants
 pub const DEFAULT_FEE_PAYER_FEE: u64 = 30000; // 0.00003 SOL
 pub const DEFAULT_REFERRAL_FEE: u64 = 10000; // 0.00001 SOL
-pub const DEFAULT_LAZORKIT_FEE: u64 = 10000; // 0.00001 SOL
+pub const DEFAULT_LAZORKIT_FEE: u64 = 10000; // 0.00001
+pub const DEFAULT_CREATE_WALLET_FEE: u64 = 10000; // 0.00001 SOL
 
 /// Maximum fee limits for validation
 pub const MAX_CREATE_WALLET_FEE: u64 = 1_000_000_000; // 1 SOL

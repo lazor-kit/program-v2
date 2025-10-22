@@ -131,11 +131,6 @@ pub fn execute_chunk(
         chunk.vault_index,
     )?;
 
-
-    msg!("Successfully executed chunk transaction: wallet={}, nonce={}, instructions={}", 
-         ctx.accounts.smart_wallet.key(), 
-         chunk.authorized_nonce,
-         instruction_data_list.len());
     Ok(())
 }
 
@@ -157,7 +152,7 @@ pub struct ExecuteChunk<'info> {
     #[account(
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
-        owner = crate::ID,
+        owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
 

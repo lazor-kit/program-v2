@@ -131,11 +131,12 @@ export interface CreateSmartWalletParams {
   payer: anchor.web3.PublicKey;
   passkeyPublicKey: number[];
   credentialIdBase64: string;
+  amount: anchor.BN;
   policyInstruction?: anchor.web3.TransactionInstruction | null;
   smartWalletId?: anchor.BN;
-  referral_address?: anchor.web3.PublicKey | null;
+  referralAddress?: anchor.web3.PublicKey | null;
   vaultIndex?: number;
-  amount: anchor.BN;
+  policyDataSize?: number;
 }
 
 export interface ExecuteParams extends AuthParams {

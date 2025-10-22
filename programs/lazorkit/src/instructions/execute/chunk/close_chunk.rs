@@ -24,11 +24,6 @@ pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
     let is_expired = chunk.authorized_timestamp < now - crate::security::TIMESTAMP_PAST_TOLERANCE
         || chunk.authorized_timestamp > now + crate::security::TIMESTAMP_FUTURE_TOLERANCE;
     require!(is_expired, LazorKitError::TransactionTooOld);
-
-    msg!("Closing expired chunk: wallet={}, nonce={}, expired_at={}", 
-         ctx.accounts.smart_wallet.key(), 
-         chunk.authorized_nonce,
-         chunk.authorized_timestamp);
     
     Ok(())
 }
