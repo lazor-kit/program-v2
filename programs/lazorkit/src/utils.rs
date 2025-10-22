@@ -207,7 +207,7 @@ pub fn verify_secp256r1_instruction(
     ix: &Instruction,
     pubkey: [u8; SECP_PUBKEY_SIZE as usize],
     msg: Vec<u8>,
-    sig: Vec<u8>,
+    sig: [u8; 64],
 ) -> Result<()> {
     // Calculate expected instruction data length based on Secp256r1 format
     let expected_len =
@@ -230,7 +230,7 @@ fn verify_secp256r1_data(
     data: &[u8],
     public_key: [u8; SECP_PUBKEY_SIZE as usize],
     message: Vec<u8>,
-    signature: Vec<u8>,
+    signature: [u8; 64],
 ) -> Result<()> {
     // Calculate the byte offsets for each component in the Secp256r1 instruction data
     let msg_len = message.len() as u16;
@@ -352,7 +352,7 @@ pub fn check_whitelist(
 pub fn verify_authorization_hash(
     ix_sysvar: &AccountInfo,
     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    signature: Vec<u8>,
+    signature: [u8; 64],
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,

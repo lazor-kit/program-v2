@@ -376,6 +376,11 @@ export type Lazorkit = {
           "name": "walletDevice"
         },
         {
+          "name": "newWalletDevice",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "referral",
           "writable": true
         },
@@ -877,6 +882,36 @@ export type Lazorkit = {
           }
         },
         {
+          "name": "lazorkitVault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  111,
+                  114,
+                  107,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.vault_index"
+              }
+            ]
+          }
+        },
+        {
           "name": "policyProgram"
         },
         {
@@ -1281,17 +1316,11 @@ export type Lazorkit = {
       "accounts": [
         {
           "name": "signer",
-          "docs": [
-            "The signer of the transaction, who will be the initial authority."
-          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -1311,9 +1340,6 @@ export type Lazorkit = {
         },
         {
           "name": "policyProgramRegistry",
-          "docs": [
-            "The registry of policy programs that can be used with smart wallets."
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -1341,16 +1367,10 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "defaultPolicyProgram",
-          "docs": [
-            "The default policy program to be used for new smart wallets."
-          ]
+          "name": "defaultPolicyProgram"
         },
         {
           "name": "systemProgram",
-          "docs": [
-            "The system program."
-          ],
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1897,20 +1917,11 @@ export type Lazorkit = {
   "types": [
     {
       "name": "callPolicyArgs",
-      "docs": [
-        "Arguments for calling policy program instructions",
-        "",
-        "Contains WebAuthn authentication data and policy program parameters",
-        "required for executing policy program instructions like adding/removing devices."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -1920,44 +1931,31 @@ export type Lazorkit = {
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "clientDataJsonRaw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticatorDataRaw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verifyInstructionIndex",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "policyData",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "newWalletDevice",
-            "docs": [
-              "Optional new wallet device to add during policy call"
-            ],
             "type": {
               "option": {
                 "defined": {
@@ -1968,23 +1966,14 @@ export type Lazorkit = {
           },
           {
             "name": "vaultIndex",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
             "type": "i64"
           },
           {
             "name": "smartWalletIsSigner",
-            "docs": [
-              "Whether the smart wallet is the signer"
-            ],
             "type": "bool"
           }
         ]
@@ -1992,20 +1981,11 @@ export type Lazorkit = {
     },
     {
       "name": "changePolicyArgs",
-      "docs": [
-        "Arguments for changing a smart wallet's policy program",
-        "",
-        "Contains WebAuthn authentication data and policy program parameters",
-        "required for securely changing the policy program governing a wallet."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2015,58 +1995,47 @@ export type Lazorkit = {
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "clientDataJsonRaw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticatorDataRaw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verifyInstructionIndex",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "splitIndex",
-            "docs": [
-              "Index for splitting remaining accounts between policy and CPI"
-            ],
             "type": "u16"
           },
           {
             "name": "destroyPolicyData",
-            "docs": [
-              "Data for destroying the old policy program"
-            ],
             "type": "bytes"
           },
           {
             "name": "initPolicyData",
-            "docs": [
-              "Data for initializing the new policy program"
-            ],
             "type": "bytes"
           },
           {
+            "name": "vaultIndex",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
             "name": "newWalletDevice",
-            "docs": [
-              "Optional new wallet device to add during policy change"
-            ],
             "type": {
               "option": {
                 "defined": {
@@ -2074,20 +2043,6 @@ export type Lazorkit = {
                 }
               }
             }
-          },
-          {
-            "name": "vaultIndex",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
-            "type": "i64"
           }
         ]
       }
@@ -2172,51 +2127,30 @@ export type Lazorkit = {
         "fields": [
           {
             "name": "isPaused",
-            "docs": [
-              "Whether the program is currently paused (1 byte)"
-            ],
             "type": "bool"
           },
           {
             "name": "createSmartWalletFee",
-            "docs": [
-              "Fee charged for creating a new smart wallet (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "feePayerFee",
-            "docs": [
-              "Fee charged to the fee payer for transactions (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "referralFee",
-            "docs": [
-              "Fee paid to referral addresses (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "lazorkitFee",
-            "docs": [
-              "Fee retained by LazorKit protocol (in lamports) (8 bytes)"
-            ],
             "type": "u64"
           },
           {
             "name": "authority",
-            "docs": [
-              "Program authority that can modify configuration settings (32 bytes)"
-            ],
             "type": "pubkey"
           },
           {
             "name": "defaultPolicyProgramId",
-            "docs": [
-              "Default policy program ID for new smart wallets (32 bytes)"
-            ],
             "type": "pubkey"
           }
         ]
@@ -2224,20 +2158,11 @@ export type Lazorkit = {
     },
     {
       "name": "createChunkArgs",
-      "docs": [
-        "Arguments for creating a chunk buffer for large transactions",
-        "",
-        "Contains WebAuthn authentication data and parameters required for",
-        "creating chunk buffers when transactions exceed size limits."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2247,58 +2172,39 @@ export type Lazorkit = {
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "clientDataJsonRaw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticatorDataRaw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verifyInstructionIndex",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "policyData",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "vaultIndex",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification (must be <= on-chain time + 30s)"
-            ],
             "type": "i64"
           },
           {
             "name": "cpiHash",
-            "docs": [
-              "Hash of CPI data and accounts (32 bytes)"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2311,20 +2217,11 @@ export type Lazorkit = {
     },
     {
       "name": "createSmartWalletArgs",
-      "docs": [
-        "Arguments for creating a new smart wallet",
-        "",
-        "Contains all necessary parameters for initializing a new smart wallet",
-        "with WebAuthn passkey authentication and policy program configuration."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2334,9 +2231,6 @@ export type Lazorkit = {
           },
           {
             "name": "credentialHash",
-            "docs": [
-              "Unique credential ID from WebAuthn registration"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2346,53 +2240,38 @@ export type Lazorkit = {
           },
           {
             "name": "initPolicyData",
-            "docs": [
-              "Policy program initialization data"
-            ],
             "type": "bytes"
           },
           {
             "name": "walletId",
-            "docs": [
-              "Random wallet ID provided by client for uniqueness"
-            ],
             "type": "u64"
           },
           {
             "name": "amount",
-            "docs": [
-              "Initial SOL amount to transfer to the wallet"
-            ],
             "type": "u64"
           },
           {
             "name": "referralAddress",
-            "docs": [
-              "Optional referral address for fee sharing"
-            ],
-            "type": {
-              "option": "pubkey"
-            }
+            "type": "pubkey"
+          },
+          {
+            "name": "vaultIndex",
+            "type": "u8"
+          },
+          {
+            "name": "policyDataSize",
+            "type": "u16"
           }
         ]
       }
     },
     {
       "name": "executeArgs",
-      "docs": [
-        "Arguments for executing a transaction through the smart wallet",
-        "",
-        "Contains WebAuthn authentication data and transaction parameters",
-        "required for secure transaction execution with policy validation."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the WebAuthn passkey for authentication"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2402,65 +2281,43 @@ export type Lazorkit = {
           },
           {
             "name": "signature",
-            "docs": [
-              "WebAuthn signature for transaction authorization"
-            ],
-            "type": "bytes"
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "clientDataJsonRaw",
-            "docs": [
-              "Raw client data JSON from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "authenticatorDataRaw",
-            "docs": [
-              "Raw authenticator data from WebAuthn authentication"
-            ],
             "type": "bytes"
           },
           {
             "name": "verifyInstructionIndex",
-            "docs": [
-              "Index of the Secp256r1 verification instruction"
-            ],
             "type": "u8"
           },
           {
             "name": "splitIndex",
-            "docs": [
-              "Index for splitting remaining accounts between policy and CPI"
-            ],
             "type": "u16"
           },
           {
             "name": "policyData",
-            "docs": [
-              "Policy program instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "cpiData",
-            "docs": [
-              "Cross-program invocation instruction data"
-            ],
             "type": "bytes"
           },
           {
             "name": "vaultIndex",
-            "docs": [
-              "Random vault index (0-31) calculated off-chain for fee distribution"
-            ],
             "type": "u8"
           },
           {
             "name": "timestamp",
-            "docs": [
-              "Unix timestamp for message verification"
-            ],
             "type": "i64"
           }
         ]
@@ -2468,20 +2325,11 @@ export type Lazorkit = {
     },
     {
       "name": "newWalletDeviceArgs",
-      "docs": [
-        "Arguments for adding a new wallet device (passkey)",
-        "",
-        "Contains the necessary data for adding a new WebAuthn passkey",
-        "to an existing smart wallet for enhanced security and convenience."
-      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPublicKey",
-            "docs": [
-              "Public key of the new WebAuthn passkey"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2491,9 +2339,6 @@ export type Lazorkit = {
           },
           {
             "name": "credentialHash",
-            "docs": [
-              "Unique credential ID from WebAuthn registration (max 256 bytes)"
-            ],
             "type": {
               "array": [
                 "u8",

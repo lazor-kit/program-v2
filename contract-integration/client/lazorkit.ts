@@ -690,6 +690,11 @@ export class LazorkitClient {
     const smartWalletId = params.smartWalletId || this.generateWalletId();
     const smartWallet = this.getSmartWalletPubkey(smartWalletId);
     const walletState = this.getWalletStatePubkey(smartWallet);
+    const vaultIndex = params.vaultIndex !== undefined ? params.vaultIndex : 0;
+    const policyDataSize =
+      params.policyDataSize !== undefined
+        ? params.policyDataSize
+        : this.defaultPolicyProgram.getPolicyDataSize();
 
     const credentialId = Buffer.from(params.credentialIdBase64, 'base64');
     const credentialHash = Array.from(
@@ -720,10 +725,11 @@ export class LazorkitClient {
       initPolicyData: policyInstruction.data,
       walletId: smartWalletId,
       amount: params.amount,
-      referralAddress: params.referral_address || null,
-      vaultIndex: getVaultIndex(params.vaultIndex, () =>
-        this.generateVaultIndex()
-      ),
+      referralAddress: params.referralAddress
+        ? params.referralAddress
+        : params.payer,
+      vaultIndex,
+      policyDataSize,
     };
 
     const instruction = await this.buildCreateSmartWalletIns(
@@ -798,10 +804,7 @@ export class LazorkitClient {
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
         timestamp: params.timestamp,
-        vaultIndex:
-          params.vaultIndex !== undefined
-            ? params.vaultIndex
-            : this.generateVaultIndex(),
+        vaultIndex: params.vaultIndex !== undefined ? params.vaultIndex : 0,
       },
       policyInstruction,
       params.cpiInstruction
@@ -1013,9 +1016,7 @@ export class LazorkitClient {
         ),
         timestamp: params.timestamp || new BN(Math.floor(Date.now() / 1000)),
         cpiHash: Array.from(cpiHash),
-        vaultIndex: getVaultIndex(params.vaultIndex, () =>
-          this.generateVaultIndex()
-        ),
+        vaultIndex: params.vaultIndex !== undefined ? params.vaultIndex : 0,
       },
       policyInstruction
     );

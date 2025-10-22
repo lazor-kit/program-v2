@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{Args as _, ExecuteArgs};
+use crate::instructions::ExecuteArgs;
 use crate::security::validation;
 use crate::state::{LazorKitVault, WalletDevice, WalletState};
 use crate::utils::{
@@ -10,83 +10,53 @@ use crate::utils::{
 use crate::ID;
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
 
-/// Execute a transaction through the smart wallet
-///
-/// The main transaction execution function that validates the transaction through
-/// the policy program before executing the target program instruction. Supports
-/// complex multi-instruction transactions with proper WebAuthn authentication.
 pub fn execute<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
     args: ExecuteArgs,
 ) -> Result<()> {
-    // Step 0: Validate input arguments and global program state
-    args.validate()?;
     require!(
         !ctx.accounts.lazorkit_config.is_paused,
         LazorKitError::ProgramPaused
     );
 
-    validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-
-    // Step 0.1: Split remaining accounts between policy and CPI instructions
-    // The split_index determines where to divide the accounts
     let (policy_accounts, cpi_accounts) =
         split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
 
-    // Ensure we have accounts for the policy program
-    require!(
-        !policy_accounts.is_empty(),
-        LazorKitError::InsufficientPolicyAccounts
-    );
-
-    // Step 0.2: Compute hashes for verification
+    // Compute hashes for verification
     let policy_hash = compute_instruction_hash(
         &args.policy_data,
         policy_accounts,
         ctx.accounts.policy_program.key(),
     )?;
-
     let cpi_hash =
         compute_instruction_hash(&args.cpi_data, cpi_accounts, ctx.accounts.cpi_program.key())?;
-
     let expected_message_hash = compute_execute_message_hash(
         ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         policy_hash,
         cpi_hash,
     )?;
-
-    // Step 0.3: Verify WebAuthn signature and message hash
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         args.passkey_public_key,
-        args.signature.clone(),
+        args.signature,
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
         expected_message_hash,
     )?;
 
+    // CPI to validate the transaction
     let policy_signer = get_policy_signer(
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.key(),
         ctx.accounts.wallet_device.credential_hash,
     )?;
-
-    // Step 3: Verify policy instruction discriminator and data integrity
     let policy_data = &args.policy_data;
-    // Ensure the policy data starts with the correct instruction discriminator
     require!(
         policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
         LazorKitError::InvalidCheckPolicyDiscriminator
     );
-
-    // Step 3.1: Validate policy data size
-    validation::validate_policy_data(policy_data)?;
-
-    // Step 5: Execute policy program CPI to validate the transaction
-    // The policy program will check if this transaction is allowed based on
-    // the wallet's security rules and return success/failure
     execute_cpi(
         policy_accounts,
         policy_data,
@@ -94,24 +64,7 @@ pub fn execute<'c: 'info, 'info>(
         policy_signer,
     )?;
 
-    // Step 6: Validate CPI instruction data
-    validation::validate_cpi_data(&args.cpi_data)?;
-
-    // Step 7: Execute the actual CPI instruction
-    // Validate the target program is executable
-    validation::validate_program_executable(&ctx.accounts.cpi_program)?;
-    // Prevent reentrancy attacks by blocking calls to ourselves
-    require!(
-        ctx.accounts.cpi_program.key() != ID,
-        LazorKitError::ReentrancyDetected
-    );
-    // Ensure we have accounts for the CPI
-    require!(
-        !cpi_accounts.is_empty(),
-        LazorKitError::InsufficientCpiAccounts
-    );
-
-    // Create PDA signer for the smart wallet to authorize the CPI
+    // CPI to execute the transaction
     let wallet_signer = PdaSigner {
         seeds: vec![
             SMART_WALLET_SEED.to_vec(),
@@ -119,7 +72,6 @@ pub fn execute<'c: 'info, 'info>(
         ],
         bump: ctx.accounts.wallet_state.bump,
     };
-    // Execute the actual transaction through CPI
     execute_cpi(
         cpi_accounts,
         &args.cpi_data,
@@ -127,7 +79,7 @@ pub fn execute<'c: 'info, 'info>(
         wallet_signer.clone(),
     )?;
 
-    // Step 8: Update wallet state and handle fees
+    // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
 
@@ -193,7 +145,6 @@ pub struct Execute<'info> {
     pub policy_program_registry: Box<Account<'info, crate::state::PolicyProgramRegistry>>,
 
     #[account(
-        executable,
         constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
         constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
     )]

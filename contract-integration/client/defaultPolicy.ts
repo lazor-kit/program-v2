@@ -30,6 +30,10 @@ export class DefaultPolicyClient {
     return derivePolicyPda(this.programId, smartWallet);
   }
 
+  getPolicyDataSize(): number {
+    return 1 + 32 + 4 + 33 + 32;
+  }
+
   async buildInitPolicyIx(
     walletId: anchor.BN,
     passkeyPublicKey: number[],

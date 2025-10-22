@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::constants::SMART_WALLET_SEED;
-use crate::instructions::{Args as _, CallPolicyArgs};
+use crate::instructions::CallPolicyArgs;
 use crate::security::validation;
 use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletDevice, WalletState};
 use crate::utils::{
@@ -13,26 +13,18 @@ pub fn call_policy<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
     args: CallPolicyArgs,
 ) -> Result<()> {
-    args.validate()?;
     require!(!ctx.accounts.lazorkit_config.is_paused, LazorKitError::ProgramPaused);
-    validation::validate_remaining_accounts(&ctx.remaining_accounts)?;
-    validation::validate_policy_data(&args.policy_data)?;
-
-    let policy_accs = &ctx.remaining_accounts;
 
     let policy_hash = compute_instruction_hash(
         &args.policy_data,
-        policy_accs,
+        ctx.remaining_accounts,
         ctx.accounts.policy_program.key(),
     )?;
-
     let expected_message_hash = compute_call_policy_message_hash(
         ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         policy_hash,
     )?;
-
-    // Step 4: Verify WebAuthn signature and message hash
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         args.passkey_public_key,
@@ -43,37 +35,39 @@ pub fn call_policy<'c: 'info, 'info>(
         expected_message_hash,
     )?;
 
-    // Step 5: Prepare policy program signer
-    // Create a signer that can authorize calls to the policy program
+
     let policy_signer = get_policy_signer(
         ctx.accounts.smart_wallet.key(),
         ctx.accounts.wallet_device.key(),
         ctx.accounts.wallet_device.credential_hash,
     )?;
-
     let policy_data = execute_cpi(
-        policy_accs,
+        ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.policy_program,
         policy_signer,
     )?;
 
-    // Step 8: Update wallet state and handle fees
+    // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
     ctx.accounts.wallet_state.policy_data = policy_data;
 
+    // Create the new wallet device account if it exists
     match args.new_wallet_device {
-        Some(new_wallet_device) => {
-            // Initialize the new wallet device account with the provided data
-            ctx.accounts.new_wallet_device.as_mut().unwrap().passkey_pubkey = new_wallet_device.passkey_public_key;
-            ctx.accounts.new_wallet_device.as_mut().unwrap().credential_hash = new_wallet_device.credential_hash;
-            ctx.accounts.new_wallet_device.as_mut().unwrap().smart_wallet = ctx.accounts.smart_wallet.key();
-            ctx.accounts.new_wallet_device.as_mut().unwrap().bump = ctx.bumps.new_wallet_device.unwrap();
+        Some(new_wallet_device_args) => {
+            let new_wallet_device_account = &mut ctx.accounts.new_wallet_device.as_mut().unwrap();
+            new_wallet_device_account.set_inner(WalletDevice {
+                bump: ctx.bumps.new_wallet_device.unwrap(),
+                passkey_pubkey: new_wallet_device_args.passkey_public_key,
+                credential_hash: new_wallet_device_args.credential_hash,
+                smart_wallet: ctx.accounts.smart_wallet.key(),
+            });
         }
         _ => {}
     }
 
+    // Handle fee distribution
     crate::utils::handle_fee_distribution(
         &ctx.accounts.lazorkit_config,
         &ctx.accounts.wallet_state,
@@ -147,7 +141,6 @@ pub struct CallPolicy<'info> {
 
     /// CHECK: executable policy program
     #[account(
-        executable,
         constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
         constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
     )]

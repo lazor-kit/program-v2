@@ -66,7 +66,7 @@ pub const MAX_VAULT_SLOTS: u8 = 32;
 /// Security validation functions
 pub mod validation {
     use super::*;
-    use crate::error::LazorKitError;
+    use crate::{error::LazorKitError, ID};
 
     pub fn validate_wallet_id(wallet_id: u64) -> Result<()> {
         require!(
@@ -144,7 +144,7 @@ pub mod validation {
         require!(program.executable, LazorKitError::ProgramNotExecutable);
 
         require!(
-            program.key() != crate::ID,
+            program.key() != ID,
             LazorKitError::ReentrancyDetected
         );
         Ok(())
@@ -153,7 +153,7 @@ pub mod validation {
     /// Check for reentrancy attacks by validating all programs in remaining accounts
     pub fn validate_no_reentrancy(remaining_accounts: &[AccountInfo]) -> Result<()> {
         for account in remaining_accounts {
-            if account.executable && account.key() == crate::ID {
+            if account.executable && account.key() == ID {
                 return Err(LazorKitError::ReentrancyDetected.into());
             }
         }

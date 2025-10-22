@@ -35,13 +35,13 @@ export function convertPasskeySignatureToInstructionArgs(
   passkeySignature: PasskeySignature
 ): {
   passkeyPublicKey: number[];
-  signature: Buffer;
+  signature: number[];
   clientDataJsonRaw: Buffer;
   authenticatorDataRaw: Buffer;
 } {
   return {
     passkeyPublicKey: passkeySignature.passkeyPublicKey,
-    signature: Buffer.from(passkeySignature.signature64, 'base64'),
+    signature: Array.from(Buffer.from(passkeySignature.signature64, 'base64')),
     clientDataJsonRaw: Buffer.from(
       passkeySignature.clientDataJsonRaw64,
       'base64'
