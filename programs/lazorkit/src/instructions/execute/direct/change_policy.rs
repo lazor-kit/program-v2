@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::constants::SMART_WALLET_SEED;
-use crate::instructions::{ChangePolicyArgs};
+use crate::instructions::ChangePolicyArgs;
 use crate::security::validation;
-use crate::state::{Config, LazorKitVault, PolicyProgramRegistry, WalletDevice, WalletState};
+use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
-     compute_change_policy_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash
+    compute_change_policy_message_hash, compute_instruction_hash, create_wallet_device_hash,
+    execute_cpi, get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash,
 };
 use crate::{error::LazorKitError, ID};
 
@@ -13,12 +14,7 @@ pub fn change_policy<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
     args: ChangePolicyArgs,
 ) -> Result<()> {
-    require!(
-        !ctx.accounts.lazorkit_config.is_paused,
-        LazorKitError::ProgramPaused
-    );
-
-    let (destroy_accounts, init_accounts) = 
+    let (destroy_accounts, init_accounts) =
         split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
 
     let old_policy_hash = compute_instruction_hash(
@@ -92,18 +88,6 @@ pub fn change_policy<'c: 'info, 'info>(
         }
         _ => {}
     }
-    
-    // Handle fee distribution
-    crate::utils::handle_fee_distribution(
-        &ctx.accounts.lazorkit_config,
-        &ctx.accounts.wallet_state,
-        &ctx.accounts.smart_wallet.to_account_info(),
-        &ctx.accounts.payer.to_account_info(),
-        &ctx.accounts.referral.to_account_info(),
-        &ctx.accounts.lazorkit_vault.to_account_info(),
-        &ctx.accounts.system_program,
-        args.vault_index,
-    )?;
 
     Ok(())
 }
@@ -113,13 +97,6 @@ pub fn change_policy<'c: 'info, 'info>(
 pub struct ChangePolicy<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-
-    #[account(
-        seeds = [Config::PREFIX_SEED],
-        bump, 
-        owner = ID
-    )]
-    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -152,38 +129,18 @@ pub struct ChangePolicy<'info> {
     )]
     pub new_wallet_device: Option<Box<Account<'info, WalletDevice>>>,
 
-    #[account(mut, address = wallet_state.referral)]
-    /// CHECK: referral account (matches wallet_state.referral)
-    pub referral: UncheckedAccount<'info>,
-
     #[account(
-        mut,
-        seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
-        bump,
-    )]
-    /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
-    pub lazorkit_vault: SystemAccount<'info>,
-
-    #[account(
-        constraint = old_policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
-        constraint = policy_program_registry.registered_programs.contains(&old_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+        address = wallet_state.policy_program
     )]
     /// CHECK: old policy program (executable)
     pub old_policy_program: UncheckedAccount<'info>,
 
     #[account(
         constraint = new_policy_program.key() != old_policy_program.key() @ LazorKitError::PolicyProgramsIdentical,
-        constraint = policy_program_registry.registered_programs.contains(&new_policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+        executable
     )]
     /// CHECK: new policy program (executable)
     pub new_policy_program: UncheckedAccount<'info>,
-
-    #[account(
-        seeds = [PolicyProgramRegistry::PREFIX_SEED],
-        bump,
-        owner = ID
-    )]
-    pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
     /// CHECK: instruction sysvar
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]

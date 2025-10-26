@@ -8,7 +8,6 @@ pub mod state;
 pub mod utils;
 
 use instructions::*;
-use state::*;
 
 declare_id!("Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh");
 
@@ -17,23 +16,11 @@ declare_id!("Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh");
 pub mod lazorkit {
     use super::*;
 
-    pub fn initialize_program(ctx: Context<InitializeProgram>) -> Result<()> {
-        instructions::initialize_program(ctx)
-    }
-
-    pub fn update_config(ctx: Context<UpdateConfig>, param: UpdateType, value: u64) -> Result<()> {
-        instructions::update_config(ctx, param, value)
-    }
-
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
         args: CreateSmartWalletArgs,
     ) -> Result<()> {
         instructions::create_smart_wallet(ctx, args)
-    }
-
-    pub fn add_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
-        instructions::add_policy_program(ctx)
     }
 
     pub fn change_policy<'c: 'info, 'info>(
@@ -74,14 +61,5 @@ pub mod lazorkit {
 
     pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
         instructions::close_chunk(ctx)
-    }
-
-    pub fn manage_vault(
-        ctx: Context<ManageVault>,
-        action: u8,
-        amount: u64,
-        index: u8,
-    ) -> Result<()> {
-        instructions::manage_vault(ctx, action, amount, index)
     }
 }

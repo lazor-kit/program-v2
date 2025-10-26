@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::LazorKitError;
 use crate::security::validation;
-use crate::state::{Chunk, Config, LazorKitVault, WalletState};
+use crate::state::{Chunk, WalletState};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
@@ -120,16 +120,6 @@ pub fn execute_chunk(
         )?;
     }
 
-    crate::utils::handle_fee_distribution(
-        &ctx.accounts.lazorkit_config,
-        &ctx.accounts.wallet_state,
-        &ctx.accounts.smart_wallet.to_account_info(),
-        &ctx.accounts.payer.to_account_info(),
-        &ctx.accounts.referral.to_account_info(),
-        &ctx.accounts.lazorkit_vault.to_account_info(),
-        &ctx.accounts.system_program,
-        chunk.vault_index,
-    )?;
 
     Ok(())
 }
@@ -139,8 +129,6 @@ pub struct ExecuteChunk<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(seeds = [Config::PREFIX_SEED], bump, owner = ID)]
-    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -155,19 +143,6 @@ pub struct ExecuteChunk<'info> {
         owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
-
-    #[account(mut, address = wallet_state.referral)]
-    /// CHECK: referral account (matches wallet_state.referral)
-    pub referral: UncheckedAccount<'info>,
-
-    /// LazorKit vault (empty PDA that holds SOL) - random vault selected by client
-    #[account(
-        mut,
-        seeds = [LazorKitVault::PREFIX_SEED, &chunk.vault_index.to_le_bytes()],
-        bump,
-    )]
-    /// CHECK: Empty PDA vault that only holds SOL, validated to be correct random vault
-    pub lazorkit_vault: SystemAccount<'info>,
 
     /// Transaction session to execute. Closed to refund rent.
     #[account(

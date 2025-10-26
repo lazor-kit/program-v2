@@ -336,18 +336,6 @@ pub fn create_custom_pda_signer(seeds: Vec<Vec<u8>>, bump: u8) -> PdaSigner {
     PdaSigner { seeds, bump }
 }
 
-/// Helper: Check if a program is in the whitelist
-pub fn check_whitelist(
-    registry: &crate::state::PolicyProgramRegistry,
-    program: &Pubkey,
-) -> Result<()> {
-    require!(
-        registry.registered_programs.contains(program),
-        crate::error::LazorKitError::PolicyProgramNotRegistered
-    );
-    Ok(())
-}
-
 /// Verify authorization using hash comparison instead of deserializing message data
 pub fn verify_authorization_hash(
     ix_sysvar: &AccountInfo,
@@ -654,94 +642,4 @@ pub fn create_wallet_signer(wallet_id: u64, bump: u8) -> PdaSigner {
         ],
         bump,
     }
-}
-
-/// Complete fee distribution and vault validation workflow
-pub fn handle_fee_distribution<'info>(
-    config: &crate::state::Config,
-    wallet_state: &crate::state::WalletState,
-    smart_wallet: &AccountInfo<'info>,
-    payer: &AccountInfo<'info>,
-    referral: &AccountInfo<'info>,
-    lazorkit_vault: &AccountInfo<'info>,
-    system_program: &Program<'info, System>,
-    vault_index: u8,
-) -> Result<()> {
-    // Validate vault
-    crate::state::LazorKitVault::validate_vault_for_index(
-        &lazorkit_vault.key(),
-        vault_index,
-        &crate::ID,
-    )?;
-
-    // Create wallet signer
-    let wallet_signer = create_wallet_signer(wallet_state.wallet_id, wallet_state.bump);
-
-    // Distribute fees
-    distribute_fees(
-        config,
-        smart_wallet,
-        payer,
-        referral,
-        lazorkit_vault,
-        system_program,
-        wallet_signer,
-    )
-}
-
-/// Distribute fees to payer, referral, and lazorkit vault (empty PDA)
-pub fn distribute_fees<'info>(
-    config: &crate::state::Config,
-    smart_wallet: &AccountInfo<'info>,
-    payer: &AccountInfo<'info>,
-    referral: &AccountInfo<'info>,
-    lazorkit_vault: &AccountInfo<'info>,
-    system_program: &Program<'info, System>,
-    wallet_signer: PdaSigner,
-) -> Result<()> {
-    use anchor_lang::solana_program::system_instruction;
-
-    // 1. Fee to payer (reimburse transaction fees)
-    if config.fee_payer_fee > 0 {
-        let transfer_to_payer =
-            system_instruction::transfer(&smart_wallet.key(), &payer.key(), config.fee_payer_fee);
-
-        execute_cpi(
-            &[smart_wallet.clone(), payer.clone()],
-            &transfer_to_payer.data,
-            system_program,
-            wallet_signer.clone(),
-        )?;
-    }
-
-    // 2. Fee to referral
-    if config.referral_fee > 0 {
-        let transfer_to_referral =
-            system_instruction::transfer(&smart_wallet.key(), &referral.key(), config.referral_fee);
-
-        execute_cpi(
-            &[smart_wallet.clone(), referral.clone()],
-            &transfer_to_referral.data,
-            system_program,
-            wallet_signer.clone(),
-        )?;
-    }
-
-    // 3. Fee to lazorkit vault (empty PDA)
-    if config.lazorkit_fee > 0 {
-        let transfer_to_vault = system_instruction::transfer(
-            &smart_wallet.key(),
-            &lazorkit_vault.key(),
-            config.lazorkit_fee,
-        );
-
-        execute_cpi(
-            &[smart_wallet.clone(), lazorkit_vault.clone()],
-            &transfer_to_vault.data,
-            system_program,
-            wallet_signer.clone(),
-        )?;
-    }
-
-    Ok(())
 }

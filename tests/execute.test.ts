@@ -50,27 +50,6 @@ describe('Test smart wallet with default policy', () => {
     bs58.decode(process.env.PRIVATE_KEY!)
   );
 
-  before(async () => {
-    // airdrop some SOL to the payer
-
-    const config = await connection.getAccountInfo(
-      lazorkitProgram.getConfigPubkey()
-    );
-
-    if (config === null) {
-      const ix = await lazorkitProgram.buildInitializeProgramIns(
-        payer.publicKey
-      );
-      const txn = new anchor.web3.Transaction().add(ix);
-
-      const sig = await anchor.web3.sendAndConfirmTransaction(connection, txn, [
-        payer,
-      ]);
-
-      console.log('Initialize txn: ', sig);
-    }
-  });
-
   it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 

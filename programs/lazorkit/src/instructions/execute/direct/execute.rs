@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::ExecuteArgs;
 use crate::security::validation;
-use crate::state::{LazorKitVault, WalletDevice, WalletState};
+use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
     compute_execute_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi,
     get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
@@ -14,11 +14,6 @@ pub fn execute<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
     args: ExecuteArgs,
 ) -> Result<()> {
-    require!(
-        !ctx.accounts.lazorkit_config.is_paused,
-        LazorKitError::ProgramPaused
-    );
-
     let (policy_accounts, cpi_accounts) =
         split_remaining_accounts(&ctx.remaining_accounts, args.split_index)?;
 
@@ -83,18 +78,6 @@ pub fn execute<'c: 'info, 'info>(
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
 
-    // Handle fee distribution and vault validation
-    crate::utils::handle_fee_distribution(
-        &ctx.accounts.lazorkit_config,
-        &ctx.accounts.wallet_state,
-        &ctx.accounts.smart_wallet.to_account_info(),
-        &ctx.accounts.payer.to_account_info(),
-        &ctx.accounts.referral.to_account_info(),
-        &ctx.accounts.lazorkit_vault.to_account_info(),
-        &ctx.accounts.system_program,
-        args.vault_index,
-    )?;
-
     Ok(())
 }
 
@@ -126,45 +109,13 @@ pub struct Execute<'info> {
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    #[account(mut, address = wallet_state.referral)]
-    /// CHECK: referral account (matches wallet_state.referral)
-    pub referral: UncheckedAccount<'info>,
-
-    #[account(
-        mut,
-        seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
-        bump,
-    )]
-    pub lazorkit_vault: SystemAccount<'info>,
-
-    #[account(
-        seeds = [crate::state::PolicyProgramRegistry::PREFIX_SEED],
-        bump,
-        owner = ID
-    )]
-    pub policy_program_registry: Box<Account<'info, crate::state::PolicyProgramRegistry>>,
-
-    #[account(
-        constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
-        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
-    )]
+    #[account(executable)]
     /// CHECK: must be executable (policy program)
     pub policy_program: UncheckedAccount<'info>,
 
-    #[account(
-        executable,
-        constraint = !policy_program_registry.registered_programs.contains(&cpi_program.key()) @ LazorKitError::InvalidProgramAddress,
-        constraint = cpi_program.key() != ID @ LazorKitError::ReentrancyDetected
-    )]
+    #[account(executable)]
     /// CHECK: must be executable (target program)
     pub cpi_program: UncheckedAccount<'info>,
-
-    #[account(
-        seeds = [crate::state::Config::PREFIX_SEED],
-        bump,
-        owner = ID
-    )]
-    pub lazorkit_config: Box<Account<'info, crate::state::Config>>,
 
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instruction sysvar

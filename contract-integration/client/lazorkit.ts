@@ -11,8 +11,6 @@ import {
 import LazorkitIdl from '../anchor/idl/lazorkit.json';
 import { Lazorkit } from '../anchor/types/lazorkit';
 import {
-  deriveConfigPda,
-  derivePolicyProgramRegistryPda,
   deriveSmartWalletPda,
   deriveSmartWalletConfigPda,
   deriveChunkPda,
@@ -81,27 +79,6 @@ export class LazorkitClient {
   // ============================================================================
 
   /**
-   * Derives the program configuration PDA
-   */
-  getConfigPubkey(): PublicKey {
-    return deriveConfigPda(this.programId);
-  }
-
-  /**
-   * Derives the policy program registry PDA
-   */
-  getPolicyProgramRegistryPubkey(): PublicKey {
-    return derivePolicyProgramRegistryPda(this.programId);
-  }
-
-  /**
-   * Derives the LazorKit vault PDA
-   */
-  getLazorkitVaultPubkey(index: number): PublicKey {
-    return deriveLazorkitVaultPda(this.programId, index);
-  }
-
-  /**
    * Derives a smart wallet PDA from wallet ID
    */
   getSmartWalletPubkey(walletId: BN): PublicKey {
@@ -152,21 +129,6 @@ export class LazorkitClient {
   }
 
   /**
-   * Gets the referral account for a smart wallet
-   */
-  private async getReferralAccount(smartWallet: PublicKey): Promise<PublicKey> {
-    const smartWalletConfig = await this.getWalletStateData(smartWallet);
-    return smartWalletConfig.referral;
-  }
-
-  /**
-   * Generates a random vault index (0-31)
-   */
-  generateVaultIndex(): number {
-    return Math.floor(Math.random() * 32);
-  }
-
-  /**
    * Calculates split indices for multiple CPI instructions
    */
   private calculateSplitIndex(
@@ -186,13 +148,6 @@ export class LazorkitClient {
   // ============================================================================
   // Account Data Fetching Methods
   // ============================================================================
-
-  /**
-   * Fetches program configuration data
-   */
-  async getConfigData() {
-    return await this.program.account.config.fetch(this.getConfigPubkey());
-  }
 
   /**
    * Fetches smart wallet data for a given smart wallet
@@ -389,24 +344,6 @@ export class LazorkitClient {
   // ============================================================================
 
   /**
-   * Builds the initialize program instruction
-   */
-  async buildInitializeProgramIns(
-    payer: PublicKey
-  ): Promise<TransactionInstruction> {
-    return await this.program.methods
-      .initializeProgram()
-      .accountsPartial({
-        signer: payer,
-        config: this.getConfigPubkey(),
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
-        defaultPolicyProgram: this.defaultPolicyProgram.programId,
-        systemProgram: SystemProgram.programId,
-      })
-      .instruction();
-  }
-
-  /**
    * Builds the create smart wallet instruction
    */
   async buildCreateSmartWalletIns(
@@ -419,14 +356,12 @@ export class LazorkitClient {
       .createSmartWallet(args)
       .accountsPartial({
         payer,
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
         walletDevice: this.getWalletDevicePubkey(
           smartWallet,
           args.credentialHash
         ),
-        lazorkitConfig: this.getConfigPubkey(),
         policyProgram: policyInstruction.programId,
         systemProgram: SystemProgram.programId,
       })
@@ -453,13 +388,9 @@ export class LazorkitClient {
         payer,
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
-        referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVaultPubkey(args.vaultIndex),
         walletDevice,
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
         policyProgram: policyInstruction.programId,
         cpiProgram: cpiInstruction.programId,
-        lazorkitConfig: this.getConfigPubkey(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
@@ -483,17 +414,13 @@ export class LazorkitClient {
       .callPolicy(args)
       .accountsPartial({
         payer,
-        lazorkitConfig: this.getConfigPubkey(),
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
-        referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVaultPubkey(args.vaultIndex),
         walletDevice: this.getWalletDevicePubkey(
           smartWallet,
           args.passkeyPublicKey
         ),
         policyProgram: policyInstruction.programId,
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
@@ -515,18 +442,14 @@ export class LazorkitClient {
       .changePolicy(args)
       .accountsPartial({
         payer,
-        lazorkitConfig: this.getConfigPubkey(),
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
-        referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVaultPubkey(args.vaultIndex),
         walletDevice: this.getWalletDevicePubkey(
           smartWallet,
           args.passkeyPublicKey
         ),
         oldPolicyProgram: destroyPolicyInstruction.programId,
         newPolicyProgram: initPolicyInstruction.programId,
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
         ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         systemProgram: SystemProgram.programId,
       })
@@ -551,11 +474,9 @@ export class LazorkitClient {
       .createChunk(args)
       .accountsPartial({
         payer,
-        lazorkitConfig: this.getConfigPubkey(),
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
         walletDevice,
-        policyProgramRegistry: this.getPolicyProgramRegistryPubkey(),
         policyProgram: policyInstruction.programId,
         chunk: this.getChunkPubkey(
           smartWallet,
@@ -604,11 +525,8 @@ export class LazorkitClient {
       .executeChunk(instructionDataList, Buffer.from(splitIndex))
       .accountsPartial({
         payer,
-        lazorkitConfig: this.getConfigPubkey(),
         smartWallet,
         walletState: this.getWalletStatePubkey(smartWallet),
-        referral: await this.getReferralAccount(smartWallet),
-        lazorkitVault: this.getLazorkitVaultPubkey(chunkData.vaultIndex), // Will be updated based on session
         chunk,
         sessionRefund: chunkData.rentRefundAddress,
         systemProgram: SystemProgram.programId,
@@ -646,35 +564,6 @@ export class LazorkitClient {
   // ============================================================================
   // High-Level Transaction Builders (with Authentication)
   // ============================================================================
-
-  async manageVaultTxn(
-    params: types.ManageVaultParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    const manageVaultInstruction = await this.program.methods
-      .manageVault(
-        params.action === 'deposit' ? 0 : 1,
-        params.amount,
-        params.vaultIndex
-      )
-      .accountsPartial({
-        authority: params.payer,
-        lazorkitConfig: this.getConfigPubkey(),
-        vault: this.getLazorkitVaultPubkey(params.vaultIndex),
-        destination: params.destination,
-        systemProgram: SystemProgram.programId,
-      })
-      .instruction();
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      [manageVaultInstruction],
-      options
-    );
-
-    return result.transaction;
-  }
 
   /**
    * Creates a smart wallet with passkey authentication
@@ -804,7 +693,6 @@ export class LazorkitClient {
         policyData: policyInstruction.data,
         cpiData: params.cpiInstruction.data,
         timestamp: params.timestamp,
-        vaultIndex: params.vaultIndex !== undefined ? params.vaultIndex : 0,
       },
       policyInstruction,
       params.cpiInstruction
@@ -864,10 +752,6 @@ export class LazorkitClient {
           options.computeUnitLimit
         ),
         timestamp: params.timestamp,
-        vaultIndex: getVaultIndex(params.vaultIndex, () =>
-          this.generateVaultIndex()
-        ),
-        smartWalletIsSigner: params.smartWalletIsSigner === true,
       },
       params.policyInstruction
     );
@@ -930,9 +814,6 @@ export class LazorkitClient {
             }
           : null,
         timestamp: new BN(Math.floor(Date.now() / 1000)),
-        vaultIndex: getVaultIndex(params.vaultIndex, () =>
-          this.generateVaultIndex()
-        ),
       },
       params.destroyPolicyInstruction,
       params.initPolicyInstruction
@@ -1016,7 +897,6 @@ export class LazorkitClient {
         ),
         timestamp: params.timestamp || new BN(Math.floor(Date.now() / 1000)),
         cpiHash: Array.from(cpiHash),
-        vaultIndex: params.vaultIndex !== undefined ? params.vaultIndex : 0,
       },
       policyInstruction
     );

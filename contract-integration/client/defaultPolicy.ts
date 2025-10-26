@@ -69,24 +69,31 @@ export class DefaultPolicyClient {
       .instruction();
   }
 
-  // async buildAddDeviceIx(
-  //   walletId: anchor.BN,
-  //   passkeyPublicKey: number[],
-  //   newPasskeyPublicKey: number[],
-  //   smartWallet: PublicKey,
-  //   walletDevice: PublicKey,
-  //   newWalletDevice: PublicKey
-  // ): Promise<TransactionInstruction> {
-  //   return await this.program.methods
-  //     .addDevice(walletId, passkeyPublicKey, newPasskeyPublicKey)
-  //     .accountsPartial({
-  //       smartWallet,
-  //       walletDevice,
-  //       newWalletDevice,
-  //       policy: this.policyPda(smartWallet),
-  //     })
-  //     .instruction();
-  // }
+  async buildAddDeviceIx(
+    walletId: anchor.BN,
+    passkeyPublicKey: number[],
+    credentialHash: number[],
+    policyData: Buffer<ArrayBufferLike>,
+    newPasskeyPublicKey: number[],
+    newCredentialHash: number[],
+    smartWallet: PublicKey,
+    policySigner: PublicKey
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .addDevice(
+        walletId,
+        passkeyPublicKey,
+        credentialHash,
+        policyData,
+        newPasskeyPublicKey,
+        newCredentialHash
+      )
+      .accountsPartial({
+        smartWallet,
+        policySigner,
+      })
+      .instruction();
+  }
 
   // async buildRemoveDeviceIx(
   //   walletId: anchor.BN,

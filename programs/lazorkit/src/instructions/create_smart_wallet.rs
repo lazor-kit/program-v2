@@ -9,9 +9,8 @@ use crate::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
     error::LazorKitError,
     security::validation,
-    state::{Config, LazorKitVault, PolicyProgramRegistry, WalletDevice, WalletState},
+    state::{WalletDevice, WalletState},
     utils::{create_wallet_device_hash, execute_cpi, get_policy_signer},
-    ID,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -21,8 +20,6 @@ pub struct CreateSmartWalletArgs {
     pub init_policy_data: Vec<u8>,
     pub wallet_id: u64,
     pub amount: u64,
-    pub referral_address: Pubkey,
-    pub vault_index: u8,
     pub policy_data_size: u16,
 }
 
@@ -30,12 +27,6 @@ pub fn create_smart_wallet(
     ctx: Context<CreateSmartWallet>,
     args: CreateSmartWalletArgs,
 ) -> Result<()> {
-    // Check that the program is not paused
-    require!(
-        !ctx.accounts.lazorkit_config.is_paused,
-        LazorKitError::ProgramPaused
-    );
-
     // Validate input parameters
     validation::validate_passkey_format(&args.passkey_public_key)?;
     validation::validate_policy_data(&args.init_policy_data)?;
@@ -62,7 +53,6 @@ pub fn create_smart_wallet(
         bump: ctx.bumps.smart_wallet,
         wallet_id: args.wallet_id,
         last_nonce: 0u64,
-        referral: args.referral_address,
         policy_program: ctx.accounts.policy_program.key(),
         policy_data,
     });
@@ -90,18 +80,6 @@ pub fn create_smart_wallet(
         )?;
     }
 
-    // // transfer the create smart wallet fee to the lazorkit vault
-    // transfer(
-    //     CpiContext::new(
-    //         ctx.accounts.system_program.to_account_info(),
-    //         Transfer {
-    //             from: ctx.accounts.payer.to_account_info(),
-    //             to: ctx.accounts.lazorkit_vault.to_account_info(),
-    //         },
-    //     ),
-    //     ctx.accounts.lazorkit_config.create_smart_wallet_fee,
-    // )?;
-
     // Check that smart-wallet balance >= empty rent exempt balance
     require!(
         ctx.accounts.smart_wallet.lamports() >= crate::constants::EMPTY_PDA_RENT_EXEMPT_BALANCE,
@@ -116,13 +94,6 @@ pub fn create_smart_wallet(
 pub struct CreateSmartWallet<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-
-    #[account(
-        seeds = [PolicyProgramRegistry::PREFIX_SEED],
-        bump,
-        owner = ID,
-    )]
-    pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
 
     #[account(
         mut,
@@ -150,23 +121,7 @@ pub struct CreateSmartWallet<'info> {
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    #[account(
-        seeds = [Config::PREFIX_SEED],
-        bump,
-        owner = ID
-    )]
-    pub lazorkit_config: Box<Account<'info, Config>>,
-
-    #[account(
-        seeds = [LazorKitVault::PREFIX_SEED, &args.vault_index.to_le_bytes()],
-        bump,
-    )]
-    pub lazorkit_vault: SystemAccount<'info>,
-
-    #[account(
-        executable,
-        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
-    )]
+    #[account(executable)]
     /// CHECK: Validated to be executable and in registry
     pub policy_program: UncheckedAccount<'info>,
 
