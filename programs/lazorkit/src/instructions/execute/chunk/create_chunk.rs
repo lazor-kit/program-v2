@@ -2,15 +2,14 @@ use anchor_lang::prelude::*;
 
 use crate::instructions::CreateChunkArgs;
 use crate::security::validation;
-use crate::state::{Chunk, Config, PolicyProgramRegistry, WalletDevice, WalletState};
+use crate::state::{Chunk, WalletDevice, WalletState};
 use crate::utils::{
-    compute_create_chunk_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, verify_authorization_hash
+    compute_create_chunk_message_hash, compute_instruction_hash, create_wallet_device_hash,
+    execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
 pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<()> {
-    require!(!ctx.accounts.lazorkit_config.is_paused, LazorKitError::ProgramPaused);
-
     // Verify the authorization hash
     let policy_hash = compute_instruction_hash(
         &args.policy_data,
@@ -32,7 +31,6 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         args.verify_instruction_index,
         expected_message_hash,
     )?;
-
 
     let policy_signer = get_policy_signer(
         ctx.accounts.smart_wallet.key(),
@@ -58,7 +56,6 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         authorized_nonce: ctx.accounts.wallet_state.last_nonce,
         authorized_timestamp: args.timestamp,
         rent_refund_address: ctx.accounts.payer.key(),
-        vault_index: args.vault_index,
     });
 
     // Update the nonce
@@ -73,13 +70,6 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
 pub struct CreateChunk<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-
-    #[account(
-        seeds = [Config::PREFIX_SEED], 
-        bump, 
-        owner = ID
-    )]
-    pub lazorkit_config: Box<Account<'info, Config>>,
 
     #[account(
         mut,
@@ -105,18 +95,9 @@ pub struct CreateChunk<'info> {
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
 
-    #[account(
-        seeds = [PolicyProgramRegistry::PREFIX_SEED],
-        bump,
-        owner = ID
-    )]
-    pub policy_program_registry: Box<Account<'info, PolicyProgramRegistry>>,
-
     /// CHECK: executable policy program
     #[account(
-        executable,
-        constraint = policy_program.key() == wallet_state.policy_program @ LazorKitError::InvalidProgramAddress,
-        constraint = policy_program_registry.registered_programs.contains(&policy_program.key()) @ LazorKitError::PolicyProgramNotRegistered
+        address = wallet_state.policy_program
     )]
     pub policy_program: UncheckedAccount<'info>,
 

@@ -17,79 +17,6 @@ export type Lazorkit = {
   ],
   "instructions": [
     {
-      "name": "addPolicyProgram",
-      "discriminator": [
-        172,
-        91,
-        65,
-        142,
-        231,
-        42,
-        251,
-        227
-      ],
-      "accounts": [
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "policyProgramRegistry",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "newPolicyProgram"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "callPolicy",
       "discriminator": [
         57,
@@ -106,24 +33,6 @@ export type Lazorkit = {
           "name": "payer",
           "writable": true,
           "signer": true
-        },
-        {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "smartWallet",
@@ -193,69 +102,7 @@ export type Lazorkit = {
           "optional": true
         },
         {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkitVault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
-        },
-        {
           "name": "policyProgram"
-        },
-        {
-          "name": "policyProgramRegistry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "ixSysvar",
@@ -296,24 +143,6 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
           "name": "smartWallet",
           "writable": true,
           "pda": {
@@ -381,72 +210,10 @@ export type Lazorkit = {
           "optional": true
         },
         {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkitVault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
-        },
-        {
           "name": "oldPolicyProgram"
         },
         {
           "name": "newPolicyProgram"
-        },
-        {
-          "name": "policyProgramRegistry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "ixSysvar",
@@ -600,24 +367,6 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
           "name": "smartWallet",
           "writable": true,
           "pda": {
@@ -678,33 +427,6 @@ export type Lazorkit = {
         },
         {
           "name": "walletDevice"
-        },
-        {
-          "name": "policyProgramRegistry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "policyProgram"
@@ -775,33 +497,6 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "policyProgramRegistry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
           "name": "smartWallet",
           "writable": true,
           "pda": {
@@ -862,54 +557,6 @@ export type Lazorkit = {
         {
           "name": "walletDevice",
           "writable": true
-        },
-        {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "lazorkitVault",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
         },
         {
           "name": "policyProgram"
@@ -1011,90 +658,10 @@ export type Lazorkit = {
           "name": "walletDevice"
         },
         {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkitVault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "args.vault_index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "policyProgramRegistry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
           "name": "policyProgram"
         },
         {
           "name": "cpiProgram"
-        },
-        {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "ixSysvar",
@@ -1133,24 +700,6 @@ export type Lazorkit = {
           "name": "payer",
           "writable": true,
           "signer": true
-        },
-        {
-          "name": "lazorkitConfig",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
         },
         {
           "name": "smartWallet",
@@ -1211,45 +760,6 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "referral",
-          "writable": true
-        },
-        {
-          "name": "lazorkitVault",
-          "docs": [
-            "LazorKit vault (empty PDA that holds SOL) - random vault selected by client"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "chunk.vault_index",
-                "account": "chunk"
-              }
-            ]
-          }
-        },
-        {
           "name": "chunk",
           "docs": [
             "Transaction session to execute. Closed to refund rent."
@@ -1300,249 +810,6 @@ export type Lazorkit = {
           "type": "bytes"
         }
       ]
-    },
-    {
-      "name": "initializeProgram",
-      "discriminator": [
-        176,
-        107,
-        205,
-        168,
-        24,
-        157,
-        175,
-        103
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "policyProgramRegistry",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  108,
-                  105,
-                  99,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "defaultPolicyProgram"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "manageVault",
-      "discriminator": [
-        165,
-        7,
-        106,
-        242,
-        73,
-        193,
-        195,
-        128
-      ],
-      "accounts": [
-        {
-          "name": "authority",
-          "docs": [
-            "The current authority of the program."
-          ],
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "lazorkitConfig"
-          ]
-        },
-        {
-          "name": "lazorkitConfig",
-          "docs": [
-            "The program's configuration account."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "docs": [
-            "Individual vault PDA (empty account that holds SOL)"
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  97,
-                  122,
-                  111,
-                  114,
-                  107,
-                  105,
-                  116,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "destination",
-          "writable": true
-        },
-        {
-          "name": "systemProgram",
-          "docs": [
-            "System program"
-          ],
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "action",
-          "type": "u8"
-        },
-        {
-          "name": "amount",
-          "type": "u64"
-        },
-        {
-          "name": "index",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "updateConfig",
-      "discriminator": [
-        29,
-        158,
-        252,
-        191,
-        10,
-        83,
-        219,
-        99
-      ],
-      "accounts": [
-        {
-          "name": "authority",
-          "docs": [
-            "The current authority of the program."
-          ],
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "config",
-          "docs": [
-            "The program's configuration account."
-          ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "param",
-          "type": {
-            "defined": {
-              "name": "updateType"
-            }
-          }
-        },
-        {
-          "name": "value",
-          "type": "u64"
-        }
-      ]
     }
   ],
   "accounts": [
@@ -1557,32 +824,6 @@ export type Lazorkit = {
         143,
         156,
         196
-      ]
-    },
-    {
-      "name": "config",
-      "discriminator": [
-        155,
-        12,
-        170,
-        224,
-        30,
-        250,
-        204,
-        130
-      ]
-    },
-    {
-      "name": "policyProgramRegistry",
-      "discriminator": [
-        158,
-        67,
-        114,
-        157,
-        27,
-        153,
-        86,
-        72
       ]
     },
     {
@@ -1965,16 +1206,8 @@ export type Lazorkit = {
             }
           },
           {
-            "name": "vaultIndex",
-            "type": "u8"
-          },
-          {
             "name": "timestamp",
             "type": "i64"
-          },
-          {
-            "name": "smartWalletIsSigner",
-            "type": "bool"
           }
         ]
       }
@@ -2025,10 +1258,6 @@ export type Lazorkit = {
           {
             "name": "initPolicyData",
             "type": "bytes"
-          },
-          {
-            "name": "vaultIndex",
-            "type": "u8"
           },
           {
             "name": "timestamp",
@@ -2098,60 +1327,6 @@ export type Lazorkit = {
               "Address to receive rent refund when closing the chunk session"
             ],
             "type": "pubkey"
-          },
-          {
-            "name": "vaultIndex",
-            "docs": [
-              "Vault index for fee collection during chunk execution"
-            ],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "config",
-      "docs": [
-        "LazorKit program configuration and settings",
-        "",
-        "Stores global program configuration including fee structures, default policy",
-        "program, and operational settings. Only the program authority can modify",
-        "these settings through the update_config instruction.",
-        "",
-        "Memory layout optimized for better cache performance:",
-        "- Group related fields together",
-        "- Align fields to natural boundaries"
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "isPaused",
-            "type": "bool"
-          },
-          {
-            "name": "createSmartWalletFee",
-            "type": "u64"
-          },
-          {
-            "name": "feePayerFee",
-            "type": "u64"
-          },
-          {
-            "name": "referralFee",
-            "type": "u64"
-          },
-          {
-            "name": "lazorkitFee",
-            "type": "u64"
-          },
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "defaultPolicyProgramId",
-            "type": "pubkey"
           }
         ]
       }
@@ -2194,10 +1369,6 @@ export type Lazorkit = {
           {
             "name": "policyData",
             "type": "bytes"
-          },
-          {
-            "name": "vaultIndex",
-            "type": "u8"
           },
           {
             "name": "timestamp",
@@ -2249,14 +1420,6 @@ export type Lazorkit = {
           {
             "name": "amount",
             "type": "u64"
-          },
-          {
-            "name": "referralAddress",
-            "type": "pubkey"
-          },
-          {
-            "name": "vaultIndex",
-            "type": "u8"
           },
           {
             "name": "policyDataSize",
@@ -2313,10 +1476,6 @@ export type Lazorkit = {
             "type": "bytes"
           },
           {
-            "name": "vaultIndex",
-            "type": "u8"
-          },
-          {
             "name": "timestamp",
             "type": "i64"
           }
@@ -2345,74 +1504,6 @@ export type Lazorkit = {
                 32
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "policyProgramRegistry",
-      "docs": [
-        "Registry of approved policy programs for smart wallet operations",
-        "",
-        "Maintains a whitelist of policy programs that can be used to govern",
-        "smart wallet transaction validation and security rules."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registeredPrograms",
-            "docs": [
-              "List of registered policy program addresses (max 10)"
-            ],
-            "type": {
-              "vec": "pubkey"
-            }
-          },
-          {
-            "name": "bump",
-            "docs": [
-              "Bump seed for PDA derivation and verification"
-            ],
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "updateType",
-      "docs": [
-        "Types of configuration parameters that can be updated",
-        "",
-        "Defines all the configuration parameters that can be modified through",
-        "the update_config instruction by the program authority."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "createWalletFee"
-          },
-          {
-            "name": "feePayerFee"
-          },
-          {
-            "name": "referralFee"
-          },
-          {
-            "name": "lazorkitFee"
-          },
-          {
-            "name": "defaultPolicyProgram"
-          },
-          {
-            "name": "admin"
-          },
-          {
-            "name": "pauseProgram"
-          },
-          {
-            "name": "unpauseProgram"
           }
         ]
       }
@@ -2467,10 +1558,6 @@ export type Lazorkit = {
           {
             "name": "lastNonce",
             "type": "u64"
-          },
-          {
-            "name": "referral",
-            "type": "pubkey"
           },
           {
             "name": "policyProgram",

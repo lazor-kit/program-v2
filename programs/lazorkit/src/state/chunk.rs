@@ -18,8 +18,6 @@ pub struct Chunk {
     pub authorized_timestamp: i64,
     /// Address to receive rent refund when closing the chunk session
     pub rent_refund_address: Pubkey,
-    /// Vault index for fee collection during chunk execution
-    pub vault_index: u8,
 }
 
 impl Chunk {
