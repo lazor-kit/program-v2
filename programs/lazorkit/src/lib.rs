@@ -23,11 +23,11 @@ pub mod lazorkit {
         instructions::create_smart_wallet(ctx, args)
     }
 
-    pub fn change_policy<'c: 'info, 'info>(
+    pub fn change_policy_program<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
         args: ChangePolicyArgs,
     ) -> Result<()> {
-        instructions::change_policy(ctx, args)
+        instructions::change_policy_program(ctx, args)
     }
 
     pub fn call_policy<'c: 'info, 'info>(

@@ -1,12 +1,14 @@
-use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID};
+use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID, SMART_WALLET_SEED};
 use crate::state::message::{Message, SimpleMessage};
 use crate::state::WalletDevice;
 use crate::{error::LazorKitError, ID};
+use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
+    hash::hash,
     instruction::Instruction,
     program::{get_return_data, invoke_signed},
+    system_instruction::transfer,
 };
-use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 /// Utility functions for LazorKit smart wallet operations
 ///
@@ -56,24 +58,6 @@ pub fn get_policy_signer(
     })
 }
 
-/// Helper to check if a slice matches a pattern
-#[inline]
-pub fn slice_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x == y)
-}
-
-/// Execute a Cross-Program Invocation (CPI) with a single PDA signer.
-///
-/// * `accounts` – slice of `AccountInfo` that will be forwarded to the target program.
-/// * `data` – raw instruction data **as a slice**; passing a slice removes the need for the
-///   caller to allocate a new `Vec<u8>` every time a CPI is performed.  A single allocation is
-///   still required internally when constructing the `Instruction`, but this change avoids an
-///   additional clone at every call-site.
-/// * `program` – account info of the program to invoke.
-/// * `signer` – PDA signer information.  The seeds are appended with the
-///   bump and the CPI is invoked with `invoke_signed`.
-///
-/// Returns the return data from the invoked program as a `Vec<u8>`.
 pub fn execute_cpi(
     accounts: &[AccountInfo],
     data: &[u8],
@@ -92,63 +76,6 @@ pub fn execute_cpi(
 
     // Execute the CPI with PDA signing
     invoke_signed(&ix, accounts, &[&seed_slices])?;
-
-    // Get the return data from the invoked program
-    if let Some((_program_id, return_data)) = get_return_data() {
-        Ok(return_data)
-    } else {
-        // If no return data was set, return empty vector
-        Ok(Vec::new())
-    }
-}
-
-/// Execute a Cross-Program Invocation (CPI) with multiple PDA signers.
-///
-/// * `accounts` – slice of `AccountInfo` that will be forwarded to the target program.
-/// * `data` – raw instruction data **as a slice**; passing a slice removes the need for the
-///   caller to allocate a new `Vec<u8>` every time a CPI is performed.
-/// * `program` – account info of the program to invoke.
-/// * `signers` – slice of PDA signer information. Each signer's seeds are appended with the
-///   bump and the CPI is invoked with `invoke_signed` using all signers.
-///
-/// Returns the return data from the invoked program as a `Vec<u8>`.
-pub fn execute_cpi_multiple_signers(
-    accounts: &[AccountInfo],
-    data: &[u8],
-    program: &AccountInfo,
-    signers: &[PdaSigner],
-) -> Result<Vec<u8>> {
-    // 1) Create the CPI instruction
-    let ix = create_cpi_instruction_multiple_signers(accounts, data, program, signers);
-
-    // 2) OWN the bytes (including bump) so references remain valid
-    // seeds_owned: Vec<signer> -> Vec<seed> -> Vec<u8>
-    let mut seeds_owned: Vec<Vec<Vec<u8>>> = Vec::with_capacity(signers.len());
-    for signer in signers {
-        let mut signer_owned: Vec<Vec<u8>> = Vec::with_capacity(signer.seeds.len() + 1);
-
-        // Copy the original seeds (so we own their backing storage here)
-        for seed in &signer.seeds {
-            signer_owned.push(seed.clone());
-        }
-
-        // Add the bump as its own Vec<u8> so it has stable storage
-        signer_owned.push(vec![signer.bump]);
-
-        seeds_owned.push(signer_owned);
-    }
-
-    // 3) Convert owned bytes into the reference shapes invoke_signed expects
-    // &[&[&[u8]]]
-    let seed_refs: Vec<Vec<&[u8]>> = seeds_owned
-        .iter()
-        .map(|signer_vec| signer_vec.iter().map(|b| b.as_slice()).collect())
-        .collect();
-
-    let seed_slice_refs: Vec<&[&[u8]]> = seed_refs.iter().map(|v| v.as_slice()).collect();
-
-    // 4) Call invoke_signed with multiple PDA signers
-    invoke_signed(&ix, accounts, &seed_slice_refs)?;
 
     // Get the return data from the invoked program
     if let Some((_program_id, return_data)) = get_return_data() {
@@ -497,7 +424,7 @@ pub fn compute_call_policy_message_hash(
 }
 
 /// Compute change policy message hash: hash(nonce, timestamp, old_policy_hash, new_policy_hash)
-pub fn compute_change_policy_message_hash(
+pub fn compute_change_policy_program_message_hash(
     nonce: u64,
     timestamp: i64,
     old_policy_hash: [u8; 32],
@@ -633,13 +560,28 @@ pub fn validate_programs_in_ranges(
     Ok(())
 }
 
-/// Create wallet signer for smart wallet operations
-pub fn create_wallet_signer(wallet_id: u64, bump: u8) -> PdaSigner {
-    PdaSigner {
-        seeds: vec![
-            crate::constants::SMART_WALLET_SEED.to_vec(),
-            wallet_id.to_le_bytes().to_vec(),
-        ],
+// Transfer transaction fee to payer
+pub fn transfer_fee_to_payer<'a>(
+    smart_wallet: &AccountInfo<'a>,
+    wallet_id: u64,
+    bump: u8,
+    payer: &AccountInfo<'a>,
+    system_program: &AccountInfo<'a>,
+    fee: u64,
+) -> Result<()> {
+    let signer = PdaSigner {
+        seeds: vec![SMART_WALLET_SEED.to_vec(), wallet_id.to_le_bytes().to_vec()],
         bump,
-    }
+    };
+
+    let transfer_ins = transfer(smart_wallet.key, payer.key, fee);
+
+    execute_cpi(
+        &[smart_wallet.to_account_info(), payer.to_account_info()],
+        &transfer_ins.data,
+        system_program,
+        signer,
+    )?;
+
+    Ok(())
 }

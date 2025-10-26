@@ -5,12 +5,13 @@ use crate::instructions::ChangePolicyArgs;
 use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
-    compute_change_policy_message_hash, compute_instruction_hash, create_wallet_device_hash,
-    execute_cpi, get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash,
+    compute_change_policy_program_message_hash, compute_instruction_hash,
+    create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, split_remaining_accounts,
+    verify_authorization_hash,
 };
 use crate::{error::LazorKitError, ID};
 
-pub fn change_policy<'c: 'info, 'info>(
+pub fn change_policy_program<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
     args: ChangePolicyArgs,
 ) -> Result<()> {
@@ -27,7 +28,7 @@ pub fn change_policy<'c: 'info, 'info>(
         init_accounts,
         ctx.accounts.new_policy_program.key(),
     )?;
-    let expected_message_hash = compute_change_policy_message_hash(
+    let expected_message_hash = compute_change_policy_program_message_hash(
         ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         old_policy_hash,
@@ -45,11 +46,11 @@ pub fn change_policy<'c: 'info, 'info>(
 
     require!(
         args.destroy_policy_data.get(0..8) == Some(&sighash("global", "destroy")),
-        LazorKitError::InvalidDestroyDiscriminator
+        LazorKitError::InvalidInstructionDiscriminator
     );
     require!(
         args.init_policy_data.get(0..8) == Some(&sighash("global", "init_policy")),
-        LazorKitError::InvalidInitPolicyDiscriminator
+        LazorKitError::InvalidInstructionDiscriminator
     );
 
     let policy_signer = get_policy_signer(
@@ -74,20 +75,6 @@ pub fn change_policy<'c: 'info, 'info>(
     ctx.accounts.wallet_state.policy_program = ctx.accounts.new_policy_program.key();
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
-
-    // Create the new wallet device account if it exists
-    match args.new_wallet_device {
-        Some(new_wallet_device_args) => {
-            let new_wallet_device_account = &mut ctx.accounts.new_wallet_device.as_mut().unwrap();
-            new_wallet_device_account.set_inner(WalletDevice {
-                bump: ctx.bumps.new_wallet_device.unwrap(),
-                passkey_pubkey: new_wallet_device_args.passkey_public_key,
-                credential_hash: new_wallet_device_args.credential_hash,
-                smart_wallet: ctx.accounts.smart_wallet.key(),
-            });
-        }
-        _ => {}
-    }
 
     Ok(())
 }
@@ -119,15 +106,6 @@ pub struct ChangePolicy<'info> {
         owner = ID,
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + WalletDevice::INIT_SPACE,
-        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), args.new_wallet_device.clone().unwrap().credential_hash)],
-        bump
-    )]
-    pub new_wallet_device: Option<Box<Account<'info, WalletDevice>>>,
 
     #[account(
         address = wallet_state.policy_program
