@@ -14,14 +14,9 @@ import {
   deriveSmartWalletPda,
   deriveSmartWalletConfigPda,
   deriveChunkPda,
-  deriveLazorkitVaultPda,
   deriveWalletDevicePda,
 } from '../pda/lazorkit';
-import {
-  getRandomBytes,
-  instructionToAccountMetas,
-  getVaultIndex,
-} from '../utils';
+import { getRandomBytes, instructionToAccountMetas } from '../utils';
 import * as types from '../types';
 import { DefaultPolicyClient } from './defaultPolicy';
 import * as bs58 from 'bs58';
@@ -439,7 +434,7 @@ export class LazorkitClient {
     initPolicyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .changePolicy(args)
+      .changePolicyProgram(args)
       .accountsPartial({
         payer,
         smartWallet,
@@ -732,21 +727,6 @@ export class LazorkitClient {
       params.smartWallet,
       {
         ...signatureArgs,
-        newWalletDevice: params.newWalletDevice
-          ? {
-              passkeyPublicKey: Array.from(
-                params.newWalletDevice.passkeyPublicKey
-              ),
-              credentialHash: Array.from(
-                require('js-sha256').arrayBuffer(
-                  Buffer.from(
-                    params.newWalletDevice.credentialIdBase64,
-                    'base64'
-                  )
-                )
-              ),
-            }
-          : null,
         policyData: params.policyInstruction.data,
         verifyInstructionIndex: calculateVerifyInstructionIndex(
           options.computeUnitLimit
@@ -798,21 +778,6 @@ export class LazorkitClient {
         splitIndex:
           (params.newWalletDevice ? 1 : 0) +
           params.destroyPolicyInstruction.keys.length,
-        newWalletDevice: params.newWalletDevice
-          ? {
-              passkeyPublicKey: Array.from(
-                params.newWalletDevice.passkeyPublicKey
-              ),
-              credentialHash: Array.from(
-                require('js-sha256').arrayBuffer(
-                  Buffer.from(
-                    params.newWalletDevice.credentialIdBase64,
-                    'base64'
-                  )
-                )
-              ),
-            }
-          : null,
         timestamp: new BN(Math.floor(Date.now() / 1000)),
       },
       params.destroyPolicyInstruction,
@@ -1035,9 +1000,9 @@ export class LazorkitClient {
         );
         break;
       }
-      case types.SmartWalletAction.ChangePolicy: {
+      case types.SmartWalletAction.ChangePolicyProgram: {
         const { initPolicyIns, destroyPolicyIns } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.ChangePolicy];
+          action.args as types.ArgsByAction[types.SmartWalletAction.ChangePolicyProgram];
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 

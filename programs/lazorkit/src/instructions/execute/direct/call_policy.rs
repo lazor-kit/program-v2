@@ -51,20 +51,6 @@ pub fn call_policy<'c: 'info, 'info>(
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
     ctx.accounts.wallet_state.policy_data = policy_data;
 
-    // Create the new wallet device account if it exists
-    match args.new_wallet_device {
-        Some(new_wallet_device_args) => {
-            let new_wallet_device_account = &mut ctx.accounts.new_wallet_device.as_mut().unwrap();
-            new_wallet_device_account.set_inner(WalletDevice {
-                bump: ctx.bumps.new_wallet_device.unwrap(),
-                passkey_pubkey: new_wallet_device_args.passkey_public_key,
-                credential_hash: new_wallet_device_args.credential_hash,
-                smart_wallet: ctx.accounts.smart_wallet.key(),
-            });
-        }
-        _ => {}
-    }
-
     Ok(())
 }
 
@@ -95,15 +81,6 @@ pub struct CallPolicy<'info> {
         owner = ID,
     )]
     pub wallet_device: Box<Account<'info, WalletDevice>>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + WalletDevice::INIT_SPACE,
-        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), args.new_wallet_device.clone().unwrap().credential_hash)],
-        bump
-    )]
-    pub new_wallet_device: Option<Box<Account<'info, WalletDevice>>>,
 
     /// CHECK: executable policy program
     #[account(

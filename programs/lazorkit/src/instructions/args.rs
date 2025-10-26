@@ -29,7 +29,6 @@ pub struct ChangePolicyArgs {
     pub destroy_policy_data: Vec<u8>,
     pub init_policy_data: Vec<u8>,
     pub timestamp: i64,
-    pub new_wallet_device: Option<NewWalletDeviceArgs>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -40,8 +39,33 @@ pub struct CallPolicyArgs {
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
-    pub new_wallet_device: Option<NewWalletDeviceArgs>,
     pub timestamp: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct AddDeviceArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    pub signature: [u8; 64],
+    pub client_data_json_raw: Vec<u8>,
+    pub authenticator_data_raw: Vec<u8>,
+    pub verify_instruction_index: u8,
+    pub policy_data: Vec<u8>,
+    pub timestamp: i64,
+    pub new_device_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    pub new_device_credential_hash: [u8; 32],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct RemoveDeviceArgs {
+    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    pub signature: [u8; 64],
+    pub client_data_json_raw: Vec<u8>,
+    pub authenticator_data_raw: Vec<u8>,
+    pub verify_instruction_index: u8,
+    pub policy_data: Vec<u8>,
+    pub timestamp: i64,
+    pub remove_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    pub remove_credential_hash: [u8; 32],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -54,12 +78,6 @@ pub struct CreateChunkArgs {
     pub policy_data: Vec<u8>,
     pub timestamp: i64,
     pub cpi_hash: [u8; 32],
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
-pub struct NewWalletDeviceArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub credential_hash: [u8; 32],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]

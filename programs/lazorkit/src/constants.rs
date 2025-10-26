@@ -13,16 +13,6 @@ pub const PASSKEY_PUBLIC_KEY_SIZE: usize = 33;
 /// Rationale: Based on Solana's current rent calculation for empty accounts
 pub const EMPTY_PDA_RENT_EXEMPT_BALANCE: u64 = 890880;
 
-/// Default fee configuration constants
-pub const DEFAULT_FEE_PAYER_FEE: u64 = 30000; // 0.00003 SOL
-pub const DEFAULT_REFERRAL_FEE: u64 = 10000; // 0.00001 SOL
-pub const DEFAULT_LAZORKIT_FEE: u64 = 10000; // 0.00001
-pub const DEFAULT_CREATE_WALLET_FEE: u64 = 10000; // 0.00001 SOL
-
-/// Maximum fee limits for validation
-pub const MAX_CREATE_WALLET_FEE: u64 = 1_000_000_000; // 1 SOL
-pub const MAX_TRANSACTION_FEE: u64 = 100_000_000; // 0.1 SOL
-
 /// Secp256r1 public key format constants
 pub const SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN: u8 = 0x02;
 pub const SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD: u8 = 0x03;
@@ -30,8 +20,5 @@ pub const SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD: u8 = 0x03;
 /// Maximum instruction index for Secp256r1 verification
 pub const MAX_VERIFY_INSTRUCTION_INDEX: u8 = 255;
 
-/// Maximum policy data size in bytes
-pub const MAX_POLICY_BYTES: usize = 1024;
-
-/// Maximum device count
-pub const MAX_DEVICE_COUNT: u8 = 3;
+/// Transaction fee amount (in lamports)
+pub const TRANSACTION_FEE: u64 = 5000;

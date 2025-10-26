@@ -52,12 +52,8 @@ pub enum LazorKitError {
     PolicyProgramNotRegistered,
     #[msg("The policy program registry is full.")]
     WhitelistFull,
-    #[msg("Invalid instruction discriminator for check_policy")]
-    InvalidCheckPolicyDiscriminator,
-    #[msg("Invalid instruction discriminator for destroy")]
-    InvalidDestroyDiscriminator,
-    #[msg("Invalid instruction discriminator for init_policy")]
-    InvalidInitPolicyDiscriminator,
+    #[msg("Invalid instruction discriminator")]
+    InvalidInstructionDiscriminator,
     #[msg("Old and new policy programs are identical")]
     PolicyProgramsIdentical,
     #[msg("Neither old nor new policy program is the default")]

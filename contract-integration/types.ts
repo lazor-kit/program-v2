@@ -7,9 +7,6 @@ import { Lazorkit } from './anchor/types/lazorkit';
 // ============================================================================
 export type WalletState = anchor.IdlTypes<Lazorkit>['walletState'];
 export type WalletDevice = anchor.IdlTypes<Lazorkit>['walletDevice'];
-export type ProgramConfig = anchor.IdlTypes<Lazorkit>['config'];
-export type PolicyProgramRegistry =
-  anchor.IdlTypes<Lazorkit>['policyProgramRegistry'];
 export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
 
 // Instruction Args
@@ -21,7 +18,6 @@ export type CallPolicyArgs = anchor.IdlTypes<Lazorkit>['callPolicyArgs'];
 export type CreateChunkArgs = anchor.IdlTypes<Lazorkit>['createChunkArgs'];
 export type NewWalletDeviceArgs =
   anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
-export type UpdateType = anchor.IdlTypes<Lazorkit>['updateType'];
 
 // ============================================================================
 // Smart Wallet Actions
@@ -29,7 +25,7 @@ export type UpdateType = anchor.IdlTypes<Lazorkit>['updateType'];
 export enum SmartWalletAction {
   Execute = 'execute',
   CallPolicy = 'call_policy',
-  ChangePolicy = 'change_policy',
+  ChangePolicyProgram = 'change_policy_program',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
   GrantPermission = 'grant_permission',
@@ -45,7 +41,7 @@ export type ArgsByAction = {
     policyInstruction: anchor.web3.TransactionInstruction;
     newWalletDevice: NewPasskeyDevice | null;
   };
-  [SmartWalletAction.ChangePolicy]: {
+  [SmartWalletAction.ChangePolicyProgram]: {
     destroyPolicyIns: anchor.web3.TransactionInstruction;
     initPolicyIns: anchor.web3.TransactionInstruction;
     newWalletDevice: NewPasskeyDevice | null;

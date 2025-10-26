@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
-
 use crate::instructions::ExecuteArgs;
 use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
     compute_execute_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi,
-    get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
+    get_policy_signer, sighash, split_remaining_accounts, transfer_fee_to_payer,
+    verify_authorization_hash, PdaSigner,
 };
 use crate::ID;
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
@@ -50,7 +50,7 @@ pub fn execute<'c: 'info, 'info>(
     let policy_data = &args.policy_data;
     require!(
         policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
-        LazorKitError::InvalidCheckPolicyDiscriminator
+        LazorKitError::InvalidInstructionDiscriminator
     );
     execute_cpi(
         policy_accounts,
@@ -77,6 +77,16 @@ pub fn execute<'c: 'info, 'info>(
     // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
+
+    // Transfer transaction fee to payer
+    transfer_fee_to_payer(
+        &ctx.accounts.smart_wallet,
+        ctx.accounts.wallet_state.wallet_id,
+        ctx.accounts.wallet_state.bump,
+        &ctx.accounts.payer,
+        &ctx.accounts.system_program,
+        crate::constants::TRANSACTION_FEE,
+    )?;
 
     Ok(())
 }
