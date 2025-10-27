@@ -238,6 +238,16 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
+pub fn compute_device_hash(
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    credential_hash: [u8; 32],
+) -> [u8; 32] {
+    let mut buf = [0u8; 65];
+    buf[..33 as usize].copy_from_slice(&passkey_public_key);
+    buf[33 as usize..].copy_from_slice(&credential_hash);
+    hash(&buf).to_bytes()
+}
+
 pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]) -> [u8; 32] {
     // Combine passkey public key with wallet address for unique hashing
     let mut buf = [0u8; 64];
@@ -345,8 +355,10 @@ pub fn compute_instruction_hash(
 #[derive(Debug, Clone, Copy)]
 pub enum MessageType {
     Execute,
-    CallPolicy,
-    ChangePolicy,
+    CallPolicyProgram,
+    ChangePolicyProgram,
+    AddDevice,
+    RemoveDevice,
     CreateChunk,
     GrantPermission,
 }
@@ -408,13 +420,13 @@ pub fn compute_execute_message_hash(
 
 /// Compute call policy message hash: hash(nonce, timestamp, policy_hash, empty_cpi_hash)
 /// Optimized to use stack allocation
-pub fn compute_call_policy_message_hash(
+pub fn compute_call_policy_program_message_hash(
     nonce: u64,
     timestamp: i64,
     policy_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
     compute_message_hash(
-        MessageType::CallPolicy,
+        MessageType::CallPolicyProgram,
         nonce,
         timestamp,
         policy_hash,
@@ -431,11 +443,45 @@ pub fn compute_change_policy_program_message_hash(
     new_policy_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
     compute_message_hash(
-        MessageType::ChangePolicy,
+        MessageType::ChangePolicyProgram,
         nonce,
         timestamp,
         old_policy_hash,
         Some(new_policy_hash),
+        None,
+    )
+}
+
+/// Compute add device message hash: hash(nonce, timestamp, policy_hash, new_device_hash)
+pub fn compute_add_device_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; 32],
+    new_device_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    compute_message_hash(
+        MessageType::AddDevice,
+        nonce,
+        timestamp,
+        policy_hash,
+        Some(new_device_hash),
+        None,
+    )
+}
+
+/// Compute remove device message hash: hash(nonce, timestamp, policy_hash, remove_device_hash)
+pub fn compute_remove_device_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; 32],
+    remove_device_hash: [u8; 32],
+) -> Result<[u8; 32]> {
+    compute_message_hash(
+        MessageType::RemoveDevice,
+        nonce,
+        timestamp,
+        policy_hash,
+        Some(remove_device_hash),
         None,
     )
 }

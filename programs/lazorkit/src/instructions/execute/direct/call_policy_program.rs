@@ -5,12 +5,12 @@ use crate::instructions::CallPolicyArgs;
 use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
-    compute_call_policy_message_hash, compute_instruction_hash, create_wallet_device_hash,
+    compute_call_policy_program_message_hash, compute_instruction_hash, create_wallet_device_hash,
     execute_cpi, get_policy_signer, verify_authorization_hash,
 };
 use crate::ID;
 
-pub fn call_policy<'c: 'info, 'info>(
+pub fn call_policy_program<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
     args: CallPolicyArgs,
 ) -> Result<()> {
@@ -19,7 +19,7 @@ pub fn call_policy<'c: 'info, 'info>(
         ctx.remaining_accounts,
         ctx.accounts.policy_program.key(),
     )?;
-    let expected_message_hash = compute_call_policy_message_hash(
+    let expected_message_hash = compute_call_policy_program_message_hash(
         ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         policy_hash,

@@ -4,12 +4,11 @@ import { expect } from 'chai';
 import * as dotenv from 'dotenv';
 import { base64, bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import {
-  buildCallPolicyMessage,
   DefaultPolicyClient,
   LazorkitClient,
+  SmartWalletAction,
 } from '../contract-integration';
 import { buildFakeMessagePasskey } from './utils';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 dotenv.config();
 
 // Helper function to get real blockchain timestamp
@@ -21,18 +20,7 @@ async function getBlockchainTimestamp(
   return new anchor.BN(timestamp || Math.floor(Date.now() / 1000));
 }
 
-// Helper function to get latest nonce from smart wallet config
-async function getLatestNonce(
-  lazorkitProgram: LazorkitClient,
-  smartWallet: anchor.web3.PublicKey
-): Promise<anchor.BN> {
-  const smartWalletConfig = await lazorkitProgram.getWalletStateData(
-    smartWallet
-  );
-  return smartWalletConfig.lastNonce;
-}
-
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.CLUSTER != 'localhost'
       ? process.env.RPC_URL
@@ -47,42 +35,7 @@ describe.skip('Test smart wallet with default policy', () => {
     bs58.decode(process.env.PRIVATE_KEY!)
   );
 
-  before(async () => {
-    // airdrop some SOL to the payer
-
-    const config = await connection.getAccountInfo(
-      lazorkitProgram.getConfigPubkey()
-    );
-
-    if (config === null) {
-      const ix = await lazorkitProgram.buildInitializeProgramIns(
-        payer.publicKey
-      );
-      const txn = new anchor.web3.Transaction().add(ix);
-
-      const sig = await anchor.web3.sendAndConfirmTransaction(connection, txn, [
-        payer,
-      ]);
-
-      console.log('Initialize txn: ', sig);
-
-      const depositTxn = await lazorkitProgram.manageVaultTxn({
-        payer: payer.publicKey,
-        action: 'deposit',
-        amount: new anchor.BN(0.001 * LAMPORTS_PER_SOL),
-        destination: payer.publicKey,
-        vaultIndex: 0,
-      });
-
-      await anchor.web3.sendAndConfirmTransaction(
-        connection,
-        depositTxn as anchor.web3.Transaction,
-        [payer]
-      );
-    }
-  });
-
-  xit('Add one device to smart wallet', async () => {
+  it('Add one device to smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -116,25 +69,28 @@ describe.skip('Test smart wallet with default policy', () => {
         amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
-    await anchor.web3.sendAndConfirmTransaction(
+    const createSmartWalletSig = await anchor.web3.sendAndConfirmTransaction(
       connection,
       createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
     );
+
+    console.log('Create smart wallet txn: ', createSmartWalletSig);
 
     const privateKey2 = ECDSA.generateKey();
 
     const publicKeyBase642 = privateKey2.toCompressedPublicKey();
 
     const passkeyPubkey2 = Array.from(Buffer.from(publicKeyBase642, 'base64'));
-
-    const walletDevice2 = lazorkitProgram.getWalletDevicePubkey(
-      smartWallet,
-      passkeyPubkey2
-    );
-
     const walletStateData = await lazorkitProgram.getWalletStateData(
       smartWallet
+    );
+
+    const credentialId2 = base64.encode(Buffer.from('testing2')); // random string
+    const credentialHash2 = Array.from(
+      new Uint8Array(
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId2, 'base64'))
+      )
     );
 
     const addDeviceIx = await defaultPolicyClient.buildAddDeviceIx(
@@ -143,28 +99,35 @@ describe.skip('Test smart wallet with default policy', () => {
       credentialHash,
       walletStateData.policyData,
       passkeyPubkey2,
-      credentialHash,
+      credentialHash2,
       smartWallet,
       policySigner
     );
 
     const timestamp = await getBlockchainTimestamp(connection);
-    const nonce = await getLatestNonce(lazorkitProgram, smartWallet);
 
-    const plainMessage = buildCallPolicyMessage(
-      payer.publicKey,
-      smartWallet,
-      nonce,
-      timestamp,
-      addDeviceIx
-    );
+    const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
+      action: {
+        type: SmartWalletAction.AddDevice,
+        args: {
+          policyInstruction: addDeviceIx,
+          newDevicePasskeyPublicKey: passkeyPubkey2,
+          newDeviceCredentialHash: credentialHash2,
+        },
+      },
+      payer: payer.publicKey,
+      smartWallet: smartWallet,
+      passkeyPublicKey: passkeyPubkey,
+      credentialHash: credentialHash,
+      timestamp: new anchor.BN(timestamp),
+    });
 
     const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
       await buildFakeMessagePasskey(plainMessage);
 
     const signature = privateKey.sign(message);
 
-    const callPolicyTxn = await lazorkitProgram.callPolicyTxn({
+    const callPolicyTxn = await lazorkitProgram.addDeviceTxn({
       payer: payer.publicKey,
       smartWallet,
       passkeySignature: {
@@ -174,11 +137,10 @@ describe.skip('Test smart wallet with default policy', () => {
         authenticatorDataRaw64: authenticatorDataRaw64,
       },
       policyInstruction: addDeviceIx,
-      newWalletDevice: {
-        passkeyPublicKey: passkeyPubkey2,
-        credentialIdBase64: credentialId,
-      },
+      newDevicePasskeyPublicKey: passkeyPubkey2,
+      newDeviceCredentialHash: credentialHash2,
       timestamp,
+      credentialHash: credentialHash,
     });
 
     const sig = await anchor.web3.sendAndConfirmTransaction(

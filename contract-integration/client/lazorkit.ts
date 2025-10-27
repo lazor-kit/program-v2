@@ -25,6 +25,8 @@ import {
   buildChangePolicyMessage,
   buildExecuteMessage,
   buildCreateChunkMessage,
+  buildAddDeviceMessage,
+  buildRemoveDeviceMessage,
 } from '../messages';
 import { Buffer } from 'buffer';
 import {
@@ -399,14 +401,14 @@ export class LazorkitClient {
   /**
    * Builds the invoke wallet policy instruction
    */
-  async buildCallPolicyIns(
+  async buildCallPolicyProgramIns(
     payer: PublicKey,
     smartWallet: PublicKey,
     args: types.CallPolicyArgs,
     policyInstruction: TransactionInstruction
   ): Promise<TransactionInstruction> {
     return await this.program.methods
-      .callPolicy(args)
+      .callPolicyProgram(args)
       .accountsPartial({
         payer,
         smartWallet,
@@ -426,7 +428,7 @@ export class LazorkitClient {
   /**
    * Builds the update wallet policy instruction
    */
-  async buildChangeRuleIns(
+  async buildChangePolicyProgramIns(
     payer: PublicKey,
     smartWallet: PublicKey,
     args: types.ChangePolicyArgs,
@@ -452,6 +454,55 @@ export class LazorkitClient {
         ...instructionToAccountMetas(destroyPolicyInstruction),
         ...instructionToAccountMetas(initPolicyInstruction),
       ])
+      .instruction();
+  }
+
+  /**
+   * Builds the add device instruction
+   */
+  async buildAddDeviceIns(
+    payer: PublicKey,
+    smartWallet: PublicKey,
+    args: types.AddDeviceArgs,
+    policyInstruction: TransactionInstruction,
+    walletDevice: PublicKey
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .addDevice(args)
+      .accountsPartial({
+        payer,
+        smartWallet,
+        walletState: this.getWalletStatePubkey(smartWallet),
+        walletDevice,
+        newWalletDevice: this.getWalletDevicePubkey(
+          smartWallet,
+          args.newDeviceCredentialHash
+        ),
+        policyProgram: policyInstruction.programId,
+        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
+      .instruction();
+  }
+
+  /**
+   * Builds the remove device instruction
+   */
+  async buildRemoveDeviceIns(
+    payer: PublicKey,
+    smartWallet: PublicKey,
+    args: types.RemoveDeviceArgs,
+    policyInstruction: TransactionInstruction
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .removeDevice(args)
+      .accountsPartial({
+        payer,
+        smartWallet,
+        walletState: this.getWalletStatePubkey(smartWallet),
+      })
+      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
   }
 
@@ -722,7 +773,7 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const invokeInstruction = await this.buildCallPolicyIns(
+    const invokeInstruction = await this.buildCallPolicyProgramIns(
       params.payer,
       params.smartWallet,
       {
@@ -765,7 +816,7 @@ export class LazorkitClient {
       params.passkeySignature
     );
 
-    const updateInstruction = await this.buildChangeRuleIns(
+    const updateInstruction = await this.buildChangePolicyProgramIns(
       params.payer,
       params.smartWallet,
       {
@@ -775,9 +826,7 @@ export class LazorkitClient {
         ),
         destroyPolicyData: params.destroyPolicyInstruction.data,
         initPolicyData: params.initPolicyInstruction.data,
-        splitIndex:
-          (params.newWalletDevice ? 1 : 0) +
-          params.destroyPolicyInstruction.keys.length,
+        splitIndex: params.destroyPolicyInstruction.keys.length,
         timestamp: new BN(Math.floor(Date.now() / 1000)),
       },
       params.destroyPolicyInstruction,
@@ -786,6 +835,103 @@ export class LazorkitClient {
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
       updateInstruction,
+    ]);
+
+    const result = await buildTransaction(
+      this.connection,
+      params.payer,
+      instructions,
+      options
+    );
+
+    return result.transaction;
+  }
+
+  /**
+   * Adds a device to a wallet with passkey authentication
+   */
+  async addDeviceTxn(
+    params: types.AddDeviceParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const walletDevice = this.getWalletDevicePubkey(
+      params.smartWallet,
+      params.credentialHash
+    );
+
+    const addDeviceInstruction = await this.buildAddDeviceIns(
+      params.payer,
+      params.smartWallet,
+      {
+        ...signatureArgs,
+        policyData: params.policyInstruction.data,
+        verifyInstructionIndex: calculateVerifyInstructionIndex(
+          options.computeUnitLimit
+        ),
+        timestamp: params.timestamp,
+        newDevicePasskeyPublicKey: params.newDevicePasskeyPublicKey,
+        newDeviceCredentialHash: params.newDeviceCredentialHash,
+      },
+
+      params.policyInstruction,
+      walletDevice
+    );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      addDeviceInstruction,
+    ]);
+
+    const result = await buildTransaction(
+      this.connection,
+      params.payer,
+      instructions,
+      options
+    );
+
+    return result.transaction;
+  }
+
+  /**
+   * Removes a device from a wallet with passkey authentication
+   */
+  async removeDeviceTxn(
+    params: types.RemoveDeviceParams,
+    options: types.TransactionBuilderOptions = {}
+  ): Promise<Transaction | VersionedTransaction> {
+    const authInstruction = buildPasskeyVerificationInstruction(
+      params.passkeySignature
+    );
+
+    const signatureArgs = convertPasskeySignatureToInstructionArgs(
+      params.passkeySignature
+    );
+
+    const removeDeviceInstruction = await this.buildRemoveDeviceIns(
+      params.payer,
+      params.smartWallet,
+      {
+        ...signatureArgs,
+        policyData: params.policyInstruction.data,
+        verifyInstructionIndex: calculateVerifyInstructionIndex(
+          options.computeUnitLimit
+        ),
+        timestamp: params.timestamp,
+        removePasskeyPublicKey: params.removeDevicePasskeyPublicKey,
+        removeCredentialHash: params.removeDeviceCredentialHash,
+      },
+      params.policyInstruction
+    );
+
+    const instructions = combineInstructionsWithAuth(authInstruction, [
+      removeDeviceInstruction,
     ]);
 
     const result = await buildTransaction(
@@ -860,7 +1006,7 @@ export class LazorkitClient {
         verifyInstructionIndex: calculateVerifyInstructionIndex(
           options.computeUnitLimit
         ),
-        timestamp: params.timestamp || new BN(Math.floor(Date.now() / 1000)),
+        timestamp: params.timestamp,
         cpiHash: Array.from(cpiHash),
       },
       policyInstruction
@@ -939,9 +1085,10 @@ export class LazorkitClient {
     smartWallet: PublicKey;
     passkeyPublicKey: number[];
     credentialHash: number[];
+    timestamp: BN;
   }): Promise<Buffer> {
     let message: Buffer;
-    const { action, payer, smartWallet, passkeyPublicKey } = params;
+    const { action, payer, smartWallet, passkeyPublicKey, timestamp } = params;
 
     switch (action.type) {
       case types.SmartWalletAction.Execute: {
@@ -973,7 +1120,6 @@ export class LazorkitClient {
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
-        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildExecuteMessage(
           payer,
           smartWallet,
@@ -984,13 +1130,12 @@ export class LazorkitClient {
         );
         break;
       }
-      case types.SmartWalletAction.CallPolicy: {
+      case types.SmartWalletAction.CallPolicyProgram: {
         const { policyInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.CallPolicy];
+          action.args as types.ArgsByAction[types.SmartWalletAction.CallPolicyProgram];
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
-        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildCallPolicyMessage(
           payer,
           smartWallet,
@@ -1006,7 +1151,6 @@ export class LazorkitClient {
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
-        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildChangePolicyMessage(
           payer,
           smartWallet,
@@ -1023,7 +1167,6 @@ export class LazorkitClient {
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
-        const timestamp = new BN(Math.floor(Date.now() / 1000));
         message = buildCreateChunkMessage(
           payer,
           smartWallet,
@@ -1034,7 +1177,48 @@ export class LazorkitClient {
         );
         break;
       }
+      case types.SmartWalletAction.AddDevice: {
+        const {
+          policyInstruction,
+          newDevicePasskeyPublicKey,
+          newDeviceCredentialHash,
+        } =
+          action.args as types.ArgsByAction[types.SmartWalletAction.AddDevice];
 
+        const smartWalletConfig = await this.getWalletStateData(smartWallet);
+
+        message = buildAddDeviceMessage(
+          payer,
+          smartWallet,
+          smartWalletConfig.lastNonce,
+          timestamp,
+          policyInstruction,
+          newDevicePasskeyPublicKey,
+          newDeviceCredentialHash
+        );
+        break;
+      }
+      case types.SmartWalletAction.RemoveDevice: {
+        const {
+          policyInstruction,
+          removeDevicePasskeyPublicKey,
+          removeDeviceCredentialHash,
+        } =
+          action.args as types.ArgsByAction[types.SmartWalletAction.RemoveDevice];
+
+        const smartWalletConfig = await this.getWalletStateData(smartWallet);
+
+        message = buildRemoveDeviceMessage(
+          payer,
+          smartWallet,
+          smartWalletConfig.lastNonce,
+          timestamp,
+          policyInstruction,
+          removeDevicePasskeyPublicKey,
+          removeDeviceCredentialHash
+        );
+        break;
+      }
       default:
         throw new Error(`Unsupported SmartWalletAction: ${action.type}`);
     }

@@ -30,11 +30,25 @@ pub mod lazorkit {
         instructions::change_policy_program(ctx, args)
     }
 
-    pub fn call_policy<'c: 'info, 'info>(
+    pub fn call_policy_program<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
         args: CallPolicyArgs,
     ) -> Result<()> {
-        instructions::call_policy(ctx, args)
+        instructions::call_policy_program(ctx, args)
+    }
+
+    pub fn add_device<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, AddDevice<'info>>,
+        args: AddDeviceArgs,
+    ) -> Result<()> {
+        instructions::add_device(ctx, args)
+    }
+
+    pub fn remove_device<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, RemoveDevice<'info>>,
+        args: RemoveDeviceArgs,
+    ) -> Result<()> {
+        instructions::remove_device(ctx, args)
     }
 
     pub fn execute<'c: 'info, 'info>(

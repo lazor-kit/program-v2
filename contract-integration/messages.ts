@@ -152,6 +152,17 @@ const computeCpiHashes = (
   return { cpiDataHash, cpiAccountsHash };
 };
 
+// Helper function to compute device hashes
+const computeDeviceHashes = (
+  passkeyPublicKey: number[],
+  credentialHash: number[]
+): Uint8Array => {
+  const deviceCombined = new Uint8Array(65); // 32 + 32 + 1 bytes
+  deviceCombined.set(passkeyPublicKey, 0);
+  deviceCombined.set(credentialHash, 33);
+  return computeHash(deviceCombined);
+};
+
 // Helper function to compute CPI hashes for multiple instructions
 export const computeMultipleCpiHashes = (
   feePayer: anchor.web3.PublicKey,
@@ -317,6 +328,96 @@ export function buildChangePolicyMessage(
     timestampBuffer,
     Buffer.from(oldPolicyHash),
     Buffer.from(newPolicyHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
+  });
+}
+
+export function buildAddDeviceMessage(
+  feePayer: anchor.web3.PublicKey,
+  smartWallet: anchor.web3.PublicKey,
+  nonce: anchor.BN,
+  timestamp: anchor.BN,
+  policyIns: anchor.web3.TransactionInstruction,
+  newDevicePasskeyPublicKey: number[],
+  newDeviceCredentialHash: number[]
+): Buffer {
+  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
+  const newDeviceHashes = computeDeviceHashes(
+    newDevicePasskeyPublicKey,
+    newDeviceCredentialHash
+  );
+
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64); // 32 + 32 bytes
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
+
+  // Create final hash: hash(nonce, timestamp, policyHash, newDeviceHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
+    Buffer.from(newDeviceHashes),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
+  });
+}
+
+export function buildRemoveDeviceMessage(
+  feePayer: anchor.web3.PublicKey,
+  smartWallet: anchor.web3.PublicKey,
+  nonce: anchor.BN,
+  timestamp: anchor.BN,
+  policyIns: anchor.web3.TransactionInstruction,
+  removeDevicePasskeyPublicKey: number[],
+  removeDeviceCredentialHash: number[]
+): Buffer {
+  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
+  const removeDeviceHashes = computeDeviceHashes(
+    removeDevicePasskeyPublicKey,
+    removeDeviceCredentialHash
+  );
+
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64); // 32 + 32 bytes
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
+
+  // Create combined hash of remove device hashes
+  const removeDeviceCombined = new Uint8Array(65); // 32 + 32 + 1 bytes
+  removeDeviceCombined.set(removeDeviceHashes, 0);
+  removeDeviceCombined.set(removeDeviceHashes, 32);
+  const removeDeviceHash = computeHash(removeDeviceCombined);
+
+  // Create final hash: hash(nonce, timestamp, policyHash, removeDeviceHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
+    Buffer.from(removeDeviceHash),
   ]);
 
   const dataHash = computeHash(finalData);

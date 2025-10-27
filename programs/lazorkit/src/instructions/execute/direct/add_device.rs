@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::system_instruction;
 
 use crate::constants::SMART_WALLET_SEED;
 use crate::error::LazorKitError;
@@ -6,8 +8,8 @@ use crate::instructions::AddDeviceArgs;
 use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
-    compute_call_policy_message_hash, compute_instruction_hash, create_wallet_device_hash,
-    execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
+    compute_add_device_message_hash, compute_device_hash, compute_instruction_hash,
+    create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
 };
 use crate::ID;
 
@@ -20,10 +22,17 @@ pub fn add_device<'c: 'info, 'info>(
         ctx.remaining_accounts,
         ctx.accounts.policy_program.key(),
     )?;
-    let expected_message_hash = compute_call_policy_message_hash(
+
+    let new_device_hash = compute_device_hash(
+        args.new_device_passkey_public_key,
+        args.new_device_credential_hash,
+    );
+
+    let expected_message_hash = compute_add_device_message_hash(
         ctx.accounts.wallet_state.last_nonce,
         args.timestamp,
         policy_hash,
+        new_device_hash,
     )?;
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
@@ -61,9 +70,36 @@ pub fn add_device<'c: 'info, 'info>(
         policy_signer,
     )?;
 
+    // Update the policy data size
+    let diff_bytes = policy_data.len() - ctx.accounts.wallet_state.policy_data.len();
+    let new_size = ctx.accounts.wallet_state.to_account_info().data_len() + diff_bytes;
+    let rent = Rent::get()?;
+    let new_minimum_balance = rent.minimum_balance(new_size);
+    let lamports_diff =
+        new_minimum_balance.saturating_sub(ctx.accounts.wallet_state.to_account_info().lamports());
+    invoke(
+        &system_instruction::transfer(
+            ctx.accounts.payer.key,
+            ctx.accounts.wallet_state.to_account_info().key,
+            lamports_diff,
+        ),
+        &[
+            ctx.accounts.payer.to_account_info().clone(),
+            ctx.accounts.wallet_state.to_account_info().clone(),
+            ctx.accounts.system_program.to_account_info().clone(),
+        ],
+    )?;
+
+    ctx.accounts
+        .wallet_state
+        .to_account_info()
+        .realloc(new_size, true)?;
+
     // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
+
+    // Update the policy data
     ctx.accounts.wallet_state.policy_data = policy_data;
 
     Ok(())
