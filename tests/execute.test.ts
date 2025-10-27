@@ -34,7 +34,7 @@ async function getBlockchainTimestamp(
 
 const EMPTY_PDA_RENT_EXEMPT_BALANCE = 890880;
 
-describe.skip('Test smart wallet with default policy', () => {
+describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.CLUSTER != 'localhost'
       ? process.env.RPC_URL

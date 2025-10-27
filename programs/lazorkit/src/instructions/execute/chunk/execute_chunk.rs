@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::error::LazorKitError;
 use crate::security::validation;
 use crate::state::{Chunk, WalletState};
-use crate::utils::{execute_cpi, transfer_fee_to_payer, PdaSigner};
+use crate::utils::{execute_cpi, transfer_sol_util, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
@@ -121,7 +121,7 @@ pub fn execute_chunk(
     }
 
     // Transfer transaction fee to payer
-    transfer_fee_to_payer(
+    transfer_sol_util(
         &ctx.accounts.smart_wallet,
         ctx.accounts.wallet_state.wallet_id,
         ctx.accounts.wallet_state.bump,

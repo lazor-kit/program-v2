@@ -607,11 +607,11 @@ pub fn validate_programs_in_ranges(
 }
 
 // Transfer transaction fee to payer
-pub fn transfer_fee_to_payer<'a>(
+pub fn transfer_sol_util<'a>(
     smart_wallet: &AccountInfo<'a>,
     wallet_id: u64,
     bump: u8,
-    payer: &AccountInfo<'a>,
+    recipient: &AccountInfo<'a>,
     system_program: &AccountInfo<'a>,
     fee: u64,
 ) -> Result<()> {
@@ -620,10 +620,10 @@ pub fn transfer_fee_to_payer<'a>(
         bump,
     };
 
-    let transfer_ins = transfer(smart_wallet.key, payer.key, fee);
+    let transfer_ins = transfer(smart_wallet.key, recipient.key, fee);
 
     execute_cpi(
-        &[smart_wallet.to_account_info(), payer.to_account_info()],
+        &[smart_wallet.to_account_info(), recipient.to_account_info()],
         &transfer_ins.data,
         system_program,
         signer,
