@@ -16,16 +16,18 @@ export type ExecuteArgs = anchor.IdlTypes<Lazorkit>['executeArgs'];
 export type ChangePolicyArgs = anchor.IdlTypes<Lazorkit>['changePolicyArgs'];
 export type CallPolicyArgs = anchor.IdlTypes<Lazorkit>['callPolicyArgs'];
 export type CreateChunkArgs = anchor.IdlTypes<Lazorkit>['createChunkArgs'];
-export type NewWalletDeviceArgs =
-  anchor.IdlTypes<Lazorkit>['newWalletDeviceArgs'];
+export type AddDeviceArgs = anchor.IdlTypes<Lazorkit>['addDeviceArgs'];
+export type RemoveDeviceArgs = anchor.IdlTypes<Lazorkit>['removeDeviceArgs'];
 
 // ============================================================================
 // Smart Wallet Actions
 // ============================================================================
 export enum SmartWalletAction {
   Execute = 'execute',
-  CallPolicy = 'call_policy',
+  CallPolicyProgram = 'call_policy_program',
   ChangePolicyProgram = 'change_policy_program',
+  AddDevice = 'add_device',
+  RemoveDevice = 'remove_device',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
   GrantPermission = 'grant_permission',
@@ -37,14 +39,12 @@ export type ArgsByAction = {
     policyInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstruction: anchor.web3.TransactionInstruction;
   };
-  [SmartWalletAction.CallPolicy]: {
+  [SmartWalletAction.CallPolicyProgram]: {
     policyInstruction: anchor.web3.TransactionInstruction;
-    newWalletDevice: NewPasskeyDevice | null;
   };
   [SmartWalletAction.ChangePolicyProgram]: {
     destroyPolicyIns: anchor.web3.TransactionInstruction;
     initPolicyIns: anchor.web3.TransactionInstruction;
-    newWalletDevice: NewPasskeyDevice | null;
   };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
@@ -61,6 +61,16 @@ export type ArgsByAction = {
   };
   [SmartWalletAction.ExecuteWithPermission]: {
     cpiInstructions: anchor.web3.TransactionInstruction[];
+  };
+  [SmartWalletAction.AddDevice]: {
+    policyInstruction: anchor.web3.TransactionInstruction;
+    newDevicePasskeyPublicKey: number[];
+    newDeviceCredentialHash: number[];
+  };
+  [SmartWalletAction.RemoveDevice]: {
+    policyInstruction: anchor.web3.TransactionInstruction;
+    removeDevicePasskeyPublicKey: number[];
+    removeDeviceCredentialHash: number[];
   };
 };
 
@@ -79,11 +89,6 @@ export interface PasskeySignature {
   signature64: string;
   clientDataJsonRaw64: string;
   authenticatorDataRaw64: string;
-}
-
-export interface NewPasskeyDevice {
-  passkeyPublicKey: number[];
-  credentialIdBase64: string;
 }
 
 export interface TransactionBuilderOptions {
@@ -116,13 +121,7 @@ interface AuthParams extends BaseParams {
 // ============================================================================
 // Parameter Types
 // ============================================================================
-export interface ManageVaultParams {
-  payer: anchor.web3.PublicKey;
-  amount: anchor.BN;
-  action: 'deposit' | 'withdraw';
-  vaultIndex: number;
-  destination: anchor.web3.PublicKey;
-}
+
 export interface CreateSmartWalletParams {
   payer: anchor.web3.PublicKey;
   passkeyPublicKey: number[];
@@ -145,13 +144,26 @@ export interface ExecuteParams extends AuthParams {
 export interface CallPolicyParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction;
   timestamp: anchor.BN;
-  newWalletDevice?: NewPasskeyDevice | null;
 }
 
 export interface ChangePolicyParams extends AuthParams {
   destroyPolicyInstruction: anchor.web3.TransactionInstruction;
   initPolicyInstruction: anchor.web3.TransactionInstruction;
-  newWalletDevice?: NewPasskeyDevice | null;
+  timestamp: anchor.BN;
+}
+
+export interface AddDeviceParams extends AuthParams {
+  policyInstruction: anchor.web3.TransactionInstruction;
+  newDevicePasskeyPublicKey: number[];
+  newDeviceCredentialHash: number[];
+  timestamp: anchor.BN;
+}
+
+export interface RemoveDeviceParams extends AuthParams {
+  policyInstruction: anchor.web3.TransactionInstruction;
+  removeDevicePasskeyPublicKey: number[];
+  removeDeviceCredentialHash: number[];
+  timestamp: anchor.BN;
 }
 
 export interface CreateChunkParams extends AuthParams {

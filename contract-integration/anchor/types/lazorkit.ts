@@ -17,16 +17,123 @@ export type Lazorkit = {
   ],
   "instructions": [
     {
-      "name": "callPolicy",
+      "name": "addDevice",
       "discriminator": [
-        57,
-        50,
-        158,
-        108,
-        226,
-        148,
-        41,
-        221
+        21,
+        27,
+        66,
+        42,
+        18,
+        30,
+        14,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smartWallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_state.wallet_id",
+                "account": "walletState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletDevice"
+        },
+        {
+          "name": "newWalletDevice",
+          "writable": true
+        },
+        {
+          "name": "policyProgram"
+        },
+        {
+          "name": "ixSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "addDeviceArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "callPolicyProgram",
+      "discriminator": [
+        83,
+        132,
+        143,
+        252,
+        31,
+        77,
+        186,
+        172
       ],
       "accounts": [
         {
@@ -800,6 +907,113 @@ export type Lazorkit = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "removeDevice",
+      "discriminator": [
+        42,
+        19,
+        175,
+        5,
+        67,
+        100,
+        238,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smartWallet",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  109,
+                  97,
+                  114,
+                  116,
+                  95,
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet_state.wallet_id",
+                "account": "walletState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "walletDevice"
+        },
+        {
+          "name": "removeWalletDevice",
+          "writable": true
+        },
+        {
+          "name": "policyProgram"
+        },
+        {
+          "name": "ixSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "removeDeviceArgs"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1137,6 +1351,70 @@ export type Lazorkit = {
   ],
   "types": [
     {
+      "name": "addDeviceArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "clientDataJsonRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticatorDataRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "verifyInstructionIndex",
+            "type": "u8"
+          },
+          {
+            "name": "policyData",
+            "type": "bytes"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "newDevicePasskeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "newDeviceCredentialHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "callPolicyArgs",
       "type": {
         "kind": "struct",
@@ -1438,6 +1716,70 @@ export type Lazorkit = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "removeDeviceArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "clientDataJsonRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticatorDataRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "verifyInstructionIndex",
+            "type": "u8"
+          },
+          {
+            "name": "policyData",
+            "type": "bytes"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "removePasskeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "removeCredentialHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
