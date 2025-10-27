@@ -1,7 +1,3 @@
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke;
-use anchor_lang::solana_program::system_instruction;
-
 use crate::constants::SMART_WALLET_SEED;
 use crate::error::LazorKitError;
 use crate::instructions::AddDeviceArgs;
@@ -9,9 +5,11 @@ use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
     compute_add_device_message_hash, compute_device_hash, compute_instruction_hash,
-    create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
+    create_wallet_device_hash, execute_cpi, get_policy_signer, sighash, transfer_sol_util,
+    verify_authorization_hash,
 };
 use crate::ID;
+use anchor_lang::prelude::*;
 
 pub fn add_device<'c: 'info, 'info>(
     ctx: Context<'_, '_, 'c, 'info, AddDevice<'info>>,
@@ -77,17 +75,15 @@ pub fn add_device<'c: 'info, 'info>(
     let new_minimum_balance = rent.minimum_balance(new_size);
     let lamports_diff =
         new_minimum_balance.saturating_sub(ctx.accounts.wallet_state.to_account_info().lamports());
-    invoke(
-        &system_instruction::transfer(
-            ctx.accounts.payer.key,
-            ctx.accounts.wallet_state.to_account_info().key,
-            lamports_diff,
-        ),
-        &[
-            ctx.accounts.payer.to_account_info().clone(),
-            ctx.accounts.wallet_state.to_account_info().clone(),
-            ctx.accounts.system_program.to_account_info().clone(),
-        ],
+
+    // Transfer SOL to wallet state account to cover the new minimum balance
+    transfer_sol_util(
+        &ctx.accounts.smart_wallet,
+        ctx.accounts.wallet_state.wallet_id,
+        ctx.accounts.wallet_state.bump,
+        &ctx.accounts.wallet_state.to_account_info(),
+        &ctx.accounts.system_program,
+        lamports_diff,
     )?;
 
     ctx.accounts
@@ -101,6 +97,18 @@ pub fn add_device<'c: 'info, 'info>(
 
     // Update the policy data
     ctx.accounts.wallet_state.policy_data = policy_data;
+
+    // Transfer transaction fee + fee to create new wallet device account
+    let minimum_balance =
+        Rent::get()?.minimum_balance(ctx.accounts.wallet_device.to_account_info().data_len());
+    transfer_sol_util(
+        &ctx.accounts.smart_wallet,
+        ctx.accounts.wallet_state.wallet_id,
+        ctx.accounts.wallet_state.bump,
+        &ctx.accounts.payer.to_account_info(),
+        &ctx.accounts.system_program,
+        minimum_balance + crate::constants::TRANSACTION_FEE * 2,
+    )?;
 
     Ok(())
 }
