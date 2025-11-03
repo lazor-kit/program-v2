@@ -137,6 +137,56 @@ export type DefaultPolicy = {
       ]
     },
     {
+      "name": "destroyPolicy",
+      "discriminator": [
+        254,
+        234,
+        136,
+        124,
+        90,
+        28,
+        94,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "policySigner",
+          "signer": true
+        },
+        {
+          "name": "smartWallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policyData",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "initPolicy",
       "discriminator": [
         45,
@@ -178,6 +228,80 @@ export type DefaultPolicy = {
         },
         {
           "name": "credentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "policyStruct"
+        }
+      }
+    },
+    {
+      "name": "removeDevice",
+      "discriminator": [
+        42,
+        19,
+        175,
+        5,
+        67,
+        100,
+        238,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "policySigner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "smartWallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "walletId",
+          "type": "u64"
+        },
+        {
+          "name": "passkeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "credentialHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "policyData",
+          "type": "bytes"
+        },
+        {
+          "name": "removeDevicePasskeyPublicKey",
+          "type": {
+            "array": [
+              "u8",
+              33
+            ]
+          }
+        },
+        {
+          "name": "removeDeviceCredentialHash",
           "type": {
             "array": [
               "u8",

@@ -101,13 +101,14 @@ pub fn add_device<'c: 'info, 'info>(
     // Transfer transaction fee + fee to create new wallet device account
     let minimum_balance =
         Rent::get()?.minimum_balance(ctx.accounts.wallet_device.to_account_info().data_len());
+
     transfer_sol_util(
         &ctx.accounts.smart_wallet,
         ctx.accounts.wallet_state.wallet_id,
         ctx.accounts.wallet_state.bump,
         &ctx.accounts.payer.to_account_info(),
         &ctx.accounts.system_program,
-        minimum_balance + crate::constants::TRANSACTION_FEE * 2,
+        minimum_balance,
     )?;
 
     Ok(())

@@ -3,8 +3,7 @@ use crate::security::validation;
 use crate::state::{WalletDevice, WalletState};
 use crate::utils::{
     compute_execute_message_hash, compute_instruction_hash, create_wallet_device_hash, execute_cpi,
-    get_policy_signer, sighash, split_remaining_accounts, transfer_sol_util,
-    verify_authorization_hash, PdaSigner,
+    get_policy_signer, sighash, split_remaining_accounts, verify_authorization_hash, PdaSigner,
 };
 use crate::ID;
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError};
@@ -77,16 +76,6 @@ pub fn execute<'c: 'info, 'info>(
     // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
-
-    // Transfer transaction fee to payer
-    transfer_sol_util(
-        &ctx.accounts.smart_wallet,
-        ctx.accounts.wallet_state.wallet_id,
-        ctx.accounts.wallet_state.bump,
-        &ctx.accounts.payer,
-        &ctx.accounts.system_program,
-        crate::constants::TRANSACTION_FEE * 2,
-    )?;
 
     Ok(())
 }
