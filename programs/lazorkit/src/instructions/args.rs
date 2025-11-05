@@ -19,56 +19,6 @@ pub struct ExecuteArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ChangePolicyArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub signature: [u8; 64],
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub split_index: u16,
-    pub destroy_policy_data: Vec<u8>,
-    pub init_policy_data: Vec<u8>,
-    pub timestamp: i64,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct CallPolicyArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub signature: [u8; 64],
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub policy_data: Vec<u8>,
-    pub timestamp: i64,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct AddDeviceArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub signature: [u8; 64],
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub policy_data: Vec<u8>,
-    pub timestamp: i64,
-    pub new_device_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub new_device_credential_hash: [u8; 32],
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct RemoveDeviceArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub signature: [u8; 64],
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub policy_data: Vec<u8>,
-    pub timestamp: i64,
-    pub remove_passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub remove_credential_hash: [u8; 32],
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateChunkArgs {
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub signature: [u8; 64],
@@ -78,18 +28,4 @@ pub struct CreateChunkArgs {
     pub policy_data: Vec<u8>,
     pub timestamp: i64,
     pub cpi_hash: [u8; 32],
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct GrantPermissionArgs {
-    pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub signature: [u8; 64],
-    pub client_data_json_raw: Vec<u8>,
-    pub authenticator_data_raw: Vec<u8>,
-    pub verify_instruction_index: u8,
-    pub ephemeral_public_key: Pubkey,
-    pub expires_at: i64,
-    pub instruction_data_list: Vec<Vec<u8>>,
-    pub split_index: Vec<u8>,
-    pub timestamp: i64,
 }

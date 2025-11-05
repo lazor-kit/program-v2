@@ -29,10 +29,6 @@ pub const MAX_REMAINING_ACCOUNTS: usize = 32;
 pub const MIN_RENT_EXEMPT_BUFFER: u64 = 1_000_000; // 0.001 SOL
 
 // === Time-based Security ===
-/// Maximum transaction age in seconds to prevent replay attacks
-/// Rationale: 5 minutes provides reasonable window while preventing old transaction replay
-pub const MAX_TRANSACTION_AGE: i64 = 300; // 5 minutes
-
 /// Maximum allowed session TTL in seconds for deferred execution
 /// Rationale: 30 seconds prevents long-lived sessions that could be exploited
 pub const MAX_SESSION_TTL_SECONDS: i64 = 30; // 30 seconds
@@ -45,23 +41,6 @@ pub const TIMESTAMP_PAST_TOLERANCE: i64 = 30; // 30 seconds
 /// Rationale: 30 seconds allows for reasonable clock skew while preventing future-dated attacks
 pub const TIMESTAMP_FUTURE_TOLERANCE: i64 = 30; // 30 seconds
 
-// === Rate Limiting ===
-/// Maximum transactions per block to prevent spam
-/// Rationale: Prevents individual wallets from spamming the network
-pub const MAX_TRANSACTIONS_PER_BLOCK: u8 = 5;
-/// Rate limiting window in blocks
-/// Rationale: 10 blocks provides reasonable rate limiting window
-pub const RATE_LIMIT_WINDOW_BLOCKS: u64 = 10;
-
-// === Nonce Security ===
-/// Threshold for nonce overflow warning (within this many of max value)
-/// Rationale: 1000 provides early warning before nonce wraps around
-pub const NONCE_OVERFLOW_WARNING_THRESHOLD: u64 = 1000;
-
-// === Vault Security ===
-/// Maximum number of vault slots supported
-/// Rationale: 32 vaults provide good load distribution while keeping complexity manageable
-pub const MAX_VAULT_SLOTS: u8 = 32;
 
 /// Security validation functions
 pub mod validation {
@@ -97,28 +76,6 @@ pub mod validation {
         Ok(())
     }
 
-    /// Validate CPI data
-    pub fn validate_cpi_data(cpi_data: &[u8]) -> Result<()> {
-        require!(
-            cpi_data.len() <= MAX_CPI_DATA_SIZE,
-            LazorKitError::CpiDataTooLarge
-        );
-        require!(!cpi_data.is_empty(), LazorKitError::CpiDataMissing);
-        Ok(())
-    }
-
-    /// Validate CPI data when a blob hash may be present. If `has_hash` is true,
-    /// inline cpi_data can be empty; otherwise, it must be non-empty.
-    pub fn validate_cpi_data_or_hash(cpi_data: &[u8], has_hash: bool) -> Result<()> {
-        require!(
-            cpi_data.len() <= MAX_CPI_DATA_SIZE,
-            LazorKitError::CpiDataTooLarge
-        );
-        if !has_hash {
-            require!(!cpi_data.is_empty(), LazorKitError::CpiDataMissing);
-        }
-        Ok(())
-    }
 
     /// Validate remaining accounts count
     pub fn validate_remaining_accounts(accounts: &[AccountInfo]) -> Result<()> {
@@ -129,15 +86,6 @@ pub mod validation {
         Ok(())
     }
 
-    /// Validate lamport amount to prevent overflow
-    pub fn validate_lamport_amount(amount: u64) -> Result<()> {
-        // Ensure amount doesn't cause overflow in calculations
-        require!(
-            amount <= u64::MAX / 2,
-            LazorKitError::TransferAmountOverflow
-        );
-        Ok(())
-    }
 
     /// Validate program is executable
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
@@ -160,40 +108,6 @@ pub mod validation {
         Ok(())
     }
 
-    /// Validate account ownership
-    pub fn validate_account_owner(account: &AccountInfo, expected_owner: &Pubkey) -> Result<()> {
-        require!(
-            account.owner == expected_owner,
-            LazorKitError::InvalidAccountOwner
-        );
-        Ok(())
-    }
-
-    /// Validate PDA derivation
-    pub fn validate_pda(
-        account: &AccountInfo,
-        seeds: &[&[u8]],
-        program_id: &Pubkey,
-        bump: u8,
-    ) -> Result<()> {
-        let (expected_key, expected_bump) = Pubkey::find_program_address(seeds, program_id);
-        require!(
-            account.key() == expected_key,
-            LazorKitError::InvalidPDADerivation
-        );
-        require!(bump == expected_bump, LazorKitError::InvalidBumpSeed);
-        Ok(())
-    }
-
-    /// Validate timestamp is within acceptable range
-    pub fn validate_timestamp(timestamp: i64, current_time: i64) -> Result<()> {
-        let age = current_time.saturating_sub(timestamp);
-        require!(
-            age >= 0 && age <= MAX_TRANSACTION_AGE,
-            LazorKitError::TransactionTooOld
-        );
-        Ok(())
-    }
 
     /// Standardized timestamp validation for all instructions
     /// Uses consistent time window across all operations
@@ -215,24 +129,6 @@ pub mod validation {
         current_nonce.wrapping_add(1)
     }
 
-    /// Check if nonce is approaching overflow (within threshold of max)
-    pub fn is_nonce_approaching_overflow(nonce: u64) -> bool {
-        nonce > u64::MAX - NONCE_OVERFLOW_WARNING_THRESHOLD
-    }
-
-    /// Enhanced vault index validation to prevent front-running
-    /// Validates vault index is within reasonable bounds and not manipulated
-    pub fn validate_vault_index_enhanced(vault_index: u8) -> Result<()> {
-        // Ensure vault index is within valid range
-        require!(
-            vault_index < MAX_VAULT_SLOTS,
-            LazorKitError::InvalidVaultIndex
-        );
-
-        // Additional validation: ensure vault index is not obviously manipulated
-        // This is a simple check - in production, you might want more sophisticated validation
-        Ok(())
-    }
 
     /// Common validation for WebAuthn authentication arguments
     /// Validates passkey format, signature, client data, and authenticator data
@@ -274,24 +170,3 @@ pub mod validation {
     }
 }
 
-/// Macro for common WebAuthn validation across all instructions
-/// Validates passkey format, signature, client data, authenticator data, vault index, and timestamp
-#[macro_export]
-macro_rules! validate_webauthn_args {
-    ($args:expr) => {
-        // Use common WebAuthn validation
-        crate::security::validation::validate_webauthn_args(
-            &$args.passkey_public_key,
-            &$args.signature,
-            &$args.client_data_json_raw,
-            &$args.authenticator_data_raw,
-            $args.verify_instruction_index,
-        )?;
-
-        // Validate vault index with enhanced validation
-        crate::security::validation::validate_vault_index_enhanced($args.vault_index)?;
-
-        // Validate timestamp using standardized validation
-        crate::security::validation::validate_instruction_timestamp($args.timestamp)?;
-    };
-}

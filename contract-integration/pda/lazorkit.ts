@@ -7,7 +7,6 @@ export const SMART_WALLET_SEED = Buffer.from('smart_wallet');
 export const SMART_WALLET_CONFIG_SEED = Buffer.from('wallet_state');
 export const WALLET_DEVICE_SEED = Buffer.from('wallet_device');
 export const CHUNK_SEED = Buffer.from('chunk');
-export const PERMISSION_SEED = Buffer.from('permission');
 
 export function deriveSmartWalletPda(
   programId: anchor.web3.PublicKey,
@@ -51,17 +50,6 @@ export function deriveChunkPda(
       smartWallet.toBuffer(),
       lastNonce.toArrayLike(Buffer, 'le', 8),
     ],
-    programId
-  )[0];
-}
-
-export function derivePermissionPda(
-  programId: anchor.web3.PublicKey,
-  smartWallet: anchor.web3.PublicKey,
-  ephemeralPublicKey: anchor.web3.PublicKey
-): anchor.web3.PublicKey {
-  return anchor.web3.PublicKey.findProgramAddressSync(
-    [PERMISSION_SEED, smartWallet.toBuffer(), ephemeralPublicKey.toBuffer()],
     programId
   )[0];
 }

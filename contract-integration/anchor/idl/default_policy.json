@@ -8,79 +8,6 @@
   },
   "instructions": [
     {
-      "name": "add_device",
-      "discriminator": [
-        21,
-        27,
-        66,
-        42,
-        18,
-        30,
-        14,
-        18
-      ],
-      "accounts": [
-        {
-          "name": "policy_signer",
-          "signer": true
-        },
-        {
-          "name": "smart_wallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "wallet_id",
-          "type": "u64"
-        },
-        {
-          "name": "passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policy_data",
-          "type": "bytes"
-        },
-        {
-          "name": "new_device_passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "new_device_credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ],
-      "returns": {
-        "defined": {
-          "name": "PolicyStruct"
-        }
-      }
-    },
-    {
       "name": "check_policy",
       "discriminator": [
         28,
@@ -91,56 +18,6 @@
         136,
         25,
         35
-      ],
-      "accounts": [
-        {
-          "name": "policy_signer",
-          "signer": true
-        },
-        {
-          "name": "smart_wallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "wallet_id",
-          "type": "u64"
-        },
-        {
-          "name": "passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policy_data",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "destroy_policy",
-      "discriminator": [
-        254,
-        234,
-        136,
-        124,
-        90,
-        28,
-        94,
-        138
       ],
       "accounts": [
         {
@@ -235,80 +112,6 @@
           "name": "PolicyStruct"
         }
       }
-    },
-    {
-      "name": "remove_device",
-      "discriminator": [
-        42,
-        19,
-        175,
-        5,
-        67,
-        100,
-        238,
-        14
-      ],
-      "accounts": [
-        {
-          "name": "policy_signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smart_wallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "wallet_id",
-          "type": "u64"
-        },
-        {
-          "name": "passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policy_data",
-          "type": "bytes"
-        },
-        {
-          "name": "remove_device_passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "remove_device_credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ],
-      "returns": {
-        "defined": {
-          "name": "PolicyStruct"
-        }
-      }
     }
   ],
   "errors": [
@@ -321,16 +124,6 @@
       "code": 6001,
       "name": "Unauthorized",
       "msg": "Unauthorized to access smart wallet"
-    },
-    {
-      "code": 6002,
-      "name": "WalletDeviceAlreadyInPolicy",
-      "msg": "Wallet device already in policy"
-    },
-    {
-      "code": 6003,
-      "name": "WalletDeviceNotInPolicy",
-      "msg": "Wallet device not in policy"
     }
   ],
   "types": [

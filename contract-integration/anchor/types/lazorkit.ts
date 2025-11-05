@@ -17,322 +17,6 @@ export type Lazorkit = {
   ],
   "instructions": [
     {
-      "name": "addDevice",
-      "discriminator": [
-        21,
-        27,
-        66,
-        42,
-        18,
-        30,
-        14,
-        18
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletState",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smartWallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletDevice"
-        },
-        {
-          "name": "newWalletDevice",
-          "writable": true
-        },
-        {
-          "name": "policyProgram"
-        },
-        {
-          "name": "ixSysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "addDeviceArgs"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "callPolicyProgram",
-      "discriminator": [
-        83,
-        132,
-        143,
-        252,
-        31,
-        77,
-        186,
-        172
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletState",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smartWallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletDevice"
-        },
-        {
-          "name": "policyProgram"
-        },
-        {
-          "name": "ixSysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "callPolicyArgs"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "changePolicyProgram",
-      "discriminator": [
-        32,
-        110,
-        151,
-        147,
-        134,
-        73,
-        226,
-        136
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletState",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smartWallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletDevice"
-        },
-        {
-          "name": "oldPolicyProgram"
-        },
-        {
-          "name": "newPolicyProgram"
-        },
-        {
-          "name": "ixSysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "changePolicyArgs"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "closeChunk",
       "discriminator": [
         150,
@@ -907,113 +591,6 @@ export type Lazorkit = {
           "type": "bytes"
         }
       ]
-    },
-    {
-      "name": "removeDevice",
-      "discriminator": [
-        42,
-        19,
-        175,
-        5,
-        67,
-        100,
-        238,
-        14
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletState",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "smartWallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "walletDevice"
-        },
-        {
-          "name": "removeWalletDevice",
-          "writable": true
-        },
-        {
-          "name": "policyProgram"
-        },
-        {
-          "name": "ixSysvar",
-          "address": "Sysvar1nstructions1111111111111111111111111"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "removeDeviceArgs"
-            }
-          }
-        }
-      ]
     }
   ],
   "accounts": [
@@ -1140,380 +717,191 @@ export type Lazorkit = {
     },
     {
       "code": 6016,
-      "name": "policyProgramNotRegistered",
-      "msg": "Policy program not found in registry"
-    },
-    {
-      "code": 6017,
-      "name": "whitelistFull",
-      "msg": "The policy program registry is full."
-    },
-    {
-      "code": 6018,
       "name": "invalidInstructionDiscriminator",
       "msg": "Invalid instruction discriminator"
     },
     {
-      "code": 6019,
-      "name": "policyProgramsIdentical",
-      "msg": "Old and new policy programs are identical"
-    },
-    {
-      "code": 6020,
-      "name": "noDefaultPolicyProgram",
-      "msg": "Neither old nor new policy program is the default"
-    },
-    {
-      "code": 6021,
-      "name": "policyProgramAlreadyRegistered",
-      "msg": "Policy program already registered"
-    },
-    {
-      "code": 6022,
+      "code": 6017,
       "name": "invalidRemainingAccounts",
       "msg": "Invalid remaining accounts"
     },
     {
-      "code": 6023,
+      "code": 6018,
       "name": "cpiDataMissing",
       "msg": "CPI data is required but not provided"
     },
     {
-      "code": 6024,
+      "code": 6019,
       "name": "insufficientPolicyAccounts",
       "msg": "Insufficient remaining accounts for policy instruction"
     },
     {
-      "code": 6025,
+      "code": 6020,
       "name": "insufficientCpiAccounts",
       "msg": "Insufficient remaining accounts for CPI instruction"
     },
     {
-      "code": 6026,
+      "code": 6021,
       "name": "accountSliceOutOfBounds",
       "msg": "Account slice index out of bounds"
     },
     {
-      "code": 6027,
+      "code": 6022,
       "name": "transferAmountOverflow",
       "msg": "Transfer amount would cause arithmetic overflow"
     },
     {
-      "code": 6028,
+      "code": 6023,
       "name": "invalidBumpSeed",
       "msg": "Invalid bump seed for PDA derivation"
     },
     {
-      "code": 6029,
+      "code": 6024,
       "name": "invalidAccountOwner",
       "msg": "Account owner verification failed"
     },
     {
-      "code": 6030,
+      "code": 6025,
       "name": "programNotExecutable",
       "msg": "Program not executable"
     },
     {
-      "code": 6031,
+      "code": 6026,
       "name": "programPaused",
       "msg": "Program is paused"
     },
     {
-      "code": 6032,
+      "code": 6027,
       "name": "walletDeviceAlreadyInitialized",
       "msg": "Wallet device already initialized"
     },
     {
-      "code": 6033,
+      "code": 6028,
       "name": "credentialIdTooLarge",
       "msg": "Credential ID exceeds maximum allowed size"
     },
     {
-      "code": 6034,
+      "code": 6029,
       "name": "credentialIdEmpty",
       "msg": "Credential ID cannot be empty"
     },
     {
-      "code": 6035,
+      "code": 6030,
       "name": "policyDataTooLarge",
       "msg": "Policy data exceeds maximum allowed size"
     },
     {
-      "code": 6036,
+      "code": 6031,
       "name": "cpiDataTooLarge",
       "msg": "CPI data exceeds maximum allowed size"
     },
     {
-      "code": 6037,
+      "code": 6032,
       "name": "tooManyRemainingAccounts",
       "msg": "Too many remaining accounts provided"
     },
     {
-      "code": 6038,
+      "code": 6033,
       "name": "invalidPdaDerivation",
       "msg": "Invalid PDA derivation"
     },
     {
-      "code": 6039,
+      "code": 6034,
       "name": "transactionTooOld",
       "msg": "Transaction is too old"
     },
     {
-      "code": 6040,
+      "code": 6035,
       "name": "invalidAccountData",
       "msg": "Invalid account data"
     },
     {
-      "code": 6041,
+      "code": 6036,
       "name": "invalidInstructionData",
       "msg": "Invalid instruction data"
     },
     {
-      "code": 6042,
+      "code": 6037,
       "name": "accountAlreadyInitialized",
       "msg": "Account already initialized"
     },
     {
-      "code": 6043,
+      "code": 6038,
       "name": "invalidAccountState",
       "msg": "Invalid account state"
     },
     {
-      "code": 6044,
+      "code": 6039,
       "name": "invalidFeeAmount",
       "msg": "Invalid fee amount"
     },
     {
-      "code": 6045,
+      "code": 6040,
       "name": "insufficientBalanceForFee",
       "msg": "Insufficient balance for fee"
     },
     {
-      "code": 6046,
+      "code": 6041,
       "name": "invalidAuthority",
       "msg": "Invalid authority"
     },
     {
-      "code": 6047,
+      "code": 6042,
       "name": "authorityMismatch",
       "msg": "Authority mismatch"
     },
     {
-      "code": 6048,
+      "code": 6043,
       "name": "invalidSequenceNumber",
       "msg": "Invalid sequence number"
     },
     {
-      "code": 6049,
+      "code": 6044,
       "name": "invalidPasskeyFormat",
       "msg": "Invalid passkey format"
     },
     {
-      "code": 6050,
+      "code": 6045,
       "name": "invalidMessageFormat",
       "msg": "Invalid message format"
     },
     {
-      "code": 6051,
+      "code": 6046,
       "name": "invalidSplitIndex",
       "msg": "Invalid split index"
     },
     {
-      "code": 6052,
+      "code": 6047,
       "name": "invalidProgramAddress",
       "msg": "Invalid program address"
     },
     {
-      "code": 6053,
+      "code": 6048,
       "name": "reentrancyDetected",
       "msg": "Reentrancy detected"
     },
     {
-      "code": 6054,
+      "code": 6049,
       "name": "invalidVaultIndex",
       "msg": "Invalid vault index"
     },
     {
-      "code": 6055,
+      "code": 6050,
       "name": "insufficientBalance",
       "msg": "Insufficient balance"
     },
     {
-      "code": 6056,
+      "code": 6051,
       "name": "invalidAction",
       "msg": "Invalid action"
     },
     {
-      "code": 6057,
+      "code": 6052,
       "name": "insufficientVaultBalance",
       "msg": "Insufficient balance in vault"
     }
   ],
   "types": [
-    {
-      "name": "addDeviceArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "clientDataJsonRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticatorDataRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "verifyInstructionIndex",
-            "type": "u8"
-          },
-          {
-            "name": "policyData",
-            "type": "bytes"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
-            "name": "newDevicePasskeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "newDeviceCredentialHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "callPolicyArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "clientDataJsonRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticatorDataRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "verifyInstructionIndex",
-            "type": "u8"
-          },
-          {
-            "name": "policyData",
-            "type": "bytes"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "changePolicyArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "clientDataJsonRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticatorDataRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "verifyInstructionIndex",
-            "type": "u8"
-          },
-          {
-            "name": "splitIndex",
-            "type": "u16"
-          },
-          {
-            "name": "destroyPolicyData",
-            "type": "bytes"
-          },
-          {
-            "name": "initPolicyData",
-            "type": "bytes"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
     {
       "name": "chunk",
       "docs": [
@@ -1716,70 +1104,6 @@ export type Lazorkit = {
           {
             "name": "timestamp",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "removeDeviceArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "passkeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "clientDataJsonRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "authenticatorDataRaw",
-            "type": "bytes"
-          },
-          {
-            "name": "verifyInstructionIndex",
-            "type": "u8"
-          },
-          {
-            "name": "policyData",
-            "type": "bytes"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
-            "name": "removePasskeyPublicKey",
-            "type": {
-              "array": [
-                "u8",
-                33
-              ]
-            }
-          },
-          {
-            "name": "removeCredentialHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           }
         ]
       }

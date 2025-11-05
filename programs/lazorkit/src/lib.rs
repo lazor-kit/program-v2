@@ -23,34 +23,6 @@ pub mod lazorkit {
         instructions::create_smart_wallet(ctx, args)
     }
 
-    pub fn change_policy_program<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
-        args: ChangePolicyArgs,
-    ) -> Result<()> {
-        instructions::change_policy_program(ctx, args)
-    }
-
-    pub fn call_policy_program<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
-        args: CallPolicyArgs,
-    ) -> Result<()> {
-        instructions::call_policy_program(ctx, args)
-    }
-
-    pub fn add_device<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, AddDevice<'info>>,
-        args: AddDeviceArgs,
-    ) -> Result<()> {
-        instructions::add_device(ctx, args)
-    }
-
-    pub fn remove_device<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, RemoveDevice<'info>>,
-        args: RemoveDeviceArgs,
-    ) -> Result<()> {
-        instructions::remove_device(ctx, args)
-    }
-
     pub fn execute<'c: 'info, 'info>(
         ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
         args: ExecuteArgs,

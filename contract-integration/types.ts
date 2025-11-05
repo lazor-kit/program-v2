@@ -12,38 +12,21 @@ export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
 export type CreateSmartWalletArgs =
   anchor.IdlTypes<Lazorkit>['createSmartWalletArgs'];
 export type ExecuteArgs = anchor.IdlTypes<Lazorkit>['executeArgs'];
-export type ChangePolicyArgs = anchor.IdlTypes<Lazorkit>['changePolicyArgs'];
-export type CallPolicyArgs = anchor.IdlTypes<Lazorkit>['callPolicyArgs'];
 export type CreateChunkArgs = anchor.IdlTypes<Lazorkit>['createChunkArgs'];
-export type AddDeviceArgs = anchor.IdlTypes<Lazorkit>['addDeviceArgs'];
-export type RemoveDeviceArgs = anchor.IdlTypes<Lazorkit>['removeDeviceArgs'];
 
 // ============================================================================
 // Smart Wallet Actions
 // ============================================================================
 export enum SmartWalletAction {
   Execute = 'execute',
-  CallPolicyProgram = 'call_policy_program',
-  ChangePolicyProgram = 'change_policy_program',
-  AddDevice = 'add_device',
-  RemoveDevice = 'remove_device',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
-  GrantPermission = 'grant_permission',
-  ExecuteWithPermission = 'execute_with_permission',
 }
 
 export type ArgsByAction = {
   [SmartWalletAction.Execute]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstruction: anchor.web3.TransactionInstruction;
-  };
-  [SmartWalletAction.CallPolicyProgram]: {
-    policyInstruction: anchor.web3.TransactionInstruction;
-  };
-  [SmartWalletAction.ChangePolicyProgram]: {
-    destroyPolicyIns: anchor.web3.TransactionInstruction;
-    initPolicyIns: anchor.web3.TransactionInstruction;
   };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
@@ -52,24 +35,6 @@ export type ArgsByAction = {
   };
   [SmartWalletAction.ExecuteChunk]: {
     cpiInstructions: anchor.web3.TransactionInstruction[];
-  };
-  [SmartWalletAction.GrantPermission]: {
-    ephemeral_public_key: anchor.web3.PublicKey;
-    expiresAt: number;
-    cpiInstructions: anchor.web3.TransactionInstruction[];
-  };
-  [SmartWalletAction.ExecuteWithPermission]: {
-    cpiInstructions: anchor.web3.TransactionInstruction[];
-  };
-  [SmartWalletAction.AddDevice]: {
-    policyInstruction: anchor.web3.TransactionInstruction;
-    newDevicePasskeyPublicKey: number[];
-    newDeviceCredentialHash: number[];
-  };
-  [SmartWalletAction.RemoveDevice]: {
-    policyInstruction: anchor.web3.TransactionInstruction;
-    removeDevicePasskeyPublicKey: number[];
-    removeDeviceCredentialHash: number[];
   };
 };
 
@@ -109,7 +74,6 @@ export interface TransactionBuilderResult {
 interface BaseParams {
   payer: anchor.web3.PublicKey;
   smartWallet: anchor.web3.PublicKey;
-  vaultIndex?: number;
 }
 
 interface AuthParams extends BaseParams {
@@ -128,8 +92,6 @@ export interface CreateSmartWalletParams {
   amount?: anchor.BN;
   policyInstruction?: anchor.web3.TransactionInstruction | null;
   smartWalletId?: anchor.BN;
-  referralAddress?: anchor.web3.PublicKey | null;
-  vaultIndex?: number;
   policyDataSize?: number;
 }
 
@@ -138,31 +100,6 @@ export interface ExecuteParams extends AuthParams {
   cpiInstruction: anchor.web3.TransactionInstruction;
   timestamp: anchor.BN;
   smartWalletId: anchor.BN;
-}
-
-export interface CallPolicyParams extends AuthParams {
-  policyInstruction: anchor.web3.TransactionInstruction;
-  timestamp: anchor.BN;
-}
-
-export interface ChangePolicyParams extends AuthParams {
-  destroyPolicyInstruction: anchor.web3.TransactionInstruction;
-  initPolicyInstruction: anchor.web3.TransactionInstruction;
-  timestamp: anchor.BN;
-}
-
-export interface AddDeviceParams extends AuthParams {
-  policyInstruction: anchor.web3.TransactionInstruction;
-  newDevicePasskeyPublicKey: number[];
-  newDeviceCredentialHash: number[];
-  timestamp: anchor.BN;
-}
-
-export interface RemoveDeviceParams extends AuthParams {
-  policyInstruction: anchor.web3.TransactionInstruction;
-  removeDevicePasskeyPublicKey: number[];
-  removeDeviceCredentialHash: number[];
-  timestamp: anchor.BN;
 }
 
 export interface CreateChunkParams extends AuthParams {
@@ -177,18 +114,4 @@ export interface ExecuteChunkParams extends BaseParams {
 
 export interface CloseChunkParams extends BaseParams {
   nonce: anchor.BN;
-}
-
-export interface GrantPermissionParams extends AuthParams {
-  ephemeral_public_key: anchor.web3.PublicKey;
-  expiresAt: number;
-  cpiInstructions: anchor.web3.TransactionInstruction[];
-}
-
-export interface ExecuteWithPermissionParams {
-  feePayer: anchor.web3.PublicKey;
-  ephemeralSigner: anchor.web3.PublicKey;
-  smartWallet: anchor.web3.PublicKey;
-  permission: anchor.web3.PublicKey;
-  cpiInstructions: anchor.web3.TransactionInstruction[];
 }

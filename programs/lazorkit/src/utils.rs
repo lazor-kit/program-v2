@@ -238,16 +238,6 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn compute_device_hash(
-    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    credential_hash: [u8; 32],
-) -> [u8; 32] {
-    let mut buf = [0u8; 65];
-    buf[..33 as usize].copy_from_slice(&passkey_public_key);
-    buf[33 as usize..].copy_from_slice(&credential_hash);
-    hash(&buf).to_bytes()
-}
-
 pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]) -> [u8; 32] {
     // Combine passkey public key with wallet address for unique hashing
     let mut buf = [0u8; 64];
@@ -255,22 +245,6 @@ pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]
     buf[32 as usize..].copy_from_slice(&credential_hash);
     // Hash the combined data to create a unique identifier
     hash(&buf).to_bytes()
-}
-
-/// Helper: Get a slice of accounts from remaining_accounts
-pub fn get_account_slice<'a>(
-    accounts: &'a [AccountInfo<'a>],
-    start: u8,
-    len: u8,
-) -> Result<&'a [AccountInfo<'a>]> {
-    accounts
-        .get(start as usize..(start as usize + len as usize))
-        .ok_or(crate::error::LazorKitError::AccountSliceOutOfBounds.into())
-}
-
-/// Helper: Create a custom PDA signer with arbitrary seeds
-pub fn create_custom_pda_signer(seeds: Vec<Vec<u8>>, bump: u8) -> PdaSigner {
-    PdaSigner { seeds, bump }
 }
 
 /// Verify authorization using hash comparison instead of deserializing message data
@@ -351,27 +325,13 @@ pub fn compute_instruction_hash(
     Ok(hash(&combined).to_bytes())
 }
 
-/// Message types for hash computation
-#[derive(Debug, Clone, Copy)]
-pub enum MessageType {
-    Execute,
-    CallPolicyProgram,
-    ChangePolicyProgram,
-    AddDevice,
-    RemoveDevice,
-    CreateChunk,
-    GrantPermission,
-}
-
 /// Generic message hash computation function
 /// Replaces all the individual hash functions with a single, optimized implementation
-pub fn compute_message_hash(
-    message_type: MessageType,
+fn compute_message_hash(
     nonce: u64,
     timestamp: i64,
     hash1: [u8; 32],
     hash2: Option<[u8; 32]>,
-    additional_data: Option<&[u8]>,
 ) -> Result<[u8; 32]> {
     use anchor_lang::solana_program::hash::hash;
 
@@ -387,16 +347,6 @@ pub fn compute_message_hash(
         data.extend_from_slice(&h2);
     }
 
-    // Add additional data for specific message types
-    match message_type {
-        MessageType::GrantPermission => {
-            if let Some(additional) = additional_data {
-                data.extend_from_slice(additional);
-            }
-        }
-        _ => {} // Other message types don't need additional data
-    }
-
     Ok(hash(&data).to_bytes())
 }
 
@@ -408,82 +358,7 @@ pub fn compute_execute_message_hash(
     policy_hash: [u8; 32],
     cpi_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::Execute,
-        nonce,
-        timestamp,
-        policy_hash,
-        Some(cpi_hash),
-        None,
-    )
-}
-
-/// Compute call policy message hash: hash(nonce, timestamp, policy_hash, empty_cpi_hash)
-/// Optimized to use stack allocation
-pub fn compute_call_policy_program_message_hash(
-    nonce: u64,
-    timestamp: i64,
-    policy_hash: [u8; 32],
-) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::CallPolicyProgram,
-        nonce,
-        timestamp,
-        policy_hash,
-        None,
-        None,
-    )
-}
-
-/// Compute change policy message hash: hash(nonce, timestamp, old_policy_hash, new_policy_hash)
-pub fn compute_change_policy_program_message_hash(
-    nonce: u64,
-    timestamp: i64,
-    old_policy_hash: [u8; 32],
-    new_policy_hash: [u8; 32],
-) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::ChangePolicyProgram,
-        nonce,
-        timestamp,
-        old_policy_hash,
-        Some(new_policy_hash),
-        None,
-    )
-}
-
-/// Compute add device message hash: hash(nonce, timestamp, policy_hash, new_device_hash)
-pub fn compute_add_device_message_hash(
-    nonce: u64,
-    timestamp: i64,
-    policy_hash: [u8; 32],
-    new_device_hash: [u8; 32],
-) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::AddDevice,
-        nonce,
-        timestamp,
-        policy_hash,
-        Some(new_device_hash),
-        None,
-    )
-}
-
-/// Compute remove device message hash: hash(nonce, timestamp, policy_hash, remove_device_hash)
-pub fn compute_remove_device_message_hash(
-    nonce: u64,
-    timestamp: i64,
-    policy_hash: [u8; 32],
-    remove_device_hash: [u8; 32],
-) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::RemoveDevice,
-        nonce,
-        timestamp,
-        policy_hash,
-        Some(remove_device_hash),
-        None,
-    )
+    compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
 /// Compute create chunk message hash: hash(nonce, timestamp, policy_hash, cpi_hash)
@@ -493,40 +368,7 @@ pub fn compute_create_chunk_message_hash(
     policy_hash: [u8; 32],
     cpi_hash: [u8; 32],
 ) -> Result<[u8; 32]> {
-    compute_message_hash(
-        MessageType::CreateChunk,
-        nonce,
-        timestamp,
-        policy_hash,
-        Some(cpi_hash),
-        None,
-    )
-}
-
-/// Compute grant permission message hash: hash(nonce, timestamp, ephemeral_key, expires_at, combined_hash)
-pub fn compute_grant_permission_message_hash(
-    nonce: u64,
-    timestamp: i64,
-    ephemeral_key: Pubkey,
-    expires_at: i64,
-    combined_hash: [u8; 32],
-) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::hash::hash;
-
-    // For GrantPermission, we need to hash the additional data separately
-    let mut additional_data = Vec::new();
-    additional_data.extend_from_slice(ephemeral_key.as_ref());
-    additional_data.extend_from_slice(&expires_at.to_le_bytes());
-    let additional_hash = hash(&additional_data).to_bytes();
-
-    compute_message_hash(
-        MessageType::GrantPermission,
-        nonce,
-        timestamp,
-        combined_hash,
-        Some(additional_hash),
-        None,
-    )
+    compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
 /// Helper: Split remaining accounts into `(policy_accounts, cpi_accounts)` using `split_index` coming from `Message`.
