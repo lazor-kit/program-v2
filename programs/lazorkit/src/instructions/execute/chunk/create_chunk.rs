@@ -5,7 +5,7 @@ use crate::security::validation;
 use crate::state::{Chunk, WalletDevice, WalletState};
 use crate::utils::{
     compute_create_chunk_message_hash, compute_instruction_hash, create_wallet_device_hash,
-    execute_cpi, get_policy_signer, sighash, transfer_sol_util, verify_authorization_hash,
+    execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
 };
 use crate::{constants::SMART_WALLET_SEED, error::LazorKitError, ID};
 
@@ -25,7 +25,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         args.passkey_public_key,
-        args.signature.clone(),
+        args.signature,
         &args.client_data_json_raw,
         &args.authenticator_data_raw,
         args.verify_instruction_index,
@@ -61,16 +61,6 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     // Update the nonce
     ctx.accounts.wallet_state.last_nonce =
         validation::safe_increment_nonce(ctx.accounts.wallet_state.last_nonce);
-
-    // Transfer transaction fee to payer
-    transfer_sol_util(
-        &ctx.accounts.smart_wallet,
-        ctx.accounts.wallet_state.wallet_id,
-        ctx.accounts.wallet_state.bump,
-        &ctx.accounts.payer,
-        &ctx.accounts.system_program,
-        crate::constants::TRANSACTION_FEE,
-    )?;
 
     Ok(())
 }

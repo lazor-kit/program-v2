@@ -14,79 +14,6 @@ export type DefaultPolicy = {
   },
   "instructions": [
     {
-      "name": "addDevice",
-      "discriminator": [
-        21,
-        27,
-        66,
-        42,
-        18,
-        30,
-        14,
-        18
-      ],
-      "accounts": [
-        {
-          "name": "policySigner",
-          "signer": true
-        },
-        {
-          "name": "smartWallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "walletId",
-          "type": "u64"
-        },
-        {
-          "name": "passkeyPublicKey",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credentialHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policyData",
-          "type": "bytes"
-        },
-        {
-          "name": "newDevicePasskeyPublicKey",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "newDeviceCredentialHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ],
-      "returns": {
-        "defined": {
-          "name": "policyStruct"
-        }
-      }
-    },
-    {
       "name": "checkPolicy",
       "discriminator": [
         28,
@@ -97,56 +24,6 @@ export type DefaultPolicy = {
         136,
         25,
         35
-      ],
-      "accounts": [
-        {
-          "name": "policySigner",
-          "signer": true
-        },
-        {
-          "name": "smartWallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "walletId",
-          "type": "u64"
-        },
-        {
-          "name": "passkeyPublicKey",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credentialHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policyData",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "destroyPolicy",
-      "discriminator": [
-        254,
-        234,
-        136,
-        124,
-        90,
-        28,
-        94,
-        138
       ],
       "accounts": [
         {
@@ -241,80 +118,6 @@ export type DefaultPolicy = {
           "name": "policyStruct"
         }
       }
-    },
-    {
-      "name": "removeDevice",
-      "discriminator": [
-        42,
-        19,
-        175,
-        5,
-        67,
-        100,
-        238,
-        14
-      ],
-      "accounts": [
-        {
-          "name": "policySigner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "smartWallet"
-        }
-      ],
-      "args": [
-        {
-          "name": "walletId",
-          "type": "u64"
-        },
-        {
-          "name": "passkeyPublicKey",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credentialHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "policyData",
-          "type": "bytes"
-        },
-        {
-          "name": "removeDevicePasskeyPublicKey",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "removeDeviceCredentialHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ],
-      "returns": {
-        "defined": {
-          "name": "policyStruct"
-        }
-      }
     }
   ],
   "errors": [
@@ -327,16 +130,6 @@ export type DefaultPolicy = {
       "code": 6001,
       "name": "unauthorized",
       "msg": "Unauthorized to access smart wallet"
-    },
-    {
-      "code": 6002,
-      "name": "walletDeviceAlreadyInPolicy",
-      "msg": "Wallet device already in policy"
-    },
-    {
-      "code": 6003,
-      "name": "walletDeviceNotInPolicy",
-      "msg": "Wallet device not in policy"
     }
   ],
   "types": [

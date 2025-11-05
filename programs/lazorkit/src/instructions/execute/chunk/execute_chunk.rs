@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::error::LazorKitError;
 use crate::security::validation;
 use crate::state::{Chunk, WalletState};
-use crate::utils::{execute_cpi, transfer_sol_util, PdaSigner};
+use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{hash, Hasher};
 
@@ -50,9 +50,10 @@ pub fn execute_chunk(
     // Serialize CPI data to match client-side format (length + data for each instruction)
     let mut serialized_cpi_data = Vec::new();
     serialized_cpi_data.extend_from_slice(&(instruction_data_list.len() as u32).to_le_bytes());
-    
     for instruction_data in &instruction_data_list {
-        serialized_cpi_data.extend_from_slice(&(instruction_data.len() as u32).to_le_bytes());
+        let data_len_usize: usize = instruction_data.len();
+        let data_len: u32 = data_len_usize as u32;
+        serialized_cpi_data.extend_from_slice(&data_len.to_le_bytes());
         serialized_cpi_data.extend_from_slice(instruction_data);
     }
     
@@ -119,17 +120,6 @@ pub fn execute_chunk(
             wallet_signer.clone(),
         )?;
     }
-
-    // Transfer transaction fee to payer
-    transfer_sol_util(
-        &ctx.accounts.smart_wallet,
-        ctx.accounts.wallet_state.wallet_id,
-        ctx.accounts.wallet_state.bump,
-        &ctx.accounts.payer,
-        &ctx.accounts.system_program,
-        crate::constants::TRANSACTION_FEE,
-    )?;
-
 
     Ok(())
 }

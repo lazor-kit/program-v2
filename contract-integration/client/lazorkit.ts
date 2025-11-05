@@ -11,14 +11,7 @@ import { getRandomBytes, instructionToAccountMetas } from '../utils';
 import * as types from '../types';
 import { DefaultPolicyClient } from './defaultPolicy';
 import * as bs58 from 'bs58';
-import {
-  buildCallPolicyMessage,
-  buildChangePolicyMessage,
-  buildExecuteMessage,
-  buildCreateChunkMessage,
-  buildAddDeviceMessage,
-  buildRemoveDeviceMessage,
-} from '../messages';
+import { buildExecuteMessage, buildCreateChunkMessage } from '../messages';
 import { Buffer } from 'buffer';
 import {
   buildPasskeyVerificationInstruction,
@@ -398,114 +391,6 @@ export class LazorkitClient {
   }
 
   /**
-   * Builds the invoke wallet policy instruction
-   */
-  async buildCallPolicyProgramIns(
-    payer: PublicKey,
-    smartWallet: PublicKey,
-    args: types.CallPolicyArgs,
-    policyInstruction: TransactionInstruction
-  ): Promise<TransactionInstruction> {
-    return await this.program.methods
-      .callPolicyProgram(args)
-      .accountsPartial({
-        payer,
-        smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
-        walletDevice: this.getWalletDevicePubkey(
-          smartWallet,
-          args.passkeyPublicKey
-        ),
-        policyProgram: policyInstruction.programId,
-        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
-      .instruction();
-  }
-
-  /**
-   * Builds the update wallet policy instruction
-   */
-  async buildChangePolicyProgramIns(
-    payer: PublicKey,
-    smartWallet: PublicKey,
-    args: types.ChangePolicyArgs,
-    destroyPolicyInstruction: TransactionInstruction,
-    initPolicyInstruction: TransactionInstruction
-  ): Promise<TransactionInstruction> {
-    return await this.program.methods
-      .changePolicyProgram(args)
-      .accountsPartial({
-        payer,
-        smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
-        walletDevice: this.getWalletDevicePubkey(
-          smartWallet,
-          args.passkeyPublicKey
-        ),
-        oldPolicyProgram: destroyPolicyInstruction.programId,
-        newPolicyProgram: initPolicyInstruction.programId,
-        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .remainingAccounts([
-        ...instructionToAccountMetas(destroyPolicyInstruction),
-        ...instructionToAccountMetas(initPolicyInstruction),
-      ])
-      .instruction();
-  }
-
-  /**
-   * Builds the add device instruction
-   */
-  async buildAddDeviceIns(
-    payer: PublicKey,
-    smartWallet: PublicKey,
-    args: types.AddDeviceArgs,
-    policyInstruction: TransactionInstruction,
-    walletDevice: PublicKey
-  ): Promise<TransactionInstruction> {
-    return await this.program.methods
-      .addDevice(args)
-      .accountsPartial({
-        payer,
-        smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
-        walletDevice,
-        newWalletDevice: this.getWalletDevicePubkey(
-          smartWallet,
-          args.newDeviceCredentialHash
-        ),
-        policyProgram: policyInstruction.programId,
-        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
-      .instruction();
-  }
-
-  /**
-   * Builds the remove device instruction
-   */
-  async buildRemoveDeviceIns(
-    payer: PublicKey,
-    smartWallet: PublicKey,
-    args: types.RemoveDeviceArgs,
-    policyInstruction: TransactionInstruction
-  ): Promise<TransactionInstruction> {
-    return await this.program.methods
-      .removeDevice(args)
-      .accountsPartial({
-        payer,
-        smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
-      })
-      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
-      .instruction();
-  }
-
-  /**
    * Builds the create deferred execution instruction
    */
   async buildCreateChunkIns(
@@ -624,7 +509,6 @@ export class LazorkitClient {
     const smartWalletId = params.smartWalletId || this.generateWalletId();
     const smartWallet = this.getSmartWalletPubkey(smartWalletId);
     const walletState = this.getWalletStatePubkey(smartWallet);
-    const vaultIndex = params.vaultIndex !== undefined ? params.vaultIndex : 0;
     const amount =
       params.amount !== undefined
         ? params.amount
@@ -663,10 +547,6 @@ export class LazorkitClient {
       initPolicyData: policyInstruction.data,
       walletId: smartWalletId,
       amount,
-      referralAddress: params.referralAddress
-        ? params.referralAddress
-        : params.payer,
-      vaultIndex,
       policyDataSize,
     };
 
@@ -749,192 +629,6 @@ export class LazorkitClient {
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
       execInstruction,
-    ]);
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      instructions,
-      options
-    );
-
-    return result.transaction;
-  }
-
-  /**
-   * Invokes a wallet policy with passkey authentication
-   */
-  async callPolicyTxn(
-    params: types.CallPolicyParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    const authInstruction = buildPasskeyVerificationInstruction(
-      params.passkeySignature
-    );
-
-    const signatureArgs = convertPasskeySignatureToInstructionArgs(
-      params.passkeySignature
-    );
-
-    const invokeInstruction = await this.buildCallPolicyProgramIns(
-      params.payer,
-      params.smartWallet,
-      {
-        ...signatureArgs,
-        policyData: params.policyInstruction.data,
-        verifyInstructionIndex: calculateVerifyInstructionIndex(
-          options.computeUnitLimit
-        ),
-        timestamp: params.timestamp,
-      },
-      params.policyInstruction
-    );
-
-    const instructions = combineInstructionsWithAuth(authInstruction, [
-      invokeInstruction,
-    ]);
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      instructions,
-      options
-    );
-
-    return result.transaction;
-  }
-
-  /**
-   * Updates a wallet policy with passkey authentication
-   */
-  async changePolicyTxn(
-    params: types.ChangePolicyParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    const authInstruction = buildPasskeyVerificationInstruction(
-      params.passkeySignature
-    );
-
-    const signatureArgs = convertPasskeySignatureToInstructionArgs(
-      params.passkeySignature
-    );
-
-    const updateInstruction = await this.buildChangePolicyProgramIns(
-      params.payer,
-      params.smartWallet,
-      {
-        ...signatureArgs,
-        verifyInstructionIndex: calculateVerifyInstructionIndex(
-          options.computeUnitLimit
-        ),
-        destroyPolicyData: params.destroyPolicyInstruction.data,
-        initPolicyData: params.initPolicyInstruction.data,
-        splitIndex: params.destroyPolicyInstruction.keys.length,
-        timestamp: new anchor.BN(Math.floor(Date.now() / 1000)),
-      },
-      params.destroyPolicyInstruction,
-      params.initPolicyInstruction
-    );
-
-    const instructions = combineInstructionsWithAuth(authInstruction, [
-      updateInstruction,
-    ]);
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      instructions,
-      options
-    );
-
-    return result.transaction;
-  }
-
-  /**
-   * Adds a device to a wallet with passkey authentication
-   */
-  async addDeviceTxn(
-    params: types.AddDeviceParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    const authInstruction = buildPasskeyVerificationInstruction(
-      params.passkeySignature
-    );
-
-    const signatureArgs = convertPasskeySignatureToInstructionArgs(
-      params.passkeySignature
-    );
-
-    const walletDevice = this.getWalletDevicePubkey(
-      params.smartWallet,
-      params.credentialHash
-    );
-
-    const addDeviceInstruction = await this.buildAddDeviceIns(
-      params.payer,
-      params.smartWallet,
-      {
-        ...signatureArgs,
-        policyData: params.policyInstruction.data,
-        verifyInstructionIndex: calculateVerifyInstructionIndex(
-          options.computeUnitLimit
-        ),
-        timestamp: params.timestamp,
-        newDevicePasskeyPublicKey: params.newDevicePasskeyPublicKey,
-        newDeviceCredentialHash: params.newDeviceCredentialHash,
-      },
-
-      params.policyInstruction,
-      walletDevice
-    );
-
-    const instructions = combineInstructionsWithAuth(authInstruction, [
-      addDeviceInstruction,
-    ]);
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      instructions,
-      options
-    );
-
-    return result.transaction;
-  }
-
-  /**
-   * Removes a device from a wallet with passkey authentication
-   */
-  async removeDeviceTxn(
-    params: types.RemoveDeviceParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    const authInstruction = buildPasskeyVerificationInstruction(
-      params.passkeySignature
-    );
-
-    const signatureArgs = convertPasskeySignatureToInstructionArgs(
-      params.passkeySignature
-    );
-
-    const removeDeviceInstruction = await this.buildRemoveDeviceIns(
-      params.payer,
-      params.smartWallet,
-      {
-        ...signatureArgs,
-        policyData: params.policyInstruction.data,
-        verifyInstructionIndex: calculateVerifyInstructionIndex(
-          options.computeUnitLimit
-        ),
-        timestamp: params.timestamp,
-        removePasskeyPublicKey: params.removeDevicePasskeyPublicKey,
-        removeCredentialHash: params.removeDeviceCredentialHash,
-      },
-      params.policyInstruction
-    );
-
-    const instructions = combineInstructionsWithAuth(authInstruction, [
-      removeDeviceInstruction,
     ]);
 
     const result = await buildTransaction(
@@ -1133,37 +827,6 @@ export class LazorkitClient {
         );
         break;
       }
-      case types.SmartWalletAction.CallPolicyProgram: {
-        const { policyInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.CallPolicyProgram];
-
-        const smartWalletConfig = await this.getWalletStateData(smartWallet);
-
-        message = buildCallPolicyMessage(
-          payer,
-          smartWallet,
-          smartWalletConfig.lastNonce,
-          timestamp,
-          policyInstruction
-        );
-        break;
-      }
-      case types.SmartWalletAction.ChangePolicyProgram: {
-        const { initPolicyIns, destroyPolicyIns } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.ChangePolicyProgram];
-
-        const smartWalletConfig = await this.getWalletStateData(smartWallet);
-
-        message = buildChangePolicyMessage(
-          payer,
-          smartWallet,
-          smartWalletConfig.lastNonce,
-          timestamp,
-          destroyPolicyIns,
-          initPolicyIns
-        );
-        break;
-      }
       case types.SmartWalletAction.CreateChunk: {
         const { policyInstruction, cpiInstructions, expiresAt } =
           action.args as types.ArgsByAction[types.SmartWalletAction.CreateChunk];
@@ -1177,48 +840,6 @@ export class LazorkitClient {
           timestamp,
           policyInstruction,
           cpiInstructions
-        );
-        break;
-      }
-      case types.SmartWalletAction.AddDevice: {
-        const {
-          policyInstruction,
-          newDevicePasskeyPublicKey,
-          newDeviceCredentialHash,
-        } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.AddDevice];
-
-        const smartWalletConfig = await this.getWalletStateData(smartWallet);
-
-        message = buildAddDeviceMessage(
-          payer,
-          smartWallet,
-          smartWalletConfig.lastNonce,
-          timestamp,
-          policyInstruction,
-          newDevicePasskeyPublicKey,
-          newDeviceCredentialHash
-        );
-        break;
-      }
-      case types.SmartWalletAction.RemoveDevice: {
-        const {
-          policyInstruction,
-          removeDevicePasskeyPublicKey,
-          removeDeviceCredentialHash,
-        } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.RemoveDevice];
-
-        const smartWalletConfig = await this.getWalletStateData(smartWallet);
-
-        message = buildRemoveDeviceMessage(
-          payer,
-          smartWallet,
-          smartWalletConfig.lastNonce,
-          timestamp,
-          policyInstruction,
-          removeDevicePasskeyPublicKey,
-          removeDeviceCredentialHash
         );
         break;
       }

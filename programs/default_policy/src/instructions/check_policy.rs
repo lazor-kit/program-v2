@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 use lazorkit::{
-    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED}, state::WalletDevice, utils::create_wallet_device_hash, ID as LAZORKIT_ID
+    constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
+    state::WalletDevice,
+    utils::create_wallet_device_hash,
+    ID as LAZORKIT_ID,
 };
 
 use crate::{

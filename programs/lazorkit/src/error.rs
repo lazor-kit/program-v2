@@ -48,18 +48,8 @@ pub enum LazorKitError {
     HashMismatch,
 
     // === Policy Program Errors ===
-    #[msg("Policy program not found in registry")]
-    PolicyProgramNotRegistered,
-    #[msg("The policy program registry is full.")]
-    WhitelistFull,
     #[msg("Invalid instruction discriminator")]
     InvalidInstructionDiscriminator,
-    #[msg("Old and new policy programs are identical")]
-    PolicyProgramsIdentical,
-    #[msg("Neither old nor new policy program is the default")]
-    NoDefaultPolicyProgram,
-    #[msg("Policy program already registered")]
-    PolicyProgramAlreadyRegistered,
 
     // === Account & CPI Errors ===
     #[msg("Invalid remaining accounts")]
