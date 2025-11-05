@@ -9,7 +9,12 @@ import {
   SmartWalletAction,
 } from '../contract-integration';
 import { createTransferInstruction } from '@solana/spl-token';
-import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
+import {
+  buildFakeMessagePasskey,
+  createNewMint,
+  fundAccountSOL,
+  mintTokenTo,
+} from './utils';
 dotenv.config();
 
 // Helper function to get latest nonce
@@ -31,8 +36,6 @@ async function getBlockchainTimestamp(
   const blockTime = await connection.getBlockTime(slot);
   return new anchor.BN(blockTime || Math.floor(Date.now() / 1000));
 }
-
-const EMPTY_PDA_RENT_EXEMPT_BALANCE = 890880;
 
 describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
@@ -68,7 +71,6 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
-        amount: new anchor.BN(EMPTY_PDA_RENT_EXEMPT_BALANCE),
       });
 
     const sig = await anchor.web3.sendAndConfirmTransaction(
@@ -118,13 +120,18 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
-        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
       connection,
       createSmartWalletTxn as anchor.web3.Transaction,
       [payer]
+    );
+
+    await fundAccountSOL(
+      connection,
+      smartWallet,
+      anchor.web3.LAMPORTS_PER_SOL * 0.1
     );
 
     const walletStateData = await lazorkitProgram.getWalletStateData(
@@ -223,7 +230,6 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
-        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -372,7 +378,6 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
-        amount: new anchor.BN(0.1 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -382,6 +387,12 @@ describe('Test smart wallet with default policy', () => {
     );
 
     console.log('Create smart wallet: ', sig1);
+
+    await fundAccountSOL(
+      connection,
+      smartWallet,
+      anchor.web3.LAMPORTS_PER_SOL * 0.1
+    );
 
     // create mint
     const mint = await createNewMint(connection, payer, 6);

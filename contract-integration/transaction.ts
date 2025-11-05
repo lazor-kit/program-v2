@@ -1,10 +1,4 @@
 import * as anchor from '@coral-xyz/anchor';
-import {
-  Transaction,
-  TransactionMessage,
-  VersionedTransaction,
-  ComputeBudgetProgram,
-} from '@solana/web3.js';
 import { TransactionBuilderOptions, TransactionBuilderResult } from './types';
 
 /**
@@ -13,7 +7,7 @@ import { TransactionBuilderOptions, TransactionBuilderResult } from './types';
 export function createComputeUnitLimitInstruction(
   limit: number
 ): anchor.web3.TransactionInstruction {
-  return ComputeBudgetProgram.setComputeUnitLimit({ units: limit });
+  return anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ units: limit });
 }
 
 /**
@@ -37,11 +31,11 @@ export async function buildVersionedTransaction(
   connection: anchor.web3.Connection,
   payer: anchor.web3.PublicKey,
   instructions: anchor.web3.TransactionInstruction[]
-): Promise<VersionedTransaction> {
+): Promise<anchor.web3.VersionedTransaction> {
   const result = await buildTransaction(connection, payer, instructions, {
     useVersionedTransaction: true,
   });
-  return result.transaction as VersionedTransaction;
+  return result.transaction as anchor.web3.VersionedTransaction;
 }
 
 /**
@@ -51,11 +45,11 @@ export async function buildLegacyTransaction(
   connection: anchor.web3.Connection,
   payer: anchor.web3.PublicKey,
   instructions: anchor.web3.TransactionInstruction[]
-): Promise<Transaction> {
+): Promise<anchor.web3.Transaction> {
   const result = await buildTransaction(connection, payer, instructions, {
     useVersionedTransaction: false,
   });
-  return result.transaction as Transaction;
+  return result.transaction as anchor.web3.Transaction;
 }
 
 /**
@@ -123,13 +117,13 @@ export async function buildTransaction(
     // Build versioned transaction
     const lookupTables = addressLookupTable ? [addressLookupTable] : [];
 
-    const message = new TransactionMessage({
+    const message = new anchor.web3.TransactionMessage({
       payerKey: payer,
       recentBlockhash,
       instructions: finalInstructions,
     }).compileToV0Message(lookupTables);
 
-    const transaction = new VersionedTransaction(message);
+    const transaction = new anchor.web3.VersionedTransaction(message);
 
     return {
       transaction,
@@ -138,7 +132,7 @@ export async function buildTransaction(
     };
   } else {
     // Build legacy transaction
-    const transaction = new Transaction().add(...finalInstructions);
+    const transaction = new anchor.web3.Transaction().add(...finalInstructions);
     transaction.feePayer = payer;
     transaction.recentBlockhash = recentBlockhash;
 

@@ -1,0 +1,1 @@
+export const EMPTY_PDA_RENT_EXEMPT_BALANCE = 890880;
