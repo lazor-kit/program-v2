@@ -50,6 +50,7 @@ const { transaction, smartWalletId, smartWallet } =
   });
 
 // Execute a transaction with compute unit limit
+const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
 const executeTx = await lazorkitClient.executeTxn({
   payer: payer.publicKey,
   smartWallet: smartWallet,
@@ -59,9 +60,11 @@ const executeTx = await lazorkitClient.executeTxn({
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
   },
-  policyInstruction: null,
+  credentialHash: [/* 32 bytes */],
+  policyInstruction: null, // Use default policy check if null
   cpiInstruction: transferInstruction,
   timestamp: new BN(Math.floor(Date.now() / 1000)),
+  smartWalletId: walletStateData.walletId,
 }, {
   computeUnitLimit: 200000, // Set compute unit limit
   useVersionedTransaction: true
@@ -78,17 +81,16 @@ The main client for interacting with the LazorKit program.
 
 **Key Methods:**
 
-- **PDA Derivation**: `getConfigPubkey()`, `getSmartWalletPubkey()`, `getWalletDevicePubkey()`, etc.
-- **Account Data**: `getWalletStateData()`, `getWalletDeviceData()`, etc.
+- **PDA Derivation**: `getSmartWalletPubkey()`, `getWalletStatePubkey()`, `getWalletDevicePubkey()`, `getChunkPubkey()`
+- **Account Data**: `getWalletStateData()`, `getChunkData()`
 - **Wallet Search**: `getSmartWalletByPasskey()`, `getSmartWalletByCredentialHash()`, `findSmartWallet()`
-- **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, etc.
+- **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, `buildCreateChunkIns()`, `buildExecuteChunkIns()`, `buildCloseChunkIns()`
 - **High-level Transaction Builders**: 
   - `createSmartWalletTxn()` - Create new smart wallet
   - `executeTxn()` - Execute transaction with authentication
-  - `callPolicyTxn()` - Call wallet policy
-  - `changePolicyTxn()` - Change wallet policy
-  - `createChunkTxn()` - Create deferred execution chunk
-  - `executeChunkTxn()` - Execute deferred chunk
+  - `createChunkTxn()` - Create deferred execution chunk (with authentication)
+  - `executeChunkTxn()` - Execute deferred chunk (no authentication needed)
+  - `closeChunkTxn()` - Close chunk and refund rent (no authentication needed)
 
 #### `DefaultPolicyClient`
 
@@ -103,7 +105,7 @@ import { buildPasskeyVerificationInstruction } from './contract-integration';
 
 // Build verification instruction
 const authInstruction = buildPasskeyVerificationInstruction({
-  passkeyPubkey: [
+  passkeyPublicKey: [
     /* 33 bytes */
   ],
   signature64: 'base64-signature',
@@ -195,7 +197,7 @@ const tx2 = await client.executeTxn(params, {
 ```typescript
 // Authentication
 interface PasskeySignature {
-  passkeyPubkey: number[];
+  passkeyPublicKey: number[];
   signature64: string;
   clientDataJsonRaw64: string;
   authenticatorDataRaw64: string;
@@ -203,33 +205,59 @@ interface PasskeySignature {
 
 // Smart Wallet Actions
 enum SmartWalletAction {
-  UpdatePolicy = 'update_policy',
-  InvokePolicy = 'invoke_policy',
-  ExecuteTransaction = 'execute_transaction',
+  Execute = 'execute',
+  CreateChunk = 'create_chunk',
+  ExecuteChunk = 'execute_chunk',
 }
 
 // Action Arguments
-type SmartWalletActionArgs = {
-  type: SmartWalletAction;
-  args: ArgsByAction[SmartWalletAction];
+type SmartWalletActionArgs<K extends SmartWalletAction = SmartWalletAction> = {
+  type: K;
+  args: ArgsByAction[K];
 };
 
 // Transaction Parameters
 interface CreateSmartWalletParams {
   payer: PublicKey;
-  passkeyPubkey: number[];
+  passkeyPublicKey: number[];
   credentialIdBase64: string;
+  amount?: BN;
   policyInstruction?: TransactionInstruction | null;
-  isPayForUser?: boolean;
   smartWalletId?: BN;
+  policyDataSize?: number;
 }
 
-interface ExecuteTransactionParams {
+interface ExecuteParams {
   payer: PublicKey;
   smartWallet: PublicKey;
   passkeySignature: PasskeySignature;
+  credentialHash: number[];
   policyInstruction: TransactionInstruction | null;
   cpiInstruction: TransactionInstruction;
+  timestamp: BN;
+  smartWalletId: BN;
+}
+
+interface CreateChunkParams {
+  payer: PublicKey;
+  smartWallet: PublicKey;
+  passkeySignature: PasskeySignature;
+  credentialHash: number[];
+  policyInstruction: TransactionInstruction | null;
+  cpiInstructions: TransactionInstruction[];
+  timestamp: BN;
+}
+
+interface ExecuteChunkParams {
+  payer: PublicKey;
+  smartWallet: PublicKey;
+  cpiInstructions: TransactionInstruction[];
+}
+
+interface CloseChunkParams {
+  payer: PublicKey;
+  smartWallet: PublicKey;
+  nonce: BN;
 }
 ```
 
@@ -249,23 +277,21 @@ interface ExecuteTransactionParams {
 
 Methods that build individual instructions:
 
-- `buildCreateSmartWalletIns()`
-- `buildExecuteIns()`
-- `buildInvokePolicyInstruction()`
-- `buildUpdatePolicyInstruction()`
-- `buildCreateChunkInstruction()`
-- `buildExecuteSessionTransactionInstruction()`
+- `buildCreateSmartWalletIns()` - Build create smart wallet instruction
+- `buildExecuteIns()` - Build execute instruction
+- `buildCreateChunkIns()` - Build create chunk instruction
+- `buildExecuteChunkIns()` - Build execute chunk instruction
+- `buildCloseChunkIns()` - Build close chunk instruction
 
 #### High-Level Transaction Builders
 
-Methods that build complete transactions with authentication:
+Methods that build complete transactions:
 
-- `createSmartWalletTxn()`
-- `executeTransactionWithAuth()`
-- `invokePolicyWithAuth()`
-- `updatePolicyWithAuth()`
-- `createChunkWithAuth()`
-- `executeSessionTransaction()`
+- `createSmartWalletTxn()` - Create new smart wallet (with optional policy initialization)
+- `executeTxn()` - Execute transaction with authentication
+- `createChunkTxn()` - Create deferred execution chunk (with authentication)
+- `executeChunkTxn()` - Execute chunk (no authentication needed)
+- `closeChunkTxn()` - Close chunk and refund rent (no authentication needed)
 
 #### Utility Methods
 
@@ -365,68 +391,93 @@ const wallet = await lazorkitClient.findSmartWallet(passkeyBytes, credentialHash
 
 ## 🔄 Migration Guide
 
-### From Old API to New API
+### Simplified Contract (Lite Version)
 
-**Old:**
+The contract has been streamlined to focus on core functionality:
 
+#### Removed Methods
+
+The following methods have been removed as part of the contract simplification:
+
+- `invokePolicyWithAuth()` / `callPolicyTxn()` - Policy invocation is now handled through policy programs directly
+- `updatePolicyWithAuth()` / `changePolicyTxn()` - Policy updates are handled through policy programs directly
+- `buildInvokePolicyInstruction()` - No longer needed
+- `buildUpdatePolicyInstruction()` - No longer needed
+
+#### Updated Method Signatures
+
+**Create Smart Wallet:**
 ```typescript
-await client.createSmartWalletTx({
-  payer: payer.publicKey,
-  passkeyPubkey: [
-    /* bytes */
-  ],
-  credentialIdBase64: 'base64',
-  ruleInstruction: null,
-});
-```
-
-**New:**
-
-```typescript
+// Old (if existed)
 await client.createSmartWalletTxn({
   payer: payer.publicKey,
-  passkeyPubkey: [
-    /* bytes */
-  ],
+  passkeyPubkey: [...], // old name
   credentialIdBase64: 'base64',
-  policyInstruction: null,
+  isPayForUser: true, // old parameter
+});
+
+// New
+await client.createSmartWalletTxn({
+  payer: payer.publicKey,
+  passkeyPublicKey: [...], // updated name
+  credentialIdBase64: 'base64',
+  amount: new BN(0.01 * 1e9), // new parameter
+  policyInstruction: null, // optional policy init
 });
 ```
 
-### Key Changes
+**Execute Transaction:**
+```typescript
+// New - requires additional parameters
+const walletStateData = await client.getWalletStateData(smartWallet);
+await client.executeTxn({
+  payer: payer.publicKey,
+  smartWallet: smartWallet,
+  passkeySignature: {
+    passkeyPublicKey: [...], // updated name
+    signature64: 'base64-signature',
+    clientDataJsonRaw64: 'base64-client-data',
+    authenticatorDataRaw64: 'base64-auth-data',
+  },
+  credentialHash: [...], // required
+  policyInstruction: null,
+  cpiInstruction: transferInstruction,
+  timestamp: new BN(Math.floor(Date.now() / 1000)), // required
+  smartWalletId: walletStateData.walletId, // required
+});
+```
 
-1. **Method Names**: More descriptive and consistent
+**Chunk Methods:**
+```typescript
+// Old names
+await client.createChunkWithAuth(...);
+await client.executeSessionTransaction(...);
 
-   - `executeTxnDirectTx` → `executeTransactionWithAuth`
-   - `callRuleDirectTx` → `invokePolicyWithAuth`
-   - `changeRuleDirectTx` → `updatePolicyWithAuth`
-   - `commitCpiTx` → `createChunkWithAuth`
-   - `executeCommitedTx` → `executeSessionTransaction`
+// New names
+await client.createChunkTxn(...);
+await client.executeChunkTxn(...);
+await client.closeChunkTxn(...); // new method
+```
 
-2. **Parameter Structure**: Better organized with typed interfaces
+#### Key Changes
 
-   - Authentication data grouped in `PasskeySignature` for methods that require signatures
-   - Clear separation of required vs optional parameters
-   - Consistent naming: `policyInstruction` instead of `ruleInstruction`
+1. **Simplified API**: Removed direct policy management methods
+   - Policy operations are now handled through policy programs directly
+   - Cleaner separation of concerns
 
-3. **Return Types**: More consistent and informative
+2. **Parameter Updates**: 
+   - `passkeyPubkey` → `passkeyPublicKey` (consistent naming)
+   - `isPayForUser` → `amount` (more explicit)
+   - Added required parameters: `credentialHash`, `timestamp`, `smartWalletId` for execute
 
-   - All high-level methods return `VersionedTransaction`
-   - Legacy methods return `Transaction` for backward compatibility
+3. **Chunk Naming**: More consistent chunk-related method names
+   - `createChunkWithAuth` → `createChunkTxn`
+   - `executeSessionTransaction` → `executeChunkTxn`
+   - Added `closeChunkTxn` for closing unused chunks
 
-4. **Type Names**: More accurate and generic
-
-   - `MessageArgs` → `SmartWalletActionArgs` (can be used anywhere, not just messages)
-
-5. **Client Names**: Updated for consistency
-
-   - `DefaultRuleClient` → `DefaultPolicyClient`
-
-6. **Terminology**: All "rule" references changed to "policy"
-   - `ruleInstruction` → `policyInstruction`
-   - `ruleData` → `policyData`
-   - `checkRule` → `checkPolicy`
-   - `initRule` → `initPolicy`
+4. **Default Policy Client**: Simplified to only essential methods
+   - Removed: `buildAddDeviceIx()`, `buildRemoveDeviceIx()`, `buildDestroyPolicyIx()`
+   - Kept: `buildInitPolicyIx()`, `buildCheckPolicyIx()`
 
 ## 🧪 Testing
 
@@ -438,11 +489,11 @@ it('should create smart wallet successfully', async () => {
   const { transaction, smartWalletId, smartWallet } =
     await client.createSmartWalletTxn({
       payer: payer.publicKey,
-      passkeyPubkey: [
+      passkeyPublicKey: [
         /* test bytes */
       ],
       credentialIdBase64: 'test-credential',
-      isPayForUser: true,
+      amount: new BN(0.01 * 1e9),
     });
 
   expect(smartWalletId).to.be.instanceOf(BN);
@@ -465,17 +516,21 @@ it('should create smart wallet successfully', async () => {
 const { transaction, smartWalletId, smartWallet } =
   await client.createSmartWalletTxn({
     payer: payer.publicKey,
-    passkeyPubkey: [
+    passkeyPublicKey: [
       /* 33 bytes */
     ],
     credentialIdBase64: 'base64-credential',
-    isPayForUser: true,
+    amount: new BN(0.01 * 1e9), // Optional: initial funding in lamports
+    policyInstruction: null, // Optional: policy initialization instruction
   });
 ```
 
 ### Executing a Transaction with Authentication
 
 ```typescript
+// First, get wallet state data
+const walletStateData = await client.getWalletStateData(smartWallet);
+
 const transaction = await client.executeTxn({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
@@ -487,19 +542,21 @@ const transaction = await client.executeTxn({
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
   },
-  policyInstruction: null,
+  credentialHash: [/* 32 bytes */], // Required
+  policyInstruction: null, // Use default policy check if null
   cpiInstruction: transferInstruction,
-  timestamp: new BN(Math.floor(Date.now() / 1000)),
+  timestamp: new BN(Math.floor(Date.now() / 1000)), // Required
+  smartWalletId: walletStateData.walletId, // Required
 }, {
   computeUnitLimit: 200000, // Set compute unit limit
   useVersionedTransaction: true
 });
 ```
 
-### Creating a Transaction Session
+### Creating a Transaction Chunk
 
 ```typescript
-const sessionTx = await client.createChunkTxn({
+const chunkTx = await client.createChunkTxn({
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
   passkeySignature: {
@@ -510,12 +567,27 @@ const sessionTx = await client.createChunkTxn({
     clientDataJsonRaw64: 'base64-client-data',
     authenticatorDataRaw64: 'base64-auth-data',
   },
-  policyInstruction: null,
-  cpiInstructions: [transferInstruction1, transferInstruction2],
-  timestamp: new BN(Math.floor(Date.now() / 1000)),
+  credentialHash: [/* 32 bytes */], // Required
+  policyInstruction: null, // Use default policy check if null
+  cpiInstructions: [transferInstruction1, transferInstruction2], // Multiple instructions
+  timestamp: new BN(Math.floor(Date.now() / 1000)), // Required
 }, {
   computeUnitLimit: 300000, // Higher limit for multiple instructions
   useVersionedTransaction: true
+});
+
+// Execute chunk (no authentication needed)
+const executeTx = await client.executeChunkTxn({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  cpiInstructions: [transferInstruction1, transferInstruction2], // Same instructions as chunk
+});
+
+// Close chunk to refund rent (if not executed)
+const closeTx = await client.closeChunkTxn({
+  payer: payer.publicKey,
+  smartWallet: smartWallet.publicKey,
+  nonce: chunkNonce,
 });
 ```
 
@@ -524,7 +596,7 @@ const sessionTx = await client.createChunkTxn({
 ```typescript
 const message = await client.buildAuthorizationMessage({
   action: {
-    type: SmartWalletAction.ExecuteTransaction,
+    type: SmartWalletAction.Execute,
     args: {
       policyInstruction: null,
       cpiInstruction: transferInstruction,
@@ -532,9 +604,11 @@ const message = await client.buildAuthorizationMessage({
   },
   payer: payer.publicKey,
   smartWallet: smartWallet.publicKey,
-  passkeyPubkey: [
+  passkeyPublicKey: [
     /* 33 bytes */
   ],
+  credentialHash: [/* 32 bytes */],
+  timestamp: new BN(Math.floor(Date.now() / 1000)),
 });
 ```
 
@@ -546,23 +620,41 @@ import { DefaultPolicyClient } from './contract-integration';
 const defaultPolicyClient = new DefaultPolicyClient(connection);
 
 // Build policy initialization instruction
+const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
+const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
+
 const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx(
-  payer.publicKey,
-  smartWallet.publicKey,
-  walletDevice.publicKey
+  walletStateData.walletId,
+  passkeyPublicKey,
+  credentialHash,
+  policySigner,
+  smartWallet,
+  walletState
 );
 
 // Build policy check instruction
 const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx(
-  walletDevice.publicKey
+  walletStateData.walletId,
+  passkeyPublicKey,
+  policySigner,
+  smartWallet,
+  credentialHash,
+  walletStateData.policyData
 );
 
-// Build add device instruction
-const addDeviceIx = await defaultPolicyClient.buildAddDeviceIx(
-  payer.publicKey,
-  walletDevice.publicKey,
-  newWalletDevice.publicKey
-);
+// Use policy instructions in transactions
+const createWalletTx = await lazorkitClient.createSmartWalletTxn({
+  payer: payer.publicKey,
+  passkeyPublicKey: [...],
+  credentialIdBase64: 'base64-credential',
+  policyInstruction: initPolicyIx, // Initialize policy during wallet creation
+});
+
+const executeTx = await lazorkitClient.executeTxn({
+  // ... other params
+  policyInstruction: checkPolicyIx, // Or null to use default policy check
+});
 ```
 
 See the `tests/` directory for comprehensive usage examples of all the new API methods.
