@@ -1,5 +1,4 @@
 import * as anchor from '@coral-xyz/anchor';
-import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { Lazorkit } from './anchor/types/lazorkit';
 
 // ============================================================================
@@ -99,7 +98,7 @@ export interface TransactionBuilderOptions {
 }
 
 export interface TransactionBuilderResult {
-  transaction: Transaction | VersionedTransaction;
+  transaction: anchor.web3.Transaction | anchor.web3.VersionedTransaction;
   isVersioned: boolean;
   recentBlockhash: string;
 }
@@ -126,7 +125,7 @@ export interface CreateSmartWalletParams {
   payer: anchor.web3.PublicKey;
   passkeyPublicKey: number[];
   credentialIdBase64: string;
-  amount: anchor.BN;
+  amount?: anchor.BN;
   policyInstruction?: anchor.web3.TransactionInstruction | null;
   smartWalletId?: anchor.BN;
   referralAddress?: anchor.web3.PublicKey | null;

@@ -400,12 +400,6 @@ export function buildRemoveDeviceMessage(
   policyCombined.set(policyHashes.policyAccountsHash, 32);
   const policyHash = computeHash(policyCombined);
 
-  // Create combined hash of remove device hashes
-  const removeDeviceCombined = new Uint8Array(65); // 32 + 32 + 1 bytes
-  removeDeviceCombined.set(removeDeviceHashes, 0);
-  removeDeviceCombined.set(removeDeviceHashes, 32);
-  const removeDeviceHash = computeHash(removeDeviceCombined);
-
   // Create final hash: hash(nonce, timestamp, policyHash, removeDeviceHash)
   const nonceBuffer = Buffer.alloc(8);
   nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
@@ -417,7 +411,7 @@ export function buildRemoveDeviceMessage(
     nonceBuffer,
     timestampBuffer,
     Buffer.from(policyHash),
-    Buffer.from(removeDeviceHash),
+    Buffer.from(removeDeviceHashes),
   ]);
 
   const dataHash = computeHash(finalData);

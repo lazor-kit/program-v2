@@ -1,13 +1,4 @@
-import { Program, BN } from '@coral-xyz/anchor';
-import {
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-  Connection,
-  SystemProgram,
-  SYSVAR_INSTRUCTIONS_PUBKEY,
-  VersionedTransaction,
-} from '@solana/web3.js';
+import * as anchor from '@coral-xyz/anchor';
 import LazorkitIdl from '../anchor/idl/lazorkit.json';
 import { Lazorkit } from '../anchor/types/lazorkit';
 import {
@@ -38,6 +29,14 @@ import {
   combineInstructionsWithAuth,
   calculateVerifyInstructionIndex,
 } from '../transaction';
+import { EMPTY_PDA_RENT_EXEMPT_BALANCE } from '../constants';
+
+// Type aliases for convenience
+type PublicKey = anchor.web3.PublicKey;
+type TransactionInstruction = anchor.web3.TransactionInstruction;
+type Transaction = anchor.web3.Transaction;
+type VersionedTransaction = anchor.web3.VersionedTransaction;
+type BN = anchor.BN;
 
 global.Buffer = Buffer;
 
@@ -57,14 +56,14 @@ Buffer.prototype.subarray = function subarray(
  * transaction builders for common smart wallet operations.
  */
 export class LazorkitClient {
-  readonly connection: Connection;
-  readonly program: Program<Lazorkit>;
-  readonly programId: PublicKey;
+  readonly connection: anchor.web3.Connection;
+  readonly program: anchor.Program<Lazorkit>;
+  readonly programId: anchor.web3.PublicKey;
   readonly defaultPolicyProgram: DefaultPolicyClient;
 
-  constructor(connection: Connection) {
+  constructor(connection: anchor.web3.Connection) {
     this.connection = connection;
-    this.program = new Program<Lazorkit>(LazorkitIdl as Lazorkit, {
+    this.program = new anchor.Program<Lazorkit>(LazorkitIdl as Lazorkit, {
       connection: connection,
     });
     this.defaultPolicyProgram = new DefaultPolicyClient(connection);
@@ -122,7 +121,7 @@ export class LazorkitClient {
    * Generates a random wallet ID
    */
   generateWalletId(): BN {
-    return new BN(getRandomBytes(8), 'le');
+    return new anchor.BN(getRandomBytes(8), 'le');
   }
 
   /**
@@ -360,7 +359,7 @@ export class LazorkitClient {
           args.credentialHash
         ),
         policyProgram: policyInstruction.programId,
-        systemProgram: SystemProgram.programId,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction, [payer]),
@@ -388,8 +387,8 @@ export class LazorkitClient {
         walletDevice,
         policyProgram: policyInstruction.programId,
         cpiProgram: cpiInstruction.programId,
-        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: SystemProgram.programId,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction),
@@ -418,8 +417,8 @@ export class LazorkitClient {
           args.passkeyPublicKey
         ),
         policyProgram: policyInstruction.programId,
-        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: SystemProgram.programId,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
@@ -447,8 +446,8 @@ export class LazorkitClient {
         ),
         oldPolicyProgram: destroyPolicyInstruction.programId,
         newPolicyProgram: initPolicyInstruction.programId,
-        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: SystemProgram.programId,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([
         ...instructionToAccountMetas(destroyPolicyInstruction),
@@ -479,8 +478,8 @@ export class LazorkitClient {
           args.newDeviceCredentialHash
         ),
         policyProgram: policyInstruction.programId,
-        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: SystemProgram.programId,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
@@ -528,8 +527,8 @@ export class LazorkitClient {
           smartWallet,
           await this.getWalletStateData(smartWallet).then((d) => d.lastNonce)
         ),
-        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
-        systemProgram: SystemProgram.programId,
+        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
@@ -546,7 +545,7 @@ export class LazorkitClient {
     const cfg = await this.getWalletStateData(smartWallet);
     const chunk = this.getChunkPubkey(
       smartWallet,
-      cfg.lastNonce.sub(new BN(1))
+      cfg.lastNonce.sub(new anchor.BN(1))
     );
 
     const chunkData = await this.getChunkData(chunk);
@@ -575,7 +574,7 @@ export class LazorkitClient {
         walletState: this.getWalletStatePubkey(smartWallet),
         chunk,
         sessionRefund: chunkData.rentRefundAddress,
-        systemProgram: SystemProgram.programId,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts(allAccountMetas)
       .instruction();
@@ -626,6 +625,10 @@ export class LazorkitClient {
     const smartWallet = this.getSmartWalletPubkey(smartWalletId);
     const walletState = this.getWalletStatePubkey(smartWallet);
     const vaultIndex = params.vaultIndex !== undefined ? params.vaultIndex : 0;
+    const amount =
+      params.amount !== undefined
+        ? params.amount
+        : new anchor.BN(EMPTY_PDA_RENT_EXEMPT_BALANCE);
     const policyDataSize =
       params.policyDataSize !== undefined
         ? params.policyDataSize
@@ -659,7 +662,7 @@ export class LazorkitClient {
       credentialHash,
       initPolicyData: policyInstruction.data,
       walletId: smartWalletId,
-      amount: params.amount,
+      amount,
       referralAddress: params.referralAddress
         ? params.referralAddress
         : params.payer,
@@ -827,7 +830,7 @@ export class LazorkitClient {
         destroyPolicyData: params.destroyPolicyInstruction.data,
         initPolicyData: params.initPolicyInstruction.data,
         splitIndex: params.destroyPolicyInstruction.keys.length,
-        timestamp: new BN(Math.floor(Date.now() / 1000)),
+        timestamp: new anchor.BN(Math.floor(Date.now() / 1000)),
       },
       params.destroyPolicyInstruction,
       params.initPolicyInstruction

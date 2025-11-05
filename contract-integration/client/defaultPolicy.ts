@@ -1,20 +1,14 @@
 import * as anchor from '@coral-xyz/anchor';
-import {
-  Connection,
-  PublicKey,
-  SystemProgram,
-  TransactionInstruction,
-} from '@solana/web3.js';
 import DefaultPolicyIdl from '../anchor/idl/default_policy.json';
 import { DefaultPolicy } from '../anchor/types/default_policy';
 import { derivePolicyPda } from '../pda/defaultPolicy';
 
 export class DefaultPolicyClient {
-  readonly connection: Connection;
+  readonly connection: anchor.web3.Connection;
   readonly program: anchor.Program<DefaultPolicy>;
-  readonly programId: PublicKey;
+  readonly programId: anchor.web3.PublicKey;
 
-  constructor(connection: Connection) {
+  constructor(connection: anchor.web3.Connection) {
     this.connection = connection;
 
     this.program = new anchor.Program<DefaultPolicy>(
@@ -26,7 +20,7 @@ export class DefaultPolicyClient {
     this.programId = this.program.programId;
   }
 
-  policyPda(smartWallet: PublicKey): PublicKey {
+  policyPda(smartWallet: anchor.web3.PublicKey): anchor.web3.PublicKey {
     return derivePolicyPda(this.programId, smartWallet);
   }
 
@@ -38,10 +32,10 @@ export class DefaultPolicyClient {
     walletId: anchor.BN,
     passkeyPublicKey: number[],
     credentialHash: number[],
-    policySigner: PublicKey,
-    smartWallet: PublicKey,
-    walletState: PublicKey
-  ): Promise<TransactionInstruction> {
+    policySigner: anchor.web3.PublicKey,
+    smartWallet: anchor.web3.PublicKey,
+    walletState: anchor.web3.PublicKey
+  ): Promise<anchor.web3.TransactionInstruction> {
     return await this.program.methods
       .initPolicy(walletId, passkeyPublicKey, credentialHash)
       .accountsPartial({
@@ -55,11 +49,11 @@ export class DefaultPolicyClient {
   async buildCheckPolicyIx(
     walletId: anchor.BN,
     passkeyPublicKey: number[],
-    policySigner: PublicKey,
-    smartWallet: PublicKey,
+    policySigner: anchor.web3.PublicKey,
+    smartWallet: anchor.web3.PublicKey,
     credentialHash: number[],
     policyData: Buffer<ArrayBufferLike>
-  ): Promise<TransactionInstruction> {
+  ): Promise<anchor.web3.TransactionInstruction> {
     return await this.program.methods
       .checkPolicy(walletId, passkeyPublicKey, credentialHash, policyData)
       .accountsPartial({
@@ -76,9 +70,9 @@ export class DefaultPolicyClient {
     policyData: Buffer<ArrayBufferLike>,
     newPasskeyPublicKey: number[],
     newCredentialHash: number[],
-    smartWallet: PublicKey,
-    policySigner: PublicKey
-  ): Promise<TransactionInstruction> {
+    smartWallet: anchor.web3.PublicKey,
+    policySigner: anchor.web3.PublicKey
+  ): Promise<anchor.web3.TransactionInstruction> {
     return await this.program.methods
       .addDevice(
         walletId,

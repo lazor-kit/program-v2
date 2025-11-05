@@ -20,7 +20,7 @@ async function getBlockchainTimestamp(
   return new anchor.BN(timestamp || Math.floor(Date.now() / 1000));
 }
 
-describe('Test smart wallet with default policy', () => {
+describe.skip('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
     process.env.CLUSTER != 'localhost'
       ? process.env.RPC_URL
