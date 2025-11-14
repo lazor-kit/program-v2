@@ -100,6 +100,8 @@ pub enum LazorKitError {
     InvalidAccountData,
     #[msg("Invalid instruction data")]
     InvalidInstructionData,
+    #[msg("Invalid instruction")]
+    InvalidInstruction,
     #[msg("Account already initialized")]
     AccountAlreadyInitialized,
     #[msg("Invalid account state")]
@@ -134,4 +136,8 @@ pub enum LazorKitError {
     InvalidAction,
     #[msg("Insufficient balance in vault")]
     InsufficientVaultBalance,
+
+    // === Admin Errors ===
+    #[msg("Unauthorized admin")]
+    UnauthorizedAdmin,
 }

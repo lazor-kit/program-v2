@@ -353,6 +353,69 @@
       ]
     },
     {
+      "name": "delete_smart_wallet",
+      "discriminator": [
+        126,
+        239,
+        172,
+        118,
+        134,
+        32,
+        52,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true,
+          "address": "BE8duRBDmh4cF4Ecz4TBCNgNAMCaonrpQiEiQ1xfQmab"
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_device",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute",
       "discriminator": [
         130,
@@ -816,83 +879,93 @@
     },
     {
       "code": 6037,
+      "name": "InvalidInstruction",
+      "msg": "Invalid instruction"
+    },
+    {
+      "code": 6038,
       "name": "AccountAlreadyInitialized",
       "msg": "Account already initialized"
     },
     {
-      "code": 6038,
+      "code": 6039,
       "name": "InvalidAccountState",
       "msg": "Invalid account state"
     },
     {
-      "code": 6039,
+      "code": 6040,
       "name": "InvalidFeeAmount",
       "msg": "Invalid fee amount"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "InsufficientBalanceForFee",
       "msg": "Insufficient balance for fee"
     },
     {
-      "code": 6041,
+      "code": 6042,
       "name": "InvalidAuthority",
       "msg": "Invalid authority"
     },
     {
-      "code": 6042,
+      "code": 6043,
       "name": "AuthorityMismatch",
       "msg": "Authority mismatch"
     },
     {
-      "code": 6043,
+      "code": 6044,
       "name": "InvalidSequenceNumber",
       "msg": "Invalid sequence number"
     },
     {
-      "code": 6044,
+      "code": 6045,
       "name": "InvalidPasskeyFormat",
       "msg": "Invalid passkey format"
     },
     {
-      "code": 6045,
+      "code": 6046,
       "name": "InvalidMessageFormat",
       "msg": "Invalid message format"
     },
     {
-      "code": 6046,
+      "code": 6047,
       "name": "InvalidSplitIndex",
       "msg": "Invalid split index"
     },
     {
-      "code": 6047,
+      "code": 6048,
       "name": "InvalidProgramAddress",
       "msg": "Invalid program address"
     },
     {
-      "code": 6048,
+      "code": 6049,
       "name": "ReentrancyDetected",
       "msg": "Reentrancy detected"
     },
     {
-      "code": 6049,
+      "code": 6050,
       "name": "InvalidVaultIndex",
       "msg": "Invalid vault index"
     },
     {
-      "code": 6050,
+      "code": 6051,
       "name": "InsufficientBalance",
       "msg": "Insufficient balance"
     },
     {
-      "code": 6051,
+      "code": 6052,
       "name": "InvalidAction",
       "msg": "Invalid action"
     },
     {
-      "code": 6052,
+      "code": 6053,
       "name": "InsufficientVaultBalance",
       "msg": "Insufficient balance in vault"
+    },
+    {
+      "code": 6054,
+      "name": "UnauthorizedAdmin",
+      "msg": "Unauthorized admin"
     }
   ],
   "types": [

@@ -20,9 +20,6 @@ pub fn execute_chunk(
     // Step 1: Prepare and validate input parameters
     let cpi_accounts = &ctx.remaining_accounts[..];
 
-    // Validate remaining accounts format
-    validation::validate_remaining_accounts(&cpi_accounts)?;
-
     let chunk = &mut ctx.accounts.chunk;
 
     // Step 2: Validate session state and authorization
@@ -68,7 +65,7 @@ pub fn execute_chunk(
         rh.hash(&[account.is_writable as u8]);
     }
     let cpi_accounts_hash = rh.result().to_bytes();
-    
+
     // Combine CPI hashes
     let mut cpi_combined = Vec::new();
     cpi_combined.extend_from_slice(&cpi_data_hash);

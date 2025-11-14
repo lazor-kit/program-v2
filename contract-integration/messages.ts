@@ -120,11 +120,10 @@ const computeAllInsAccountsHash = (
 
 // Helper function to compute policy hashes
 const computePolicyHashes = (
-  feePayer: anchor.web3.PublicKey,
   policyIns: anchor.web3.TransactionInstruction,
   smartWallet: anchor.web3.PublicKey
 ): { policyDataHash: Uint8Array; policyAccountsHash: Uint8Array } => {
-  const policyMetas = instructionToAccountMetas(policyIns, feePayer);
+  const policyMetas = instructionToAccountMetas(policyIns, []);
   const policyAccountsHash = computeSingleInsAccountsHash(
     policyIns.programId,
     policyMetas,
@@ -137,11 +136,11 @@ const computePolicyHashes = (
 
 // Helper function to compute CPI hashes for single instruction
 const computeCpiHashes = (
-  feePayer: anchor.web3.PublicKey,
   cpiIns: anchor.web3.TransactionInstruction,
-  smartWallet: anchor.web3.PublicKey
+  smartWallet: anchor.web3.PublicKey,
+  signers: anchor.web3.PublicKey[]
 ): { cpiDataHash: Uint8Array; cpiAccountsHash: Uint8Array } => {
-  const cpiMetas = instructionToAccountMetas(cpiIns, feePayer);
+  const cpiMetas = instructionToAccountMetas(cpiIns, signers);
   const cpiAccountsHash = computeSingleInsAccountsHash(
     cpiIns.programId,
     cpiMetas,
@@ -154,9 +153,9 @@ const computeCpiHashes = (
 
 // Helper function to compute CPI hashes for multiple instructions
 export const computeMultipleCpiHashes = (
-  feePayer: anchor.web3.PublicKey,
   cpiInstructions: anchor.web3.TransactionInstruction[],
-  smartWallet: anchor.web3.PublicKey
+  smartWallet: anchor.web3.PublicKey,
+  cpiSigners?: anchor.web3.PublicKey[]
 ): { cpiDataHash: Uint8Array; cpiAccountsHash: Uint8Array } => {
   // Optimized serialization without unnecessary Buffer allocations
   const lengthBuffer = Buffer.alloc(4);
@@ -176,7 +175,7 @@ export const computeMultipleCpiHashes = (
 
   const allMetas = cpiInstructions.flatMap((ix) => [
     { pubkey: ix.programId, isSigner: false, isWritable: false },
-    ...instructionToAccountMetas(ix, feePayer),
+    ...instructionToAccountMetas(ix, cpiSigners),
   ]);
 
   const cpiAccountsHash = computeAllInsAccountsHash(allMetas, smartWallet);
@@ -200,15 +199,15 @@ const encodeMessage = <T>(messageType: string, data: T): Buffer => {
 
 // Main message building functions with simplified 32-byte hash structure
 export function buildExecuteMessage(
-  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   timestamp: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiIns: anchor.web3.TransactionInstruction
+  cpiIns: anchor.web3.TransactionInstruction,
+  cpiSigners: anchor.web3.PublicKey[]
 ): Buffer {
-  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
-  const cpiHashes = computeCpiHashes(feePayer, cpiIns, smartWallet);
+  const policyHashes = computePolicyHashes(policyIns, smartWallet);
+  const cpiHashes = computeCpiHashes(cpiIns, smartWallet, cpiSigners);
 
   // Create combined hash of policy hashes
   const policyCombined = new Uint8Array(64); // 32 + 32 bytes
@@ -244,18 +243,18 @@ export function buildExecuteMessage(
 }
 
 export function buildCreateChunkMessage(
-  feePayer: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   nonce: anchor.BN,
   timestamp: anchor.BN,
   policyIns: anchor.web3.TransactionInstruction,
-  cpiInstructions: anchor.web3.TransactionInstruction[]
+  cpiInstructions: anchor.web3.TransactionInstruction[],
+  cpiSigners: anchor.web3.PublicKey[]
 ): Buffer {
-  const policyHashes = computePolicyHashes(feePayer, policyIns, smartWallet);
+  const policyHashes = computePolicyHashes(policyIns, smartWallet);
   const cpiHashes = computeMultipleCpiHashes(
-    feePayer,
     cpiInstructions,
-    smartWallet
+    smartWallet,
+    cpiSigners
   );
 
   // Create combined hash of policy hashes
