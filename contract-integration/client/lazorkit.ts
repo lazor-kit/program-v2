@@ -163,7 +163,7 @@ export class LazorkitClient {
     deviceSlot: { passkeyPubkey: number[]; credentialHash: number[] } | null;
   }> {
     // Get the discriminator for WalletState accounts
-    const discriminator = this.program.idl.accounts?.find(
+    const discriminator = LazorkitIdl.accounts?.find(
       (a: any) => a.name === 'WalletState'
     )?.discriminator;
 
@@ -237,7 +237,7 @@ export class LazorkitClient {
     deviceSlot: { passkeyPubkey: number[]; credentialHash: number[] } | null;
   }> {
     // Get the discriminator for WalletState accounts
-    const discriminator = this.program.idl.accounts?.find(
+    const discriminator = LazorkitIdl.accounts?.find(
       (a: any) => a.name === 'WalletState'
     )?.discriminator;
 

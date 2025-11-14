@@ -56,7 +56,7 @@ describe('Test smart wallet with default policy', () => {
     bs58.decode(process.env.PRIVATE_KEY)
   );
 
-  xit('Init smart wallet with default policy successfully', async () => {
+  it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -147,7 +147,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Delete smart wallet: ', deleteSmartWalletSig);
   });
 
-  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
+  it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -177,6 +177,7 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
+        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     await anchor.web3.sendAndConfirmTransaction(
@@ -185,11 +186,11 @@ describe('Test smart wallet with default policy', () => {
       [payer]
     );
 
-    await fundAccountSOL(
-      connection,
-      smartWallet,
-      anchor.web3.LAMPORTS_PER_SOL * 0.1
-    );
+    // await fundAccountSOL(
+    //   connection,
+    //   smartWallet,
+    //   anchor.web3.LAMPORTS_PER_SOL * 0.1
+    // );
 
     const walletStateData = await lazorkitProgram.getWalletStateData(
       smartWallet
@@ -257,7 +258,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
+  it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
