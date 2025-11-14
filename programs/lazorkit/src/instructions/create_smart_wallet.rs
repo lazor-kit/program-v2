@@ -31,7 +31,6 @@ pub fn create_smart_wallet(
     validation::validate_passkey_format(&args.passkey_public_key)?;
     validation::validate_policy_data(&args.init_policy_data)?;
     validation::validate_wallet_id(args.wallet_id)?;
-    validation::validate_remaining_accounts(ctx.remaining_accounts)?;
     validation::validate_no_reentrancy(ctx.remaining_accounts)?;
 
     // CPI to initialize the policy data

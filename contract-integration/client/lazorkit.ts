@@ -369,9 +369,10 @@ export class LazorkitClient {
     walletDevice: PublicKey,
     args: types.ExecuteArgs,
     policyInstruction: TransactionInstruction,
-    cpiInstruction: TransactionInstruction
+    cpiInstruction: TransactionInstruction,
+    cpiSigners?: PublicKey[]
   ): Promise<TransactionInstruction> {
-    return await this.program.methods
+    const a = await this.program.methods
       .execute(args)
       .accountsPartial({
         payer,
@@ -385,9 +386,11 @@ export class LazorkitClient {
       })
       .remainingAccounts([
         ...instructionToAccountMetas(policyInstruction),
-        ...instructionToAccountMetas(cpiInstruction, [payer]),
+        ...instructionToAccountMetas(cpiInstruction, cpiSigners),
       ])
       .instruction();
+
+    return a;
   }
 
   /**
@@ -425,7 +428,8 @@ export class LazorkitClient {
   async buildExecuteChunkIns(
     payer: PublicKey,
     smartWallet: PublicKey,
-    cpiInstructions: TransactionInstruction[]
+    cpiInstructions: TransactionInstruction[],
+    cpiSigners?: PublicKey[]
   ): Promise<TransactionInstruction> {
     const cfg = await this.getWalletStateData(smartWallet);
     const chunk = this.getChunkPubkey(
@@ -448,7 +452,7 @@ export class LazorkitClient {
         isSigner: false,
         isWritable: false,
       },
-      ...instructionToAccountMetas(ix, [payer]),
+      ...instructionToAccountMetas(ix, cpiSigners),
     ]);
 
     return await this.program.methods
@@ -624,7 +628,8 @@ export class LazorkitClient {
         timestamp: params.timestamp,
       },
       policyInstruction,
-      params.cpiInstruction
+      params.cpiInstruction,
+      params.cpiSigners
     );
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
@@ -679,9 +684,9 @@ export class LazorkitClient {
     // Calculate cpiHash from empty CPI instructions (since create chunk doesn't have CPI instructions)
     const { computeMultipleCpiHashes } = await import('../messages');
     const cpiHashes = computeMultipleCpiHashes(
-      params.payer,
       params.cpiInstructions,
-      params.smartWallet
+      params.smartWallet,
+      params.cpiSigners
     );
 
     // Create combined hash of CPI hashes
@@ -692,7 +697,7 @@ export class LazorkitClient {
       require('js-sha256').arrayBuffer(cpiCombined)
     );
 
-    const sessionInstruction = await this.buildCreateChunkIns(
+    const createChunkInstruction = await this.buildCreateChunkIns(
       params.payer,
       params.smartWallet,
       walletDevice,
@@ -710,7 +715,7 @@ export class LazorkitClient {
     );
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
-      sessionInstruction,
+      createChunkInstruction,
     ]);
 
     const result = await buildTransaction(
@@ -733,7 +738,8 @@ export class LazorkitClient {
     const instruction = await this.buildExecuteChunkIns(
       params.payer,
       params.smartWallet,
-      params.cpiInstructions
+      params.cpiInstructions,
+      params.cpiSigners
     );
 
     const result = await buildTransaction(
@@ -785,12 +791,15 @@ export class LazorkitClient {
     timestamp: BN;
   }): Promise<Buffer> {
     let message: Buffer;
-    const { action, payer, smartWallet, passkeyPublicKey, timestamp } = params;
+    const { action, smartWallet, passkeyPublicKey, timestamp } = params;
 
     switch (action.type) {
       case types.SmartWalletAction.Execute: {
-        const { policyInstruction: policyIns, cpiInstruction } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.Execute];
+        const {
+          policyInstruction: policyIns,
+          cpiInstruction,
+          cpiSigners,
+        } = action.args as types.ArgsByAction[types.SmartWalletAction.Execute];
 
         const walletStateData = await this.getWalletStateData(
           params.smartWallet
@@ -818,28 +827,28 @@ export class LazorkitClient {
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
         message = buildExecuteMessage(
-          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
           timestamp,
           policyInstruction,
-          cpiInstruction
+          cpiInstruction,
+          cpiSigners
         );
         break;
       }
       case types.SmartWalletAction.CreateChunk: {
-        const { policyInstruction, cpiInstructions, expiresAt } =
+        const { policyInstruction, cpiInstructions, cpiSigners } =
           action.args as types.ArgsByAction[types.SmartWalletAction.CreateChunk];
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 
         message = buildCreateChunkMessage(
-          payer,
           smartWallet,
           smartWalletConfig.lastNonce,
           timestamp,
           policyInstruction,
-          cpiInstructions
+          cpiInstructions,
+          cpiSigners
         );
         break;
       }

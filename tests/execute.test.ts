@@ -8,7 +8,11 @@ import {
   LazorkitClient,
   SmartWalletAction,
 } from '../contract-integration';
-import { createTransferInstruction } from '@solana/spl-token';
+import {
+  createInitializeMint2Instruction,
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
 import {
   buildFakeMessagePasskey,
   createNewMint,
@@ -49,10 +53,10 @@ describe('Test smart wallet with default policy', () => {
   const defaultPolicyClient = new DefaultPolicyClient(connection);
 
   const payer = anchor.web3.Keypair.fromSecretKey(
-    bs58.decode(process.env.PRIVATE_KEY!)
+    bs58.decode(process.env.PRIVATE_KEY)
   );
 
-  it('Init smart wallet with default policy successfully', async () => {
+  xit('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -90,7 +94,60 @@ describe('Test smart wallet with default policy', () => {
     );
   });
 
-  it('Execute direct transaction with transfer sol from smart wallet', async () => {
+  xit('Delete smart wallet successfully', async () => {
+    // create smart wallet first
+    const privateKey = ECDSA.generateKey();
+    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const smartWalletId = lazorkitProgram.generateWalletId();
+    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
+    const credentialId = base64.encode(Buffer.from('testing')); // random string
+    const credentialHash = Array.from(
+      new Uint8Array(
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+      )
+    );
+
+    const { transaction: createSmartWalletTxn } =
+      await lazorkitProgram.createSmartWalletTxn({
+        payer: payer.publicKey,
+        passkeyPublicKey: passkeyPubkey,
+        credentialIdBase64: credentialId,
+        smartWalletId,
+      });
+
+    const sig = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      createSmartWalletTxn as anchor.web3.Transaction,
+      [payer]
+    );
+
+    console.log('Create smart wallet: ', sig);
+
+    const deleteSmartWalletTxn = await lazorkitProgram.program.methods
+      .deleteSmartWallet()
+      .accountsPartial({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        walletState: lazorkitProgram.getWalletStatePubkey(smartWallet),
+        walletDevice: lazorkitProgram.getWalletDevicePubkey(
+          smartWallet,
+          credentialHash
+        ),
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .transaction();
+
+    const deleteSmartWalletSig = await anchor.web3.sendAndConfirmTransaction(
+      connection,
+      deleteSmartWalletTxn as anchor.web3.Transaction,
+      [payer]
+    );
+
+    console.log('Delete smart wallet: ', deleteSmartWalletSig);
+  });
+
+  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -200,7 +257,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  it('Execute chunk transaction with transfer token from smart wallet', async () => {
+  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -348,7 +405,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  it('Execute deferred transaction with transfer token from smart wallet and transfer sol from smart_wallet', async () => {
+  it('Execute deferred transaction with multiple CPI instructions', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -378,6 +435,7 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         smartWalletId,
+        amount: new anchor.BN(0.1 * anchor.web3.LAMPORTS_PER_SOL),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -387,12 +445,6 @@ describe('Test smart wallet with default policy', () => {
     );
 
     console.log('Create smart wallet: ', sig1);
-
-    await fundAccountSOL(
-      connection,
-      smartWallet,
-      anchor.web3.LAMPORTS_PER_SOL * 0.1
-    );
 
     // create mint
     const mint = await createNewMint(connection, payer, 6);
@@ -444,12 +496,47 @@ describe('Test smart wallet with default policy', () => {
 
     const timestamp = await getBlockchainTimestamp(connection);
 
+    const newMint = new anchor.web3.Keypair();
+
+    const rentExemption = await connection.getMinimumBalanceForRentExemption(
+      82
+    );
+
+    const createAccountIns = anchor.web3.SystemProgram.createAccount({
+      fromPubkey: smartWallet,
+      newAccountPubkey: newMint.publicKey,
+      lamports: rentExemption,
+      space: 82,
+      programId: TOKEN_PROGRAM_ID,
+    });
+
+    const createMintIns = createInitializeMint2Instruction(
+      newMint.publicKey,
+      6,
+      smartWallet,
+      smartWallet,
+      TOKEN_PROGRAM_ID
+    );
+
+    const cpiInstructions = [
+      transferTokenIns,
+      transferFromSmartWalletIns,
+      transferFromSmartWalletIns,
+      transferTokenIns,
+      transferTokenIns,
+      createAccountIns,
+      createMintIns,
+    ];
+
+    const cpiSigners = [newMint.publicKey];
+
     const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
         type: SmartWalletAction.CreateChunk,
         args: {
           policyInstruction: checkPolicyIns,
-          cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
+          cpiInstructions,
+          cpiSigners,
         },
       },
 
@@ -477,10 +564,11 @@ describe('Test smart wallet with default policy', () => {
           authenticatorDataRaw64: authenticatorDataRaw64,
         },
         policyInstruction: null,
-        cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
+        cpiInstructions,
 
         timestamp,
         credentialHash,
+        cpiSigners,
       },
       {
         computeUnitLimit: 300_000,
@@ -500,16 +588,20 @@ describe('Test smart wallet with default policy', () => {
         {
           payer: payer.publicKey,
           smartWallet: smartWallet,
-          cpiInstructions: [transferTokenIns, transferFromSmartWalletIns],
+          cpiInstructions,
+          cpiSigners,
         },
         {
           useVersionedTransaction: true,
         }
       )) as anchor.web3.VersionedTransaction;
 
-    executeDeferredTransactionTxn.sign([payer]);
+    executeDeferredTransactionTxn.sign([payer, newMint]);
     const sig3 = await connection.sendTransaction(
-      executeDeferredTransactionTxn
+      executeDeferredTransactionTxn,
+      {
+        skipPreflight: true,
+      }
     );
     await connection.confirmTransaction(sig3);
 

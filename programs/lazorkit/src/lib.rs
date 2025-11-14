@@ -48,4 +48,8 @@ pub mod lazorkit {
     pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
         instructions::close_chunk(ctx)
     }
+
+    pub fn delete_smart_wallet(ctx: Context<DeleteSmartWallet>) -> Result<()> {
+        instructions::delete_smart_wallet(ctx)
+    }
 }

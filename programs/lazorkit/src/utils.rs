@@ -71,11 +71,18 @@ pub fn execute_cpi(
     // Build the seed slice once to avoid repeated heap allocations
     // Convert Vec<Vec<u8>> to Vec<&[u8]> for invoke_signed
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
-    let bump_slice = [signer.bump];
-    seed_slices.push(&bump_slice);
+    let signer_addr = Pubkey::find_program_address(&seed_slices, &ID).0;
+    // check if pda signer is in accounts
+    if !accounts.iter().any(|acc| *acc.key == signer_addr) {
+        // return error
+        return Err(LazorKitError::InvalidInstruction.into());
+    } else {
+        let bump_slice = [signer.bump];
+        seed_slices.push(&bump_slice);
 
-    // Execute the CPI with PDA signing
-    invoke_signed(&ix, accounts, &[&seed_slices])?;
+        // Execute the CPI with PDA signing
+        invoke_signed(&ix, accounts, &[&seed_slices])?;
+    }
 
     // Get the return data from the invoked program
     if let Some((_program_id, return_data)) = get_return_data() {

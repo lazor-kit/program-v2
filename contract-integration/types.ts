@@ -27,14 +27,17 @@ export type ArgsByAction = {
   [SmartWalletAction.Execute]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstruction: anchor.web3.TransactionInstruction;
+    cpiSigners?: anchor.web3.PublicKey[];
   };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction: anchor.web3.TransactionInstruction | null;
     cpiInstructions: anchor.web3.TransactionInstruction[];
     expiresAt: number;
+    cpiSigners?: anchor.web3.PublicKey[];
   };
   [SmartWalletAction.ExecuteChunk]: {
     cpiInstructions: anchor.web3.TransactionInstruction[];
+    cpiSigners?: anchor.web3.PublicKey[];
   };
 };
 
@@ -100,16 +103,19 @@ export interface ExecuteParams extends AuthParams {
   cpiInstruction: anchor.web3.TransactionInstruction;
   timestamp: anchor.BN;
   smartWalletId: anchor.BN;
+  cpiSigners?: anchor.web3.PublicKey[];
 }
 
 export interface CreateChunkParams extends AuthParams {
   policyInstruction: anchor.web3.TransactionInstruction | null;
   cpiInstructions: anchor.web3.TransactionInstruction[];
   timestamp: anchor.BN;
+  cpiSigners?: anchor.web3.PublicKey[];
 }
 
 export interface ExecuteChunkParams extends BaseParams {
   cpiInstructions: anchor.web3.TransactionInstruction[];
+  cpiSigners?: anchor.web3.PublicKey[];
 }
 
 export interface CloseChunkParams extends BaseParams {

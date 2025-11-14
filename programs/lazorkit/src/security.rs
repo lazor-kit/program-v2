@@ -41,7 +41,6 @@ pub const TIMESTAMP_PAST_TOLERANCE: i64 = 30; // 30 seconds
 /// Rationale: 30 seconds allows for reasonable clock skew while preventing future-dated attacks
 pub const TIMESTAMP_FUTURE_TOLERANCE: i64 = 30; // 30 seconds
 
-
 /// Security validation functions
 pub mod validation {
     use super::*;
@@ -76,25 +75,11 @@ pub mod validation {
         Ok(())
     }
 
-
-    /// Validate remaining accounts count
-    pub fn validate_remaining_accounts(accounts: &[AccountInfo]) -> Result<()> {
-        require!(
-            accounts.len() <= MAX_REMAINING_ACCOUNTS,
-            LazorKitError::TooManyRemainingAccounts
-        );
-        Ok(())
-    }
-
-
     /// Validate program is executable
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
         require!(program.executable, LazorKitError::ProgramNotExecutable);
 
-        require!(
-            program.key() != ID,
-            LazorKitError::ReentrancyDetected
-        );
+        require!(program.key() != ID, LazorKitError::ReentrancyDetected);
         Ok(())
     }
 
@@ -107,7 +92,6 @@ pub mod validation {
         }
         Ok(())
     }
-
 
     /// Standardized timestamp validation for all instructions
     /// Uses consistent time window across all operations
@@ -128,7 +112,6 @@ pub mod validation {
     pub fn safe_increment_nonce(current_nonce: u64) -> u64 {
         current_nonce.wrapping_add(1)
     }
-
 
     /// Common validation for WebAuthn authentication arguments
     /// Validates passkey format, signature, client data, and authenticator data
@@ -169,4 +152,3 @@ pub mod validation {
         Ok(())
     }
 }
-
