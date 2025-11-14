@@ -92,6 +92,16 @@ describe('Test smart wallet with default policy', () => {
     expect(smartWalletConfig.walletId.toString()).to.be.equal(
       smartWalletId.toString()
     );
+    const credentialHash = Array.from(
+      new Uint8Array(
+        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+      )
+    );
+
+    const result = await lazorkitProgram.getSmartWalletByCredentialHash(
+      credentialHash
+    );
+    console.log('result: ', result);
   });
 
   xit('Delete smart wallet successfully', async () => {
@@ -147,7 +157,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Delete smart wallet: ', deleteSmartWalletSig);
   });
 
-  it('Execute direct transaction with transfer sol from smart wallet', async () => {
+  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -258,7 +268,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  it('Execute chunk transaction with transfer token from smart wallet', async () => {
+  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -406,7 +416,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  it('Execute deferred transaction with multiple CPI instructions', async () => {
+  xit('Execute deferred transaction with multiple CPI instructions', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();

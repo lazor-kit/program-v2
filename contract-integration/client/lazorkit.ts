@@ -231,101 +231,39 @@ export class LazorkitClient {
    * Find smart wallet by credential hash
    * Searches through all WalletState accounts to find one containing the specified credential hash
    */
-  async getSmartWalletByCredentialHash(credentialHash: number[]): Promise<{
-    smartWallet: PublicKey | null;
-    walletState: PublicKey | null;
-    deviceSlot: { passkeyPubkey: number[]; credentialHash: number[] } | null;
-  }> {
+  async getSmartWalletByCredentialHash(credentialHash: number[]) {
     // Get the discriminator for WalletState accounts
     const discriminator = LazorkitIdl.accounts?.find(
-      (a: any) => a.name === 'WalletState'
+      (a: any) => a.name === 'WalletDevice'
     )?.discriminator;
 
     if (!discriminator) {
       throw new Error('WalletState discriminator not found in IDL');
     }
 
-    // Get all WalletState accounts
+    // Get wallet_device have this credential hash
     const accounts = await this.connection.getProgramAccounts(this.programId, {
-      filters: [{ memcmp: { offset: 0, bytes: bs58.encode(discriminator) } }],
+      filters: [
+        { memcmp: { offset: 0, bytes: bs58.encode(discriminator) } },
+        {
+          memcmp: { offset: 8 + 33, bytes: bs58.encode(credentialHash) },
+        },
+      ],
     });
 
-    // Search through each WalletState account
+    if (accounts.length === 0) {
+      return null;
+    }
     for (const account of accounts) {
-      try {
-        // Deserialize the WalletState account data
-        const walletStateData = this.program.coder.accounts.decode(
-          'WalletState',
-          account.account.data
-        );
-
-        // Check if any device contains the target credential hash
-        for (const device of walletStateData.devices) {
-          if (this.arraysEqual(device.credentialHash, credentialHash)) {
-            // Found the matching device, return the smart wallet
-            const smartWallet = this.getSmartWalletPubkey(
-              walletStateData.walletId
-            );
-            return {
-              smartWallet,
-              walletState: account.pubkey,
-              deviceSlot: {
-                passkeyPubkey: device.passkeyPubkey,
-                credentialHash: device.credentialHash,
-              },
-            };
-          }
-        }
-      } catch (error) {
-        // Skip accounts that can't be deserialized (might be corrupted or different type)
-        continue;
-      }
+      const walletDevice = await this.program.account.walletDevice.fetch(
+        account.pubkey
+      );
+      return {
+        smartWallet: walletDevice.smartWallet,
+        walletState: this.getWalletStatePubkey(walletDevice.smartWallet),
+        walletDevice: account.pubkey,
+      };
     }
-
-    // No matching wallet found
-    return {
-      smartWallet: null,
-      walletState: null,
-      deviceSlot: null,
-    };
-  }
-
-  /**
-   * Find smart wallet by either passkey public key or credential hash
-   * This is a convenience method that tries both approaches
-   */
-  async findSmartWallet(
-    passkeyPublicKey?: number[],
-    credentialHash?: number[]
-  ): Promise<{
-    smartWallet: PublicKey | null;
-    walletState: PublicKey | null;
-    deviceSlot: { passkeyPubkey: number[]; credentialHash: number[] } | null;
-    foundBy: 'passkey' | 'credential' | null;
-  }> {
-    // Try passkey first if provided
-    if (passkeyPublicKey) {
-      const result = await this.getSmartWalletByPasskey(passkeyPublicKey);
-      if (result.smartWallet) {
-        return { ...result, foundBy: 'passkey' as const };
-      }
-    }
-
-    // Try credential hash if provided and passkey didn't work
-    if (credentialHash) {
-      const result = await this.getSmartWalletByCredentialHash(credentialHash);
-      if (result.smartWallet) {
-        return { ...result, foundBy: 'credential' as const };
-      }
-    }
-
-    // No wallet found
-    return {
-      smartWallet: null,
-      walletState: null,
-      deviceSlot: null,
-      foundBy: null,
-    };
   }
 
   // ============================================================================
