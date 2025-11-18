@@ -14,5 +14,5 @@ pub struct WalletState {
 impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 
-    pub const INIT_SPACE: usize = 8 + 1 + 8 + 8 + 32 + 4;
+    pub const INIT_SPACE: usize = 1 + 8 + 8 + 32 + 4;
 }
