@@ -7,30 +7,12 @@ import {
   DefaultPolicyClient,
   LazorkitClient,
   SmartWalletAction,
+  asPasskeyPublicKey,
+  asCredentialHash,
 } from '../contract-integration';
-import {
-  createInitializeMint2Instruction,
-  createTransferInstruction,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
-import {
-  buildFakeMessagePasskey,
-  createNewMint,
-  fundAccountSOL,
-  mintTokenTo,
-} from './utils';
+import { createTransferInstruction } from '@solana/spl-token';
+import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
-
-// Helper function to get latest nonce
-async function getLatestNonce(
-  lazorkitProgram: LazorkitClient,
-  smartWallet: anchor.web3.PublicKey
-): Promise<anchor.BN> {
-  const smartWalletConfig = await lazorkitProgram.getWalletStateData(
-    smartWallet
-  );
-  return smartWalletConfig.lastNonce;
-}
 
 // Helper function to get blockchain timestamp
 async function getBlockchainTimestamp(
@@ -61,7 +43,9 @@ describe('Test smart wallet with default policy', () => {
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64, 'base64'))
+    );
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
@@ -92,9 +76,11 @@ describe('Test smart wallet with default policy', () => {
     expect(smartWalletConfig.walletId.toString()).to.be.equal(
       smartWalletId.toString()
     );
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -108,13 +94,17 @@ describe('Test smart wallet with default policy', () => {
     // create smart wallet first
     const privateKey = ECDSA.generateKey();
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
-    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64, 'base64'))
+    );
     const smartWalletId = lazorkitProgram.generateWalletId();
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
     const credentialId = base64.encode(Buffer.from('testing')); // random string
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -157,12 +147,14 @@ describe('Test smart wallet with default policy', () => {
     console.log('Delete smart wallet: ', deleteSmartWalletSig);
   });
 
-  xit('Execute direct transaction with transfer sol from smart wallet', async () => {
+  it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64, 'base64'))
+    );
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
@@ -170,9 +162,11 @@ describe('Test smart wallet with default policy', () => {
 
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -196,12 +190,6 @@ describe('Test smart wallet with default policy', () => {
       [payer]
     );
 
-    // await fundAccountSOL(
-    //   connection,
-    //   smartWallet,
-    //   anchor.web3.LAMPORTS_PER_SOL * 0.1
-    // );
-
     const walletStateData = await lazorkitProgram.getWalletStateData(
       smartWallet
     );
@@ -212,14 +200,14 @@ describe('Test smart wallet with default policy', () => {
       lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
-      smartWalletId,
-      passkeyPubkey,
+    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
+      walletId: smartWalletId,
+      passkeyPublicKey: passkeyPubkey,
       policySigner,
       smartWallet,
-      credentialHash,
-      walletStateData.policyData
-    );
+      credentialHash: asCredentialHash(credentialHash),
+      policyData: walletStateData.policyData,
+    });
 
     const timestamp = await getBlockchainTimestamp(connection);
 
@@ -255,7 +243,6 @@ describe('Test smart wallet with default policy', () => {
       policyInstruction: checkPolicyIns,
       cpiInstruction: transferFromSmartWalletIns,
       timestamp,
-      smartWalletId,
       credentialHash,
     });
 
@@ -268,12 +255,14 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
+  it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64, 'base64'))
+    );
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
@@ -281,9 +270,11 @@ describe('Test smart wallet with default policy', () => {
 
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -341,14 +332,14 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
-      smartWalletId,
-      passkeyPubkey,
+    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
+      walletId: smartWalletId,
+      passkeyPublicKey: passkeyPubkey,
       policySigner,
       smartWallet,
-      credentialHash,
-      walletStateData.policyData
-    );
+      credentialHash: asCredentialHash(credentialHash),
+      policyData: walletStateData.policyData,
+    });
 
     const timestamp = await getBlockchainTimestamp(connection);
 
@@ -416,12 +407,14 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute deferred transaction: ', sig3);
   });
 
-  xit('Execute deferred transaction with multiple CPI instructions', async () => {
+  it('Execute deferred transaction with multiple CPI instructions', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const passkeyPubkey = Array.from(Buffer.from(publicKeyBase64, 'base64'));
+    const passkeyPubkey = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64, 'base64'))
+    );
 
     const smartWalletId = lazorkitProgram.generateWalletId();
 
@@ -429,9 +422,11 @@ describe('Test smart wallet with default policy', () => {
 
     const credentialId = base64.encode(Buffer.from('testing')); // random string
 
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -496,38 +491,16 @@ describe('Test smart wallet with default policy', () => {
       smartWallet
     );
 
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx(
-      smartWalletId,
-      passkeyPubkey,
+    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
+      walletId: smartWalletId,
+      passkeyPublicKey: passkeyPubkey,
       policySigner,
       smartWallet,
-      credentialHash,
-      walletStateData.policyData
-    );
-
-    const timestamp = await getBlockchainTimestamp(connection);
-
-    const newMint = new anchor.web3.Keypair();
-
-    const rentExemption = await connection.getMinimumBalanceForRentExemption(
-      82
-    );
-
-    const createAccountIns = anchor.web3.SystemProgram.createAccount({
-      fromPubkey: smartWallet,
-      newAccountPubkey: newMint.publicKey,
-      lamports: rentExemption,
-      space: 82,
-      programId: TOKEN_PROGRAM_ID,
+      credentialHash: asCredentialHash(credentialHash),
+      policyData: walletStateData.policyData,
     });
 
-    const createMintIns = createInitializeMint2Instruction(
-      newMint.publicKey,
-      6,
-      smartWallet,
-      smartWallet,
-      TOKEN_PROGRAM_ID
-    );
+    const timestamp = await getBlockchainTimestamp(connection);
 
     const cpiInstructions = [
       transferTokenIns,
@@ -535,11 +508,7 @@ describe('Test smart wallet with default policy', () => {
       transferFromSmartWalletIns,
       transferTokenIns,
       transferTokenIns,
-      createAccountIns,
-      createMintIns,
     ];
-
-    const cpiSigners = [newMint.publicKey];
 
     const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
@@ -547,7 +516,6 @@ describe('Test smart wallet with default policy', () => {
         args: {
           policyInstruction: checkPolicyIns,
           cpiInstructions,
-          cpiSigners,
         },
       },
 
@@ -579,7 +547,6 @@ describe('Test smart wallet with default policy', () => {
 
         timestamp,
         credentialHash,
-        cpiSigners,
       },
       {
         computeUnitLimit: 300_000,
@@ -600,14 +567,13 @@ describe('Test smart wallet with default policy', () => {
           payer: payer.publicKey,
           smartWallet: smartWallet,
           cpiInstructions,
-          cpiSigners,
         },
         {
           useVersionedTransaction: true,
         }
       )) as anchor.web3.VersionedTransaction;
 
-    executeDeferredTransactionTxn.sign([payer, newMint]);
+    executeDeferredTransactionTxn.sign([payer]);
     const sig3 = await connection.sendTransaction(
       executeDeferredTransactionTxn,
       {
@@ -623,15 +589,19 @@ describe('Test smart wallet with default policy', () => {
     // Create initial smart wallet with first device
     const privateKey1 = ECDSA.generateKey();
     const publicKeyBase64_1 = privateKey1.toCompressedPublicKey();
-    const passkeyPubkey1 = Array.from(Buffer.from(publicKeyBase64_1, 'base64'));
+    const passkeyPubkey1 = asPasskeyPublicKey(
+      Array.from(Buffer.from(publicKeyBase64_1, 'base64'))
+    );
 
     const smartWalletId = lazorkitProgram.generateWalletId();
     const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
     const credentialId = base64.encode(Buffer.from('testing-cu-limit'));
 
-    const credentialHash = Array.from(
-      new Uint8Array(
-        require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+    const credentialHash = asCredentialHash(
+      Array.from(
+        new Uint8Array(
+          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+        )
       )
     );
 
@@ -661,7 +631,6 @@ describe('Test smart wallet with default policy', () => {
     });
 
     let timestamp = await getBlockchainTimestamp(connection);
-    let nonce = await getLatestNonce(lazorkitProgram, smartWallet);
     // Create a mock policy instruction
     const mockPolicyInstruction = {
       keys: [],
@@ -702,7 +671,6 @@ describe('Test smart wallet with default policy', () => {
         policyInstruction: mockPolicyInstruction,
         cpiInstruction: transferInstruction1,
         timestamp,
-        smartWalletId,
         credentialHash,
       },
       {
@@ -720,7 +688,6 @@ describe('Test smart wallet with default policy', () => {
     });
 
     timestamp = await getBlockchainTimestamp(connection);
-    nonce = await getLatestNonce(lazorkitProgram, smartWallet);
 
     plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
@@ -757,7 +724,6 @@ describe('Test smart wallet with default policy', () => {
         policyInstruction: mockPolicyInstruction,
         cpiInstruction: transferInstruction2,
         timestamp,
-        smartWalletId,
         credentialHash,
       },
       {
@@ -795,7 +761,6 @@ describe('Test smart wallet with default policy', () => {
     });
 
     timestamp = await getBlockchainTimestamp(connection);
-    nonce = await getLatestNonce(lazorkitProgram, smartWallet);
     plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
         type: SmartWalletAction.CreateChunk,

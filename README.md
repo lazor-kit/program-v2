@@ -55,6 +55,7 @@ The `contract-integration` folder provides a comprehensive TypeScript SDK for in
 contract-integration/
 ├── anchor/           # Generated Anchor types and IDL
 ├── client/           # Main client classes
+│   └── internal/     # Shared helpers (PDA, policy resolver, CPI utils)
 ├── pda/             # PDA derivation functions
 ├── webauthn/        # WebAuthn/Passkey utilities
 ├── auth.ts          # Authentication utilities
@@ -371,6 +372,18 @@ The contract has been streamlined for better efficiency and clarity:
 - `closeChunkTxn()` - Close chunk and refund rent
 
 See the [contract-integration README](./contract-integration/README.md) for detailed API documentation and examples.
+
+### SDK Refactor (Nov 2025)
+
+The TypeScript integration SDK was refactored to make contracts easier to use securely:
+
+- **Centralized PDA Logic**: `client/internal/walletPdas.ts` now derives every PDA with shared validation, removing duplicated logic in `LazorkitClient`.
+- **Policy Resolution Layer**: `PolicyInstructionResolver` automatically falls back to the default policy program when callers don’t pass custom instructions, keeping execute/create flows concise.
+- **CPI Utilities**: Reusable helpers build split indices, CPI hashes, and remaining account metas, ensuring signer flags are preserved and CPI hashing stays consistent between `messages.ts` and runtime builders.
+- **Stronger Validation Helpers**: New utilities such as `credentialHashFromBase64` and `byteArrayEquals` handle credential hashing and byte comparisons in one place.
+- **Tooling**: Run `yarn tsc --noEmit --noUnusedLocals --noUnusedParameters` to catch unused imports/functions early, and use `yarn ts-node tests/execute.test.ts` (or your preferred runner) to exercise the updated flows.
+
+These changes shrink the public client surface, improve readability, and reduce the chance of subtle security mistakes when composing instructions.
 
 ## Contributing
 

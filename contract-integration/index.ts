@@ -9,7 +9,11 @@ if (typeof globalThis.structuredClone !== 'function') {
 
 // Core clients
 export { LazorkitClient } from './client/lazorkit';
-export { DefaultPolicyClient } from './client/defaultPolicy';
+export { 
+  DefaultPolicyClient,
+  BuildInitPolicyIxParams,
+  BuildCheckPolicyIxParams,
+} from './client/defaultPolicy';
 
 // All types and utilities
 export * from './types';
@@ -18,3 +22,5 @@ export * from './transaction';
 export * from './utils';
 export * from './messages';
 export * from './pda/lazorkit';
+export * from './validation';
+export * from './constants';
