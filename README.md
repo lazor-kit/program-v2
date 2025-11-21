@@ -72,7 +72,7 @@ contract-integration/
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js 
 - Solana CLI
 - Anchor Framework (v0.31.0)
 - Rust (for program development)
@@ -82,14 +82,14 @@ contract-integration/
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd wallet-management-contract
+git clone https://github.com/lazor-kit/program-v2.git
+cd program-v2
 ```
 
 2. Install dependencies:
 
 ```bash
-npm install
+yarn install
 ```
 
 3. Build the programs:
@@ -135,7 +135,7 @@ anchor idl upgrade BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7 -f ./target/idl/
 ### Basic Setup
 
 ```typescript
-import { LazorkitClient, DefaultPolicyClient } from './contract-integration';
+import { LazorkitClient, DefaultPolicyClient } from './sdk';
 import { Connection } from '@solana/web3.js';
 
 // Initialize connection
