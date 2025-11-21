@@ -49,7 +49,6 @@ export class WalletPdaFactory {
 
   chunk(smartWallet: PublicKey, nonce: BN): PublicKey {
     assertValidPublicKey(smartWallet, 'smartWallet');
-    assertPositiveBN(nonce, 'nonce');
     return deriveChunkPda(this.programId, smartWallet, nonce);
   }
 }
