@@ -2,37 +2,20 @@ use anchor_lang::prelude::*;
 
 pub mod constants;
 pub mod error;
-pub mod events;
 pub mod instructions;
 pub mod security;
 pub mod state;
 pub mod utils;
 
 use instructions::*;
-use state::*;
 
-declare_id!("J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W");
+declare_id!("Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh");
 
-/// The Lazor Kit program provides smart wallet functionality with passkey authentication
+/// LazorKit: Smart Wallet with WebAuthn Passkey Authentication
 #[program]
 pub mod lazorkit {
     use super::*;
 
-    /// Initialize the program by creating the sequence tracker
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        instructions::initialize(ctx)
-    }
-
-    /// Update the program configuration
-    pub fn update_config(
-        ctx: Context<UpdateConfig>,
-        param: UpdateConfigType,
-        value: u64,
-    ) -> Result<()> {
-        instructions::update_config(ctx, param, value)
-    }
-
-    /// Create a new smart wallet with passkey authentication
     pub fn create_smart_wallet(
         ctx: Context<CreateSmartWallet>,
         args: CreateSmartWalletArgs,
@@ -40,43 +23,33 @@ pub mod lazorkit {
         instructions::create_smart_wallet(ctx, args)
     }
 
-    /// Add a program to the policy program registry
-    pub fn register_policy_program(ctx: Context<RegisterPolicyProgram>) -> Result<()> {
-        instructions::register_policy_program(ctx)
+    pub fn execute<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>,
+        args: ExecuteArgs,
+    ) -> Result<()> {
+        instructions::execute(ctx, args)
     }
 
-    pub fn update_policy<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, UpdatePolicy<'info>>,
-        args: UpdatePolicyArgs,
+    pub fn create_chunk<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CreateChunk<'info>>,
+        args: CreateChunkArgs,
     ) -> Result<()> {
-        instructions::update_policy(ctx, args)
+        instructions::create_chunk(ctx, args)
     }
 
-    pub fn invoke_policy<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, InvokePolicy<'info>>,
-        args: InvokePolicyArgs,
+    pub fn execute_chunk(
+        ctx: Context<ExecuteChunk>,
+        instruction_data_list: Vec<Vec<u8>>,
+        split_index: Vec<u8>,
     ) -> Result<()> {
-        instructions::invoke_policy(ctx, args)
+        instructions::execute_chunk(ctx, instruction_data_list, split_index)
     }
 
-    pub fn execute_transaction<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, ExecuteTransaction<'info>>,
-        args: ExecuteTransactionArgs,
-    ) -> Result<()> {
-        instructions::execute_transaction(ctx, args)
+    pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
+        instructions::close_chunk(ctx)
     }
 
-    pub fn create_transaction_session<'c: 'info, 'info>(
-        ctx: Context<'_, '_, 'c, 'info, CreateTransactionSession<'info>>,
-        args: CreateSessionArgs,
-    ) -> Result<()> {
-        instructions::create_transaction_session(ctx, args)
-    }
-
-    pub fn execute_session_transaction(
-        ctx: Context<ExecuteSessionTransaction>,
-        cpi_data: Vec<u8>,
-    ) -> Result<()> {
-        instructions::execute_session_transaction(ctx, cpi_data)
+    pub fn delete_smart_wallet(ctx: Context<DeleteSmartWallet>) -> Result<()> {
+        instructions::delete_smart_wallet(ctx)
     }
 }
