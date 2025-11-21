@@ -1,38 +1,31 @@
-.PHONY: check fmt lint test build run clean all fix-all
+.PHONY: build build-and-sync clean
 
-# Default target
-all: check test build
+# Default target - build and sync
+build-and-sync:
+	@echo "🚀 Building and syncing LazorKit..."
+	anchor build
+	@echo "🔄 Syncing IDL and types to contract-integration..."
+	cp target/idl/lazorkit.json contract-integration/anchor/idl/lazorkit.json
+	cp target/idl/default_policy.json contract-integration/anchor/idl/default_policy.json
+	cp target/types/lazorkit.ts contract-integration/anchor/types/lazorkit.ts
+	cp target/types/default_policy.ts contract-integration/anchor/types/default_policy.ts
+	@echo "✅ Build and sync complete!"
 
-# Check code formatting
-check:
-	cargo fmt --all -- --check
-
-# Format code
-fmt:
-	cargo fmt --all
-
-# Run clippy
-lint:
-	cargo clippy -- -D warnings
-
-# Run tests
-test:
-	anchor run test
-
-# Build all binaries
+# Just build (no sync)
 build:
-	cargo build --workspace
+	anchor build
+
+init-idl:
+	anchor idl init -f ./target/idl/lazorkit.json Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh
+	anchor idl init -f ./target/idl/default_policy.json BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7
+
+upgrade-idl:
+	anchor idl upgrade Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh -f ./target/idl/lazorkit.json
+	anchor idl upgrade BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7 -f ./target/idl/default_policy.json
+
+deploy: 
+	anchor deploy
 
 # Clean build artifacts
 clean:
 	anchor clean
-
-test-local:
-	./scripts/install.sh
-	./scripts/test.local.sh
-
-# Run all fixes and checks
-lint-fix-all:
-	cargo clippy --fix -- -D warnings
-	cargo fmt --all
-	cargo fmt --all -- --check

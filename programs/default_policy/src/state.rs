@@ -1,12 +1,15 @@
 use anchor_lang::prelude::*;
+use lazorkit::constants::PASSKEY_PUBLIC_KEY_SIZE;
 
-#[account]
-#[derive(Debug, InitSpace)]
-pub struct Policy {
-    pub smart_wallet: Pubkey,
-    pub wallet_device: Pubkey,
+#[derive(Debug, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Clone, Copy)]
+pub struct DeviceSlot {
+    pub passkey_pubkey: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    pub credential_hash: [u8; 32],
 }
 
-impl Policy {
-    pub const PREFIX_SEED: &'static [u8] = b"policy";
+#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
+pub struct PolicyStruct {
+    pub bump: u8,
+    pub smart_wallet: Pubkey,
+    pub device_slots: Vec<DeviceSlot>,
 }

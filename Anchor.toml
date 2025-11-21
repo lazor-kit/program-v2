@@ -7,16 +7,16 @@ resolution = true
 skip-lint = false
 
 [programs.mainnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh"
+default_policy = "BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7"
 
 [programs.devnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh"
+default_policy = "BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7"
 
 [programs.localnet]
-lazorkit = "J6Big9w1VNeRZgDWH5qmNz2Nd6XFq5QeZbqC8caqSE5W"
-default_policy = "CNT2aEgxucQjmt5SRsA6hSGrt241Bvc9zsgPvSuMjQTE"
+lazorkit = "Gsuz7YcA5sbMGVRXT3xSYhJBessW4xFC4xYsihNCqMFh"
+default_policy = "BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7"
 
 [registry]
 url = "https://api.apr.dev"
