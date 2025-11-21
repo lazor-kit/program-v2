@@ -393,10 +393,8 @@ These changes shrink the public client surface, improve readability, and reduce 
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+---
 
-[Add your license information here]
+Built and maintained by the [LazorKit](https://lazorkit.com/).
 
-## Support
-
-For questions and support, please open an issue on GitHub or contact the development team.
+Licensed under MIT. See [LICENSE](LICENSE) for details.
