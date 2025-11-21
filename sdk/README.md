@@ -1,4 +1,4 @@
-# LazorKit Contract Integration
+# LazorKit typescript sdk
 
 This directory contains the TypeScript integration code for the LazorKit smart wallet program. The code provides a clean, well-organized API with clear separation of concerns and comprehensive transaction building capabilities.
 
