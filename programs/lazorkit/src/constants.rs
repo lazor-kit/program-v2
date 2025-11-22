@@ -19,6 +19,3 @@ pub const SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD: u8 = 0x03;
 
 /// Maximum instruction index for Secp256r1 verification
 pub const MAX_VERIFY_INSTRUCTION_INDEX: u8 = 255;
-
-/// Transaction fee amount (in lamports)
-pub const TRANSACTION_FEE: u64 = 5000;
