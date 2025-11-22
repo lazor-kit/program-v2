@@ -451,9 +451,7 @@ export class LazorkitClient {
         policyProgram: policyInstruction.programId,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .remainingAccounts([
-        ...instructionToAccountMetas(policyInstruction),
-      ])
+      .remainingAccounts([...instructionToAccountMetas(policyInstruction)])
       .instruction();
   }
 

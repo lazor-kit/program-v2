@@ -1,14 +1,19 @@
 use anchor_lang::prelude::*;
 
+/// Wallet state account storing wallet configuration and execution state
 #[account]
 #[derive(Debug)]
 pub struct WalletState {
-    // Core header
-    pub bump: u8,        // 1
-    pub wallet_id: u64,  // 8
-    pub last_nonce: u64, // 8  (anti-replay cho exec)
+    /// PDA bump seed for smart wallet
+    pub bump: u8,
+    /// Unique wallet identifier
+    pub wallet_id: u64,
+    /// Last used nonce for anti-replay protection
+    pub last_nonce: u64,
 
+    /// Policy program that validates transactions
     pub policy_program: Pubkey,
+    /// Serialized policy data returned from policy initialization
     pub policy_data: Vec<u8>,
 }
 impl WalletState {
