@@ -12,9 +12,7 @@ use state::*;
 
 #[program]
 pub mod default_policy {
-
     use super::*;
-
     pub fn init_policy(
         ctx: Context<InitPolicy>,
         wallet_id: u64,

@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
 
-pub const MAX_TIMESTAMP_DRIFT_SECONDS: i64 = 30;
-
 pub trait Message {
     fn verify_hash(challenge_bytes: Vec<u8>, expected_hash: [u8; 32]) -> Result<()>;
 }
