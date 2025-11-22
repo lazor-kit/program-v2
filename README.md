@@ -1,4 +1,4 @@
-# LazorKit - Smart Wallet Management System
+# LazorKit - Open-source Smart Wallet Program on Solana
 
 A comprehensive Solana-based smart wallet management system that provides secure passkey authentication, customizable policy engines, and flexible transaction execution capabilities.
 
