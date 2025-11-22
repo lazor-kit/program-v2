@@ -94,9 +94,6 @@ export type Lazorkit = {
         },
         {
           "name": "chunk",
-          "docs": [
-            "Expired chunk to close and refund rent"
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -605,9 +602,6 @@ export type Lazorkit = {
         },
         {
           "name": "chunk",
-          "docs": [
-            "Transaction session to execute. Closed to refund rent."
-          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -705,8 +699,8 @@ export type Lazorkit = {
     },
     {
       "code": 6001,
-      "name": "smartWalletConfigMismatch",
-      "msg": "Smart wallet address mismatch with authenticator"
+      "name": "invalidPolicyDataSize",
+      "msg": "Invalid policy data size"
     },
     {
       "code": 6002,
@@ -755,221 +749,81 @@ export type Lazorkit = {
     },
     {
       "code": 6011,
-      "name": "timestampTooOld",
-      "msg": "Message timestamp is too far in the past"
-    },
-    {
-      "code": 6012,
-      "name": "timestampTooNew",
-      "msg": "Message timestamp is too far in the future"
-    },
-    {
-      "code": 6013,
-      "name": "nonceMismatch",
-      "msg": "Nonce mismatch: expected different value"
-    },
-    {
-      "code": 6014,
-      "name": "nonceOverflow",
-      "msg": "Nonce overflow: cannot increment further"
-    },
-    {
-      "code": 6015,
       "name": "hashMismatch",
       "msg": "Message hash mismatch: expected different value"
     },
     {
-      "code": 6016,
+      "code": 6012,
       "name": "invalidInstructionDiscriminator",
       "msg": "Invalid instruction discriminator"
     },
     {
-      "code": 6017,
-      "name": "invalidRemainingAccounts",
-      "msg": "Invalid remaining accounts"
-    },
-    {
-      "code": 6018,
-      "name": "cpiDataMissing",
-      "msg": "CPI data is required but not provided"
-    },
-    {
-      "code": 6019,
-      "name": "insufficientPolicyAccounts",
-      "msg": "Insufficient remaining accounts for policy instruction"
-    },
-    {
-      "code": 6020,
+      "code": 6013,
       "name": "insufficientCpiAccounts",
       "msg": "Insufficient remaining accounts for CPI instruction"
     },
     {
-      "code": 6021,
+      "code": 6014,
       "name": "accountSliceOutOfBounds",
       "msg": "Account slice index out of bounds"
     },
     {
-      "code": 6022,
-      "name": "transferAmountOverflow",
-      "msg": "Transfer amount would cause arithmetic overflow"
-    },
-    {
-      "code": 6023,
-      "name": "invalidBumpSeed",
-      "msg": "Invalid bump seed for PDA derivation"
-    },
-    {
-      "code": 6024,
+      "code": 6015,
       "name": "invalidAccountOwner",
       "msg": "Account owner verification failed"
     },
     {
-      "code": 6025,
+      "code": 6016,
       "name": "programNotExecutable",
       "msg": "Program not executable"
     },
     {
-      "code": 6026,
-      "name": "programPaused",
-      "msg": "Program is paused"
-    },
-    {
-      "code": 6027,
-      "name": "walletDeviceAlreadyInitialized",
-      "msg": "Wallet device already initialized"
-    },
-    {
-      "code": 6028,
-      "name": "credentialIdTooLarge",
-      "msg": "Credential ID exceeds maximum allowed size"
-    },
-    {
-      "code": 6029,
+      "code": 6017,
       "name": "credentialIdEmpty",
       "msg": "Credential ID cannot be empty"
     },
     {
-      "code": 6030,
+      "code": 6018,
       "name": "policyDataTooLarge",
       "msg": "Policy data exceeds maximum allowed size"
     },
     {
-      "code": 6031,
-      "name": "cpiDataTooLarge",
-      "msg": "CPI data exceeds maximum allowed size"
-    },
-    {
-      "code": 6032,
-      "name": "tooManyRemainingAccounts",
-      "msg": "Too many remaining accounts provided"
-    },
-    {
-      "code": 6033,
-      "name": "invalidPdaDerivation",
-      "msg": "Invalid PDA derivation"
-    },
-    {
-      "code": 6034,
+      "code": 6019,
       "name": "transactionTooOld",
       "msg": "Transaction is too old"
     },
     {
-      "code": 6035,
-      "name": "invalidAccountData",
-      "msg": "Invalid account data"
-    },
-    {
-      "code": 6036,
+      "code": 6020,
       "name": "invalidInstructionData",
       "msg": "Invalid instruction data"
     },
     {
-      "code": 6037,
+      "code": 6021,
       "name": "invalidInstruction",
       "msg": "Invalid instruction"
     },
     {
-      "code": 6038,
-      "name": "accountAlreadyInitialized",
-      "msg": "Account already initialized"
-    },
-    {
-      "code": 6039,
-      "name": "invalidAccountState",
-      "msg": "Invalid account state"
-    },
-    {
-      "code": 6040,
-      "name": "invalidFeeAmount",
-      "msg": "Invalid fee amount"
-    },
-    {
-      "code": 6041,
+      "code": 6022,
       "name": "insufficientBalanceForFee",
       "msg": "Insufficient balance for fee"
     },
     {
-      "code": 6042,
-      "name": "invalidAuthority",
-      "msg": "Invalid authority"
-    },
-    {
-      "code": 6043,
-      "name": "authorityMismatch",
-      "msg": "Authority mismatch"
-    },
-    {
-      "code": 6044,
+      "code": 6023,
       "name": "invalidSequenceNumber",
       "msg": "Invalid sequence number"
     },
     {
-      "code": 6045,
+      "code": 6024,
       "name": "invalidPasskeyFormat",
       "msg": "Invalid passkey format"
     },
     {
-      "code": 6046,
-      "name": "invalidMessageFormat",
-      "msg": "Invalid message format"
-    },
-    {
-      "code": 6047,
-      "name": "invalidSplitIndex",
-      "msg": "Invalid split index"
-    },
-    {
-      "code": 6048,
-      "name": "invalidProgramAddress",
-      "msg": "Invalid program address"
-    },
-    {
-      "code": 6049,
+      "code": 6025,
       "name": "reentrancyDetected",
       "msg": "Reentrancy detected"
     },
     {
-      "code": 6050,
-      "name": "invalidVaultIndex",
-      "msg": "Invalid vault index"
-    },
-    {
-      "code": 6051,
-      "name": "insufficientBalance",
-      "msg": "Insufficient balance"
-    },
-    {
-      "code": 6052,
-      "name": "invalidAction",
-      "msg": "Invalid action"
-    },
-    {
-      "code": 6053,
-      "name": "insufficientVaultBalance",
-      "msg": "Insufficient balance in vault"
-    },
-    {
-      "code": 6054,
+      "code": 6026,
       "name": "unauthorizedAdmin",
       "msg": "Unauthorized admin"
     }
@@ -1183,11 +1037,17 @@ export type Lazorkit = {
     },
     {
       "name": "walletDevice",
+      "docs": [
+        "Wallet device account linking a passkey to a smart wallet"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkeyPubkey",
+            "docs": [
+              "Secp256r1 compressed public key (33 bytes)"
+            ],
             "type": {
               "array": [
                 "u8",
@@ -1197,6 +1057,9 @@ export type Lazorkit = {
           },
           {
             "name": "credentialHash",
+            "docs": [
+              "SHA256 hash of the credential ID"
+            ],
             "type": {
               "array": [
                 "u8",
@@ -1206,10 +1069,16 @@ export type Lazorkit = {
           },
           {
             "name": "smartWallet",
+            "docs": [
+              "Associated smart wallet address"
+            ],
             "type": "pubkey"
           },
           {
             "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
             "type": "u8"
           }
         ]
@@ -1217,27 +1086,45 @@ export type Lazorkit = {
     },
     {
       "name": "walletState",
+      "docs": [
+        "Wallet state account storing wallet configuration and execution state"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "bump",
+            "docs": [
+              "PDA bump seed for smart wallet"
+            ],
             "type": "u8"
           },
           {
             "name": "walletId",
+            "docs": [
+              "Unique wallet identifier"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNonce",
+            "docs": [
+              "Last used nonce for anti-replay protection"
+            ],
             "type": "u64"
           },
           {
             "name": "policyProgram",
+            "docs": [
+              "Policy program that validates transactions"
+            ],
             "type": "pubkey"
           },
           {
             "name": "policyData",
+            "docs": [
+              "Serialized policy data returned from policy initialization"
+            ],
             "type": "bytes"
           }
         ]

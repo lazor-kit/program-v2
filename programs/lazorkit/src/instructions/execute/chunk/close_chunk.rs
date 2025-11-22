@@ -5,26 +5,19 @@ use crate::state::{Chunk, WalletState};
 use crate::{constants::SMART_WALLET_SEED, ID};
 
 /// Close an expired chunk to refund rent
-///
-/// This instruction allows closing a chunk that has expired (timestamp too old)
-/// without executing the CPI instructions. This is useful for cleanup when
-/// a chunk session has timed out.
 pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
     let chunk = &ctx.accounts.chunk;
-    
-    // Verify the chunk belongs to the correct smart wallet
+
     require!(
         chunk.owner_wallet_address == ctx.accounts.smart_wallet.key(),
         LazorKitError::InvalidAccountOwner
     );
 
-    // Check if the chunk session has expired based on timestamp
-    // A chunk is considered expired if it's outside the valid timestamp range
     let now = Clock::get()?.unix_timestamp;
-    let is_expired = chunk.authorized_timestamp < now - crate::security::TIMESTAMP_PAST_TOLERANCE
-        || chunk.authorized_timestamp > now + crate::security::TIMESTAMP_FUTURE_TOLERANCE;
+    let session_end = chunk.authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS;
+    let is_expired = now > session_end;
     require!(is_expired, LazorKitError::TransactionTooOld);
-    
+
     Ok(())
 }
 
@@ -38,7 +31,6 @@ pub struct CloseChunk<'info> {
         seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
         bump = wallet_state.bump,
     )]
-    /// CHECK: PDA verified
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
@@ -48,12 +40,11 @@ pub struct CloseChunk<'info> {
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
 
-    /// Expired chunk to close and refund rent
     #[account(
         mut,
         seeds = [
             Chunk::PREFIX_SEED,
-            smart_wallet.key.as_ref(),
+            smart_wallet.key().as_ref(),
             &chunk.authorized_nonce.to_le_bytes(),
         ], 
         close = session_refund,
@@ -62,7 +53,7 @@ pub struct CloseChunk<'info> {
     )]
     pub chunk: Account<'info, Chunk>,
 
-    /// CHECK: rent refund destination (stored in session)
     #[account(mut, address = chunk.rent_refund_address)]
+    /// CHECK: Validated to match chunk.rent_refund_address
     pub session_refund: UncheckedAccount<'info>,
 }

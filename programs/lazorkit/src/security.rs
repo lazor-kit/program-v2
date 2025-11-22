@@ -47,10 +47,7 @@ pub mod validation {
     use crate::{error::LazorKitError, ID};
 
     pub fn validate_wallet_id(wallet_id: u64) -> Result<()> {
-        require!(
-            wallet_id != 0 && wallet_id < u64::MAX,
-            LazorKitError::InvalidSequenceNumber
-        );
+        require!(wallet_id != 0, LazorKitError::InvalidSequenceNumber);
         Ok(())
     }
 
@@ -66,24 +63,39 @@ pub mod validation {
         Ok(())
     }
 
-    /// Validate policy data size
-    pub fn validate_policy_data(policy_data: &[u8]) -> Result<()> {
+    pub fn validate_policy_data(policy_data: &[u8], policy_data_size: u16) -> Result<()> {
+        require!(
+            policy_data_size == policy_data.len() as u16,
+            LazorKitError::InvalidPolicyDataSize
+        );
         require!(
             policy_data.len() <= MAX_POLICY_DATA_SIZE,
             LazorKitError::PolicyDataTooLarge
         );
+        require!(
+            !policy_data.is_empty() && policy_data.len() >= 8,
+            LazorKitError::InvalidInstructionData
+        );
         Ok(())
     }
 
-    /// Validate program is executable
+    pub fn validate_credential_hash(credential_hash: &[u8; 32]) -> Result<()> {
+        let is_all_zeros = credential_hash.iter().all(|&b| b == 0);
+        require!(!is_all_zeros, LazorKitError::CredentialIdEmpty);
+        Ok(())
+    }
+
     pub fn validate_program_executable(program: &AccountInfo) -> Result<()> {
         require!(program.executable, LazorKitError::ProgramNotExecutable);
-
         require!(program.key() != ID, LazorKitError::ReentrancyDetected);
         Ok(())
     }
 
-    /// Check for reentrancy attacks by validating all programs in remaining accounts
+    pub fn validate_no_self_reentrancy(program: &AccountInfo) -> Result<()> {
+        require!(program.key() != ID, LazorKitError::ReentrancyDetected);
+        Ok(())
+    }
+
     pub fn validate_no_reentrancy(remaining_accounts: &[AccountInfo]) -> Result<()> {
         for account in remaining_accounts {
             if account.executable && account.key() == ID {
@@ -93,12 +105,8 @@ pub mod validation {
         Ok(())
     }
 
-    /// Standardized timestamp validation for all instructions
-    /// Uses consistent time window across all operations
     pub fn validate_instruction_timestamp(timestamp: i64) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-
-        // Use configurable tolerance constants
         require!(
             timestamp >= now - TIMESTAMP_PAST_TOLERANCE
                 && timestamp <= now + TIMESTAMP_FUTURE_TOLERANCE,
@@ -107,14 +115,10 @@ pub mod validation {
         Ok(())
     }
 
-    /// Safely increment nonce with overflow protection
-    /// If nonce would overflow, reset to 0 instead of failing
     pub fn safe_increment_nonce(current_nonce: u64) -> u64 {
         current_nonce.wrapping_add(1)
     }
 
-    /// Common validation for WebAuthn authentication arguments
-    /// Validates passkey format, signature, client data, and authenticator data
     pub fn validate_webauthn_args(
         passkey_public_key: &[u8; crate::constants::PASSKEY_PUBLIC_KEY_SIZE],
         signature: &[u8],
@@ -122,18 +126,8 @@ pub mod validation {
         authenticator_data_raw: &[u8],
         verify_instruction_index: u8,
     ) -> Result<()> {
-        // Validate passkey format
-        require!(
-            passkey_public_key[0] == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_EVEN
-                || passkey_public_key[0]
-                    == crate::constants::SECP256R1_COMPRESSED_PUBKEY_PREFIX_ODD,
-            LazorKitError::InvalidPasskeyFormat
-        );
-
-        // Validate signature length (Secp256r1 signature should be 64 bytes)
+        validate_passkey_format(passkey_public_key)?;
         require!(signature.len() == 64, LazorKitError::InvalidSignature);
-
-        // Validate client data and authenticator data are not empty
         require!(
             !client_data_json_raw.is_empty(),
             LazorKitError::InvalidInstructionData
@@ -142,13 +136,10 @@ pub mod validation {
             !authenticator_data_raw.is_empty(),
             LazorKitError::InvalidInstructionData
         );
-
-        // Validate verify instruction index
         require!(
             verify_instruction_index <= crate::constants::MAX_VERIFY_INSTRUCTION_INDEX,
             LazorKitError::InvalidInstructionData
         );
-
         Ok(())
     }
 }

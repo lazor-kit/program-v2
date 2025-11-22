@@ -10,8 +10,9 @@ pub enum LazorKitError {
     // === Authentication & Passkey Errors ===
     #[msg("Passkey public key mismatch with stored authenticator")]
     PasskeyMismatch,
-    #[msg("Smart wallet address mismatch with authenticator")]
-    SmartWalletConfigMismatch,
+
+    #[msg("Invalid policy data size")]
+    InvalidPolicyDataSize,
 
     // === Signature Verification Errors ===
     #[msg("Secp256r1 instruction has invalid data length")]
@@ -36,14 +37,6 @@ pub enum LazorKitError {
     ChallengeDeserializationError,
 
     // === Timestamp & Nonce Errors ===
-    #[msg("Message timestamp is too far in the past")]
-    TimestampTooOld,
-    #[msg("Message timestamp is too far in the future")]
-    TimestampTooNew,
-    #[msg("Nonce mismatch: expected different value")]
-    NonceMismatch,
-    #[msg("Nonce overflow: cannot increment further")]
-    NonceOverflow,
     #[msg("Message hash mismatch: expected different value")]
     HashMismatch,
 
@@ -52,90 +45,38 @@ pub enum LazorKitError {
     InvalidInstructionDiscriminator,
 
     // === Account & CPI Errors ===
-    #[msg("Invalid remaining accounts")]
-    InvalidRemainingAccounts,
-    #[msg("CPI data is required but not provided")]
-    CpiDataMissing,
-    #[msg("Insufficient remaining accounts for policy instruction")]
-    InsufficientPolicyAccounts,
     #[msg("Insufficient remaining accounts for CPI instruction")]
     InsufficientCpiAccounts,
     #[msg("Account slice index out of bounds")]
     AccountSliceOutOfBounds,
 
-    // === Financial Errors ===
-    #[msg("Transfer amount would cause arithmetic overflow")]
-    TransferAmountOverflow,
-
     // === Validation Errors ===
-    #[msg("Invalid bump seed for PDA derivation")]
-    InvalidBumpSeed,
     #[msg("Account owner verification failed")]
     InvalidAccountOwner,
 
     // === Program Errors ===
     #[msg("Program not executable")]
     ProgramNotExecutable,
-    #[msg("Program is paused")]
-    ProgramPaused,
-    #[msg("Wallet device already initialized")]
-    WalletDeviceAlreadyInitialized,
 
     // === Security Errors ===
-    #[msg("Credential ID exceeds maximum allowed size")]
-    CredentialIdTooLarge,
     #[msg("Credential ID cannot be empty")]
     CredentialIdEmpty,
     #[msg("Policy data exceeds maximum allowed size")]
     PolicyDataTooLarge,
-    #[msg("CPI data exceeds maximum allowed size")]
-    CpiDataTooLarge,
-    #[msg("Too many remaining accounts provided")]
-    TooManyRemainingAccounts,
-    #[msg("Invalid PDA derivation")]
-    InvalidPDADerivation,
     #[msg("Transaction is too old")]
     TransactionTooOld,
-    #[msg("Invalid account data")]
-    InvalidAccountData,
     #[msg("Invalid instruction data")]
     InvalidInstructionData,
     #[msg("Invalid instruction")]
     InvalidInstruction,
-    #[msg("Account already initialized")]
-    AccountAlreadyInitialized,
-    #[msg("Invalid account state")]
-    InvalidAccountState,
-    #[msg("Invalid fee amount")]
-    InvalidFeeAmount,
     #[msg("Insufficient balance for fee")]
     InsufficientBalanceForFee,
-    #[msg("Invalid authority")]
-    InvalidAuthority,
-    #[msg("Authority mismatch")]
-    AuthorityMismatch,
     #[msg("Invalid sequence number")]
     InvalidSequenceNumber,
     #[msg("Invalid passkey format")]
     InvalidPasskeyFormat,
-    #[msg("Invalid message format")]
-    InvalidMessageFormat,
-    #[msg("Invalid split index")]
-    InvalidSplitIndex,
-    #[msg("Invalid program address")]
-    InvalidProgramAddress,
     #[msg("Reentrancy detected")]
     ReentrancyDetected,
-
-    // === Vault Errors ===
-    #[msg("Invalid vault index")]
-    InvalidVaultIndex,
-    #[msg("Insufficient balance")]
-    InsufficientBalance,
-    #[msg("Invalid action")]
-    InvalidAction,
-    #[msg("Insufficient balance in vault")]
-    InsufficientVaultBalance,
 
     // === Admin Errors ===
     #[msg("Unauthorized admin")]

@@ -1,5 +1,3 @@
-use std::vec;
-
 use anchor_lang::prelude::*;
 
 const ADMIN_PUBLIC_KEY: Pubkey = pubkey!("BE8duRBDmh4cF4Ecz4TBCNgNAMCaonrpQiEiQ1xfQmab");
@@ -11,8 +9,9 @@ use crate::{
     ID,
 };
 
+/// Delete smart wallet and transfer remaining funds to admin
+/// Only callable by the admin account
 pub fn delete_smart_wallet(ctx: Context<DeleteSmartWallet>) -> Result<()> {
-    // transfer lamports to the admin
     transfer_sol_util(
         &ctx.accounts.smart_wallet.to_account_info(),
         ctx.accounts.wallet_state.wallet_id,
@@ -34,7 +33,6 @@ pub struct DeleteSmartWallet<'info> {
     pub payer: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK:
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(

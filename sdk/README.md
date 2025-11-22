@@ -5,23 +5,28 @@ This directory contains the TypeScript integration code for the LazorKit smart w
 ## 📁 Directory Structure
 
 ```
-contract-integration/
+sdk/
 ├── anchor/           # Generated Anchor types and IDL
 │   ├── idl/         # JSON IDL files
 │   └── types/       # TypeScript type definitions
 ├── client/           # Main client classes
 │   ├── lazorkit.ts  # Main LazorkitClient
-│   └── defaultPolicy.ts # DefaultPolicyClient
+│   ├── defaultPolicy.ts # DefaultPolicyClient
+│   └── internal/    # Shared helpers
+│       ├── walletPdas.ts # Centralized PDA derivation
+│       ├── policyResolver.ts # Policy instruction resolver
+│       └── cpi.ts    # CPI utilities
 ├── pda/             # PDA derivation functions
 │   ├── lazorkit.ts  # Lazorkit PDA functions
 │   └── defaultPolicy.ts # Default policy PDA functions
 ├── webauthn/        # WebAuthn/Passkey utilities
 │   └── secp256r1.ts # Secp256r1 signature verification
-├── examples/        # Usage examples
 ├── auth.ts          # Authentication utilities
 ├── transaction.ts   # Transaction building utilities
 ├── utils.ts         # General utilities
+├── validation.ts    # Validation helpers
 ├── messages.ts      # Message building utilities
+├── constants.ts     # Program constants
 ├── types.ts         # TypeScript type definitions
 ├── index.ts         # Main exports
 └── README.md        # This file
@@ -30,7 +35,7 @@ contract-integration/
 ## 🚀 Quick Start
 
 ```typescript
-import { LazorkitClient, DefaultPolicyClient } from './contract-integration';
+import { LazorkitClient, DefaultPolicyClient } from './sdk';
 import { Connection } from '@solana/web3.js';
 
 // Initialize clients
@@ -96,12 +101,20 @@ The main client for interacting with the LazorKit program.
 
 Client for interacting with the default policy program.
 
+**Key Methods:**
+
+- **PDA Derivation**: `policyPda()` - Get policy PDA for a smart wallet
+- **Policy Data**: `getPolicyDataSize()` - Get default policy data size
+- **Instruction Builders**:
+  - `buildInitPolicyIx()` - Build policy initialization instruction
+  - `buildCheckPolicyIx()` - Build policy check instruction
+
 ### Authentication
 
 The integration provides utilities for passkey authentication:
 
 ```typescript
-import { buildPasskeyVerificationInstruction } from './contract-integration';
+import { buildPasskeyVerificationInstruction } from './sdk';
 
 // Build verification instruction
 const authInstruction = buildPasskeyVerificationInstruction({
@@ -123,7 +136,7 @@ import {
   buildVersionedTransaction,
   buildLegacyTransaction,
   buildTransaction,
-} from './contract-integration';
+} from './sdk';
 
 // Build versioned transaction (v0)
 const v0Tx = await buildVersionedTransaction(connection, payer, instructions);
@@ -236,6 +249,7 @@ interface ExecuteParams {
   cpiInstruction: TransactionInstruction;
   timestamp: BN;
   smartWalletId: BN;
+  cpiSigners?: readonly PublicKey[]; // Optional: signers for CPI instruction
 }
 
 interface CreateChunkParams {
@@ -246,12 +260,14 @@ interface CreateChunkParams {
   policyInstruction: TransactionInstruction | null;
   cpiInstructions: TransactionInstruction[];
   timestamp: BN;
+  cpiSigners?: readonly PublicKey[]; // Optional: signers for CPI instructions
 }
 
 interface ExecuteChunkParams {
   payer: PublicKey;
   smartWallet: PublicKey;
   cpiInstructions: TransactionInstruction[];
+  cpiSigners?: readonly PublicKey[]; // Optional: signers for CPI instructions
 }
 
 interface CloseChunkParams {
@@ -268,8 +284,11 @@ interface CloseChunkParams {
 1. **Authentication (`auth.ts`)**: Handles passkey signature verification
 2. **Transaction Building (`transaction.ts`)**: Manages transaction construction
 3. **Message Building (`messages.ts`)**: Creates authorization messages
-4. **PDA Derivation (`pda/`)**: Handles program-derived address calculations
-5. **Client Logic (`client/`)**: High-level business logic and API
+4. **PDA Derivation (`pda/` and `client/internal/walletPdas.ts`)**: Handles program-derived address calculations
+5. **Validation (`validation.ts`)**: Provides comprehensive validation helpers
+6. **Policy Resolution (`client/internal/policyResolver.ts`)**: Automatically resolves policy instructions
+7. **CPI Utilities (`client/internal/cpi.ts`)**: Handles CPI instruction building and account management
+8. **Client Logic (`client/`)**: High-level business logic and API
 
 ### Method Categories
 
@@ -615,33 +634,34 @@ const message = await client.buildAuthorizationMessage({
 ### Using the Default Policy Client
 
 ```typescript
-import { DefaultPolicyClient } from './contract-integration';
+import { DefaultPolicyClient } from './sdk';
 
 const defaultPolicyClient = new DefaultPolicyClient(connection);
 
-// Build policy initialization instruction
+// Get required PDAs
 const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
 const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
 const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
 
-const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx(
-  walletStateData.walletId,
-  passkeyPublicKey,
-  credentialHash,
-  policySigner,
-  smartWallet,
-  walletState
-);
+// Build policy initialization instruction
+const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  credentialHash: credentialHash,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  walletState: walletState,
+});
 
 // Build policy check instruction
-const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx(
-  walletStateData.walletId,
-  passkeyPublicKey,
-  policySigner,
-  smartWallet,
-  credentialHash,
-  walletStateData.policyData
-);
+const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  credentialHash: credentialHash,
+  policyData: walletStateData.policyData,
+});
 
 // Use policy instructions in transactions
 const createWalletTx = await lazorkitClient.createSmartWalletTxn({
