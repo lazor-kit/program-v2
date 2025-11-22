@@ -9,7 +9,7 @@ import {
   SmartWalletAction,
   asPasskeyPublicKey,
   asCredentialHash,
-} from '../contract-integration';
+} from '../sdk';
 import { createTransferInstruction } from '@solana/spl-token';
 import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
@@ -814,7 +814,7 @@ describe('Test smart wallet with default policy', () => {
   xit('Test verifyInstructionIndex calculation', async () => {
     // Import the helper function
     const { calculateVerifyInstructionIndex } = await import(
-      '../contract-integration/transaction'
+      '../sdk/transaction'
     );
 
     // Test without compute unit limit
