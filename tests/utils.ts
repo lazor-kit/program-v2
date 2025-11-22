@@ -5,7 +5,7 @@ import {
 } from '@solana/spl-token';
 import { Connection, Keypair, PublicKey, Signer } from '@solana/web3.js';
 import { sha256 } from 'js-sha256';
-import { getRandomBytes } from '../contract-integration';
+import { getRandomBytes } from '../sdk';
 
 export const fundAccountSOL = async (
   connection: Connection,

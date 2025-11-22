@@ -34,6 +34,7 @@ The core smart wallet program that handles:
 - `create_chunk` - Create a deferred execution chunk for complex transactions
 - `execute_chunk` - Execute a previously created chunk (no authentication needed)
 - `close_chunk` - Close a chunk and refund rent (no authentication needed)
+- `delete_smart_wallet` - Delete a smart wallet and reclaim rent (program-level instruction, not exposed in SDK)
 
 #### 2. Default Policy Program (`BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7`)
 
@@ -49,23 +50,34 @@ A reference implementation of transaction policies that provides:
 
 ### Contract Integration SDK
 
-The `contract-integration` folder provides a comprehensive TypeScript SDK for interacting with the LazorKit system:
+The `sdk` folder provides a comprehensive TypeScript SDK for interacting with the LazorKit system:
 
 ```
-contract-integration/
+sdk/
 ├── anchor/           # Generated Anchor types and IDL
+│   ├── idl/         # JSON IDL files
+│   └── types/       # TypeScript type definitions
 ├── client/           # Main client classes
-│   └── internal/     # Shared helpers (PDA, policy resolver, CPI utils)
+│   ├── lazorkit.ts  # Main LazorkitClient
+│   ├── defaultPolicy.ts # DefaultPolicyClient
+│   └── internal/    # Shared helpers
+│       ├── walletPdas.ts # Centralized PDA derivation
+│       ├── policyResolver.ts # Policy instruction resolver
+│       └── cpi.ts    # CPI utilities
 ├── pda/             # PDA derivation functions
+│   ├── lazorkit.ts  # Lazorkit PDA functions
+│   └── defaultPolicy.ts # Default policy PDA functions
 ├── webauthn/        # WebAuthn/Passkey utilities
+│   └── secp256r1.ts # Secp256r1 signature verification
 ├── auth.ts          # Authentication utilities
 ├── transaction.ts   # Transaction building utilities
 ├── utils.ts         # General utilities
+├── validation.ts    # Validation helpers
 ├── messages.ts      # Message building utilities
 ├── constants.ts     # Program constants
 ├── types.ts         # TypeScript type definitions
 ├── index.ts         # Main exports
-└── README.md        # This file
+└── README.md        # SDK documentation
 ```
 
 ## Installation
@@ -135,7 +147,7 @@ anchor idl upgrade BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7 -f ./target/idl/
 ### Basic Setup
 
 ```typescript
-import { LazorkitClient, DefaultPolicyClient } from './contract-integration';
+import { LazorkitClient, DefaultPolicyClient } from './sdk';
 import { Connection } from '@solana/web3.js';
 
 // Initialize connection
@@ -195,15 +207,20 @@ const transaction = await lazorkitClient.executeTxn({
 Policy management is done through the policy program directly. The default policy handles device management and transaction validation:
 
 ```typescript
+// Get required PDAs for policy initialization
+const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
+const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
+
 // Initialize policy during wallet creation
-const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx(
-  walletId,
-  passkeyPublicKey,
-  credentialHash,
-  policySigner,
-  smartWallet,
-  walletState
-);
+const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  credentialHash: credentialHash,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  walletState: walletState,
+});
 
 // Include policy initialization when creating wallet
 const { transaction } = await lazorkitClient.createSmartWalletTxn({
@@ -214,14 +231,14 @@ const { transaction } = await lazorkitClient.createSmartWalletTxn({
 });
 
 // Check policy before executing transactions
-const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx(
-  walletId,
-  passkeyPublicKey,
-  policySigner,
-  smartWallet,
-  credentialHash,
-  policyData
-);
+const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  credentialHash: credentialHash,
+  policyData: walletStateData.policyData,
+});
 
 // Use policy check in execute transaction
 const transaction = await lazorkitClient.executeTxn({
@@ -272,25 +289,30 @@ const closeTx = await lazorkitClient.closeChunkTxn({
 ### Using the Default Policy Client
 
 ```typescript
+// Get required PDAs
+const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
+const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
+
 // Build policy initialization instruction
-const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx(
-  walletId,
-  passkeyPublicKey,
-  credentialHash,
-  policySigner,
-  smartWallet,
-  walletState
-);
+const initPolicyIx = await defaultPolicyClient.buildInitPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  credentialHash: credentialHash,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  walletState: walletState,
+});
 
 // Build policy check instruction
-const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx(
-  walletId,
-  passkeyPublicKey,
-  policySigner,
-  smartWallet,
-  credentialHash,
-  policyData
-);
+const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx({
+  walletId: walletStateData.walletId,
+  passkeyPublicKey: passkeyPublicKey,
+  policySigner: policySigner,
+  smartWallet: smartWallet,
+  credentialHash: credentialHash,
+  policyData: walletStateData.policyData,
+});
 ```
 
 ## Testing
@@ -371,19 +393,19 @@ The contract has been streamlined for better efficiency and clarity:
 - `executeChunkTxn()` - Execute chunk (no auth needed)
 - `closeChunkTxn()` - Close chunk and refund rent
 
-See the [contract-integration README](./contract-integration/README.md) for detailed API documentation and examples.
+See the [sdk README](./sdk/README.md) for detailed API documentation and examples.
 
-### SDK Refactor (Nov 2025)
+### SDK Refactor
 
-The TypeScript integration SDK was refactored to make contracts easier to use securely:
+The TypeScript integration SDK has been refactored to make contracts easier to use securely:
 
 - **Centralized PDA Logic**: `client/internal/walletPdas.ts` now derives every PDA with shared validation, removing duplicated logic in `LazorkitClient`.
-- **Policy Resolution Layer**: `PolicyInstructionResolver` automatically falls back to the default policy program when callers don’t pass custom instructions, keeping execute/create flows concise.
-- **CPI Utilities**: Reusable helpers build split indices, CPI hashes, and remaining account metas, ensuring signer flags are preserved and CPI hashing stays consistent between `messages.ts` and runtime builders.
-- **Stronger Validation Helpers**: New utilities such as `credentialHashFromBase64` and `byteArrayEquals` handle credential hashing and byte comparisons in one place.
-- **Tooling**: Run `yarn tsc --noEmit --noUnusedLocals --noUnusedParameters` to catch unused imports/functions early, and use `yarn ts-node tests/execute.test.ts` (or your preferred runner) to exercise the updated flows.
+- **Policy Resolution Layer**: `client/internal/policyResolver.ts` automatically falls back to the default policy program when callers don't pass custom instructions, keeping execute/create flows concise.
+- **CPI Utilities**: `client/internal/cpi.ts` provides reusable helpers that build split indices, CPI hashes, and remaining account metas, ensuring signer flags are preserved and CPI hashing stays consistent between `messages.ts` and runtime builders.
+- **Validation Layer**: `validation.ts` provides comprehensive validation helpers with clear error messages, including `credentialHashFromBase64`, `byteArrayEquals`, and type-safe assertions.
+- **Type Safety**: Full TypeScript support with generated Anchor types and comprehensive type definitions in `types.ts`.
 
-These changes shrink the public client surface, improve readability, and reduce the chance of subtle security mistakes when composing instructions.
+These changes improve code organization, reduce duplication, enhance security, and make the SDK easier to maintain and extend.
 
 ## Contributing
 

@@ -4,11 +4,11 @@
 build-and-sync:
 	@echo "🚀 Building and syncing LazorKit..."
 	anchor build
-	@echo "🔄 Syncing IDL and types to contract-integration..."
-	cp target/idl/lazorkit.json contract-integration/anchor/idl/lazorkit.json
-	cp target/idl/default_policy.json contract-integration/anchor/idl/default_policy.json
-	cp target/types/lazorkit.ts contract-integration/anchor/types/lazorkit.ts
-	cp target/types/default_policy.ts contract-integration/anchor/types/default_policy.ts
+	@echo "🔄 Syncing IDL and types to sdk..."
+	cp target/idl/lazorkit.json sdk/anchor/idl/lazorkit.json
+	cp target/idl/default_policy.json sdk/anchor/idl/default_policy.json
+	cp target/types/lazorkit.ts sdk/anchor/types/lazorkit.ts
+	cp target/types/default_policy.ts sdk/anchor/types/default_policy.ts
 	@echo "✅ Build and sync complete!"
 
 # Just build (no sync)
