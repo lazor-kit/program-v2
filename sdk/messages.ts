@@ -202,11 +202,7 @@ export function buildExecuteMessage(
   cpiSigners?: readonly anchor.web3.PublicKey[]
 ): Buffer {
   const policyHashes = computePolicyHashes(policyIns, smartWallet);
-  const cpiHashes = computeCpiHashes(
-    cpiIns,
-    smartWallet,
-    cpiSigners ?? []
-  );
+  const cpiHashes = computeCpiHashes(cpiIns, smartWallet, cpiSigners ?? []);
 
   // Create combined hash of policy hashes
   const policyCombined = new Uint8Array(64); // 32 + 32 bytes
