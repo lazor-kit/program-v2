@@ -963,7 +963,7 @@ export class LazorkitClient {
           timestamp,
           policyInstruction,
           cpiInstruction,
-          cpiSigners
+          [...(cpiSigners ?? []), params.payer]
         );
         break;
       }
@@ -979,7 +979,7 @@ export class LazorkitClient {
           timestamp,
           policyInstruction,
           cpiInstructions,
-          cpiSigners
+          [...(cpiSigners ?? []), params.payer]
         );
         break;
       }
