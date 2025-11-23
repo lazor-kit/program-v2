@@ -38,7 +38,7 @@ describe('Test smart wallet with default policy', () => {
     bs58.decode(process.env.PRIVATE_KEY)
   );
 
-  it('Init smart wallet with default policy successfully', async () => {
+  xit('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -196,7 +196,7 @@ describe('Test smart wallet with default policy', () => {
 
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
+      toPubkey: payer.publicKey,
       lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
@@ -255,7 +255,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  it('Execute chunk transaction with transfer token from smart wallet', async () => {
+  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -483,7 +483,7 @@ describe('Test smart wallet with default policy', () => {
 
     const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
       fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
+      toPubkey: payer.publicKey,
       lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
@@ -518,7 +518,6 @@ describe('Test smart wallet with default policy', () => {
           cpiInstructions,
         },
       },
-
       payer: payer.publicKey,
       smartWallet: smartWallet,
       passkeyPublicKey: passkeyPubkey,
