@@ -767,7 +767,7 @@ export class LazorkitClient {
       },
       policyInstruction,
       params.cpiInstruction,
-      params.cpiSigners
+      [...(params.cpiSigners ?? []), params.payer]
     );
 
     const instructions = combineInstructionsWithAuth(authInstruction, [
@@ -823,7 +823,7 @@ export class LazorkitClient {
     const cpiHash = calculateCpiHash(
       params.cpiInstructions,
       params.smartWallet,
-      params.cpiSigners
+      [...(params.cpiSigners ?? []), params.payer]
     );
 
     const createChunkInstruction = await this.buildCreateChunkIns(
@@ -963,7 +963,7 @@ export class LazorkitClient {
           timestamp,
           policyInstruction,
           cpiInstruction,
-          cpiSigners
+          [...(cpiSigners ?? []), params.payer]
         );
         break;
       }
@@ -979,7 +979,7 @@ export class LazorkitClient {
           timestamp,
           policyInstruction,
           cpiInstructions,
-          cpiSigners
+          [...(cpiSigners ?? []), params.payer]
         );
         break;
       }
