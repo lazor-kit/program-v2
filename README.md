@@ -34,7 +34,6 @@ The core smart wallet program that handles:
 - `create_chunk` - Create a deferred execution chunk for complex transactions
 - `execute_chunk` - Execute a previously created chunk (no authentication needed)
 - `close_chunk` - Close a chunk and refund rent (no authentication needed)
-- `delete_smart_wallet` - Delete a smart wallet and reclaim rent (program-level instruction, not exposed in SDK)
 
 #### 2. Default Policy Program (`BiE9vSdz9MidUiyjVYsu3PG4C1fbPZ8CVPADA9jRfXw7`)
 
