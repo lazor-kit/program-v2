@@ -90,63 +90,6 @@ describe('Test smart wallet with default policy', () => {
     console.log('result: ', result);
   });
 
-  xit('Delete smart wallet successfully', async () => {
-    // create smart wallet first
-    const privateKey = ECDSA.generateKey();
-    const publicKeyBase64 = privateKey.toCompressedPublicKey();
-    const passkeyPubkey = asPasskeyPublicKey(
-      Array.from(Buffer.from(publicKeyBase64, 'base64'))
-    );
-    const smartWalletId = lazorkitProgram.generateWalletId();
-    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
-    const credentialId = base64.encode(Buffer.from('testing')); // random string
-    const credentialHash = asCredentialHash(
-      Array.from(
-        new Uint8Array(
-          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
-        )
-      )
-    );
-
-    const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTxn({
-        payer: payer.publicKey,
-        passkeyPublicKey: passkeyPubkey,
-        credentialIdBase64: credentialId,
-        smartWalletId,
-      });
-
-    const sig = await anchor.web3.sendAndConfirmTransaction(
-      connection,
-      createSmartWalletTxn as anchor.web3.Transaction,
-      [payer]
-    );
-
-    console.log('Create smart wallet: ', sig);
-
-    const deleteSmartWalletTxn = await lazorkitProgram.program.methods
-      .deleteSmartWallet()
-      .accountsPartial({
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        walletState: lazorkitProgram.getWalletStatePubkey(smartWallet),
-        walletDevice: lazorkitProgram.getWalletDevicePubkey(
-          smartWallet,
-          credentialHash
-        ),
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .transaction();
-
-    const deleteSmartWalletSig = await anchor.web3.sendAndConfirmTransaction(
-      connection,
-      deleteSmartWalletTxn as anchor.web3.Transaction,
-      [payer]
-    );
-
-    console.log('Delete smart wallet: ', deleteSmartWalletSig);
-  });
-
   it('Execute direct transaction with transfer sol from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
