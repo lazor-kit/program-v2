@@ -28,3 +28,10 @@ action "deploy_lazorkit" "svm::deploy_program" {
     // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
     instant_surfnet_deployment = true
 }
+
+action "airdrop_sol" "svm::setup_surfnet" {
+    set_account {
+        public_key = "F4d85zy69zgQw9WUCmfiWKFJnfJ14ZB8D65LYkHuUVuU"
+        lamports = 1000000000 // 1 SOL
+    }
+}
