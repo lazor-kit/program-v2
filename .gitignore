@@ -7,3 +7,5 @@ test-ledger
 .yarn
 yarn.lock
 .env
+.surfpool
+*-wallet.json
