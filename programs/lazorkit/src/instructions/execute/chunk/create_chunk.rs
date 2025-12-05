@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::HASH_BYTES;
 
 use crate::security::validation;
 use crate::state::{Chunk, WalletDevice, WalletState};
@@ -21,7 +22,7 @@ pub struct CreateChunkArgs {
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
     pub timestamp: i64,
-    pub cpi_hash: [u8; 32],
+    pub cpi_hash: [u8; HASH_BYTES],
 }
 
 /// Create a chunk for deferred execution of large transactions
@@ -111,7 +112,7 @@ pub struct CreateChunk<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = 8 + Chunk::INIT_SPACE,
+        space = Chunk::DISCRIMINATOR.len() + Chunk::INIT_SPACE,
         seeds = [Chunk::PREFIX_SEED, smart_wallet.key().as_ref(), &wallet_state.last_nonce.to_le_bytes()],
         bump,
         owner = ID,

@@ -1,4 +1,5 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::pubkey::PUBKEY_BYTES};
+use core::mem::size_of;
 
 /// Wallet state account storing wallet configuration and execution state
 #[account]
@@ -19,5 +20,5 @@ pub struct WalletState {
 impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 
-    pub const INIT_SPACE: usize = 1 + 8 + 8 + 32 + 4;
+    pub const INIT_SPACE: usize = size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + PUBKEY_BYTES + 4;
 }

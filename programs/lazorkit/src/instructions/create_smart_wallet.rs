@@ -99,7 +99,7 @@ pub struct CreateSmartWallet<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + WalletState::INIT_SPACE + args.policy_data_size as usize,
+        space = WalletState::DISCRIMINATOR.len() + WalletState::INIT_SPACE + args.policy_data_size as usize,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump
     )]
@@ -108,7 +108,7 @@ pub struct CreateSmartWallet<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + WalletDevice::INIT_SPACE,
+        space = WalletDevice::DISCRIMINATOR.len() + WalletDevice::INIT_SPACE,
         seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), args.credential_hash)],
         bump
     )]
