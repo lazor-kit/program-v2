@@ -23,6 +23,15 @@ pub struct PdaSigner {
     pub bump: u8,
 }
 
+impl PdaSigner {
+    pub fn get_pda(&self) -> Pubkey {
+        let mut seed_slices: Vec<&[u8]> = self.seeds.iter().map(|s| s.as_slice()).collect();
+        let bump = &[self.bump];
+        seed_slices.push(bump);
+        Pubkey::create_program_address(&seed_slices, &ID).unwrap()
+    }
+}
+
 pub fn get_policy_signer(
     smart_wallet: Pubkey,
     policy_signer: Pubkey,
@@ -54,15 +63,14 @@ pub fn execute_cpi(
     let ix = create_cpi_instruction_optimized(accounts, data, program, &signer);
 
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
-    let signer_addr = Pubkey::find_program_address(&seed_slices, &ID).0;
+    let bump_slice = &[signer.bump];
+    seed_slices.push(bump_slice);
+    let signer_addr = Pubkey::create_program_address(&seed_slices, &ID).unwrap();
 
     require!(
         accounts.iter().any(|acc| *acc.key == signer_addr),
         LazorKitError::InvalidInstruction
     );
-
-    let bump_slice = [signer.bump];
-    seed_slices.push(&bump_slice);
 
     invoke_signed(&ix, accounts, &[&seed_slices])?;
 
@@ -90,8 +98,7 @@ fn create_cpi_instruction_multiple_signers(
 ) -> Instruction {
     let mut pda_pubkeys = Vec::new();
     for signer in pda_signers {
-        let seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
-        let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
+        let pda_pubkey = signer.get_pda();
         pda_pubkeys.push(pda_pubkey);
     }
 
