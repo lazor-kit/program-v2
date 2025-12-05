@@ -3,6 +3,7 @@ use crate::state::message::{Message, SimpleMessage};
 use crate::state::WalletDevice;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::HASH_BYTES;
 use anchor_lang::solana_program::{
     hash::hash,
     instruction::Instruction,
@@ -217,10 +218,10 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]) -> [u8; 32] {
+pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
     let mut buf = [0u8; 64];
-    buf[..32].copy_from_slice(&smart_wallet.to_bytes());
-    buf[32..].copy_from_slice(&credential_hash);
+    buf[..HASH_BYTES].copy_from_slice(&smart_wallet.to_bytes());
+    buf[HASH_BYTES..].copy_from_slice(&credential_hash);
     hash(&buf).to_bytes()
 }
 
@@ -231,7 +232,7 @@ pub fn verify_authorization_hash(
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,
-    expected_hash: [u8; 32],
+    expected_hash: [u8; HASH_BYTES],
 ) -> Result<()> {
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
@@ -265,7 +266,7 @@ pub fn compute_instruction_hash(
     instruction_data: &[u8],
     instruction_accounts: &[AccountInfo],
     program_id: Pubkey,
-) -> Result<[u8; 32]> {
+) -> Result<[u8; HASH_BYTES]> {
     use anchor_lang::solana_program::hash::{hash, Hasher};
 
     let data_hash = hash(instruction_data);
@@ -279,9 +280,9 @@ pub fn compute_instruction_hash(
     }
     let accounts_hash = rh.result();
 
-    let mut combined = [0u8; 64];
-    combined[..32].copy_from_slice(data_hash.as_ref());
-    combined[32..].copy_from_slice(accounts_hash.as_ref());
+    let mut combined = [0u8; HASH_BYTES * 2];
+    combined[..HASH_BYTES].copy_from_slice(data_hash.as_ref());
+    combined[HASH_BYTES..].copy_from_slice(accounts_hash.as_ref());
 
     Ok(hash(&combined).to_bytes())
 }
@@ -289,9 +290,9 @@ pub fn compute_instruction_hash(
 fn compute_message_hash(
     nonce: u64,
     timestamp: i64,
-    hash1: [u8; 32],
-    hash2: Option<[u8; 32]>,
-) -> Result<[u8; 32]> {
+    hash1: [u8; HASH_BYTES],
+    hash2: Option<[u8; HASH_BYTES]>,
+) -> Result<[u8; HASH_BYTES]> {
     use anchor_lang::solana_program::hash::hash;
 
     let mut data = Vec::new();
@@ -309,18 +310,18 @@ fn compute_message_hash(
 pub fn compute_execute_message_hash(
     nonce: u64,
     timestamp: i64,
-    policy_hash: [u8; 32],
-    cpi_hash: [u8; 32],
-) -> Result<[u8; 32]> {
+    policy_hash: [u8; HASH_BYTES],
+    cpi_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
     compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
 pub fn compute_create_chunk_message_hash(
     nonce: u64,
     timestamp: i64,
-    policy_hash: [u8; 32],
-    cpi_hash: [u8; 32],
-) -> Result<[u8; 32]> {
+    policy_hash: [u8; HASH_BYTES],
+    cpi_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
     compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
