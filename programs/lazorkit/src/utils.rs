@@ -9,12 +9,9 @@ use anchor_lang::solana_program::{
     program::{get_return_data, invoke_signed},
     system_instruction::transfer,
 };
+use solana_secp256r1_program::{COMPRESSED_PUBKEY_SERIALIZED_SIZE as SECP_PUBKEY_SIZE, DATA_START as SECP_DATA_START, SIGNATURE_SERIALIZED_SIZE as SECP_SIGNATURE_SIZE};
 
 // Constants for Secp256r1 signature verification
-const SECP_HEADER_SIZE: u16 = 14;
-const SECP_DATA_START: u16 = 2 + SECP_HEADER_SIZE;
-const SECP_PUBKEY_SIZE: u16 = 33;
-const SECP_SIGNATURE_SIZE: u16 = 64;
 const SECP_HEADER_TOTAL: usize = 16;
 
 #[derive(Clone, Debug)]
@@ -119,7 +116,7 @@ pub fn verify_secp256r1_instruction(
     sig: [u8; 64],
 ) -> Result<()> {
     let expected_len =
-        (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
+        SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE + msg.len();
 
     if ix.program_id != SECP256R1_PROGRAM_ID
         || !ix.accounts.is_empty()
@@ -162,9 +159,9 @@ struct SecpOffsets {
 #[inline]
 fn calculate_secp_offsets(msg_len: u16) -> SecpOffsets {
     SecpOffsets {
-        pubkey_offset: SECP_DATA_START,
-        sig_offset: SECP_DATA_START + SECP_PUBKEY_SIZE,
-        msg_offset: SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE,
+        pubkey_offset: SECP_DATA_START as u16,
+        sig_offset: (SECP_DATA_START + SECP_PUBKEY_SIZE) as u16,
+        msg_offset: (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as u16,
         msg_len,
     }
 }
@@ -192,7 +189,7 @@ fn verify_secp_header(data: &[u8], offsets: &SecpOffsets) -> bool {
 
 #[inline]
 fn verify_secp_data(data: &[u8], public_key: &[u8], signature: &[u8], message: &[u8]) -> bool {
-    let pubkey_range = SECP_HEADER_TOTAL..SECP_HEADER_TOTAL + SECP_PUBKEY_SIZE as usize;
+    let pubkey_range = SECP_HEADER_TOTAL..SECP_HEADER_TOTAL + SECP_PUBKEY_SIZE;
     let sig_range = pubkey_range.end..pubkey_range.end + SECP_SIGNATURE_SIZE as usize;
     let msg_range = sig_range.end..;
 
