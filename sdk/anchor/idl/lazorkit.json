@@ -855,10 +855,6 @@
             "type": "bytes"
           },
           {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
             "name": "cpi_hash",
             "type": {
               "array": [

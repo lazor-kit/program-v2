@@ -317,7 +317,6 @@ describe('Test smart wallet with default policy', () => {
       },
       policyInstruction: null,
       cpiInstructions: [transferTokenIns],
-      timestamp,
       credentialHash,
     });
 
@@ -486,8 +485,6 @@ describe('Test smart wallet with default policy', () => {
         },
         policyInstruction: null,
         cpiInstructions,
-
-        timestamp,
         credentialHash,
       },
       {
@@ -738,7 +735,6 @@ describe('Test smart wallet with default policy', () => {
         },
         policyInstruction: mockPolicyInstruction,
         cpiInstructions: [transferInstruction3, transferInstruction4],
-        timestamp,
         credentialHash,
       },
       {
