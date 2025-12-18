@@ -20,13 +20,12 @@ pub struct CreateChunkArgs {
     pub authenticator_data_raw: Vec<u8>,
     pub verify_instruction_index: u8,
     pub policy_data: Vec<u8>,
-    pub timestamp: i64,
     pub cpi_hash: [u8; 32],
 }
 
 /// Create a chunk for deferred execution of large transactions
 pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<()> {
-    validation::validate_instruction_timestamp(args.timestamp)?;
+    let now = Clock::get()?.unix_timestamp;
 
     let smart_wallet_key = ctx.accounts.smart_wallet.key();
     let wallet_device_key = ctx.accounts.wallet_device.key();
@@ -41,7 +40,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         policy_program_key,
     )?;
     let expected_message_hash =
-        compute_create_chunk_message_hash(last_nonce, args.timestamp, policy_hash, args.cpi_hash)?;
+        compute_create_chunk_message_hash(last_nonce, now, policy_hash, args.cpi_hash)?;
     verify_authorization_hash(
         &ctx.accounts.ix_sysvar,
         args.passkey_public_key,
@@ -68,7 +67,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         owner_wallet_address: smart_wallet_key,
         cpi_hash: args.cpi_hash,
         authorized_nonce: last_nonce,
-        authorized_timestamp: args.timestamp,
+        authorized_timestamp: now,
         rent_refund_address: payer_key,
     });
 

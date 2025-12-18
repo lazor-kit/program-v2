@@ -861,10 +861,6 @@ export type Lazorkit = {
             "type": "bytes"
           },
           {
-            "name": "timestamp",
-            "type": "i64"
-          },
-          {
             "name": "cpiHash",
             "type": {
               "array": [

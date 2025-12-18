@@ -213,8 +213,6 @@ export interface CreateChunkParams extends AuthParams {
   readonly policyInstruction: anchor.web3.TransactionInstruction | null;
   /** CPI instructions to execute later (required, must be non-empty array, all must be valid TransactionInstructions) */
   readonly cpiInstructions: readonly anchor.web3.TransactionInstruction[];
-  /** Transaction timestamp (Unix timestamp in seconds, required, must be non-negative) */
-  readonly timestamp: anchor.BN;
   /** Optional signers for CPI instructions (all must be valid PublicKeys if provided) */
   readonly cpiSigners?: readonly anchor.web3.PublicKey[];
 }

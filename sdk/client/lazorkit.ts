@@ -228,7 +228,6 @@ export class LazorkitClient {
       params.cpiInstructions,
       'params.cpiInstructions'
     );
-    assertPositiveBN(params.timestamp, 'params.timestamp');
 
     if (params.policyInstruction !== null) {
       assertValidTransactionInstruction(
@@ -836,7 +835,6 @@ export class LazorkitClient {
         verifyInstructionIndex: calculateVerifyInstructionIndex(
           options.computeUnitLimit
         ),
-        timestamp: params.timestamp,
         cpiHash: Array.from(cpiHash),
       },
       policyInstruction
