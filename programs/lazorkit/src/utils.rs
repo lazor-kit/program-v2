@@ -1,3 +1,7 @@
+use crate::constants::{
+    COMPRESSED_PUBKEY_SERIALIZED_SIZE as SECP_PUBKEY_SIZE, DATA_START as SECP_DATA_START,
+    SIGNATURE_SERIALIZED_SIZE as SECP_SIGNATURE_SIZE,
+};
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID, SMART_WALLET_SEED};
 use crate::state::message::{Message, SimpleMessage};
 use crate::state::WalletDevice;
@@ -10,7 +14,6 @@ use anchor_lang::solana_program::{
     program::{get_return_data, invoke_signed},
     system_instruction::transfer,
 };
-use solana_secp256r1_program::{COMPRESSED_PUBKEY_SERIALIZED_SIZE as SECP_PUBKEY_SIZE, DATA_START as SECP_DATA_START, SIGNATURE_SERIALIZED_SIZE as SECP_SIGNATURE_SIZE};
 
 // Constants for Secp256r1 signature verification
 const SECP_HEADER_TOTAL: usize = 16;
@@ -123,8 +126,7 @@ pub fn verify_secp256r1_instruction(
     msg: Vec<u8>,
     sig: [u8; 64],
 ) -> Result<()> {
-    let expected_len =
-        SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE + msg.len();
+    let expected_len = SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE + msg.len();
 
     if ix.program_id != SECP256R1_PROGRAM_ID
         || !ix.accounts.is_empty()
@@ -215,7 +217,10 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
+pub fn create_wallet_device_hash(
+    smart_wallet: Pubkey,
+    credential_hash: [u8; HASH_BYTES],
+) -> [u8; HASH_BYTES] {
     let mut buf = [0u8; 64];
     buf[..HASH_BYTES].copy_from_slice(&smart_wallet.to_bytes());
     buf[HASH_BYTES..].copy_from_slice(&credential_hash);
