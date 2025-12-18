@@ -258,16 +258,6 @@ export class LazorkitClient {
     }
   }
 
-  /**
-   * Validates CloseChunkParams
-   */
-  private validateCloseChunkParams(params: types.CloseChunkParams): void {
-    assertDefined(params, 'params');
-    assertValidPublicKey(params.payer, 'params.payer');
-    assertValidPublicKey(params.smartWallet, 'params.smartWallet');
-    assertPositiveBN(params.nonce, 'params.nonce');
-  }
-
   // ============================================================================
   // Account Data Fetching Methods
   // ============================================================================
@@ -285,79 +275,6 @@ export class LazorkitClient {
    */
   async getChunkData(chunk: PublicKey) {
     return (await this.program.account.chunk.fetch(chunk)) as types.Chunk;
-  }
-
-  /**
-   * Finds a smart wallet by passkey public key
-   * Searches through all WalletState accounts to find one containing the specified passkey
-   *
-   * @param passkeyPublicKey - Passkey public key (33 bytes)
-   * @returns Smart wallet information or null if not found
-   * @throws {ValidationError} if passkeyPublicKey is invalid
-   */
-  async getSmartWalletByPasskey(
-    passkeyPublicKey: types.PasskeyPublicKey | number[]
-  ): Promise<{
-    smartWallet: PublicKey | null;
-    walletState: PublicKey | null;
-    deviceSlot: { passkeyPubkey: number[]; credentialHash: number[] } | null;
-  }> {
-    assertValidPasskeyPublicKey(passkeyPublicKey, 'passkeyPublicKey');
-    // Get the discriminator for WalletState accounts
-    const discriminator = LazorkitIdl.accounts?.find(
-      (a: any) => a.name === 'WalletState'
-    )?.discriminator;
-
-    if (!discriminator) {
-      throw new ValidationError(
-        'WalletState discriminator not found in IDL',
-        'passkeyPublicKey'
-      );
-    }
-
-    // Get all WalletState accounts
-    const accounts = await this.connection.getProgramAccounts(this.programId, {
-      filters: [{ memcmp: { offset: 0, bytes: bs58.encode(discriminator) } }],
-    });
-
-    // Search through each WalletState account
-    for (const account of accounts) {
-      try {
-        // Deserialize the WalletState account data
-        const walletStateData = this.program.coder.accounts.decode(
-          'WalletState',
-          account.account.data
-        );
-
-        // Check if any device contains the target passkey
-        for (const device of walletStateData.devices) {
-          if (byteArrayEquals(device.passkeyPubkey, passkeyPublicKey)) {
-            // Found the matching device, return the smart wallet
-            const smartWallet = this.getSmartWalletPubkey(
-              walletStateData.walletId
-            );
-            return {
-              smartWallet,
-              walletState: account.pubkey,
-              deviceSlot: {
-                passkeyPubkey: device.passkeyPubkey,
-                credentialHash: device.credentialHash,
-              },
-            };
-          }
-        }
-      } catch (error) {
-        // Skip accounts that can't be deserialized (might be corrupted or different type)
-        continue;
-      }
-    }
-
-    // No matching wallet found
-    return {
-      smartWallet: null,
-      walletState: null,
-      deviceSlot: null,
-    };
   }
 
   /**

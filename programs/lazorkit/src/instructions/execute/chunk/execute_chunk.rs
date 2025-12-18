@@ -37,7 +37,7 @@ pub fn execute_chunk(
     };
     
     // Validate timestamp - check if chunk is expired
-    let session_end = authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS * 3;
+    let session_end = authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS * 2;
     if now > session_end {
         msg!("TransactionTooOld: Chunk expired: now={}, session_end={}", now, session_end);
         // Chunk will be closed automatically due to close = session_refund constraint

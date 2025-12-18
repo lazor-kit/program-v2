@@ -36,7 +36,7 @@ impl PdaSigner {
 pub fn get_policy_signer(
     smart_wallet: Pubkey,
     policy_signer: Pubkey,
-    credential_hash: [u8; 32],
+    credential_hash: [u8; HASH_BYTES],
 ) -> Result<PdaSigner> {
     let seeds: &[&[u8]] = &[
         WalletDevice::PREFIX_SEED,
