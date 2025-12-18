@@ -44,8 +44,4 @@ pub mod lazorkit {
     ) -> Result<()> {
         instructions::execute_chunk(ctx, instruction_data_list, split_index)
     }
-
-    pub fn close_chunk(ctx: Context<CloseChunk>) -> Result<()> {
-        instructions::close_chunk(ctx)
-    }
 }
