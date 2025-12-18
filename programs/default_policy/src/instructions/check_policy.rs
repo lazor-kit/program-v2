@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
     state::WalletDevice,
@@ -16,7 +16,7 @@ pub fn check_policy(
     ctx: Context<CheckPolicy>,
     wallet_id: u64,
     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    credential_hash: [u8; 32],
+    credential_hash: [u8; HASH_BYTES],
     policy_data: Vec<u8>,
 ) -> Result<()> {
     let smart_wallet_key = ctx.accounts.smart_wallet.key();

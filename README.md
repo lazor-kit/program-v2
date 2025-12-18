@@ -83,7 +83,7 @@ sdk/
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js 
 - Solana CLI
 - Anchor Framework (v0.31.0)
 - Rust (for program development)
@@ -93,14 +93,14 @@ sdk/
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd wallet-management-contract
+git clone https://github.com/lazor-kit/program-v2.git
+cd program-v2
 ```
 
 2. Install dependencies:
 
 ```bash
-npm install
+yarn install
 ```
 
 3. Build the programs:
@@ -316,10 +316,42 @@ const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx({
 
 ## Testing
 
+Generate a keypair:
+
+```bash
+solana-keygen new -o lazorkit-wallet.json
+```
+
+Get the base58 encoded version of your private key:
+
+```bash
+bun run tests/encode-bs58.ts
+```
+
+Setup env:
+
+```bash
+cp .env.example .env
+```
+
+Get the address of your keypair:
+
+```bash
+solana address -k lazorkit-wallet.json
+```
+
+In `runbooks/deployment/main.tx`, replace the `public_key` in airdrop_sol action with your address
+
+In another terminal, start Surfpool:
+
+```bash
+bun run surfpool:start
+```
+
 Run the test suite:
 
 ```bash
-anchor test
+bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts
 ```
 
 The test suite includes:
@@ -414,10 +446,8 @@ These changes improve code organization, reduce duplication, enhance security, a
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+---
 
-[Add your license information here]
+Built and maintained by the [LazorKit](https://lazorkit.com/).
 
-## Support
-
-For questions and support, please open an issue on GitHub or contact the development team.
+Licensed under MIT. See [LICENSE](LICENSE) for details.
