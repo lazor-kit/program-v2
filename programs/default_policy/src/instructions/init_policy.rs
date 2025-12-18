@@ -2,7 +2,7 @@ use crate::{
     error::PolicyError,
     state::{DeviceSlot, PolicyStruct},
 };
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 use lazorkit::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
     state::{WalletDevice, WalletState},
@@ -15,7 +15,7 @@ pub fn init_policy(
     ctx: Context<InitPolicy>,
     wallet_id: u64,
     passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    credential_hash: [u8; 32],
+    credential_hash: [u8; HASH_BYTES],
 ) -> Result<PolicyStruct> {
     let smart_wallet_key = ctx.accounts.smart_wallet.key();
     let wallet_state_key = ctx.accounts.wallet_state.key();

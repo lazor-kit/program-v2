@@ -1,16 +1,16 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 
 pub trait Message {
-    fn verify_hash(challenge_bytes: Vec<u8>, expected_hash: [u8; 32]) -> Result<()>;
+    fn verify_hash(challenge_bytes: Vec<u8>, expected_hash: [u8; HASH_BYTES]) -> Result<()>;
 }
 
 #[derive(Default, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct SimpleMessage {
-    pub data_hash: [u8; 32],
+    pub data_hash: [u8; HASH_BYTES],
 }
 
 impl Message for SimpleMessage {
-    fn verify_hash(challenge_bytes: Vec<u8>, expected_hash: [u8; 32]) -> Result<()> {
+    fn verify_hash(challenge_bytes: Vec<u8>, expected_hash: [u8; HASH_BYTES]) -> Result<()> {
         let message: SimpleMessage = AnchorDeserialize::deserialize(&mut &challenge_bytes[..])
             .map_err(|_| crate::error::LazorKitError::ChallengeDeserializationError)?;
 

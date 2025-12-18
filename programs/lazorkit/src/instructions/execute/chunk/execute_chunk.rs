@@ -4,7 +4,7 @@ use crate::error::LazorKitError;
 use crate::state::{Chunk, WalletState};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
-use anchor_lang::solana_program::hash::{hash, Hasher};
+use anchor_lang::solana_program::hash::{HASH_BYTES, Hasher, hash};
 
 /// Execute a previously created chunk
 pub fn execute_chunk(
@@ -62,9 +62,9 @@ pub fn execute_chunk(
     }
     let cpi_accounts_hash = rh.result().to_bytes();
 
-    let mut cpi_combined = [0u8; 64];
-    cpi_combined[..32].copy_from_slice(&cpi_data_hash);
-    cpi_combined[32..].copy_from_slice(&cpi_accounts_hash);
+    let mut cpi_combined = [0u8; HASH_BYTES * 2];
+    cpi_combined[..HASH_BYTES].copy_from_slice(&cpi_data_hash);
+    cpi_combined[HASH_BYTES..].copy_from_slice(&cpi_accounts_hash);
     let cpi_hash = hash(&cpi_combined).to_bytes();
 
     require!(cpi_hash == expected_cpi_hash, LazorKitError::HashMismatch);
