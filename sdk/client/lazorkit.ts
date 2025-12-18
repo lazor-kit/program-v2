@@ -405,13 +405,14 @@ export class LazorkitClient {
         smartWallet: walletDevice.smartWallet,
         walletState: this.getWalletStatePubkey(walletDevice.smartWallet),
         walletDevice: account.pubkey,
+        passkeyPublicKey: walletDevice.passkeyPubkey,
       };
     }
   }
 
   // ============================================================================
   // Low-Level Instruction Builders
-  // ============================================================================
+  // =======================================c=====================================
 
   /**
    * Builds the create smart wallet instruction
@@ -607,41 +608,6 @@ export class LazorkitClient {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .remainingAccounts(allAccountMetas)
-      .instruction();
-  }
-
-  /**
-   * Builds the close chunk instruction
-   *
-   * @param payer - Payer account public key
-   * @param smartWallet - Smart wallet PDA address
-   * @param nonce - Nonce of the chunk to close
-   * @returns Transaction instruction
-   * @throws {ValidationError} if parameters are invalid
-   */
-  async buildCloseChunkIns(
-    payer: PublicKey,
-    smartWallet: PublicKey,
-    nonce: BN
-  ): Promise<TransactionInstruction> {
-    assertValidPublicKey(payer, 'payer');
-    assertValidPublicKey(smartWallet, 'smartWallet');
-    assertPositiveBN(nonce, 'nonce');
-
-    const { chunk, data: chunkData } = await this.fetchChunkContext(
-      smartWallet,
-      nonce
-    );
-
-    return await this.program.methods
-      .closeChunk()
-      .accountsPartial({
-        payer,
-        smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
-        chunk,
-        sessionRefund: chunkData.rentRefundAddress,
-      })
       .instruction();
   }
 
@@ -875,36 +841,6 @@ export class LazorkitClient {
       params.smartWallet,
       params.cpiInstructions,
       params.cpiSigners
-    );
-
-    const result = await buildTransaction(
-      this.connection,
-      params.payer,
-      [instruction],
-      options
-    );
-
-    return result.transaction;
-  }
-
-  /**
-   * Closes a deferred transaction (no authentication needed)
-   *
-   * @param params - Close chunk parameters
-   * @param options - Transaction builder options
-   * @returns Transaction
-   * @throws {ValidationError} if parameters are invalid
-   */
-  async closeChunkTxn(
-    params: types.CloseChunkParams,
-    options: types.TransactionBuilderOptions = {}
-  ): Promise<Transaction | VersionedTransaction> {
-    this.validateCloseChunkParams(params);
-
-    const instruction = await this.buildCloseChunkIns(
-      params.payer,
-      params.smartWallet,
-      params.nonce
     );
 
     const result = await buildTransaction(
