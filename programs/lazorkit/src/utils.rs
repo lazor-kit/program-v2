@@ -1,8 +1,13 @@
+use crate::constants::{
+    COMPRESSED_PUBKEY_SERIALIZED_SIZE as SECP_PUBKEY_SIZE, DATA_START as SECP_DATA_START,
+    SIGNATURE_SERIALIZED_SIZE as SECP_SIGNATURE_SIZE,
+};
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID, SMART_WALLET_SEED};
 use crate::state::message::{Message, SimpleMessage};
 use crate::state::WalletDevice;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::HASH_BYTES;
 use anchor_lang::solana_program::{
     hash::hash,
     instruction::Instruction,
@@ -11,16 +16,21 @@ use anchor_lang::solana_program::{
 };
 
 // Constants for Secp256r1 signature verification
-const SECP_HEADER_SIZE: u16 = 14;
-const SECP_DATA_START: u16 = 2 + SECP_HEADER_SIZE;
-const SECP_PUBKEY_SIZE: u16 = 33;
-const SECP_SIGNATURE_SIZE: u16 = 64;
 const SECP_HEADER_TOTAL: usize = 16;
 
 #[derive(Clone, Debug)]
 pub struct PdaSigner {
     pub seeds: Vec<Vec<u8>>,
     pub bump: u8,
+}
+
+impl PdaSigner {
+    pub fn get_pda(&self) -> Pubkey {
+        let mut seed_slices: Vec<&[u8]> = self.seeds.iter().map(|s| s.as_slice()).collect();
+        let bump = &[self.bump];
+        seed_slices.push(bump);
+        Pubkey::create_program_address(&seed_slices, &ID).unwrap()
+    }
 }
 
 pub fn get_policy_signer(
@@ -54,15 +64,14 @@ pub fn execute_cpi(
     let ix = create_cpi_instruction_optimized(accounts, data, program, &signer);
 
     let mut seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
-    let signer_addr = Pubkey::find_program_address(&seed_slices, &ID).0;
+    let bump_slice = &[signer.bump];
+    seed_slices.push(bump_slice);
+    let signer_addr = Pubkey::create_program_address(&seed_slices, &ID).unwrap();
 
     require!(
         accounts.iter().any(|acc| *acc.key == signer_addr),
         LazorKitError::InvalidInstruction
     );
-
-    let bump_slice = [signer.bump];
-    seed_slices.push(&bump_slice);
 
     invoke_signed(&ix, accounts, &[&seed_slices])?;
 
@@ -90,8 +99,7 @@ fn create_cpi_instruction_multiple_signers(
 ) -> Instruction {
     let mut pda_pubkeys = Vec::new();
     for signer in pda_signers {
-        let seed_slices: Vec<&[u8]> = signer.seeds.iter().map(|s| s.as_slice()).collect();
-        let pda_pubkey = Pubkey::find_program_address(&seed_slices, &ID).0;
+        let pda_pubkey = signer.get_pda();
         pda_pubkeys.push(pda_pubkey);
     }
 
@@ -118,8 +126,7 @@ pub fn verify_secp256r1_instruction(
     msg: Vec<u8>,
     sig: [u8; 64],
 ) -> Result<()> {
-    let expected_len =
-        (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as usize + msg.len();
+    let expected_len = SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE + msg.len();
 
     if ix.program_id != SECP256R1_PROGRAM_ID
         || !ix.accounts.is_empty()
@@ -162,9 +169,9 @@ struct SecpOffsets {
 #[inline]
 fn calculate_secp_offsets(msg_len: u16) -> SecpOffsets {
     SecpOffsets {
-        pubkey_offset: SECP_DATA_START,
-        sig_offset: SECP_DATA_START + SECP_PUBKEY_SIZE,
-        msg_offset: SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE,
+        pubkey_offset: SECP_DATA_START as u16,
+        sig_offset: (SECP_DATA_START + SECP_PUBKEY_SIZE) as u16,
+        msg_offset: (SECP_DATA_START + SECP_PUBKEY_SIZE + SECP_SIGNATURE_SIZE) as u16,
         msg_len,
     }
 }
@@ -192,7 +199,7 @@ fn verify_secp_header(data: &[u8], offsets: &SecpOffsets) -> bool {
 
 #[inline]
 fn verify_secp_data(data: &[u8], public_key: &[u8], signature: &[u8], message: &[u8]) -> bool {
-    let pubkey_range = SECP_HEADER_TOTAL..SECP_HEADER_TOTAL + SECP_PUBKEY_SIZE as usize;
+    let pubkey_range = SECP_HEADER_TOTAL..SECP_HEADER_TOTAL + SECP_PUBKEY_SIZE;
     let sig_range = pubkey_range.end..pubkey_range.end + SECP_SIGNATURE_SIZE as usize;
     let msg_range = sig_range.end..;
 
@@ -210,10 +217,13 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn create_wallet_device_hash(smart_wallet: Pubkey, credential_hash: [u8; 32]) -> [u8; 32] {
+pub fn create_wallet_device_hash(
+    smart_wallet: Pubkey,
+    credential_hash: [u8; HASH_BYTES],
+) -> [u8; HASH_BYTES] {
     let mut buf = [0u8; 64];
-    buf[..32].copy_from_slice(&smart_wallet.to_bytes());
-    buf[32..].copy_from_slice(&credential_hash);
+    buf[..HASH_BYTES].copy_from_slice(&smart_wallet.to_bytes());
+    buf[HASH_BYTES..].copy_from_slice(&credential_hash);
     hash(&buf).to_bytes()
 }
 
@@ -224,7 +234,7 @@ pub fn verify_authorization_hash(
     client_data_json_raw: &[u8],
     authenticator_data_raw: &[u8],
     verify_instruction_index: u8,
-    expected_hash: [u8; 32],
+    expected_hash: [u8; HASH_BYTES],
 ) -> Result<()> {
     use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
@@ -258,7 +268,7 @@ pub fn compute_instruction_hash(
     instruction_data: &[u8],
     instruction_accounts: &[AccountInfo],
     program_id: Pubkey,
-) -> Result<[u8; 32]> {
+) -> Result<[u8; HASH_BYTES]> {
     use anchor_lang::solana_program::hash::{hash, Hasher};
 
     let data_hash = hash(instruction_data);
@@ -272,9 +282,9 @@ pub fn compute_instruction_hash(
     }
     let accounts_hash = rh.result();
 
-    let mut combined = [0u8; 64];
-    combined[..32].copy_from_slice(data_hash.as_ref());
-    combined[32..].copy_from_slice(accounts_hash.as_ref());
+    let mut combined = [0u8; HASH_BYTES * 2];
+    combined[..HASH_BYTES].copy_from_slice(data_hash.as_ref());
+    combined[HASH_BYTES..].copy_from_slice(accounts_hash.as_ref());
 
     Ok(hash(&combined).to_bytes())
 }
@@ -282,9 +292,9 @@ pub fn compute_instruction_hash(
 fn compute_message_hash(
     nonce: u64,
     timestamp: i64,
-    hash1: [u8; 32],
-    hash2: Option<[u8; 32]>,
-) -> Result<[u8; 32]> {
+    hash1: [u8; HASH_BYTES],
+    hash2: Option<[u8; HASH_BYTES]>,
+) -> Result<[u8; HASH_BYTES]> {
     use anchor_lang::solana_program::hash::hash;
 
     let mut data = Vec::new();
@@ -302,18 +312,18 @@ fn compute_message_hash(
 pub fn compute_execute_message_hash(
     nonce: u64,
     timestamp: i64,
-    policy_hash: [u8; 32],
-    cpi_hash: [u8; 32],
-) -> Result<[u8; 32]> {
+    policy_hash: [u8; HASH_BYTES],
+    cpi_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
     compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
 pub fn compute_create_chunk_message_hash(
     nonce: u64,
     timestamp: i64,
-    policy_hash: [u8; 32],
-    cpi_hash: [u8; 32],
-) -> Result<[u8; 32]> {
+    policy_hash: [u8; HASH_BYTES],
+    cpi_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
     compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 

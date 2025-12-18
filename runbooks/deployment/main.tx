@@ -1,0 +1,37 @@
+################################################################
+# Manage program-v2 deployment through Crypto Infrastructure as Code
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+action "deploy_default_policy" "svm::deploy_program" {
+    description = "Deploy default_policy program"
+    program = svm::get_program_from_anchor_project("default_policy") 
+    authority = signer.authority
+    payer = signer.payer
+    // Optional: if you want to deploy the program via a cheatcode when targeting a Surfnet, set `instant_surfnet_deployment = true`
+    // Deploying via a cheatcode will write the program data directly to the program account, rather than sending transactions.
+    // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
+    instant_surfnet_deployment = true
+}
+
+action "deploy_lazorkit" "svm::deploy_program" {
+    description = "Deploy lazorkit program"
+    program = svm::get_program_from_anchor_project("lazorkit") 
+    authority = signer.authority
+    payer = signer.payer
+    // Optional: if you want to deploy the program via a cheatcode when targeting a Surfnet, set `instant_surfnet_deployment = true`
+    // Deploying via a cheatcode will write the program data directly to the program account, rather than sending transactions.
+    // This will make deployments instantaneous, but is deviating from how the deployments will take place on devnet/mainnet.
+    instant_surfnet_deployment = true
+}
+
+action "airdrop_sol" "svm::setup_surfnet" {
+    set_account {
+        public_key = "F4d85zy69zgQw9WUCmfiWKFJnfJ14ZB8D65LYkHuUVuU"
+        lamports = 1000000000 // 1 SOL
+    }
+}
