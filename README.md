@@ -316,10 +316,42 @@ const checkPolicyIx = await defaultPolicyClient.buildCheckPolicyIx({
 
 ## Testing
 
+Generate a keypair:
+
+```bash
+solana-keygen new -o lazorkit-wallet.json
+```
+
+Get the base58 encoded version of your private key:
+
+```bash
+bun run tests/encode-bs58.ts
+```
+
+Setup env:
+
+```bash
+cp .env.example .env
+```
+
+Get the address of your keypair:
+
+```bash
+solana address -k lazorkit-wallet.json
+```
+
+In `runbooks/deployment/main.tx`, replace the `public_key` in airdrop_sol action with your address
+
+In another terminal, start Surfpool:
+
+```bash
+bun run surfpool:start
+```
+
 Run the test suite:
 
 ```bash
-anchor test
+bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts
 ```
 
 The test suite includes:
