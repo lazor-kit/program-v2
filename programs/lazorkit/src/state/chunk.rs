@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 
 /// Transaction chunk for deferred execution
 ///
@@ -11,7 +11,7 @@ pub struct Chunk {
     /// Smart wallet address that authorized this chunk session
     pub owner_wallet_address: Pubkey,
     /// Combined SHA256 hash of all cpi transaction instruction data
-    pub cpi_hash: [u8; 32],
+    pub cpi_hash: [u8; HASH_BYTES],
     /// The nonce that was authorized at chunk creation (bound into data hash)
     pub authorized_nonce: u64,
     /// Timestamp from the original message hash for expiration validation

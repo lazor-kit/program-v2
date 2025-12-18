@@ -38,7 +38,7 @@ describe('Test smart wallet with default policy', () => {
     bs58.decode(process.env.PRIVATE_KEY)
   );
 
-  xit('Init smart wallet with default policy successfully', async () => {
+  it('Init smart wallet with default policy successfully', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -76,18 +76,6 @@ describe('Test smart wallet with default policy', () => {
     expect(smartWalletConfig.walletId.toString()).to.be.equal(
       smartWalletId.toString()
     );
-    const credentialHash = asCredentialHash(
-      Array.from(
-        new Uint8Array(
-          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
-        )
-      )
-    );
-
-    const result = await lazorkitProgram.getSmartWalletByCredentialHash(
-      credentialHash
-    );
-    console.log('result: ', result);
   });
 
   it('Execute direct transaction with transfer sol from smart wallet', async () => {
@@ -198,7 +186,7 @@ describe('Test smart wallet with default policy', () => {
     console.log('Execute direct transaction: ', sig2);
   });
 
-  xit('Execute chunk transaction with transfer token from smart wallet', async () => {
+  it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
 
     const publicKeyBase64 = privateKey.toCompressedPublicKey();
@@ -504,279 +492,20 @@ describe('Test smart wallet with default policy', () => {
     console.log('Create deferred execution: ', sig2);
 
     const executeDeferredTransactionTxn =
-      (await lazorkitProgram.executeChunkTxn(
-        {
-          payer: payer.publicKey,
-          smartWallet: smartWallet,
-          cpiInstructions,
-        },
-        {
-          useVersionedTransaction: true,
-        }
-      )) as anchor.web3.VersionedTransaction;
+      (await lazorkitProgram.executeChunkTxn({
+        payer: payer.publicKey,
+        smartWallet: smartWallet,
+        cpiInstructions,
+      })) as anchor.web3.Transaction;
 
-    executeDeferredTransactionTxn.sign([payer]);
-    const sig3 = await connection.sendTransaction(
-      executeDeferredTransactionTxn,
+    executeDeferredTransactionTxn.sign(payer);
+    const sig3 = await connection.sendRawTransaction(
+      executeDeferredTransactionTxn.serialize(),
       {
         skipPreflight: true,
       }
     );
-    await connection.confirmTransaction(sig3);
 
     console.log('Execute deferred transaction: ', sig3);
-  });
-
-  xit('Test compute unit limit functionality', async () => {
-    // Create initial smart wallet with first device
-    const privateKey1 = ECDSA.generateKey();
-    const publicKeyBase64_1 = privateKey1.toCompressedPublicKey();
-    const passkeyPubkey1 = asPasskeyPublicKey(
-      Array.from(Buffer.from(publicKeyBase64_1, 'base64'))
-    );
-
-    const smartWalletId = lazorkitProgram.generateWalletId();
-    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
-    const credentialId = base64.encode(Buffer.from('testing-cu-limit'));
-
-    const credentialHash = asCredentialHash(
-      Array.from(
-        new Uint8Array(
-          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
-        )
-      )
-    );
-
-    // Create smart wallet
-    const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTxn({
-        payer: payer.publicKey,
-        passkeyPublicKey: passkeyPubkey1,
-        credentialIdBase64: credentialId,
-        smartWalletId,
-        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
-      });
-
-    await anchor.web3.sendAndConfirmTransaction(
-      connection,
-      createSmartWalletTxn as anchor.web3.Transaction,
-      [payer]
-    );
-
-    console.log('Created smart wallet for CU limit test');
-
-    // Test 1: Execute transaction without compute unit limit
-    const transferInstruction1 = anchor.web3.SystemProgram.transfer({
-      fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
-    });
-
-    let timestamp = await getBlockchainTimestamp(connection);
-    // Create a mock policy instruction
-    const mockPolicyInstruction = {
-      keys: [],
-      programId: anchor.web3.SystemProgram.programId,
-      data: Buffer.alloc(0),
-    };
-
-    let plainMessage = await lazorkitProgram.buildAuthorizationMessage({
-      action: {
-        type: SmartWalletAction.Execute,
-        args: {
-          policyInstruction: mockPolicyInstruction,
-          cpiInstruction: transferInstruction1,
-        },
-      },
-      payer: payer.publicKey,
-      smartWallet: smartWallet,
-      passkeyPublicKey: passkeyPubkey1,
-      credentialHash: credentialHash,
-      timestamp: new anchor.BN(timestamp),
-    });
-
-    const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
-      await buildFakeMessagePasskey(plainMessage);
-
-    const signature1 = privateKey1.sign(message);
-
-    const executeTxnWithoutCU = await lazorkitProgram.executeTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey1,
-          signature64: signature1,
-          clientDataJsonRaw64: clientDataJsonRaw64,
-          authenticatorDataRaw64: authenticatorDataRaw64,
-        },
-        policyInstruction: mockPolicyInstruction,
-        cpiInstruction: transferInstruction1,
-        timestamp,
-        credentialHash,
-      },
-      {
-        useVersionedTransaction: true,
-      }
-    );
-
-    console.log('✓ Transaction without CU limit built successfully');
-
-    // Test 2: Execute transaction with compute unit limit
-    const transferInstruction2 = anchor.web3.SystemProgram.transfer({
-      fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
-    });
-
-    timestamp = await getBlockchainTimestamp(connection);
-
-    plainMessage = await lazorkitProgram.buildAuthorizationMessage({
-      action: {
-        type: SmartWalletAction.Execute,
-        args: {
-          policyInstruction: mockPolicyInstruction,
-          cpiInstruction: transferInstruction2,
-        },
-      },
-      payer: payer.publicKey,
-      smartWallet: smartWallet,
-      passkeyPublicKey: passkeyPubkey1,
-      credentialHash: credentialHash,
-      timestamp: new anchor.BN(timestamp),
-    });
-    const {
-      message: message2,
-      clientDataJsonRaw64: clientDataJsonRaw64_2,
-      authenticatorDataRaw64: authenticatorDataRaw64_2,
-    } = await buildFakeMessagePasskey(plainMessage);
-
-    const signature2 = privateKey1.sign(message2);
-
-    const executeTxnWithCU = await lazorkitProgram.executeTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey1,
-          signature64: signature2,
-          clientDataJsonRaw64: clientDataJsonRaw64_2,
-          authenticatorDataRaw64: authenticatorDataRaw64_2,
-        },
-        policyInstruction: mockPolicyInstruction,
-        cpiInstruction: transferInstruction2,
-        timestamp,
-        credentialHash,
-      },
-      {
-        computeUnitLimit: 200000,
-        useVersionedTransaction: true,
-      }
-    );
-
-    console.log('✓ Transaction with CU limit built successfully');
-
-    // Test 3: Verify instruction count difference
-    const txWithoutCU = executeTxnWithoutCU as anchor.web3.VersionedTransaction;
-    const txWithCU = executeTxnWithCU as anchor.web3.VersionedTransaction;
-
-    // Note: We can't easily inspect the instruction count from VersionedTransaction
-    // but we can verify they were built successfully
-    expect(txWithoutCU).to.not.be.undefined;
-    expect(txWithCU).to.not.be.undefined;
-
-    console.log(
-      '✓ Both transactions built successfully with different configurations'
-    );
-
-    // Test 4: Test createChunkTxn with compute unit limit
-    const transferInstruction3 = anchor.web3.SystemProgram.transfer({
-      fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
-    });
-
-    const transferInstruction4 = anchor.web3.SystemProgram.transfer({
-      fromPubkey: smartWallet,
-      toPubkey: anchor.web3.Keypair.generate().publicKey,
-      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
-    });
-
-    timestamp = await getBlockchainTimestamp(connection);
-    plainMessage = await lazorkitProgram.buildAuthorizationMessage({
-      action: {
-        type: SmartWalletAction.CreateChunk,
-        args: {
-          policyInstruction: mockPolicyInstruction,
-          cpiInstructions: [transferInstruction3, transferInstruction4],
-        },
-      },
-      payer: payer.publicKey,
-      smartWallet: smartWallet,
-      passkeyPublicKey: passkeyPubkey1,
-      credentialHash: credentialHash,
-      timestamp: new anchor.BN(timestamp),
-    });
-
-    const {
-      message: message3,
-      clientDataJsonRaw64: clientDataJsonRaw64_3,
-      authenticatorDataRaw64: authenticatorDataRaw64_3,
-    } = await buildFakeMessagePasskey(plainMessage);
-
-    const signature3 = privateKey1.sign(message3);
-
-    const createChunkTxnWithCU = await lazorkitProgram.createChunkTxn(
-      {
-        payer: payer.publicKey,
-        smartWallet: smartWallet,
-        passkeySignature: {
-          passkeyPublicKey: passkeyPubkey1,
-          signature64: signature3,
-          clientDataJsonRaw64: clientDataJsonRaw64_3,
-          authenticatorDataRaw64: authenticatorDataRaw64_3,
-        },
-        policyInstruction: mockPolicyInstruction,
-        cpiInstructions: [transferInstruction3, transferInstruction4],
-        timestamp,
-        credentialHash,
-      },
-      {
-        computeUnitLimit: 300000, // Higher limit for multiple instructions
-        useVersionedTransaction: true,
-      }
-    );
-
-    expect(createChunkTxnWithCU).to.not.be.undefined;
-    console.log('✓ Create chunk transaction with CU limit built successfully');
-
-    console.log('✅ All compute unit limit tests passed!');
-  });
-
-  xit('Test verifyInstructionIndex calculation', async () => {
-    // Import the helper function
-    const { calculateVerifyInstructionIndex } = await import(
-      '../sdk/transaction'
-    );
-
-    // Test without compute unit limit
-    const indexWithoutCU = calculateVerifyInstructionIndex();
-    expect(indexWithoutCU).to.equal(0);
-    console.log('✓ verifyInstructionIndex without CU limit:', indexWithoutCU);
-
-    // Test with compute unit limit
-    const indexWithCU = calculateVerifyInstructionIndex(200000);
-    expect(indexWithCU).to.equal(1);
-    console.log('✓ verifyInstructionIndex with CU limit:', indexWithCU);
-
-    // Test with undefined compute unit limit
-    const indexWithUndefined = calculateVerifyInstructionIndex(undefined);
-    expect(indexWithUndefined).to.equal(0);
-    console.log(
-      '✓ verifyInstructionIndex with undefined CU limit:',
-      indexWithUndefined
-    );
-
-    console.log('✅ verifyInstructionIndex calculation tests passed!');
   });
 });

@@ -25,34 +25,6 @@ export function prependComputeUnitLimit(
 }
 
 /**
- * Builds a versioned transaction (v0) from instructions
- */
-export async function buildVersionedTransaction(
-  connection: anchor.web3.Connection,
-  payer: anchor.web3.PublicKey,
-  instructions: anchor.web3.TransactionInstruction[]
-): Promise<anchor.web3.VersionedTransaction> {
-  const result = await buildTransaction(connection, payer, instructions, {
-    useVersionedTransaction: true,
-  });
-  return result.transaction as anchor.web3.VersionedTransaction;
-}
-
-/**
- * Builds a legacy transaction from instructions
- */
-export async function buildLegacyTransaction(
-  connection: anchor.web3.Connection,
-  payer: anchor.web3.PublicKey,
-  instructions: anchor.web3.TransactionInstruction[]
-): Promise<anchor.web3.Transaction> {
-  const result = await buildTransaction(connection, payer, instructions, {
-    useVersionedTransaction: false,
-  });
-  return result.transaction as anchor.web3.Transaction;
-}
-
-/**
  * Combines authentication verification instruction with smart wallet instructions
  */
 export function combineInstructionsWithAuth(
@@ -94,8 +66,7 @@ export async function buildTransaction(
   options: TransactionBuilderOptions = {}
 ): Promise<TransactionBuilderResult> {
   const {
-    useVersionedTransaction,
-    addressLookupTable,
+    addressLookupTables,
     recentBlockhash: customBlockhash,
     computeUnitLimit,
   } = options;
@@ -106,22 +77,19 @@ export async function buildTransaction(
     computeUnitLimit
   );
 
-  // Auto-detect: if addressLookupTable is provided, use versioned transaction
-  const shouldUseVersioned = useVersionedTransaction ?? !!addressLookupTable;
+  const shouldUseVersioned =
+    addressLookupTables !== undefined && addressLookupTables.length > 0;
 
   // Get recent blockhash
   const recentBlockhash =
     customBlockhash || (await connection.getLatestBlockhash()).blockhash;
 
   if (shouldUseVersioned) {
-    // Build versioned transaction
-    const lookupTables = addressLookupTable ? [addressLookupTable] : [];
-
     const message = new anchor.web3.TransactionMessage({
       payerKey: payer,
       recentBlockhash,
       instructions: finalInstructions,
-    }).compileToV0Message(lookupTables);
+    }).compileToV0Message([...addressLookupTables]);
 
     const transaction = new anchor.web3.VersionedTransaction(message);
 
