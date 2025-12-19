@@ -136,6 +136,7 @@ pub fn execute_chunk(
             return Ok(());
         }
     }
+    
     let last_nonce = ctx.accounts.wallet_state.last_nonce;
     ctx.accounts.wallet_state.last_nonce = validation::safe_increment_nonce(last_nonce);
 

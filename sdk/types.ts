@@ -71,17 +71,11 @@ export function asSignature(value: number[]): Signature {
 // Smart Wallet Actions
 // ============================================================================
 export enum SmartWalletAction {
-  Execute = 'execute',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
 }
 
 export type ArgsByAction = {
-  [SmartWalletAction.Execute]: {
-    policyInstruction?: anchor.web3.TransactionInstruction;
-    cpiInstruction: anchor.web3.TransactionInstruction;
-    cpiSigners?: readonly anchor.web3.PublicKey[];
-  };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction?: anchor.web3.TransactionInstruction;
     cpiInstructions: readonly anchor.web3.TransactionInstruction[];
