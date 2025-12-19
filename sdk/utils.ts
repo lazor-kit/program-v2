@@ -51,3 +51,17 @@ export function credentialHashFromBase64(
     new Uint8Array(sha256.arrayBuffer(credentialId))
   ) as types.CredentialHash;
 }
+
+// Helper function to get blockchain timestamp
+export async function getBlockchainTimestamp(
+  connection: anchor.web3.Connection
+): Promise<anchor.BN> {
+  const slot = await connection.getSlot();
+  const blockTime = await connection.getBlockTime(slot);
+
+  if (blockTime === null) {
+    throw new Error('Failed to get blockchain timestamp');
+  }
+
+  return new anchor.BN(blockTime);
+}

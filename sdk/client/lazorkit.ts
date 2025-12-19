@@ -797,37 +797,6 @@ export class LazorkitClient {
     const { action, smartWallet, passkeyPublicKey, timestamp } = params;
 
     switch (action.type) {
-      case types.SmartWalletAction.Execute: {
-        const {
-          policyInstruction: policyIns,
-          cpiInstruction,
-          cpiSigners,
-        } = action.args as types.ArgsByAction[types.SmartWalletAction.Execute];
-
-        const walletStateData = await this.getWalletStateData(
-          params.smartWallet
-        );
-
-        const policyInstruction = await this.policyResolver.resolveForExecute({
-          provided: policyIns,
-          smartWallet: params.smartWallet,
-          credentialHash: params.credentialHash as types.CredentialHash,
-          passkeyPublicKey,
-          walletStateData,
-        });
-
-        const smartWalletConfig = await this.getWalletStateData(smartWallet);
-
-        message = buildExecuteMessage(
-          smartWallet,
-          smartWalletConfig.lastNonce,
-          timestamp,
-          policyInstruction,
-          cpiInstruction,
-          [...(cpiSigners ?? []), params.payer]
-        );
-        break;
-      }
       case types.SmartWalletAction.CreateChunk: {
         const {
           policyInstruction: policyIns,

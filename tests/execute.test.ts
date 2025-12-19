@@ -9,19 +9,11 @@ import {
   SmartWalletAction,
   asPasskeyPublicKey,
   asCredentialHash,
+  getBlockchainTimestamp,
 } from '../sdk';
 import { createTransferInstruction } from '@solana/spl-token';
 import { buildFakeMessagePasskey, createNewMint, mintTokenTo } from './utils';
 dotenv.config();
-
-// Helper function to get blockchain timestamp
-async function getBlockchainTimestamp(
-  connection: anchor.web3.Connection
-): Promise<anchor.BN> {
-  const slot = await connection.getSlot();
-  const blockTime = await connection.getBlockTime(slot);
-  return new anchor.BN(blockTime || Math.floor(Date.now() / 1000));
-}
 
 describe('Test smart wallet with default policy', () => {
   const connection = new anchor.web3.Connection(
@@ -78,102 +70,97 @@ describe('Test smart wallet with default policy', () => {
     );
   });
 
-  it('Execute direct transaction with transfer sol from smart wallet', async () => {
-    const privateKey = ECDSA.generateKey();
+  // it('Execute direct transaction with transfer sol from smart wallet', async () => {
+  //   const privateKey = ECDSA.generateKey();
 
-    const publicKeyBase64 = privateKey.toCompressedPublicKey();
+  //   const publicKeyBase64 = privateKey.toCompressedPublicKey();
 
-    const passkeyPubkey = asPasskeyPublicKey(
-      Array.from(Buffer.from(publicKeyBase64, 'base64'))
-    );
+  //   const passkeyPubkey = asPasskeyPublicKey(
+  //     Array.from(Buffer.from(publicKeyBase64, 'base64'))
+  //   );
 
-    const smartWalletId = lazorkitProgram.generateWalletId();
+  //   const smartWalletId = lazorkitProgram.generateWalletId();
 
-    const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
+  //   const smartWallet = lazorkitProgram.getSmartWalletPubkey(smartWalletId);
 
-    const credentialId = base64.encode(Buffer.from('testing')); // random string
+  //   const credentialId = base64.encode(Buffer.from('testing')); // random string
 
-    const credentialHash = asCredentialHash(
-      Array.from(
-        new Uint8Array(
-          require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
-        )
-      )
-    );
+  //   const credentialHash = asCredentialHash(
+  //     Array.from(
+  //       new Uint8Array(
+  //         require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
+  //       )
+  //     )
+  //   );
 
-    const policySigner = lazorkitProgram.getWalletDevicePubkey(
-      smartWallet,
-      credentialHash
-    );
+  //   const { transaction: createSmartWalletTxn } =
+  //     await lazorkitProgram.createSmartWalletTxn({
+  //       payer: payer.publicKey,
+  //       passkeyPublicKey: passkeyPubkey,
+  //       credentialIdBase64: credentialId,
+  //       smartWalletId,
+  //       amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
+  //     });
 
-    const { transaction: createSmartWalletTxn } =
-      await lazorkitProgram.createSmartWalletTxn({
-        payer: payer.publicKey,
-        passkeyPublicKey: passkeyPubkey,
-        credentialIdBase64: credentialId,
-        smartWalletId,
-        amount: new anchor.BN(0.01 * anchor.web3.LAMPORTS_PER_SOL),
-      });
+  //   await anchor.web3.sendAndConfirmTransaction(
+  //     connection,
+  //     createSmartWalletTxn as anchor.web3.Transaction,
+  //     [payer]
+  //   );
 
-    await anchor.web3.sendAndConfirmTransaction(
-      connection,
-      createSmartWalletTxn as anchor.web3.Transaction,
-      [payer]
-    );
+  //   const walletStateData = await lazorkitProgram.getWalletStateData(
+  //     smartWallet
+  //   );
 
-    const walletStateData = await lazorkitProgram.getWalletStateData(
-      smartWallet
-    );
+  //   const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
+  //     fromPubkey: smartWallet,
+  //     toPubkey: payer.publicKey,
+  //     lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
+  //   });
 
-    const transferFromSmartWalletIns = anchor.web3.SystemProgram.transfer({
-      fromPubkey: smartWallet,
-      toPubkey: payer.publicKey,
-      lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
-    });
+  //   const timestamp = await getBlockchainTimestamp(connection);
 
-    const timestamp = await getBlockchainTimestamp(connection);
+  //   const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
+  //     action: {
+  //       type: SmartWalletAction.Execute,
+  //       args: {
+  //         cpiInstruction: transferFromSmartWalletIns,
+  //       },
+  //     },
+  //     payer: payer.publicKey,
+  //     smartWallet: smartWallet,
+  //     passkeyPublicKey: passkeyPubkey,
+  //     credentialHash: credentialHash,
+  //     timestamp: new anchor.BN(timestamp),
+  //   });
 
-    const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
-      action: {
-        type: SmartWalletAction.Execute,
-        args: {
-          cpiInstruction: transferFromSmartWalletIns,
-        },
-      },
-      payer: payer.publicKey,
-      smartWallet: smartWallet,
-      passkeyPublicKey: passkeyPubkey,
-      credentialHash: credentialHash,
-      timestamp: new anchor.BN(timestamp),
-    });
+  //   const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
+  //     await buildFakeMessagePasskey(plainMessage);
 
-    const { message, clientDataJsonRaw64, authenticatorDataRaw64 } =
-      await buildFakeMessagePasskey(plainMessage);
+  //   const signature = privateKey.sign(message);
 
-    const signature = privateKey.sign(message);
+  //   const executeDirectTransactionTxn = await lazorkitProgram.executeTxn({
+  //     payer: payer.publicKey,
+  //     smartWallet: smartWallet,
+  //     passkeySignature: {
+  //       passkeyPublicKey: passkeyPubkey,
+  //       signature64: signature,
+  //       clientDataJsonRaw64: clientDataJsonRaw64,
+  //       authenticatorDataRaw64: authenticatorDataRaw64,
+  //     },
+  //     cpiInstruction: transferFromSmartWalletIns,
+  //     timestamp,
+  //     credentialHash,
+  //   });
 
-    const executeDirectTransactionTxn = await lazorkitProgram.executeTxn({
-      payer: payer.publicKey,
-      smartWallet: smartWallet,
-      passkeySignature: {
-        passkeyPublicKey: passkeyPubkey,
-        signature64: signature,
-        clientDataJsonRaw64: clientDataJsonRaw64,
-        authenticatorDataRaw64: authenticatorDataRaw64,
-      },
-      cpiInstruction: transferFromSmartWalletIns,
-      timestamp,
-      credentialHash,
-    });
+  //   const sig2 = await anchor.web3.sendAndConfirmTransaction(
+  //     connection,
+  //     executeDirectTransactionTxn as anchor.web3.Transaction,
+  //     [payer]
+  //   );
 
-    const sig2 = await anchor.web3.sendAndConfirmTransaction(
-      connection,
-      executeDirectTransactionTxn as anchor.web3.Transaction,
-      [payer]
-    );
-
-    console.log('Execute direct transaction: ', sig2);
-  });
+  //   console.log('Execute direct transaction: ', sig2);
+  // });
 
   it('Execute chunk transaction with transfer token from smart wallet', async () => {
     const privateKey = ECDSA.generateKey();
