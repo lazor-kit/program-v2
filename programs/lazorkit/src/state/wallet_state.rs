@@ -20,5 +20,6 @@ pub struct WalletState {
 impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 
-    pub const INIT_SPACE: usize = size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + PUBKEY_BYTES + 4;
+    pub const INIT_SPACE: usize =
+        size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + PUBKEY_BYTES + 4;
 }
