@@ -158,7 +158,7 @@ pub struct ExecuteChunk<'info> {
     #[account(
         mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
-        bump = wallet_state.bump,
+        bump,
         owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
