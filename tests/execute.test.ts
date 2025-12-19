@@ -131,22 +131,12 @@ describe('Test smart wallet with default policy', () => {
       lamports: 0.001 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
-      walletId: smartWalletId,
-      passkeyPublicKey: passkeyPubkey,
-      policySigner,
-      smartWallet,
-      credentialHash: asCredentialHash(credentialHash),
-      policyData: walletStateData.policyData,
-    });
-
     const timestamp = await getBlockchainTimestamp(connection);
 
     const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
         type: SmartWalletAction.Execute,
         args: {
-          policyInstruction: checkPolicyIns,
           cpiInstruction: transferFromSmartWalletIns,
         },
       },
@@ -171,7 +161,6 @@ describe('Test smart wallet with default policy', () => {
         clientDataJsonRaw64: clientDataJsonRaw64,
         authenticatorDataRaw64: authenticatorDataRaw64,
       },
-      policyInstruction: checkPolicyIns,
       cpiInstruction: transferFromSmartWalletIns,
       timestamp,
       credentialHash,
@@ -207,11 +196,6 @@ describe('Test smart wallet with default policy', () => {
           require('js-sha256').arrayBuffer(Buffer.from(credentialId, 'base64'))
         )
       )
-    );
-
-    const policySigner = lazorkitProgram.getWalletDevicePubkey(
-      smartWallet,
-      credentialHash
     );
 
     const { transaction: createSmartWalletTxn } =
@@ -259,26 +243,12 @@ describe('Test smart wallet with default policy', () => {
       10 * 10 ** 6
     );
 
-    const walletStateData = await lazorkitProgram.getWalletStateData(
-      smartWallet
-    );
-
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
-      walletId: smartWalletId,
-      passkeyPublicKey: passkeyPubkey,
-      policySigner,
-      smartWallet,
-      credentialHash: asCredentialHash(credentialHash),
-      policyData: walletStateData.policyData,
-    });
-
     const timestamp = await getBlockchainTimestamp(connection);
 
     const plainMessage = await lazorkitProgram.buildAuthorizationMessage({
       action: {
         type: SmartWalletAction.CreateChunk,
         args: {
-          policyInstruction: checkPolicyIns,
           cpiInstructions: [transferTokenIns],
         },
       },
@@ -303,7 +273,6 @@ describe('Test smart wallet with default policy', () => {
         clientDataJsonRaw64: clientDataJsonRaw64,
         authenticatorDataRaw64: authenticatorDataRaw64,
       },
-      policyInstruction: null,
       cpiInstructions: [transferTokenIns],
       timestamp,
       credentialHash,
@@ -361,11 +330,6 @@ describe('Test smart wallet with default policy', () => {
       )
     );
 
-    const policySigner = lazorkitProgram.getWalletDevicePubkey(
-      smartWallet,
-      credentialHash
-    );
-
     const { transaction: createSmartWalletTxn } =
       await lazorkitProgram.createSmartWalletTxn({
         payer: payer.publicKey,
@@ -418,19 +382,6 @@ describe('Test smart wallet with default policy', () => {
       lamports: 0.01 * anchor.web3.LAMPORTS_PER_SOL,
     });
 
-    const walletStateData = await lazorkitProgram.getWalletStateData(
-      smartWallet
-    );
-
-    const checkPolicyIns = await defaultPolicyClient.buildCheckPolicyIx({
-      walletId: smartWalletId,
-      passkeyPublicKey: passkeyPubkey,
-      policySigner,
-      smartWallet,
-      credentialHash: asCredentialHash(credentialHash),
-      policyData: walletStateData.policyData,
-    });
-
     const timestamp = await getBlockchainTimestamp(connection);
 
     const cpiInstructions = [
@@ -445,7 +396,6 @@ describe('Test smart wallet with default policy', () => {
       action: {
         type: SmartWalletAction.CreateChunk,
         args: {
-          policyInstruction: checkPolicyIns,
           cpiInstructions,
         },
       },
@@ -472,9 +422,7 @@ describe('Test smart wallet with default policy', () => {
           clientDataJsonRaw64: clientDataJsonRaw64,
           authenticatorDataRaw64: authenticatorDataRaw64,
         },
-        policyInstruction: null,
         cpiInstructions,
-
         timestamp,
         credentialHash,
       },

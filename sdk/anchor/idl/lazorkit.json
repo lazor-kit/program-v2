@@ -60,7 +60,6 @@
         },
         {
           "name": "wallet_state",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -395,6 +394,7 @@
         },
         {
           "name": "wallet_state",
+          "writable": true,
           "pda": {
             "seeds": [
               {

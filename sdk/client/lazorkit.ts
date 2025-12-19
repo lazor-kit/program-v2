@@ -41,6 +41,7 @@ import {
   assertPositiveInteger,
   assertValidPublicKeyArray,
   assertValidTransactionInstructionArray,
+  assertValidPasskeySignature,
 } from '../validation';
 
 // Type aliases for convenience
@@ -183,10 +184,7 @@ export class LazorkitClient {
     if (params.policyDataSize !== undefined) {
       assertPositiveInteger(params.policyDataSize, 'params.policyDataSize');
     }
-    if (
-      params.policyInstruction !== null &&
-      params.policyInstruction !== undefined
-    ) {
+    if (params.policyInstruction !== undefined) {
       assertValidTransactionInstruction(
         params.policyInstruction,
         'params.policyInstruction'
@@ -201,6 +199,10 @@ export class LazorkitClient {
     assertDefined(params, 'params');
     assertValidPublicKey(params.payer, 'params.payer');
     assertValidPublicKey(params.smartWallet, 'params.smartWallet');
+    assertValidPasskeySignature(
+      params.passkeySignature,
+      'params.passkeySignature'
+    );
     assertValidCredentialHash(params.credentialHash, 'params.credentialHash');
     assertValidTransactionInstruction(
       params.cpiInstruction,
@@ -208,11 +210,14 @@ export class LazorkitClient {
     );
     assertPositiveBN(params.timestamp, 'params.timestamp');
 
-    if (params.policyInstruction !== null) {
+    if (params.policyInstruction !== undefined) {
       assertValidTransactionInstruction(
         params.policyInstruction,
         'params.policyInstruction'
       );
+    }
+    if (params.cpiSigners !== undefined) {
+      assertValidPublicKeyArray(params.cpiSigners, 'params.cpiSigners');
     }
   }
 
@@ -223,6 +228,10 @@ export class LazorkitClient {
     assertDefined(params, 'params');
     assertValidPublicKey(params.payer, 'params.payer');
     assertValidPublicKey(params.smartWallet, 'params.smartWallet');
+    assertValidPasskeySignature(
+      params.passkeySignature,
+      'params.passkeySignature'
+    );
     assertValidCredentialHash(params.credentialHash, 'params.credentialHash');
     assertValidTransactionInstructionArray(
       params.cpiInstructions,
@@ -230,7 +239,7 @@ export class LazorkitClient {
     );
     assertPositiveBN(params.timestamp, 'params.timestamp');
 
-    if (params.policyInstruction !== null) {
+    if (params.policyInstruction !== undefined) {
       assertValidTransactionInstruction(
         params.policyInstruction,
         'params.policyInstruction'
@@ -498,18 +507,17 @@ export class LazorkitClient {
       assertValidPublicKeyArray(cpiSigners, 'cpiSigners');
     }
 
-    const { data: walletStateData } = await this.fetchWalletStateContext(
-      smartWallet
-    );
-    const latestNonce = walletStateData.lastNonce.sub(new anchor.BN(1));
+    const { data: walletStateData, walletState } =
+      await this.fetchWalletStateContext(smartWallet);
+
     const { chunk, data: chunkData } = await this.fetchChunkContext(
       smartWallet,
-      latestNonce
+      walletStateData.lastNonce
     );
 
     // Prepare CPI data and split indices
-    const instructionDataList = cpiInstructions.map((ix) =>
-      Buffer.from(ix.data)
+    const instructionDataList = cpiInstructions.map(
+      (ix: TransactionInstruction) => Buffer.from(ix.data)
     );
     const splitIndex = calculateSplitIndex(cpiInstructions);
     const allAccountMetas = collectCpiAccountMetas(cpiInstructions, cpiSigners);
@@ -519,7 +527,7 @@ export class LazorkitClient {
       .accountsPartial({
         payer,
         smartWallet,
-        walletState: this.getWalletStatePubkey(smartWallet),
+        walletState,
         chunk,
         sessionRefund: chunkData.rentRefundAddress,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -821,8 +829,23 @@ export class LazorkitClient {
         break;
       }
       case types.SmartWalletAction.CreateChunk: {
-        const { policyInstruction, cpiInstructions, cpiSigners } =
-          action.args as types.ArgsByAction[types.SmartWalletAction.CreateChunk];
+        const {
+          policyInstruction: policyIns,
+          cpiInstructions,
+          cpiSigners,
+        } = action.args as types.ArgsByAction[types.SmartWalletAction.CreateChunk];
+
+        const walletStateData = await this.getWalletStateData(
+          params.smartWallet
+        );
+
+        const policyInstruction = await this.policyResolver.resolveForExecute({
+          provided: policyIns,
+          smartWallet: params.smartWallet,
+          credentialHash: params.credentialHash as types.CredentialHash,
+          passkeyPublicKey,
+          walletStateData,
+        });
 
         const smartWalletConfig = await this.getWalletStateData(smartWallet);
 

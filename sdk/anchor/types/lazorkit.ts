@@ -66,7 +66,6 @@ export type Lazorkit = {
         },
         {
           "name": "walletState",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -401,6 +400,7 @@ export type Lazorkit = {
         },
         {
           "name": "walletState",
+          "writable": true,
           "pda": {
             "seeds": [
               {
