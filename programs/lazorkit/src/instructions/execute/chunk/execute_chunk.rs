@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::security::validation;
 use crate::state::{Chunk, WalletState};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
@@ -135,6 +136,8 @@ pub fn execute_chunk(
             return Ok(());
         }
     }
+    let last_nonce = ctx.accounts.wallet_state.last_nonce;
+    ctx.accounts.wallet_state.last_nonce = validation::safe_increment_nonce(last_nonce);
 
     Ok(())
 }
@@ -152,8 +155,9 @@ pub struct ExecuteChunk<'info> {
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
+        mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
-        bump,
+        bump = wallet_state.bump,
         owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,

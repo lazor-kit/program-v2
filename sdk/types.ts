@@ -78,12 +78,12 @@ export enum SmartWalletAction {
 
 export type ArgsByAction = {
   [SmartWalletAction.Execute]: {
-    policyInstruction: anchor.web3.TransactionInstruction | null;
+    policyInstruction?: anchor.web3.TransactionInstruction;
     cpiInstruction: anchor.web3.TransactionInstruction;
     cpiSigners?: readonly anchor.web3.PublicKey[];
   };
   [SmartWalletAction.CreateChunk]: {
-    policyInstruction: anchor.web3.TransactionInstruction | null;
+    policyInstruction?: anchor.web3.TransactionInstruction;
     cpiInstructions: readonly anchor.web3.TransactionInstruction[];
     expiresAt: number;
     cpiSigners?: readonly anchor.web3.PublicKey[];
@@ -179,7 +179,7 @@ export interface CreateSmartWalletParams {
   /** Initial funding amount in lamports (optional, defaults to EMPTY_PDA_RENT_EXEMPT_BALANCE) */
   readonly amount?: anchor.BN;
   /** Custom policy instruction (optional, if not provided, default policy is used) */
-  readonly policyInstruction?: anchor.web3.TransactionInstruction | null;
+  readonly policyInstruction?: anchor.web3.TransactionInstruction;
   /** Wallet ID (optional, if not provided, a random one is generated) */
   readonly smartWalletId?: anchor.BN;
   /** Policy data size in bytes (optional, if not provided, default policy size is used) */
@@ -192,8 +192,8 @@ export interface CreateSmartWalletParams {
  * All required fields must be provided and validated
  */
 export interface ExecuteParams extends AuthParams {
-  /** Policy instruction (null for default policy, must be valid TransactionInstruction if provided) */
-  readonly policyInstruction: anchor.web3.TransactionInstruction | null;
+  /** Policy instruction (optional, if not provided, default policy is used) */
+  readonly policyInstruction?: anchor.web3.TransactionInstruction;
   /** CPI instruction to execute (required, must be valid TransactionInstruction) */
   readonly cpiInstruction: anchor.web3.TransactionInstruction;
   /** Transaction timestamp (Unix timestamp in seconds, required, must be non-negative) */
@@ -207,8 +207,8 @@ export interface ExecuteParams extends AuthParams {
  * All required fields must be provided and validated
  */
 export interface CreateChunkParams extends AuthParams {
-  /** Policy instruction (null for default policy, must be valid TransactionInstruction if provided) */
-  readonly policyInstruction: anchor.web3.TransactionInstruction | null;
+  /** Policy instruction (optional, if not provided, default policy is used) */
+  readonly policyInstruction?: anchor.web3.TransactionInstruction;
   /** CPI instructions to execute later (required, must be non-empty array, all must be valid TransactionInstructions) */
   readonly cpiInstructions: readonly anchor.web3.TransactionInstruction[];
   /** Transaction timestamp (Unix timestamp in seconds, required, must be non-negative) */
