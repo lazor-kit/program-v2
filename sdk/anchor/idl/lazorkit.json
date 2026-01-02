@@ -11,16 +11,16 @@
   ],
   "instructions": [
     {
-      "name": "create_chunk",
+      "name": "call_policy",
       "discriminator": [
-        83,
+        57,
+        50,
+        158,
+        108,
         226,
-        15,
-        219,
-        9,
-        19,
-        186,
-        90
+        148,
+        41,
+        221
       ],
       "accounts": [
         {
@@ -30,36 +30,11 @@
         },
         {
           "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "WalletState"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "wallet_state",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -87,7 +62,164 @@
           }
         },
         {
-          "name": "wallet_device"
+          "name": "wallet_authority"
+        },
+        {
+          "name": "policy_program"
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CallPolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "change_policy",
+      "discriminator": [
+        105,
+        129,
+        139,
+        210,
+        10,
+        152,
+        183,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "wallet_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_authority"
+        },
+        {
+          "name": "old_policy_program"
+        },
+        {
+          "name": "new_policy_program"
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ChangePolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_chunk",
+      "discriminator": [
+        83,
+        226,
+        15,
+        219,
+        9,
+        19,
+        186,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "wallet_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smart_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_authority"
         },
         {
           "name": "policy_program"
@@ -181,7 +313,7 @@
               },
               {
                 "kind": "arg",
-                "path": "args.wallet_id"
+                "path": "args.credential_hash"
               }
             ]
           }
@@ -216,7 +348,7 @@
           }
         },
         {
-          "name": "wallet_device",
+          "name": "wallet_authority",
           "writable": true
         },
         {
@@ -257,36 +389,6 @@
           "signer": true
         },
         {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "WalletState"
-              }
-            ]
-          }
-        },
-        {
           "name": "wallet_state",
           "writable": true,
           "pda": {
@@ -316,7 +418,11 @@
           }
         },
         {
-          "name": "wallet_device"
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_authority"
         },
         {
           "name": "policy_program"
@@ -363,36 +469,6 @@
           "signer": true
         },
         {
-          "name": "smart_wallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "WalletState"
-              }
-            ]
-          }
-        },
-        {
           "name": "wallet_state",
           "writable": true,
           "pda": {
@@ -420,6 +496,13 @@
               }
             ]
           }
+        },
+        {
+          "name": "smart_wallet",
+          "writable": true
+        },
+        {
+          "name": "wallet_authority"
         },
         {
           "name": "chunk",
@@ -486,16 +569,16 @@
       ]
     },
     {
-      "name": "WalletDevice",
+      "name": "WalletAuthority",
       "discriminator": [
-        35,
-        85,
-        31,
-        31,
-        179,
-        48,
-        136,
-        123
+        77,
+        154,
+        162,
+        218,
+        217,
+        205,
+        216,
+        227
       ]
     },
     {
@@ -651,6 +734,138 @@
   ],
   "types": [
     {
+      "name": "CallPolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "policy_data",
+            "type": "bytes"
+          },
+          {
+            "name": "new_wallet_authoritys",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "NewWalletAuthority"
+                }
+              }
+            }
+          },
+          {
+            "name": "wallet_authority_split_index",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChangePolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "client_data_json_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticator_data_raw",
+            "type": "bytes"
+          },
+          {
+            "name": "verify_instruction_index",
+            "type": "u8"
+          },
+          {
+            "name": "split_index",
+            "type": "u16"
+          },
+          {
+            "name": "delete_policy_data",
+            "type": "bytes"
+          },
+          {
+            "name": "init_policy_data",
+            "type": "bytes"
+          },
+          {
+            "name": "new_wallet_authoritys",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "NewWalletAuthority"
+                }
+              }
+            }
+          },
+          {
+            "name": "wallet_authority_split_index",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Chunk",
       "docs": [
         "Transaction chunk for deferred execution",
@@ -788,10 +1003,6 @@
             "type": "bytes"
           },
           {
-            "name": "wallet_id",
-            "type": "u64"
-          },
-          {
             "name": "amount",
             "type": "u64"
           },
@@ -857,9 +1068,35 @@
       }
     },
     {
-      "name": "WalletDevice",
+      "name": "NewWalletAuthority",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkey_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credential_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WalletAuthority",
       "docs": [
-        "Wallet device account linking a passkey to a smart wallet"
+        "Wallet authority account linking a passkey to a smart wallet"
       ],
       "type": {
         "kind": "struct",
@@ -921,18 +1158,23 @@
             "type": "u8"
           },
           {
-            "name": "wallet_id",
-            "docs": [
-              "Unique wallet identifier"
-            ],
-            "type": "u64"
-          },
-          {
             "name": "last_nonce",
             "docs": [
               "Last used nonce for anti-replay protection"
             ],
             "type": "u64"
+          },
+          {
+            "name": "base_seed",
+            "docs": [
+              "Base seed for smart wallet address derivation (initial credential_hash)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "policy_program",

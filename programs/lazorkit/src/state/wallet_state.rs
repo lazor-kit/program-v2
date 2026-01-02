@@ -7,10 +7,11 @@ use core::mem::size_of;
 pub struct WalletState {
     /// PDA bump seed for smart wallet
     pub bump: u8,
-    /// Unique wallet identifier
-    pub wallet_id: u64,
     /// Last used nonce for anti-replay protection
     pub last_nonce: u64,
+
+    /// Base seed for smart wallet address derivation (initial credential_hash)
+    pub base_seed: [u8; 32],
 
     /// Policy program that validates transactions
     pub policy_program: Pubkey,
@@ -20,6 +21,5 @@ pub struct WalletState {
 impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 
-    pub const INIT_SPACE: usize =
-        size_of::<u8>() + size_of::<u64>() + size_of::<u64>() + PUBKEY_BYTES + 4;
+    pub const INIT_SPACE: usize = size_of::<u8>() + size_of::<u64>() + 32 + PUBKEY_BYTES + 4;
 }

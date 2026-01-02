@@ -208,7 +208,7 @@ Policy management is done through the policy program directly. The default polic
 ```typescript
 // Get required PDAs for policy initialization
 const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
-const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const policySigner = lazorkitClient.getWalletAuthorityPubkey(smartWallet, credentialHash);
 const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
 
 // Initialize policy during wallet creation
@@ -290,7 +290,7 @@ const closeTx = await lazorkitClient.closeChunkTxn({
 ```typescript
 // Get required PDAs
 const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
-const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const policySigner = lazorkitClient.getWalletAuthorityPubkey(smartWallet, credentialHash);
 const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
 
 // Build policy initialization instruction
@@ -367,7 +367,7 @@ The test suite includes:
 ### Security
 
 - **Passkey Authentication**: Uses secp256r1 WebAuthn for secure authentication
-- **Multi-Device Support**: Add multiple wallet_devices to a single wallet
+- **Multi-Device Support**: Add multiple wallet_authoritys to a single wallet
 - **Policy-Based Validation**: Customizable transaction validation policies
 
 ### Flexibility

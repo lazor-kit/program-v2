@@ -4,7 +4,7 @@ use crate::constants::{
 };
 use crate::constants::{PASSKEY_PUBLIC_KEY_SIZE, SECP256R1_PROGRAM_ID, SMART_WALLET_SEED};
 use crate::state::message::{Message, SimpleMessage};
-use crate::state::WalletDevice;
+use crate::state::WalletAuthority;
 use crate::{error::LazorKitError, ID};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::HASH_BYTES;
@@ -33,19 +33,19 @@ impl PdaSigner {
     }
 }
 
-pub fn get_policy_signer(
+pub fn get_wallet_authority(
     smart_wallet: Pubkey,
-    policy_signer: Pubkey,
+    wallet_authority: Pubkey,
     credential_hash: [u8; HASH_BYTES],
 ) -> Result<PdaSigner> {
     let seeds: &[&[u8]] = &[
-        WalletDevice::PREFIX_SEED,
-        &create_wallet_device_hash(smart_wallet, credential_hash),
+        WalletAuthority::PREFIX_SEED,
+        &create_wallet_authority_hash(smart_wallet, credential_hash),
     ];
-    let (expected_policy_signer, bump) = Pubkey::find_program_address(seeds, &ID);
+    let (expected_wallet_authority, bump) = Pubkey::find_program_address(seeds, &ID);
 
     require!(
-        policy_signer == expected_policy_signer,
+        wallet_authority == expected_wallet_authority,
         LazorKitError::PasskeyMismatch
     );
 
@@ -217,7 +217,7 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
-pub fn create_wallet_device_hash(
+pub fn create_wallet_authority_hash(
     smart_wallet: Pubkey,
     credential_hash: [u8; HASH_BYTES],
 ) -> [u8; HASH_BYTES] {
@@ -327,6 +327,23 @@ pub fn compute_create_chunk_message_hash(
     compute_message_hash(nonce, timestamp, policy_hash, Some(cpi_hash))
 }
 
+pub fn compute_change_policy_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    delete_policy_hash: [u8; HASH_BYTES],
+    init_policy_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
+    compute_message_hash(nonce, timestamp, delete_policy_hash, Some(init_policy_hash))
+}
+
+pub fn compute_call_policy_message_hash(
+    nonce: u64,
+    timestamp: i64,
+    policy_hash: [u8; HASH_BYTES],
+) -> Result<[u8; HASH_BYTES]> {
+    compute_message_hash(nonce, timestamp, policy_hash, None)
+}
+
 pub fn split_remaining_accounts<'a>(
     accounts: &'a [AccountInfo<'a>],
     split_index: u16,
@@ -395,14 +412,14 @@ pub fn validate_programs_in_ranges(
 
 pub fn transfer_sol_util<'a>(
     smart_wallet: &AccountInfo<'a>,
-    wallet_id: u64,
+    base_seed: [u8; 32],
     bump: u8,
     recipient: &AccountInfo<'a>,
     system_program: &AccountInfo<'a>,
     fee: u64,
 ) -> Result<()> {
     let signer = PdaSigner {
-        seeds: vec![SMART_WALLET_SEED.to_vec(), wallet_id.to_le_bytes().to_vec()],
+        seeds: vec![SMART_WALLET_SEED.to_vec(), base_seed.to_vec()],
         bump,
     };
 
@@ -414,6 +431,85 @@ pub fn transfer_sol_util<'a>(
         system_program,
         &signer,
     )?;
+
+    Ok(())
+}
+
+/// Initialize a wallet authority account if it doesn't exist
+pub fn init_wallet_authority_if_needed<'a>(
+    wallet_authority_account: &AccountInfo<'a>,
+    smart_wallet: Pubkey,
+    passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
+    credential_hash: [u8; HASH_BYTES],
+    payer: &AccountInfo<'a>,
+    system_program: &AccountInfo<'a>,
+) -> Result<()> {
+    use crate::state::WalletAuthority;
+
+    let wallet_authority_space = WalletAuthority::DISCRIMINATOR.len() + WalletAuthority::INIT_SPACE;
+    let rent = Rent::get()?;
+    let rent_required = rent.minimum_balance(wallet_authority_space);
+
+    // Check if account exists and is initialized
+    if wallet_authority_account.data_len() == 0 {
+        // Account doesn't exist, need to initialize
+        wallet_authority_account.realloc(wallet_authority_space, false)?;
+
+        // Transfer rent
+        anchor_lang::solana_program::program::invoke(
+            &anchor_lang::solana_program::system_instruction::transfer(
+                payer.key,
+                wallet_authority_account.key,
+                rent_required,
+            ),
+            &[
+                payer.to_account_info(),
+                wallet_authority_account.to_account_info(),
+                system_program.to_account_info(),
+            ],
+        )?;
+
+        // Get bump
+        let wallet_authority_hash = create_wallet_authority_hash(smart_wallet, credential_hash);
+        let (_expected_pda, bump) = Pubkey::find_program_address(
+            &[WalletAuthority::PREFIX_SEED, &wallet_authority_hash],
+            &ID,
+        );
+
+        // Initialize account data
+        let authority = WalletAuthority {
+            bump,
+            passkey_pubkey: passkey_public_key,
+            credential_hash,
+            smart_wallet,
+        };
+
+        // Serialize to Vec first
+        use anchor_lang::AccountSerialize;
+        let mut serialized = Vec::new();
+        let discriminator = WalletAuthority::DISCRIMINATOR;
+        serialized.extend_from_slice(&discriminator);
+        authority.try_serialize(&mut serialized)?;
+
+        // Copy to account data
+        let mut account_data = wallet_authority_account.try_borrow_mut_data()?;
+        account_data[..serialized.len()].copy_from_slice(&serialized);
+
+        // Set owner
+        wallet_authority_account.assign(&ID);
+    } else {
+        // Account exists, verify it matches
+        use anchor_lang::AccountDeserialize;
+        let existing_authority =
+            WalletAuthority::try_deserialize(&mut &wallet_authority_account.data.borrow()[..])?;
+
+        require!(
+            existing_authority.credential_hash == credential_hash
+                && existing_authority.passkey_pubkey == passkey_public_key
+                && existing_authority.smart_wallet == smart_wallet,
+            crate::error::LazorKitError::InvalidInstruction
+        );
+    }
 
     Ok(())
 }

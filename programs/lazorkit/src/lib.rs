@@ -44,4 +44,18 @@ pub mod lazorkit {
     ) -> Result<()> {
         instructions::execute_chunk(ctx, instruction_data_list, split_index)
     }
+
+    pub fn change_policy<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, ChangePolicy<'info>>,
+        args: ChangePolicyArgs,
+    ) -> Result<()> {
+        instructions::change_policy(ctx, args)
+    }
+
+    pub fn call_policy<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, CallPolicy<'info>>,
+        args: CallPolicyArgs,
+    ) -> Result<()> {
+        instructions::call_policy(ctx, args)
+    }
 }

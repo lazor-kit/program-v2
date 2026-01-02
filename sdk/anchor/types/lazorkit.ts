@@ -17,16 +17,16 @@ export type Lazorkit = {
   ],
   "instructions": [
     {
-      "name": "createChunk",
+      "name": "callPolicy",
       "discriminator": [
-        83,
+        57,
+        50,
+        158,
+        108,
         226,
-        15,
-        219,
-        9,
-        19,
-        186,
-        90
+        148,
+        41,
+        221
       ],
       "accounts": [
         {
@@ -36,36 +36,11 @@ export type Lazorkit = {
         },
         {
           "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "walletState",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -93,7 +68,164 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "walletDevice"
+          "name": "walletAuthority"
+        },
+        {
+          "name": "policyProgram"
+        },
+        {
+          "name": "ixSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "callPolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "changePolicy",
+      "discriminator": [
+        105,
+        129,
+        139,
+        210,
+        10,
+        152,
+        183,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "walletState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletAuthority"
+        },
+        {
+          "name": "oldPolicyProgram"
+        },
+        {
+          "name": "newPolicyProgram"
+        },
+        {
+          "name": "ixSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "changePolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "createChunk",
+      "discriminator": [
+        83,
+        226,
+        15,
+        219,
+        9,
+        19,
+        186,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "walletState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  108,
+                  108,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "smartWallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletAuthority"
         },
         {
           "name": "policyProgram"
@@ -187,7 +319,7 @@ export type Lazorkit = {
               },
               {
                 "kind": "arg",
-                "path": "args.wallet_id"
+                "path": "args.credential_hash"
               }
             ]
           }
@@ -222,7 +354,7 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "walletDevice",
+          "name": "walletAuthority",
           "writable": true
         },
         {
@@ -263,36 +395,6 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
           "name": "walletState",
           "writable": true,
           "pda": {
@@ -322,7 +424,11 @@ export type Lazorkit = {
           }
         },
         {
-          "name": "walletDevice"
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletAuthority"
         },
         {
           "name": "policyProgram"
@@ -369,36 +475,6 @@ export type Lazorkit = {
           "signer": true
         },
         {
-          "name": "smartWallet",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  109,
-                  97,
-                  114,
-                  116,
-                  95,
-                  119,
-                  97,
-                  108,
-                  108,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet_state.wallet_id",
-                "account": "walletState"
-              }
-            ]
-          }
-        },
-        {
           "name": "walletState",
           "writable": true,
           "pda": {
@@ -426,6 +502,13 @@ export type Lazorkit = {
               }
             ]
           }
+        },
+        {
+          "name": "smartWallet",
+          "writable": true
+        },
+        {
+          "name": "walletAuthority"
         },
         {
           "name": "chunk",
@@ -492,16 +575,16 @@ export type Lazorkit = {
       ]
     },
     {
-      "name": "walletDevice",
+      "name": "walletAuthority",
       "discriminator": [
-        35,
-        85,
-        31,
-        31,
-        179,
-        48,
-        136,
-        123
+        77,
+        154,
+        162,
+        218,
+        217,
+        205,
+        216,
+        227
       ]
     },
     {
@@ -657,6 +740,138 @@ export type Lazorkit = {
   ],
   "types": [
     {
+      "name": "callPolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "clientDataJsonRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticatorDataRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "verifyInstructionIndex",
+            "type": "u8"
+          },
+          {
+            "name": "policyData",
+            "type": "bytes"
+          },
+          {
+            "name": "newWalletAuthoritys",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "newWalletAuthority"
+                }
+              }
+            }
+          },
+          {
+            "name": "walletAuthoritySplitIndex",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "changePolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "clientDataJsonRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "authenticatorDataRaw",
+            "type": "bytes"
+          },
+          {
+            "name": "verifyInstructionIndex",
+            "type": "u8"
+          },
+          {
+            "name": "splitIndex",
+            "type": "u16"
+          },
+          {
+            "name": "deletePolicyData",
+            "type": "bytes"
+          },
+          {
+            "name": "initPolicyData",
+            "type": "bytes"
+          },
+          {
+            "name": "newWalletAuthoritys",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "newWalletAuthority"
+                }
+              }
+            }
+          },
+          {
+            "name": "walletAuthoritySplitIndex",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "chunk",
       "docs": [
         "Transaction chunk for deferred execution",
@@ -794,10 +1009,6 @@ export type Lazorkit = {
             "type": "bytes"
           },
           {
-            "name": "walletId",
-            "type": "u64"
-          },
-          {
             "name": "amount",
             "type": "u64"
           },
@@ -863,9 +1074,35 @@ export type Lazorkit = {
       }
     },
     {
-      "name": "walletDevice",
+      "name": "newWalletAuthority",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "passkeyPublicKey",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "credentialHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "walletAuthority",
       "docs": [
-        "Wallet device account linking a passkey to a smart wallet"
+        "Wallet authority account linking a passkey to a smart wallet"
       ],
       "type": {
         "kind": "struct",
@@ -927,18 +1164,23 @@ export type Lazorkit = {
             "type": "u8"
           },
           {
-            "name": "walletId",
-            "docs": [
-              "Unique wallet identifier"
-            ],
-            "type": "u64"
-          },
-          {
             "name": "lastNonce",
             "docs": [
               "Last used nonce for anti-replay protection"
             ],
             "type": "u64"
+          },
+          {
+            "name": "baseSeed",
+            "docs": [
+              "Base seed for smart wallet address derivation (initial credential_hash)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "policyProgram",

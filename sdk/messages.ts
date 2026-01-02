@@ -185,9 +185,7 @@ const encodeMessage = <T>(messageType: string, data: T): Buffer => {
     return Buffer.from(encoded);
   } catch (error) {
     throw new Error(
-      `Failed to encode ${messageType}: ${
-        error instanceof Error ? error.message : 'Unknown error'
-      }`
+      `Failed to encode ${messageType}: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 };
@@ -277,6 +275,82 @@ export function buildCreateChunkMessage(
     timestampBuffer,
     Buffer.from(policyHash),
     Buffer.from(cpiHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
+  });
+}
+export function buildChangePolicyMessage(
+  smartWallet: anchor.web3.PublicKey,
+  nonce: anchor.BN,
+  timestamp: anchor.BN,
+  deletePolicyIns: anchor.web3.TransactionInstruction,
+  initPolicyIns: anchor.web3.TransactionInstruction
+): Buffer {
+  const deletePolicyHashes = computePolicyHashes(deletePolicyIns, smartWallet);
+  const initPolicyHashes = computePolicyHashes(initPolicyIns, smartWallet);
+
+  // Create combined hash of delete policy hashes
+  const deletePolicyCombined = new Uint8Array(64);
+  deletePolicyCombined.set(deletePolicyHashes.policyDataHash, 0);
+  deletePolicyCombined.set(deletePolicyHashes.policyAccountsHash, 32);
+  const deletePolicyHash = computeHash(deletePolicyCombined);
+
+  // Create combined hash of init policy hashes
+  const initPolicyCombined = new Uint8Array(64);
+  initPolicyCombined.set(initPolicyHashes.policyDataHash, 0);
+  initPolicyCombined.set(initPolicyHashes.policyAccountsHash, 32);
+  const initPolicyHash = computeHash(initPolicyCombined);
+
+  // Create final hash: hash(nonce, timestamp, deletePolicyHash, initPolicyHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(deletePolicyHash),
+    Buffer.from(initPolicyHash),
+  ]);
+
+  const dataHash = computeHash(finalData);
+
+  return encodeMessage('SimpleMessage', {
+    dataHash: Array.from(dataHash),
+  });
+}
+
+export function buildCallPolicyMessage(
+  smartWallet: anchor.web3.PublicKey,
+  nonce: anchor.BN,
+  timestamp: anchor.BN,
+  policyIns: anchor.web3.TransactionInstruction
+): Buffer {
+  const policyHashes = computePolicyHashes(policyIns, smartWallet);
+
+  // Create combined hash of policy hashes
+  const policyCombined = new Uint8Array(64);
+  policyCombined.set(policyHashes.policyDataHash, 0);
+  policyCombined.set(policyHashes.policyAccountsHash, 32);
+  const policyHash = computeHash(policyCombined);
+
+  // Create final hash: hash(nonce, timestamp, policyHash)
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(BigInt(nonce.toString()), 0);
+
+  const timestampBuffer = Buffer.alloc(8);
+  timestampBuffer.writeBigInt64LE(BigInt(timestamp.toString()), 0);
+
+  const finalData = Buffer.concat([
+    nonceBuffer,
+    timestampBuffer,
+    Buffer.from(policyHash),
   ]);
 
   const dataHash = computeHash(finalData);

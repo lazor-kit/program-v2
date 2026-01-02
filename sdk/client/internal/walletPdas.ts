@@ -3,7 +3,7 @@ import {
   deriveSmartWalletPda,
   deriveSmartWalletConfigPda,
   deriveChunkPda,
-  deriveWalletDevicePda,
+  deriveWalletAuthorityPda,
 } from '../../pda/lazorkit';
 import * as types from '../../types';
 import {
@@ -21,11 +21,10 @@ type BN = anchor.BN;
  * consistent validation for every caller.
  */
 export class WalletPdaFactory {
-  constructor(private readonly programId: PublicKey) {}
+  constructor(private readonly programId: PublicKey) { }
 
-  smartWallet(walletId: BN): PublicKey {
-    assertPositiveBN(walletId, 'walletId');
-    return deriveSmartWalletPda(this.programId, walletId);
+  smartWallet(baseSeed: number[]): PublicKey {
+    return deriveSmartWalletPda(this.programId, baseSeed);
   }
 
   walletState(smartWallet: PublicKey): PublicKey {
@@ -33,14 +32,14 @@ export class WalletPdaFactory {
     return deriveSmartWalletConfigPda(this.programId, smartWallet);
   }
 
-  walletDevice(
+  walletAuthority(
     smartWallet: PublicKey,
     credentialHash: types.CredentialHash | number[]
   ): PublicKey {
     assertValidPublicKey(smartWallet, 'smartWallet');
     assertValidCredentialHash(credentialHash, 'credentialHash');
 
-    return deriveWalletDevicePda(
+    return deriveWalletAuthorityPda(
       this.programId,
       smartWallet,
       credentialHash

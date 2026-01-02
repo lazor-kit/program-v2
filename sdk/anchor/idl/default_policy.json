@@ -8,6 +8,43 @@
   },
   "instructions": [
     {
+      "name": "add_authority",
+      "discriminator": [
+        229,
+        9,
+        106,
+        73,
+        91,
+        213,
+        109,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "smart_wallet"
+        }
+      ],
+      "args": [
+        {
+          "name": "policy_data",
+          "type": "bytes"
+        },
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "PolicyStruct"
+        }
+      }
+    },
+    {
       "name": "check_policy",
       "discriminator": [
         28,
@@ -21,7 +58,7 @@
       ],
       "accounts": [
         {
-          "name": "policy_signer",
+          "name": "authority",
           "signer": true
         },
         {
@@ -29,28 +66,6 @@
         }
       ],
       "args": [
-        {
-          "name": "wallet_id",
-          "type": "u64"
-        },
-        {
-          "name": "passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
         {
           "name": "policy_data",
           "type": "bytes"
@@ -71,40 +86,53 @@
       ],
       "accounts": [
         {
-          "name": "policy_signer",
+          "name": "authority",
           "signer": true
         },
         {
           "name": "smart_wallet",
+          "docs": [
+            "Must mut follow lazorkit standard"
+          ],
           "writable": true
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "PolicyStruct"
+        }
+      }
+    },
+    {
+      "name": "remove_authority",
+      "discriminator": [
+        242,
+        104,
+        208,
+        132,
+        190,
+        250,
+        74,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
         },
         {
-          "name": "wallet_state",
-          "writable": true
+          "name": "smart_wallet"
         }
       ],
       "args": [
         {
-          "name": "wallet_id",
-          "type": "u64"
+          "name": "policy_data",
+          "type": "bytes"
         },
         {
-          "name": "passkey_public_key",
-          "type": {
-            "array": [
-              "u8",
-              33
-            ]
-          }
-        },
-        {
-          "name": "credential_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
+          "name": "new_authority",
+          "type": "pubkey"
         }
       ],
       "returns": {
@@ -112,6 +140,21 @@
           "name": "PolicyStruct"
         }
       }
+    }
+  ],
+  "accounts": [
+    {
+      "name": "WalletAuthority",
+      "discriminator": [
+        77,
+        154,
+        162,
+        218,
+        217,
+        205,
+        216,
+        227
+      ]
     }
   ],
   "errors": [
@@ -124,16 +167,45 @@
       "code": 6001,
       "name": "Unauthorized",
       "msg": "Unauthorized to access smart wallet"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidSmartWallet",
+      "msg": "Invalid smart wallet"
     }
   ],
   "types": [
     {
-      "name": "DeviceSlot",
+      "name": "PolicyStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "smart_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authoritis",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WalletAuthority",
+      "docs": [
+        "Wallet authority account linking a passkey to a smart wallet"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "passkey_pubkey",
+            "docs": [
+              "Secp256r1 compressed public key (33 bytes)"
+            ],
             "type": {
               "array": [
                 "u8",
@@ -143,41 +215,39 @@
           },
           {
             "name": "credential_hash",
+            "docs": [
+              "SHA256 hash of the credential ID"
+            ],
             "type": {
               "array": [
                 "u8",
                 32
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "PolicyStruct",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
           },
           {
             "name": "smart_wallet",
+            "docs": [
+              "Associated smart wallet address"
+            ],
             "type": "pubkey"
           },
           {
-            "name": "device_slots",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "DeviceSlot"
-                }
-              }
-            }
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
           }
         ]
       }
+    }
+  ],
+  "constants": [
+    {
+      "name": "POLICY_DATA_SIZE",
+      "type": "u16",
+      "value": "196"
     }
   ]
 }

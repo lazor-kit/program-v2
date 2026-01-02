@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::HASH_BYTES;
 
 use crate::security::validation;
-use crate::state::{Chunk, WalletDevice, WalletState};
+use crate::state::{Chunk, WalletAuthority, WalletState};
 use crate::utils::{
-    compute_create_chunk_message_hash, compute_instruction_hash, create_wallet_device_hash,
-    execute_cpi, get_policy_signer, sighash, verify_authorization_hash,
+    compute_create_chunk_message_hash, compute_instruction_hash, create_wallet_authority_hash,
+    execute_cpi, get_wallet_authority, sighash, verify_authorization_hash,
 };
 use crate::{
     constants::{PASSKEY_PUBLIC_KEY_SIZE, SMART_WALLET_SEED},
@@ -30,9 +30,9 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
     validation::validate_instruction_timestamp(args.timestamp)?;
 
     let smart_wallet_key = ctx.accounts.smart_wallet.key();
-    let wallet_device_key = ctx.accounts.wallet_device.key();
+    let wallet_authority_key = ctx.accounts.wallet_authority.key();
     let policy_program_key = ctx.accounts.policy_program.key();
-    let credential_hash = ctx.accounts.wallet_device.credential_hash;
+    let credential_hash = ctx.accounts.wallet_authority.credential_hash;
     let last_nonce = ctx.accounts.wallet_state.last_nonce;
     let payer_key = ctx.accounts.payer.key();
 
@@ -53,7 +53,8 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         expected_message_hash,
     )?;
 
-    let policy_signer = get_policy_signer(smart_wallet_key, wallet_device_key, credential_hash)?;
+    let wallet_authority =
+        get_wallet_authority(smart_wallet_key, wallet_authority_key, credential_hash)?;
     require!(
         args.policy_data.get(0..8) == Some(&sighash("global", "check_policy")),
         LazorKitError::InvalidInstructionDiscriminator
@@ -62,7 +63,7 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         ctx.remaining_accounts,
         &args.policy_data,
         &ctx.accounts.policy_program,
-        &policy_signer,
+        &wallet_authority,
     )?;
 
     ctx.accounts.chunk.set_inner(Chunk {
@@ -83,12 +84,6 @@ pub struct CreateChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
-        bump = wallet_state.bump,
-    )]
-    pub smart_wallet: SystemAccount<'info>,
-
-    #[account(
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
@@ -96,11 +91,18 @@ pub struct CreateChunk<'info> {
     pub wallet_state: Box<Account<'info, WalletState>>,
 
     #[account(
-        seeds = [WalletDevice::PREFIX_SEED, &create_wallet_device_hash(smart_wallet.key(), wallet_device.credential_hash)],
+        mut,
+        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed],
+        bump = wallet_state.bump,
+    )]
+    pub smart_wallet: SystemAccount<'info>,
+
+    #[account(
+        seeds = [WalletAuthority::PREFIX_SEED, &create_wallet_authority_hash(smart_wallet.key(), wallet_authority.credential_hash)],
         bump,
         owner = ID,
     )]
-    pub wallet_device: Box<Account<'info, WalletDevice>>,
+    pub wallet_authority: Box<Account<'info, WalletAuthority>>,
 
     #[account(address = wallet_state.policy_program)]
     /// CHECK: Validated to match wallet_state.policy_program

@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::security::validation;
-use crate::state::{Chunk, WalletState};
-use crate::utils::{execute_cpi, PdaSigner};
+use crate::state::{Chunk, WalletAuthority, WalletState};
+use crate::utils::{create_wallet_authority_hash, execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{HASH_BYTES, Hasher, hash};
 
@@ -16,8 +16,8 @@ pub fn execute_chunk(
     // Cache frequently accessed values
     let cpi_accounts = &ctx.remaining_accounts;
     let smart_wallet_key = ctx.accounts.smart_wallet.key();
-    let wallet_id = ctx.accounts.wallet_state.wallet_id;
     let wallet_bump = ctx.accounts.wallet_state.bump;
+
     let chunk = &ctx.accounts.chunk;
     let authorized_timestamp = chunk.authorized_timestamp;
     let expected_cpi_hash = chunk.cpi_hash;
@@ -120,7 +120,7 @@ pub fn execute_chunk(
 
     // Execute CPI instructions
     let wallet_signer = PdaSigner {
-        seeds: vec![SMART_WALLET_SEED.to_vec(), wallet_id.to_le_bytes().to_vec()],
+        seeds: vec![SMART_WALLET_SEED.to_vec(), ctx.accounts.wallet_state.base_seed.to_vec()],
         bump: wallet_bump,
     };
 
@@ -150,18 +150,25 @@ pub struct ExecuteChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, wallet_state.wallet_id.to_le_bytes().as_ref()],
-        bump = wallet_state.bump,
-    )]
-    pub smart_wallet: SystemAccount<'info>,
-
-    #[account(
-        mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
     )]
     pub wallet_state: Box<Account<'info, WalletState>>,
+
+    #[account(
+        mut,
+        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed],
+        bump = wallet_state.bump,
+    )]
+    pub smart_wallet: SystemAccount<'info>,
+
+    #[account(
+        seeds = [WalletAuthority::PREFIX_SEED, &create_wallet_authority_hash(smart_wallet.key(), wallet_authority.credential_hash)],
+        bump,
+        owner = ID,
+    )]
+    pub wallet_authority: Box<Account<'info, WalletAuthority>>,
 
     #[account(
         mut,

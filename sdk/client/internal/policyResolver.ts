@@ -10,18 +10,14 @@ type BN = anchor.BN;
 interface ExecutePolicyContext {
   provided?: TransactionInstruction;
   smartWallet: PublicKey;
-  credentialHash: types.CredentialHash;
-  passkeyPublicKey: types.PasskeyPublicKey | number[];
-  walletStateData: types.WalletState;
+  authority: PublicKey;
+  policyData: Buffer;
 }
 
 interface CreatePolicyContext {
   provided?: TransactionInstruction;
-  smartWalletId: BN;
   smartWallet: PublicKey;
-  walletState: PublicKey;
-  passkeyPublicKey: types.PasskeyPublicKey | number[];
-  credentialHash: types.CredentialHash;
+  authority: PublicKey;
 }
 
 /**
@@ -32,58 +28,37 @@ export class PolicyInstructionResolver {
   constructor(
     private readonly policyClient: DefaultPolicyClient,
     private readonly walletPdas: WalletPdaFactory
-  ) {}
+  ) { }
 
   async resolveForExecute({
     provided,
     smartWallet,
-    credentialHash,
-    passkeyPublicKey,
-    walletStateData,
+    authority,
+    policyData
   }: ExecutePolicyContext): Promise<TransactionInstruction> {
     if (provided !== undefined) {
       return provided;
     }
 
-    const policySigner = this.walletPdas.walletDevice(
-      smartWallet,
-      credentialHash
-    );
-
     return this.policyClient.buildCheckPolicyIx({
-      walletId: walletStateData.walletId,
-      passkeyPublicKey,
-      policySigner,
+      authority,
       smartWallet,
-      credentialHash,
-      policyData: walletStateData.policyData,
+      policyData,
     });
   }
 
   async resolveForCreate({
     provided,
-    smartWalletId,
     smartWallet,
-    walletState,
-    passkeyPublicKey,
-    credentialHash,
+    authority,
   }: CreatePolicyContext): Promise<TransactionInstruction> {
     if (provided !== undefined) {
       return provided;
     }
 
-    const policySigner = this.walletPdas.walletDevice(
-      smartWallet,
-      credentialHash
-    );
-
     return this.policyClient.buildInitPolicyIx({
-      walletId: smartWalletId,
-      passkeyPublicKey,
-      credentialHash,
-      policySigner,
+      authority,
       smartWallet,
-      walletState,
     });
   }
 }

@@ -4,8 +4,12 @@ use lazorkit::{state::WalletAuthority, ID as LAZORKIT_ID};
 use crate::{error::PolicyError, state::PolicyStruct};
 
 /// Verify that a passkey is authorized for a smart wallet transaction
-pub fn check_policy(ctx: Context<CheckPolicy>, policy_data: Vec<u8>) -> Result<()> {
-    let policy_struct = PolicyStruct::try_from_slice(&policy_data)?;
+pub fn remove_authority(
+    ctx: Context<RemoveAuthority>,
+    policy_data: Vec<u8>,
+    new_authority: Pubkey,
+) -> Result<PolicyStruct> {
+    let mut policy_struct = PolicyStruct::try_from_slice(&policy_data)?;
 
     require!(
         policy_struct.smart_wallet == ctx.accounts.smart_wallet.key(),
@@ -19,11 +23,13 @@ pub fn check_policy(ctx: Context<CheckPolicy>, policy_data: Vec<u8>) -> Result<(
         PolicyError::Unauthorized
     );
 
-    Ok(())
+    policy_struct.authoritis.push(new_authority);
+
+    Ok(policy_struct)
 }
 
 #[derive(Accounts)]
-pub struct CheckPolicy<'info> {
+pub struct RemoveAuthority<'info> {
     #[account(
         signer,
         owner = LAZORKIT_ID,

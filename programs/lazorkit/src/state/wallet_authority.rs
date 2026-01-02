@@ -1,10 +1,10 @@
 use crate::constants::PASSKEY_PUBLIC_KEY_SIZE;
 use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 
-/// Wallet device account linking a passkey to a smart wallet
+/// Wallet authority account linking a passkey to a smart wallet
 #[account]
 #[derive(Debug, InitSpace)]
-pub struct WalletDevice {
+pub struct WalletAuthority {
     /// Secp256r1 compressed public key (33 bytes)
     pub passkey_pubkey: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     /// SHA256 hash of the credential ID
@@ -15,6 +15,6 @@ pub struct WalletDevice {
     pub bump: u8,
 }
 
-impl WalletDevice {
-    pub const PREFIX_SEED: &'static [u8] = b"wallet_device";
+impl WalletAuthority {
+    pub const PREFIX_SEED: &'static [u8] = b"wallet_authority";
 }

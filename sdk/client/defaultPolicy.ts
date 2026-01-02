@@ -17,34 +17,20 @@ import {
  * Parameters for building initialize policy instruction
  */
 export interface BuildInitPolicyIxParams {
-  /** Wallet ID (required, must be non-negative) */
-  readonly walletId: anchor.BN;
-  /** Passkey public key (33 bytes, required) */
-  readonly passkeyPublicKey: types.PasskeyPublicKey | number[];
-  /** Credential hash (32 bytes, required) */
-  readonly credentialHash: types.CredentialHash | number[];
   /** Policy signer PDA address (required) */
-  readonly policySigner: anchor.web3.PublicKey;
+  readonly authority: anchor.web3.PublicKey;
   /** Smart wallet PDA address (required) */
   readonly smartWallet: anchor.web3.PublicKey;
-  /** Wallet state PDA address (required) */
-  readonly walletState: anchor.web3.PublicKey;
 }
 
 /**
  * Parameters for building check policy instruction
  */
 export interface BuildCheckPolicyIxParams {
-  /** Wallet ID (required, must be non-negative) */
-  readonly walletId: anchor.BN;
-  /** Passkey public key (33 bytes, required) */
-  readonly passkeyPublicKey: types.PasskeyPublicKey | number[];
   /** Policy signer PDA address (required) */
-  readonly policySigner: anchor.web3.PublicKey;
+  readonly authority: anchor.web3.PublicKey;
   /** Smart wallet PDA address (required) */
   readonly smartWallet: anchor.web3.PublicKey;
-  /** Credential hash (32 bytes, required) */
-  readonly credentialHash: types.CredentialHash | number[];
   /** Policy data buffer (required, must be a Buffer instance) */
   readonly policyData: Buffer;
 }
@@ -85,7 +71,7 @@ export class DefaultPolicyClient {
    * @returns Policy data size in bytes
    */
   getPolicyDataSize(): number {
-    return 1 + 32 + 4 + 33 + 32;
+    return 32 + 4 + 32;
   }
 
   /**
@@ -93,15 +79,8 @@ export class DefaultPolicyClient {
    */
   private validateInitPolicyParams(params: BuildInitPolicyIxParams): void {
     assertDefined(params, 'params');
-    assertPositiveBN(params.walletId, 'params.walletId');
-    assertValidPasskeyPublicKey(
-      params.passkeyPublicKey,
-      'params.passkeyPublicKey'
-    );
-    assertValidCredentialHash(params.credentialHash, 'params.credentialHash');
-    assertValidPublicKey(params.policySigner, 'params.policySigner');
+    assertValidPublicKey(params.authority, 'params.authority');
     assertValidPublicKey(params.smartWallet, 'params.smartWallet');
-    assertValidPublicKey(params.walletState, 'params.walletState');
   }
 
   /**
@@ -117,15 +96,10 @@ export class DefaultPolicyClient {
     this.validateInitPolicyParams(params);
 
     return await this.program.methods
-      .initPolicy(
-        params.walletId,
-        toNumberArraySafe(params.passkeyPublicKey),
-        toNumberArraySafe(params.credentialHash)
-      )
+      .initPolicy()
       .accountsPartial({
         smartWallet: params.smartWallet,
-        walletState: params.walletState,
-        policySigner: params.policySigner,
+        authority: params.authority,
       })
       .instruction();
   }
@@ -135,14 +109,8 @@ export class DefaultPolicyClient {
    */
   private validateCheckPolicyParams(params: BuildCheckPolicyIxParams): void {
     assertDefined(params, 'params');
-    assertPositiveBN(params.walletId, 'params.walletId');
-    assertValidPasskeyPublicKey(
-      params.passkeyPublicKey,
-      'params.passkeyPublicKey'
-    );
-    assertValidPublicKey(params.policySigner, 'params.policySigner');
+    assertValidPublicKey(params.authority, 'params.authority');
     assertValidPublicKey(params.smartWallet, 'params.smartWallet');
-    assertValidCredentialHash(params.credentialHash, 'params.credentialHash');
     assertDefined(params.policyData, 'params.policyData');
     if (!Buffer.isBuffer(params.policyData)) {
       throw new ValidationError(
@@ -166,14 +134,12 @@ export class DefaultPolicyClient {
 
     return await this.program.methods
       .checkPolicy(
-        params.walletId,
-        toNumberArraySafe(params.passkeyPublicKey),
-        toNumberArraySafe(params.credentialHash),
+
         params.policyData
       )
       .accountsPartial({
         smartWallet: params.smartWallet,
-        policySigner: params.policySigner,
+        authority: params.authority,
       })
       .instruction();
   }
