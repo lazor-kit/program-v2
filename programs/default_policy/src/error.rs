@@ -6,4 +6,7 @@ pub enum PolicyError {
     InvalidPasskey,
     #[msg("Unauthorized to access smart wallet")]
     Unauthorized,
+
+    #[msg("Invalid smart wallet")]
+    InvalidSmartWallet,
 }

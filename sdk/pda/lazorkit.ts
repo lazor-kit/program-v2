@@ -5,15 +5,15 @@ import { sha256 } from 'js-sha256';
 
 export const SMART_WALLET_SEED = Buffer.from('smart_wallet');
 export const SMART_WALLET_CONFIG_SEED = Buffer.from('wallet_state');
-export const WALLET_DEVICE_SEED = Buffer.from('wallet_device');
+export const wallet_authority_SEED = Buffer.from('wallet_authority');
 export const CHUNK_SEED = Buffer.from('chunk');
 
 export function deriveSmartWalletPda(
   programId: anchor.web3.PublicKey,
-  walletId: anchor.BN
+  baseSeed: number[]
 ): anchor.web3.PublicKey {
   return anchor.web3.PublicKey.findProgramAddressSync(
-    [SMART_WALLET_SEED, walletId.toArrayLike(Buffer, 'le', 8)],
+    [SMART_WALLET_SEED, Buffer.from(baseSeed)],
     programId
   )[0];
 }
@@ -28,7 +28,7 @@ export function deriveSmartWalletConfigPda(
   )[0];
 }
 
-function createWalletDeviceHash(
+function createWalletAuthorityHash(
   smartWallet: anchor.web3.PublicKey,
   credentialHash: number[]
 ): Buffer {
@@ -40,13 +40,13 @@ function createWalletDeviceHash(
   return Buffer.from(hash).subarray(0, 32);
 }
 
-export function deriveWalletDevicePda(
+export function deriveWalletAuthorityPda(
   programId: anchor.web3.PublicKey,
   smartWallet: anchor.web3.PublicKey,
   credentialHash: number[]
 ): [anchor.web3.PublicKey, number] {
   return anchor.web3.PublicKey.findProgramAddressSync(
-    [WALLET_DEVICE_SEED, createWalletDeviceHash(smartWallet, credentialHash)],
+    [wallet_authority_SEED, createWalletAuthorityHash(smartWallet, credentialHash)],
     programId
   );
 }

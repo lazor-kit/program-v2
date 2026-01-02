@@ -46,11 +46,6 @@ pub mod validation {
     use super::*;
     use crate::{error::LazorKitError, ID};
 
-    pub fn validate_wallet_id(wallet_id: u64) -> Result<()> {
-        require!(wallet_id != 0, LazorKitError::InvalidSequenceNumber);
-        Ok(())
-    }
-
     pub fn validate_passkey_format(
         passkey_public_key: &[u8; crate::constants::PASSKEY_PUBLIC_KEY_SIZE],
     ) -> Result<()> {

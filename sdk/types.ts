@@ -5,7 +5,7 @@ import { Lazorkit } from './anchor/types/lazorkit';
 // Core Types (from on-chain)
 // ============================================================================
 export type WalletState = anchor.IdlTypes<Lazorkit>['walletState'];
-export type WalletDevice = anchor.IdlTypes<Lazorkit>['walletDevice'];
+export type WalletAuthority = anchor.IdlTypes<Lazorkit>['walletAuthority'];
 export type Chunk = anchor.IdlTypes<Lazorkit>['chunk'];
 
 // Instruction Args
@@ -71,11 +71,19 @@ export function asSignature(value: number[]): Signature {
 // Smart Wallet Actions
 // ============================================================================
 export enum SmartWalletAction {
+  Execute = 'execute',
   CreateChunk = 'create_chunk',
   ExecuteChunk = 'execute_chunk',
+  ChangePolicy = 'change_policy',
+  CallPolicy = 'call_policy',
 }
 
 export type ArgsByAction = {
+  [SmartWalletAction.Execute]: {
+    policyInstruction?: anchor.web3.TransactionInstruction;
+    cpiInstruction: anchor.web3.TransactionInstruction;
+    cpiSigners?: readonly anchor.web3.PublicKey[];
+  };
   [SmartWalletAction.CreateChunk]: {
     policyInstruction?: anchor.web3.TransactionInstruction;
     cpiInstructions: readonly anchor.web3.TransactionInstruction[];
@@ -85,6 +93,14 @@ export type ArgsByAction = {
   [SmartWalletAction.ExecuteChunk]: {
     cpiInstructions: readonly anchor.web3.TransactionInstruction[];
     cpiSigners?: readonly anchor.web3.PublicKey[];
+  };
+  [SmartWalletAction.ChangePolicy]: {
+    deletePolicyInstruction?: anchor.web3.TransactionInstruction;
+    initPolicyInstruction?: anchor.web3.TransactionInstruction;
+    newPolicyProgram: anchor.web3.PublicKey;
+  };
+  [SmartWalletAction.CallPolicy]: {
+    policyInstruction: anchor.web3.TransactionInstruction;
   };
 };
 
@@ -125,8 +141,8 @@ export interface TransactionBuilderOptions {
 
 export interface TransactionBuilderResult {
   readonly transaction:
-    | anchor.web3.Transaction
-    | anchor.web3.VersionedTransaction;
+  | anchor.web3.Transaction
+  | anchor.web3.VersionedTransaction;
   readonly isVersioned: boolean;
   readonly recentBlockhash: string;
 }
@@ -170,12 +186,12 @@ export interface CreateSmartWalletParams {
   readonly passkeyPublicKey: PasskeyPublicKey;
   /** Base64-encoded credential ID (required, must be valid base64) */
   readonly credentialIdBase64: string;
+  /** Base seed for smart wallet PDA (required) */
+  readonly baseSeed: number[];
   /** Initial funding amount in lamports (optional, defaults to EMPTY_PDA_RENT_EXEMPT_BALANCE) */
   readonly amount?: anchor.BN;
   /** Custom policy instruction (optional, if not provided, default policy is used) */
   readonly policyInstruction?: anchor.web3.TransactionInstruction;
-  /** Wallet ID (optional, if not provided, a random one is generated) */
-  readonly smartWalletId?: anchor.BN;
   /** Policy data size in bytes (optional, if not provided, default policy size is used) */
   readonly policyDataSize?: number;
 }
@@ -217,6 +233,8 @@ export interface CreateChunkParams extends AuthParams {
  * All required fields must be provided and validated
  */
 export interface ExecuteChunkParams extends BaseParams {
+  /** Wallet authority (required, must be valid PublicKey) */
+  readonly walletAuthority: anchor.web3.PublicKey;
   /** CPI instructions to execute (required, must be non-empty array, all must be valid TransactionInstructions) */
   readonly cpiInstructions: readonly anchor.web3.TransactionInstruction[];
   /** Optional signers for CPI instructions (all must be valid PublicKeys if provided) */

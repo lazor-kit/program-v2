@@ -1,15 +1,12 @@
-use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
-use lazorkit::constants::PASSKEY_PUBLIC_KEY_SIZE;
+use anchor_lang::prelude::*;
 
-#[derive(Debug, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Clone, Copy)]
-pub struct DeviceSlot {
-    pub passkey_pubkey: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub credential_hash: [u8; HASH_BYTES],
+#[derive(Debug, AnchorSerialize, AnchorDeserialize, InitSpace)]
+pub struct PolicyStruct {
+    pub smart_wallet: Pubkey,
+    #[max_len(5)]
+    pub authoritis: Vec<Pubkey>, // max 5
 }
 
-#[derive(Debug, AnchorSerialize, AnchorDeserialize)]
-pub struct PolicyStruct {
-    pub bump: u8,
-    pub smart_wallet: Pubkey,
-    pub device_slots: Vec<DeviceSlot>,
+impl PolicyStruct {
+    pub const LEN: usize = PolicyStruct::INIT_SPACE;
 }

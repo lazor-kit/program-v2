@@ -86,7 +86,7 @@ The main client for interacting with the LazorKit program.
 
 **Key Methods:**
 
-- **PDA Derivation**: `getSmartWalletPubkey()`, `getWalletStatePubkey()`, `getWalletDevicePubkey()`, `getChunkPubkey()`
+- **PDA Derivation**: `getSmartWalletPubkey()`, `getWalletStatePubkey()`, `getWalletAuthorityPubkey()`, `getChunkPubkey()`
 - **Account Data**: `getWalletStateData()`, `getChunkData()`
 - **Wallet Search**: `getSmartWalletByPasskey()`, `getSmartWalletByCredentialHash()`, `findSmartWallet()`
 - **Low-level Builders**: `buildCreateSmartWalletIns()`, `buildExecuteIns()`, `buildCreateChunkIns()`, `buildExecuteChunkIns()`, `buildCloseChunkIns()`
@@ -640,7 +640,7 @@ const defaultPolicyClient = new DefaultPolicyClient(connection);
 
 // Get required PDAs
 const walletStateData = await lazorkitClient.getWalletStateData(smartWallet);
-const policySigner = lazorkitClient.getWalletDevicePubkey(smartWallet, credentialHash);
+const policySigner = lazorkitClient.getWalletAuthorityPubkey(smartWallet, credentialHash);
 const walletState = lazorkitClient.getWalletStatePubkey(smartWallet);
 
 // Build policy initialization instruction
