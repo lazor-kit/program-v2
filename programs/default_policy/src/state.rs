@@ -1,10 +1,10 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::HASH_BYTES};
 use lazorkit::constants::PASSKEY_PUBLIC_KEY_SIZE;
 
 #[derive(Debug, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Clone, Copy)]
 pub struct DeviceSlot {
     pub passkey_pubkey: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub credential_hash: [u8; 32],
+    pub credential_hash: [u8; HASH_BYTES],
 }
 
 #[derive(Debug, AnchorSerialize, AnchorDeserialize)]

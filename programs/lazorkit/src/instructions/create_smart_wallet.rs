@@ -1,5 +1,6 @@
 use anchor_lang::{
     prelude::*,
+    solana_program::hash::HASH_BYTES,
     system_program::{transfer, Transfer},
 };
 
@@ -14,7 +15,7 @@ use crate::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CreateSmartWalletArgs {
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
-    pub credential_hash: [u8; 32],
+    pub credential_hash: [u8; HASH_BYTES],
     pub init_policy_data: Vec<u8>,
     pub wallet_id: u64,
     pub amount: u64,

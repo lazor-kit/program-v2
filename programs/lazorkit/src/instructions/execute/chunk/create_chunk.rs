@@ -69,11 +69,9 @@ pub fn create_chunk(ctx: Context<CreateChunk>, args: CreateChunkArgs) -> Result<
         owner_wallet_address: smart_wallet_key,
         cpi_hash: args.cpi_hash,
         authorized_nonce: last_nonce,
-        authorized_timestamp: args.timestamp,
+        authorized_timestamp: Clock::get()?.unix_timestamp,
         rent_refund_address: payer_key,
     });
-
-    ctx.accounts.wallet_state.last_nonce = validation::safe_increment_nonce(last_nonce);
     Ok(())
 }
 
@@ -91,7 +89,6 @@ pub struct CreateChunk<'info> {
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
-        mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,
