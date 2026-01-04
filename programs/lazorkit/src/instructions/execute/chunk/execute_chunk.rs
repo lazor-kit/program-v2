@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::error::LazorKitError;
+use crate::security::validation;
 use crate::state::{Chunk, WalletState};
 use crate::utils::{execute_cpi, PdaSigner};
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::solana_program::hash::{HASH_BYTES, Hasher, hash};
 
 /// Execute a previously created chunk
+/// Always returns Ok(()) - errors are logged but don't fail the transaction
 pub fn execute_chunk(
     ctx: Context<ExecuteChunk>,
     instruction_data_list: Vec<Vec<u8>>,
@@ -21,39 +22,68 @@ pub fn execute_chunk(
     let authorized_timestamp = chunk.authorized_timestamp;
     let expected_cpi_hash = chunk.cpi_hash;
 
-    let now = Clock::get()?.unix_timestamp;
-    let session_end = authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS;
-    require!(
-        now >= authorized_timestamp && now <= session_end,
-        LazorKitError::TransactionTooOld
-    );
-    require!(
-        chunk.owner_wallet_address == smart_wallet_key,
-        LazorKitError::InvalidAccountOwner
-    );
+    // Validate owner first (fail fast)
+    if chunk.owner_wallet_address != smart_wallet_key {
+        msg!("InvalidAccountOwner: Invalid account owner: expected={}, got={}", smart_wallet_key, chunk.owner_wallet_address);
+        return Ok(());
+    }
 
-    require!(
-        !instruction_data_list.is_empty(),
-        LazorKitError::InsufficientCpiAccounts
-    );
-    require!(
-        instruction_data_list.len() == split_index.len() + 1,
-        LazorKitError::InvalidInstructionData
-    );
+    // Get current timestamp
+    let now = match Clock::get() {
+        Ok(clock) => clock.unix_timestamp,
+        Err(e) => {
+            msg!("InvalidInstruction: Error getting clock: {:?}", e);
+            return Ok(());
+        }
+    };
+    
+    // Validate timestamp - check if chunk is expired
+    let session_end = authorized_timestamp + crate::security::MAX_SESSION_TTL_SECONDS * 2;
+    if now > session_end {
+        msg!("TransactionTooOld: Chunk expired: now={}, session_end={}", now, session_end);
+        // Chunk will be closed automatically due to close = session_refund constraint
+        return Ok(());
+    }
 
-    let instruction_count: u32 = instruction_data_list.len().try_into()
-        .map_err(|_| LazorKitError::InvalidInstructionData)?;
+    // Validate instruction data
+    if instruction_data_list.is_empty() {
+        msg!("InvalidInstructionData: Instruction data list is empty");
+        return Ok(());
+    }
+
+    if instruction_data_list.len() != split_index.len() + 1 {
+        msg!("InvalidInstructionData: Invalid instruction data: instruction_data_list.len()={}, split_index.len()={}", 
+             instruction_data_list.len(), split_index.len());
+        return Ok(());
+    }
+
+    // Serialize CPI data
+    let instruction_count: u32 = match instruction_data_list.len().try_into() {
+        Ok(count) => count,
+        Err(e) => {
+            msg!("InvalidInstructionData: Failed to convert instruction count: {:?}", e);
+            return Ok(());
+        }
+    };
+
     let mut serialized_cpi_data = Vec::new();
     serialized_cpi_data.extend_from_slice(&instruction_count.to_le_bytes());
+    
     for instruction_data in &instruction_data_list {
-        let data_len: u32 = instruction_data.len().try_into()
-            .map_err(|_| LazorKitError::InvalidInstructionData)?;
+        let data_len: u32 = match instruction_data.len().try_into() {
+            Ok(len) => len,
+            Err(e) => {
+                msg!("InvalidInstructionData: Failed to convert instruction data length: {:?}", e);
+                return Ok(());
+            }
+        };
         serialized_cpi_data.extend_from_slice(&data_len.to_le_bytes());
         serialized_cpi_data.extend_from_slice(instruction_data);
     }
 
     let cpi_data_hash = hash(&serialized_cpi_data).to_bytes();
 
+    // Hash CPI accounts
     let mut rh = Hasher::default();
     for account in cpi_accounts.iter() {
         rh.hash(account.key().as_ref());
@@ -67,25 +97,48 @@ pub fn execute_chunk(
     cpi_combined[HASH_BYTES..].copy_from_slice(&cpi_accounts_hash);
     let cpi_hash = hash(&cpi_combined).to_bytes();
 
-    require!(cpi_hash == expected_cpi_hash, LazorKitError::HashMismatch);
+    // Validate hash
+    if cpi_hash != expected_cpi_hash {
+        msg!("HashMismatch: Hash mismatch: expected={:?}, got={:?}", expected_cpi_hash, cpi_hash);
+        return Ok(());
+    }
 
-    let account_ranges = crate::utils::calculate_account_ranges(cpi_accounts, &split_index)?;
-    crate::utils::validate_programs_in_ranges(cpi_accounts, &account_ranges)?;
+    // Calculate account ranges
+    let account_ranges = match crate::utils::calculate_account_ranges(cpi_accounts, &split_index) {
+        Ok(ranges) => ranges,
+        Err(e) => {
+            msg!("InvalidInstructionData: Failed to calculate account ranges: {:?}", e);
+            return Ok(());
+        }
+    };
 
+    // Validate programs in ranges
+    if let Err(e) = crate::utils::validate_programs_in_ranges(cpi_accounts, &account_ranges) {
+        msg!("InvalidInstruction: Failed to validate programs in ranges: {:?}", e);
+        return Ok(());
+    }
+
+    // Execute CPI instructions
     let wallet_signer = PdaSigner {
         seeds: vec![SMART_WALLET_SEED.to_vec(), wallet_id.to_le_bytes().to_vec()],
         bump: wallet_bump,
     };
 
-    for (cpi_data, &(range_start, range_end)) in
-        instruction_data_list.iter().zip(account_ranges.iter())
+    for (idx, (cpi_data, &(range_start, range_end))) in
+        instruction_data_list.iter().zip(account_ranges.iter()).enumerate()
     {
         let instruction_accounts = &cpi_accounts[range_start..range_end];
         let program_account = &instruction_accounts[0];
         let instruction_accounts = &instruction_accounts[1..];
 
-        execute_cpi(instruction_accounts, cpi_data, program_account, &wallet_signer)?;
+        if let Err(e) = execute_cpi(instruction_accounts, cpi_data, program_account, &wallet_signer) {
+            msg!("InvalidInstruction: Failed to execute CPI instruction {}: {:?}", idx, e);
+            return Ok(());
+        }
     }
+    
+    let last_nonce = ctx.accounts.wallet_state.last_nonce;
+    ctx.accounts.wallet_state.last_nonce = validation::safe_increment_nonce(last_nonce);
 
     Ok(())
 }
@@ -103,6 +156,7 @@ pub struct ExecuteChunk<'info> {
     pub smart_wallet: SystemAccount<'info>,
 
     #[account(
+        mut,
         seeds = [WalletState::PREFIX_SEED, smart_wallet.key().as_ref()],
         bump,
         owner = ID,

@@ -1,8 +1,15 @@
 use anchor_lang::prelude::*;
-use solana_secp256r1_program::COMPRESSED_PUBKEY_SERIALIZED_SIZE;
+
+// Constants from solana-secp256r1-program (defined locally to avoid crate compilation issues)
+pub const COMPRESSED_PUBKEY_SERIALIZED_SIZE: usize = 33;
+pub const SIGNATURE_SERIALIZED_SIZE: usize = 64;
+pub const SIGNATURE_OFFSETS_SERIALIZED_SIZE: usize = 14;
+pub const SIGNATURE_OFFSETS_START: usize = 2;
+pub const DATA_START: usize = SIGNATURE_OFFSETS_SERIALIZED_SIZE + SIGNATURE_OFFSETS_START;
 
 /// Solana's built-in Secp256r1 signature verification program ID
-pub const SECP256R1_PROGRAM_ID: Pubkey = Pubkey::new_from_array(solana_secp256r1_program::ID.to_bytes());
+/// This is the program ID for the secp256r1 native program
+pub const SECP256R1_PROGRAM_ID: Pubkey = anchor_lang::solana_program::pubkey!("Secp256r1SigVerify1111111111111111111111111");
 
 /// Seed used for smart wallet PDA derivation
 pub const SMART_WALLET_SEED: &[u8] = b"smart_wallet";
