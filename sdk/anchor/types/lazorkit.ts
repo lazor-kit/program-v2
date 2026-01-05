@@ -319,7 +319,11 @@ export type Lazorkit = {
               },
               {
                 "kind": "arg",
-                "path": "args.credential_hash"
+                "path": "args.base_seed"
+              },
+              {
+                "kind": "arg",
+                "path": "args.salt"
               }
             ]
           }
@@ -1005,6 +1009,19 @@ export type Lazorkit = {
             }
           },
           {
+            "name": "baseSeed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "salt",
+            "type": "u64"
+          },
+          {
             "name": "initPolicyData",
             "type": "bytes"
           },
@@ -1181,6 +1198,13 @@ export type Lazorkit = {
                 32
               ]
             }
+          },
+          {
+            "name": "salt",
+            "docs": [
+              "Salt for smart wallet address derivation"
+            ],
+            "type": "u64"
           },
           {
             "name": "policyProgram",

@@ -313,7 +313,11 @@
               },
               {
                 "kind": "arg",
-                "path": "args.credential_hash"
+                "path": "args.base_seed"
+              },
+              {
+                "kind": "arg",
+                "path": "args.salt"
               }
             ]
           }
@@ -999,6 +1003,19 @@
             }
           },
           {
+            "name": "base_seed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "salt",
+            "type": "u64"
+          },
+          {
             "name": "init_policy_data",
             "type": "bytes"
           },
@@ -1175,6 +1192,13 @@
                 32
               ]
             }
+          },
+          {
+            "name": "salt",
+            "docs": [
+              "Salt for smart wallet address derivation"
+            ],
+            "type": "u64"
           },
           {
             "name": "policy_program",

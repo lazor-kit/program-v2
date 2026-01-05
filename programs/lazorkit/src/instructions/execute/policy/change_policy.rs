@@ -5,7 +5,8 @@ use crate::security::validation;
 use crate::state::{WalletAuthority, WalletState};
 use crate::utils::{
     compute_change_policy_message_hash, compute_instruction_hash, create_wallet_authority_hash,
-    execute_cpi, get_wallet_authority, sighash, split_remaining_accounts, verify_authorization_hash,
+    execute_cpi, get_wallet_authority, sighash, split_remaining_accounts,
+    verify_authorization_hash,
 };
 use crate::{constants::SMART_WALLET_SEED, ID};
 use anchor_lang::prelude::*;
@@ -98,7 +99,8 @@ pub fn change_policy<'c: 'info, 'info>(
     )?;
 
     // Get policy signer for both old and new policy programs
-    let wallet_authority = get_wallet_authority(smart_wallet_key, wallet_authority_key, credential_hash)?;
+    let wallet_authority =
+        get_wallet_authority(smart_wallet_key, wallet_authority_key, credential_hash)?;
 
     // Validate delete_policy instruction discriminator
     require!(
@@ -238,7 +240,7 @@ pub struct ChangePolicy<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed],
+        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed, &wallet_state.salt.to_le_bytes()],
         bump = wallet_state.bump,
     )]
     pub smart_wallet: SystemAccount<'info>,

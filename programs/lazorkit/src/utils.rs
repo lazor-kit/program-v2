@@ -413,13 +413,18 @@ pub fn validate_programs_in_ranges(
 pub fn transfer_sol_util<'a>(
     smart_wallet: &AccountInfo<'a>,
     base_seed: [u8; 32],
+    salt: u64,
     bump: u8,
     recipient: &AccountInfo<'a>,
     system_program: &AccountInfo<'a>,
     fee: u64,
 ) -> Result<()> {
     let signer = PdaSigner {
-        seeds: vec![SMART_WALLET_SEED.to_vec(), base_seed.to_vec()],
+        seeds: vec![
+            SMART_WALLET_SEED.to_vec(),
+            base_seed.to_vec(),
+            salt.to_le_bytes().to_vec(),
+        ],
         bump,
     };
 
