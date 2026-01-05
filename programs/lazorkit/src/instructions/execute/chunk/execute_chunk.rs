@@ -120,7 +120,11 @@ pub fn execute_chunk(
 
     // Execute CPI instructions
     let wallet_signer = PdaSigner {
-        seeds: vec![SMART_WALLET_SEED.to_vec(), ctx.accounts.wallet_state.base_seed.to_vec()],
+        seeds: vec![
+            SMART_WALLET_SEED.to_vec(),
+            ctx.accounts.wallet_state.base_seed.to_vec(),
+            ctx.accounts.wallet_state.salt.to_le_bytes().to_vec(),
+        ],
         bump: wallet_bump,
     };
 
@@ -158,7 +162,7 @@ pub struct ExecuteChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed],
+        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed, &wallet_state.salt.to_le_bytes()],
         bump = wallet_state.bump,
     )]
     pub smart_wallet: SystemAccount<'info>,

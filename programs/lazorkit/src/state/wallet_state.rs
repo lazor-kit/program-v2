@@ -13,6 +13,9 @@ pub struct WalletState {
     /// Base seed for smart wallet address derivation (initial credential_hash)
     pub base_seed: [u8; 32],
 
+    /// Salt for smart wallet address derivation
+    pub salt: u64,
+
     /// Policy program that validates transactions
     pub policy_program: Pubkey,
     /// Serialized policy data returned from policy initialization
@@ -21,5 +24,6 @@ pub struct WalletState {
 impl WalletState {
     pub const PREFIX_SEED: &'static [u8] = b"wallet_state";
 
-    pub const INIT_SPACE: usize = size_of::<u8>() + size_of::<u64>() + 32 + PUBKEY_BYTES + 4;
+    pub const INIT_SPACE: usize =
+        size_of::<u8>() + size_of::<u64>() + 32 + size_of::<u64>() + PUBKEY_BYTES + 4;
 }

@@ -16,6 +16,8 @@ use crate::{
 pub struct CreateSmartWalletArgs {
     pub passkey_public_key: [u8; PASSKEY_PUBLIC_KEY_SIZE],
     pub credential_hash: [u8; HASH_BYTES],
+    pub base_seed: [u8; 32],
+    pub salt: u64,
     pub init_policy_data: Vec<u8>,
     pub amount: u64,
     pub policy_data_size: u16,
@@ -50,7 +52,8 @@ pub fn create_smart_wallet(
     ctx.accounts.wallet_state.set_inner(WalletState {
         bump: ctx.bumps.smart_wallet,
         last_nonce: 0u64,
-        base_seed: args.credential_hash,
+        base_seed: args.base_seed,
+        salt: args.salt,
         policy_program: policy_program_key,
         policy_data,
     });
@@ -91,7 +94,7 @@ pub struct CreateSmartWallet<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, args.credential_hash.as_ref()],
+        seeds = [SMART_WALLET_SEED, args.base_seed.as_ref(), &args.salt.to_le_bytes()],
         bump,
     )]
     pub smart_wallet: SystemAccount<'info>,

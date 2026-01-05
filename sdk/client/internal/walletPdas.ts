@@ -23,8 +23,8 @@ type BN = anchor.BN;
 export class WalletPdaFactory {
   constructor(private readonly programId: PublicKey) { }
 
-  smartWallet(baseSeed: number[]): PublicKey {
-    return deriveSmartWalletPda(this.programId, baseSeed);
+  smartWallet(baseSeed: number[], salt: BN): PublicKey {
+    return deriveSmartWalletPda(this.programId, baseSeed, salt);
   }
 
   walletState(smartWallet: PublicKey): PublicKey {

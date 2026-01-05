@@ -10,10 +10,11 @@ export const CHUNK_SEED = Buffer.from('chunk');
 
 export function deriveSmartWalletPda(
   programId: anchor.web3.PublicKey,
-  baseSeed: number[]
+  baseSeed: number[],
+  salt: anchor.BN
 ): anchor.web3.PublicKey {
   return anchor.web3.PublicKey.findProgramAddressSync(
-    [SMART_WALLET_SEED, Buffer.from(baseSeed)],
+    [SMART_WALLET_SEED, Buffer.from(baseSeed), salt.toArrayLike(Buffer, 'le', 8)],
     programId
   )[0];
 }

@@ -55,7 +55,8 @@ describe('Test smart wallet with default policy', () => {
         payer: payer.publicKey,
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
-        baseSeed: credentialHash
+        baseSeed: credentialHash,
+        salt: new anchor.BN(0),
       });
 
     const sig = await anchor.web3.sendAndConfirmTransaction(
@@ -100,6 +101,7 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         baseSeed: credentialHash,
+        salt: new anchor.BN(0),
       });
 
     const sig1 = await anchor.web3.sendAndConfirmTransaction(
@@ -229,6 +231,7 @@ describe('Test smart wallet with default policy', () => {
         passkeyPublicKey: passkeyPubkey,
         credentialIdBase64: credentialId,
         baseSeed: credentialHash,
+        salt: new anchor.BN(0),
         amount: new anchor.BN(0.1 * anchor.web3.LAMPORTS_PER_SOL),
       });
 

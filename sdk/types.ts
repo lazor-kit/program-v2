@@ -188,6 +188,8 @@ export interface CreateSmartWalletParams {
   readonly credentialIdBase64: string;
   /** Base seed for smart wallet PDA (required) */
   readonly baseSeed: number[];
+  /** Salt for smart wallet PDA (required) */
+  readonly salt: anchor.BN;
   /** Initial funding amount in lamports (optional, defaults to EMPTY_PDA_RENT_EXEMPT_BALANCE) */
   readonly amount?: anchor.BN;
   /** Custom policy instruction (optional, if not provided, default policy is used) */

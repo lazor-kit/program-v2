@@ -92,7 +92,7 @@ pub struct CreateChunk<'info> {
 
     #[account(
         mut,
-        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed],
+        seeds = [SMART_WALLET_SEED, &wallet_state.base_seed, &wallet_state.salt.to_le_bytes()],
         bump = wallet_state.bump,
     )]
     pub smart_wallet: SystemAccount<'info>,

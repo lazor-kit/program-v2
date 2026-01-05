@@ -102,8 +102,8 @@ export class LazorkitClient {
   /**
    * Derives a smart wallet PDA from wallet ID
    */
-  getSmartWalletPubkey(baseSeed: number[]): PublicKey {
-    return this.walletPdas.smartWallet(baseSeed);
+  getSmartWalletPubkey(baseSeed: number[], salt: BN): PublicKey {
+    return this.walletPdas.smartWallet(baseSeed, salt);
   }
 
   /**
@@ -172,6 +172,7 @@ export class LazorkitClient {
       'params.passkeyPublicKey'
     );
     assertValidBase64(params.credentialIdBase64, 'params.credentialIdBase64');
+    assertPositiveBN(params.salt, 'params.salt');
 
     if (params.amount !== undefined) {
       assertPositiveBN(params.amount, 'params.amount');
@@ -357,6 +358,7 @@ export class LazorkitClient {
     assertDefined(args, 'args');
     assertValidPasskeyPublicKey(args.passkeyPublicKey, 'args.passkeyPublicKey');
     assertValidCredentialHash(args.credentialHash, 'args.credentialHash');
+    assertPositiveBN(args.salt, 'args.salt');
     assertPositiveBN(args.amount, 'args.amount');
 
     return await this.program.methods
@@ -553,7 +555,10 @@ export class LazorkitClient {
   }> {
     this.validateCreateSmartWalletParams(params);
 
-    const smartWallet = this.getSmartWalletPubkey(params.baseSeed);
+    const smartWallet = this.getSmartWalletPubkey(
+      params.baseSeed,
+      params.salt
+    );
     const amount =
       params.amount ?? new anchor.BN(EMPTY_PDA_RENT_EXEMPT_BALANCE);
     const policyDataSize =
@@ -572,6 +577,8 @@ export class LazorkitClient {
     const args = {
       passkeyPublicKey: params.passkeyPublicKey,
       credentialHash,
+      baseSeed: params.baseSeed,
+      salt: params.salt,
       initPolicyData: policyInstruction.data,
       amount,
       policyDataSize,
