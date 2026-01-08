@@ -1,0 +1,14 @@
+[package]
+name = "lazorkit-v2-interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+bytemuck = { version = "1.19.0", features = ["derive"] }
+solana-sdk = { version = "2" }
+lazorkit-v2 = { path = "../program", default-features = false, features = ["no-entrypoint"] }
+lazorkit-v2-instructions = { path = "../instructions", default-features = false }
+lazorkit-v2-state = { path = "../state" }
+anyhow = "1.0.75"

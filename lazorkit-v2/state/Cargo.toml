@@ -1,0 +1,17 @@
+[package]
+name = "lazorkit-v2-state"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+client = ["bs58"]
+
+[dependencies]
+pinocchio = { version = "0.9", features = ["std"] }
+pinocchio-pubkey = { version = "0.3" }
+no-padding = { path = "../no-padding" }
+lazorkit-v2-assertions = { path = "../assertions" }
+libsecp256k1 = { version = "0.7.2", default-features = false }
+bs58 = { version = "*", optional = true }

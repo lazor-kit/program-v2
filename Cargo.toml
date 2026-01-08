@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "programs/*"
+    "programs/default_policy",
+    "programs/lazorkit",
 ]
 resolver = "2"
 

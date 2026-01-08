@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+  "program",
+  "interface",
+  "instructions",
+  "state",
+  "assertions",
+  "no-padding",
+]
+
+[workspace.dependencies]
+pinocchio = { version = "0.9", features = ["std"] }
+pinocchio-pubkey = { version = "0.3" }
+pinocchio-system = { version = "0.3" }
+pinocchio-token = { version = "0.3" }
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Lazorkit Team"]
+edition = "2021"
+license = "AGPL-3.0"
+
+[workspace.lints.rust]
+unused_imports = "allow"
+unused_mut = "allow"
+dead_code = "allow"
+unused_macros = "allow"
+unused_variables = "allow"
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))']
