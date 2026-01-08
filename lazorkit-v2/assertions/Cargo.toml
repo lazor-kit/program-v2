@@ -1,0 +1,15 @@
+[package]
+name = "lazorkit-v2-assertions"
+version.workspace = true
+edition.workspace = true
+description = "Solana program assertion utilities"
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+pinocchio = { version = "0.9" }
+pinocchio-system = { version = "0.3" }
+pinocchio-pubkey = { version = "0.3" }
+
+[lints]
+workspace = true

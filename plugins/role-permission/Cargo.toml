@@ -1,0 +1,28 @@
+[package]
+name = "lazorkit-role-permission-plugin"
+version = "0.1.0"
+description = "Role/Permission Plugin for Lazorkit V2 - Based on Swig All/ManageAuthority actions"
+edition = "2021"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "lazorkit_role_permission_plugin"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+pinocchio = { version = "0.9", features = ["std"] }
+pinocchio-system = { version = "0.3" }
+lazorkit-v2-interface = { path = "../../lazorkit-v2/interface" }
+lazorkit-v2-state = { path = "../../lazorkit-v2/state" }
+lazorkit-v2-assertions = { path = "../../lazorkit-v2/assertions" }
+
+[dev-dependencies]
+test-log = { version = "0.2", default-features = false }
