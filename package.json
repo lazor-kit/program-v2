@@ -3,7 +3,9 @@
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "surfpool:start": "surfpool start --offline"
+    "surfpool:start": "surfpool start --offline",
+    "test": "ts-mocha -p tsconfig.json tests/**/*.test.ts",
+    "test:v2": "ts-mocha -p tsconfig.json tests/lazorkit-v2-client.test.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
