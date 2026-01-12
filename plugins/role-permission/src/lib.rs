@@ -1,6 +1,5 @@
 //! Role/Permission Plugin for Lazorkit V2
 //!
-//! This plugin implements basic role/permission checking similar to Swig's
 //! All and ManageAuthority actions. It allows or denies operations based on
 //! configured permissions.
 
@@ -25,7 +24,7 @@ pub enum PluginInstruction {
     Initialize = 3,
 }
 
-/// Permission types (similar to Swig)
+/// Permission types
 #[repr(u8)]
 pub enum PermissionType {
     All = 0,                    // Allow all operations
