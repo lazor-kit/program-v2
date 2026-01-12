@@ -1,15 +1,35 @@
 [workspace]
-members = [
-    "programs/default_policy",
-    "programs/lazorkit",
-]
 resolver = "2"
+members = [
+  "program",
+  "interface",
+  "instructions",
+  "state",
+  "plugins/sol-limit",
+  "plugins/program-whitelist",
+  "no-padding",
+  "tests-integration",
+]
+
+[patch.crates-io]
+blake3 = { git = "https://github.com/BLAKE3-team/BLAKE3.git", tag = "1.5.5" }
 
 [profile.release]
-overflow-checks = true
-lto = "fat"
-codegen-units = 1
-[profile.release.build-override]
-opt-level = 3
-incremental = false
-codegen-units = 1
+lto = true
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Lazorkit Team"]
+edition = "2021"
+license = "AGPL-3.0"
+
+[workspace.lints.rust]
+unused_imports = "allow"
+unused_mut = "allow"
+dead_code = "allow"
+unused_macros = "allow"
+unused_variables = "allow"
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))']

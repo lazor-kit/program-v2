@@ -1,0 +1,42 @@
+{
+  "name": "@lazorkit/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Lazorkit V2 smart wallet",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "ENABLE_INTEGRATION_TESTS=true vitest run tests/integration",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "deploy": "tsx tests/setup/deploy.ts",
+    "build:contracts": "cd .. && cargo build-sbf --manifest-path=program/Cargo.toml && cargo build-sbf --manifest-path=plugins/sol-limit/Cargo.toml && cargo build-sbf --manifest-path=plugins/program-whitelist/Cargo.toml"
+  },
+  "keywords": [
+    "solana",
+    "wallet",
+    "smart-wallet",
+    "lazorkit"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/kit": "^5.3.0",
+    "@types/bs58": "^4.0.4",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "tweetnacl": "^1.0.3",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.16"
+  },
+  "files": [
+    "dist"
+  ]
+}

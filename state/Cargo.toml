@@ -1,0 +1,25 @@
+[package]
+name = "lazorkit-v2-state"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+client = ["bs58"]
+
+[dependencies]
+pinocchio = { version = "0.9" }
+pinocchio-pubkey = { version = "0.3" }
+no-padding = { path = "../no-padding" }
+lazorkit-v2-assertions = { path = "../assertions" }
+libsecp256k1 = { version = "0.7.2", default-features = false }
+bs58 = { version = "*", optional = true }
+
+
+[dev-dependencies]
+rand = "0.8"
+hex = "0.4.3"
+openssl = { version = "0.10.72", features = ["vendored"] }
+agave-precompiles = "2.2.14"
+solana-secp256r1-program = "2.2.1"
