@@ -1,7 +1,7 @@
 //! Secp256k1 authority implementation.
 //!
 //! This module provides implementations for Secp256k1-based authority types in
-//! the wallet system. It includes both standard Secp256k1 authority and
+//! the Swig wallet system. It includes both standard Secp256k1 authority and
 //! session-based Secp256k1 authority with expiration support. The
 //! implementation handles key compression, signature recovery, and Keccak256
 //! hashing.
@@ -10,15 +10,13 @@
 
 use core::mem::MaybeUninit;
 
-use lazorkit_v2_assertions::sol_assert_bytes_eq;
+use lazor_assertions::sol_assert_bytes_eq;
 #[allow(unused_imports)]
 use pinocchio::syscalls::{sol_keccak256, sol_secp256k1_recover, sol_sha256};
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 use super::{ed25519::ed25519_authenticate, Authority, AuthorityInfo, AuthorityType};
-use crate::{
-    IntoBytes, LazorkitAuthenticateError, LazorkitStateError, Transmutable, TransmutableMut,
-};
+use crate::{IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable, TransmutableMut};
 
 /// Maximum age (in slots) for a Secp256k1 signature to be considered valid
 const MAX_SIGNATURE_AGE_IN_SLOTS: u64 = 60;
@@ -120,7 +118,7 @@ impl Authority for Secp256k1Authority {
                 authority.signature_odometer = 0;
             },
             _ => {
-                return Err(LazorkitStateError::InvalidRoleData.into());
+                return Err(LazorStateError::InvalidRoleData.into());
             },
         }
 
@@ -300,7 +298,7 @@ impl AuthorityInfo for Secp256k1SessionAuthority {
         slot: u64,
     ) -> Result<(), ProgramError> {
         if slot > self.current_session_expiration {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSessionExpired.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -316,7 +314,7 @@ impl AuthorityInfo for Secp256k1SessionAuthority {
         duration: u64,
     ) -> Result<(), ProgramError> {
         if duration > self.max_session_age {
-            return Err(LazorkitAuthenticateError::InvalidSessionDuration.into());
+            return Err(LazorAuthenticateError::InvalidSessionDuration.into());
         }
         self.current_session_expiration = current_slot + duration;
         self.session_key = session_key;
@@ -349,26 +347,26 @@ fn secp_authority_authenticate(
     account_infos: &[AccountInfo],
 ) -> Result<(), ProgramError> {
     if authority_payload.len() < 77 {
-        return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+        return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
     }
 
     let authority_slot = u64::from_le_bytes(unsafe {
         authority_payload
             .get_unchecked(..8)
             .try_into()
-            .map_err(|_| LazorkitAuthenticateError::InvalidAuthorityPayload)?
+            .map_err(|_| LazorAuthenticateError::InvalidAuthorityPayload)?
     });
 
     let counter = u32::from_le_bytes(unsafe {
         authority_payload
             .get_unchecked(8..12)
             .try_into()
-            .map_err(|_| LazorkitAuthenticateError::InvalidAuthorityPayload)?
+            .map_err(|_| LazorAuthenticateError::InvalidAuthorityPayload)?
     });
 
     let expected_counter = authority.signature_odometer.wrapping_add(1);
     if counter != expected_counter {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1SignatureReused.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1SignatureReused.into());
     }
     secp256k1_authenticate(
         &authority.public_key,
@@ -402,7 +400,7 @@ fn secp_session_authority_authenticate(
     account_infos: &[AccountInfo],
 ) -> Result<(), ProgramError> {
     if authority_payload.len() < 77 {
-        return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+        return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
     }
     let authority_slot =
         u64::from_le_bytes(unsafe { authority_payload.get_unchecked(..8).try_into().unwrap() });
@@ -412,7 +410,7 @@ fn secp_session_authority_authenticate(
 
     let expected_counter = authority.signature_odometer.wrapping_add(1);
     if counter != expected_counter {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1SignatureReused.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1SignatureReused.into());
     }
 
     secp256k1_authenticate(
@@ -448,17 +446,17 @@ fn secp256k1_authenticate(
     counter: u32,
 ) -> Result<(), ProgramError> {
     if authority_payload.len() != 65 {
-        return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+        return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
     }
     if current_slot < authority_slot || current_slot - authority_slot > MAX_SIGNATURE_AGE_IN_SLOTS {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into());
     }
 
     let signature = libsecp256k1::Signature::parse_standard_slice(&authority_payload[..64])
-        .map_err(|_| LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidSignature)?;
+        .map_err(|_| LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignature)?;
 
     if signature.s.is_high() {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into());
     }
 
     let mut accounts_payload = [0u8; 64 * AccountsPayload::LEN];
@@ -501,7 +499,7 @@ fn secp256k1_authenticate(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
         }
 
         hex_encode(&data_payload_hash, &mut data_payload_hash_hex);
@@ -519,7 +517,7 @@ fn secp256k1_authenticate(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
         }
         #[allow(unused)]
         let recovery_id = if *authority_payload.get_unchecked(64) == 27 {
@@ -538,16 +536,14 @@ fn secp256k1_authenticate(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(
-                LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into(),
-            );
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignature.into());
         }
         // First compress the recovered key to 33 bytes
         let compressed_recovered_key = compress(&recovered_key.assume_init());
         sol_assert_bytes_eq(&compressed_recovered_key, expected_key, 33)
     };
     if !matches {
-        return Err(LazorkitAuthenticateError::PermissionDenied.into());
+        return Err(LazorAuthenticateError::PermissionDenied.into());
     }
     Ok(())
 }

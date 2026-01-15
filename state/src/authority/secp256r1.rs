@@ -1,7 +1,7 @@
 //! Secp256r1 authority implementation for passkey support.
 //!
 //! This module provides implementations for Secp256r1-based authority types in
-//! the wallet system, designed to work with passkeys. It
+//! the Swig wallet system, designed to work with passkeys. It
 //! includes both standard Secp256r1 authority and session-based Secp256r1
 //! authority with expiration support. The implementation relies on the Solana
 //! secp256r1 precompile program for signature verification.
@@ -10,7 +10,7 @@
 
 use core::mem::MaybeUninit;
 
-use lazorkit_v2_assertions::sol_assert_bytes_eq;
+use lazor_assertions::sol_assert_bytes_eq;
 #[allow(unused_imports)]
 use pinocchio::syscalls::sol_sha256;
 use pinocchio::{
@@ -21,9 +21,7 @@ use pinocchio::{
 use pinocchio_pubkey::pubkey;
 
 use super::{Authority, AuthorityInfo, AuthorityType};
-use crate::{
-    IntoBytes, LazorkitAuthenticateError, LazorkitStateError, Transmutable, TransmutableMut,
-};
+use crate::{IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable, TransmutableMut};
 
 /// Maximum age (in slots) for a Secp256r1 signature to be considered valid
 const MAX_SIGNATURE_AGE_IN_SLOTS: u64 = 60;
@@ -69,9 +67,7 @@ impl Secp256r1SignatureOffsets {
     /// Deserialize from bytes (14 bytes in little-endian format)
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProgramError> {
         if bytes.len() != SIGNATURE_OFFSETS_SERIALIZED_SIZE {
-            return Err(
-                LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into(),
-            );
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
         }
 
         Ok(Self {
@@ -169,7 +165,7 @@ impl Authority for Secp256r1Authority {
 
     fn set_into_bytes(create_data: &[u8], bytes: &mut [u8]) -> Result<(), ProgramError> {
         if create_data.len() != 33 {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
         let authority = unsafe { Secp256r1Authority::load_mut_unchecked(bytes)? };
         authority.public_key.copy_from_slice(create_data);
@@ -329,7 +325,7 @@ impl AuthorityInfo for Secp256r1SessionAuthority {
         use super::ed25519::ed25519_authenticate;
 
         if slot > self.current_session_expiration {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSessionExpired.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -345,7 +341,7 @@ impl AuthorityInfo for Secp256r1SessionAuthority {
         duration: u64,
     ) -> Result<(), ProgramError> {
         if duration > self.max_session_age {
-            return Err(LazorkitAuthenticateError::InvalidSessionDuration.into());
+            return Err(LazorAuthenticateError::InvalidSessionDuration.into());
         }
         self.current_session_expiration = current_slot + duration;
         self.session_key = session_key;
@@ -379,28 +375,28 @@ fn secp256r1_authority_authenticate(
 ) -> Result<(), ProgramError> {
     if authority_payload.len() < 17 {
         // 8 + 4 + 1 + 4 = slot + counter + instructions_account_index + extra data
-        return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+        return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
     }
 
     let authority_slot = u64::from_le_bytes(unsafe {
         authority_payload
             .get_unchecked(..8)
             .try_into()
-            .map_err(|_| LazorkitAuthenticateError::InvalidAuthorityPayload)?
+            .map_err(|_| LazorAuthenticateError::InvalidAuthorityPayload)?
     });
 
     let counter = u32::from_le_bytes(unsafe {
         authority_payload
             .get_unchecked(8..12)
             .try_into()
-            .map_err(|_| LazorkitAuthenticateError::InvalidAuthorityPayload)?
+            .map_err(|_| LazorAuthenticateError::InvalidAuthorityPayload)?
     });
 
     let instruction_account_index = authority_payload[12] as usize;
 
     let expected_counter = authority.signature_odometer.wrapping_add(1);
     if counter != expected_counter {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1SignatureReused.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1SignatureReused.into());
     }
 
     secp256r1_authenticate(
@@ -436,7 +432,7 @@ fn secp256r1_session_authority_authenticate(
 ) -> Result<(), ProgramError> {
     if authority_payload.len() < 13 {
         // 8 + 4 + 1 = slot + counter + instruction_index
-        return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+        return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
     }
 
     let authority_slot =
@@ -449,7 +445,7 @@ fn secp256r1_session_authority_authenticate(
 
     let expected_counter = authority.signature_odometer.wrapping_add(1);
     if counter != expected_counter {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1SignatureReused.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1SignatureReused.into());
     }
 
     secp256r1_authenticate(
@@ -487,7 +483,7 @@ fn secp256r1_authenticate(
 ) -> Result<(), ProgramError> {
     // Validate signature age
     if current_slot < authority_slot || current_slot - authority_slot > MAX_SIGNATURE_AGE_IN_SLOTS {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidSignatureAge.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignatureAge.into());
     }
 
     // Compute our expected message hash
@@ -517,25 +513,25 @@ fn secp256r1_authenticate(
     // Get the sysvar instructions account
     let sysvar_instructions = account_infos
         .get(instruction_account_index)
-        .ok_or(LazorkitAuthenticateError::InvalidAuthorityPayload)?;
+        .ok_or(LazorAuthenticateError::InvalidAuthorityPayload)?;
 
     // Verify this is the sysvar instructions account
     if sysvar_instructions.key().as_ref() != &INSTRUCTIONS_ID {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     let sysvar_instructions_data = unsafe { sysvar_instructions.borrow_data_unchecked() };
     let ixs = unsafe { Instructions::new_unchecked(sysvar_instructions_data) };
     let current_index = ixs.load_current_index() as usize;
     if current_index == 0 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     let secpr1ix = unsafe { ixs.deserialize_instruction_unchecked(current_index - 1) };
 
     // Verify the instruction is calling the secp256r1 program
     if secpr1ix.get_program_id() != &SECP256R1_PROGRAM_ID {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     let instruction_data = secpr1ix.get_instruction_data();
@@ -562,8 +558,7 @@ fn compute_message_hash(
             .copy_from_slice(AccountsPayload::from(account).into_bytes()?);
         cursor = offset;
     }
-    let _hash = MaybeUninit::<[u8; 32]>::uninit();
-    #[allow(unused_variables)]
+    let mut hash = MaybeUninit::<[u8; 32]>::uninit();
     let data: &[&[u8]] = &[
         data_payload,
         &accounts_payload[..cursor],
@@ -571,21 +566,21 @@ fn compute_message_hash(
         &counter.to_le_bytes(),
     ];
 
-    let mut hash_array = [0u8; 32];
     unsafe {
         #[cfg(target_os = "solana")]
         let res = pinocchio::syscalls::sol_keccak256(
             data.as_ptr() as *const u8,
             4,
-            hash_array.as_mut_ptr() as *mut u8,
+            hash.as_mut_ptr() as *mut u8,
         );
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
         }
+
+        Ok(hash.assume_init())
     }
-    Ok(hash_array)
 }
 
 /// Verify the secp256r1 instruction data contains the expected signature and
@@ -598,15 +593,15 @@ pub fn verify_secp256r1_instruction_data(
 ) -> Result<(), ProgramError> {
     // Minimum check: must have at least the header and offsets
     if instruction_data.len() < DATA_START {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
     let num_signatures = instruction_data[0] as usize;
     if num_signatures == 0 || num_signatures > 1 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     if instruction_data.len() < MESSAGE_DATA_OFFSET + MESSAGE_DATA_SIZE {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     // Parse the Secp256r1SignatureOffsets structure
@@ -618,25 +613,25 @@ pub fn verify_secp256r1_instruction_data(
     // Validate that all offsets point to the current instruction (0xFFFF)
     // This ensures all data references are within the same instruction
     if offsets.signature_instruction_index != 0xFFFF {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
     if offsets.public_key_instruction_index != 0xFFFF {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
     if offsets.message_instruction_index != 0xFFFF {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     // Validate that the offsets match the expected fixed locations
     // This ensures the precompile is verifying the data we're checking
     if offsets.public_key_offset as usize != PUBKEY_DATA_OFFSET {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
     if offsets.message_data_offset as usize != MESSAGE_DATA_OFFSET {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
     if offsets.message_data_size as usize != expected_message.len() {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into());
     }
 
     let pubkey_data = &instruction_data
@@ -645,15 +640,14 @@ pub fn verify_secp256r1_instruction_data(
         &instruction_data[MESSAGE_DATA_OFFSET..MESSAGE_DATA_OFFSET + expected_message.len()];
 
     if pubkey_data != expected_pubkey {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidPubkey.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidPubkey.into());
     }
     if message_data != expected_message {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessageHash.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessageHash.into());
     }
     Ok(())
 }
 
-#[allow(dead_code)]
 fn generate_client_data_json(
     field_order: &[u8],
     challenge: &str,
@@ -684,7 +678,7 @@ pub enum WebAuthnField {
 }
 
 impl TryFrom<u8> for WebAuthnField {
-    type Error = LazorkitAuthenticateError;
+    type Error = LazorAuthenticateError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -694,7 +688,7 @@ impl TryFrom<u8> for WebAuthnField {
             3 => Ok(Self::Origin),
             4 => Ok(Self::CrossOrigin),
             // todo: change this error message
-            _ => Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage),
+            _ => Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage),
         }
     }
 }
@@ -705,12 +699,12 @@ pub enum R1AuthenticationKind {
 }
 
 impl TryFrom<u16> for R1AuthenticationKind {
-    type Error = LazorkitAuthenticateError;
+    type Error = LazorAuthenticateError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::WebAuthn),
-            _ => Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidAuthenticationKind),
+            _ => Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidAuthenticationKind),
         }
     }
 }
@@ -730,17 +724,17 @@ fn webauthn_message<'a>(
     // [2 bytes huffman_encoded_len][huffman_encoded_origin]
 
     if auth_payload.len() < 6 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
 
     let auth_len = u16::from_le_bytes(auth_payload[2..4].try_into().unwrap()) as usize;
 
     if auth_len >= WEBAUTHN_AUTHENTICATOR_DATA_MAX_SIZE {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
 
     if auth_payload.len() < 4 + auth_len + 4 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
 
     let auth_data = &auth_payload[4..4 + auth_len];
@@ -758,7 +752,7 @@ fn webauthn_message<'a>(
 
     // Parse huffman tree length
     if auth_payload.len() < offset + 2 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
     let huffman_tree_len =
         u16::from_le_bytes(auth_payload[offset..offset + 2].try_into().unwrap()) as usize;
@@ -766,7 +760,7 @@ fn webauthn_message<'a>(
 
     // Parse huffman encoded origin length
     if auth_payload.len() < offset + 2 {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
     let huffman_encoded_len =
         u16::from_le_bytes(auth_payload[offset..offset + 2].try_into().unwrap()) as usize;
@@ -774,7 +768,7 @@ fn webauthn_message<'a>(
 
     // Validate we have enough data
     if auth_payload.len() < offset + huffman_tree_len + huffman_encoded_len {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
 
     let huffman_tree = &auth_payload[offset..offset + huffman_tree_len];
@@ -784,15 +778,18 @@ fn webauthn_message<'a>(
     // Decode the huffman-encoded origin URL
     let decoded_origin = decode_huffman_origin(huffman_tree, huffman_encoded_origin, origin_len)?;
 
-    // Reconstruct the client data JSON using the decoded origin and reconstructed challenge
-    #[allow(unused_variables)]
+    // Log the decoded origin for monitoring
+    // let origin_str = core::str::from_utf8(&decoded_origin).unwrap_or("<invalid
+    // utf8>"); pinocchio::msg!("WebAuthn Huffman decoded origin: '{}'",
+    // origin_str);
+
+    // Reconstruct the client data JSON using the decoded origin and reconstructed
+    // challenge
     let client_data_json =
         reconstruct_client_data_json(field_order, &decoded_origin, &computed_hash)?;
 
     // Compute SHA256 hash of the reconstructed client data JSON
-    #[allow(unused_mut)]
     let mut client_data_hash = [0u8; 32];
-    #[allow(unused_unsafe)]
     unsafe {
         #[cfg(target_os = "solana")]
         let res = pinocchio::syscalls::sol_sha256(
@@ -803,7 +800,7 @@ fn webauthn_message<'a>(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
         }
     }
 
@@ -827,7 +824,7 @@ fn decode_huffman_origin(
     const BIT_MASKS: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
 
     if tree_data.len() % NODE_SIZE != 0 || tree_data.is_empty() {
-        return Err(LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
     }
 
     let node_count = tree_data.len() / NODE_SIZE;
@@ -848,9 +845,7 @@ fn decode_huffman_origin(
 
             // Should not start a loop at a leaf
             if node_type == LEAF_NODE {
-                return Err(
-                    LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into(),
-                );
+                return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
             }
 
             // Navigate to the correct child index
@@ -863,9 +858,7 @@ fn decode_huffman_origin(
             };
 
             if current_node_index >= node_count {
-                return Err(
-                    LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into(),
-                );
+                return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage.into());
             }
 
             // Check if the new node is a leaf
@@ -891,7 +884,7 @@ fn reconstruct_client_data_json(
 ) -> Result<Vec<u8>, ProgramError> {
     // Convert origin bytes to string
     let origin_str = core::str::from_utf8(origin)
-        .map_err(|_| LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessage)?;
+        .map_err(|_| LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessage)?;
 
     // Base64url encode the challenge data (without padding)
     let challenge_b64 = base64url_encode_no_pad(challenge_data);
@@ -1034,7 +1027,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidPubkey.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidPubkey.into()
         );
     }
 
@@ -1057,7 +1050,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidMessageHash.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidMessageHash.into()
         );
     }
 
@@ -1076,7 +1069,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
         );
     }
 
@@ -1097,7 +1090,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
         );
     }
 
@@ -1129,7 +1122,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
         );
     }
 
@@ -1196,7 +1189,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
-            LazorkitAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
+            LazorAuthenticateError::PermissionDeniedSecp256r1InvalidInstruction.into()
         );
     }
 }

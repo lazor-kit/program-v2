@@ -1,15 +1,19 @@
 [package]
-name = "lazorkit-v2-assertions"
+name = "lazor-assertions"
 version.workspace = true
-edition.workspace = true
+edition = "2021"
 description = "Solana program assertion utilities"
-license.workspace = true
+license = "AGPL-3.0"
 authors.workspace = true
+
 
 [dependencies]
 pinocchio = { version = "0.9" }
 pinocchio-system = { version = "0.3" }
 pinocchio-pubkey = { version = "0.3" }
+
+[features]
+default = []
 
 [lints]
 workspace = true

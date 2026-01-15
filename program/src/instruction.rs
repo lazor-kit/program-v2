@@ -1,107 +1,167 @@
-//! Instruction definitions for the Lazorkit V2 wallet program.
+//! LazorKit Instruction Definitions
+//!
+//! Matches architecture spec v2.1.0
 
-use num_enum::{FromPrimitive, IntoPrimitive};
-use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
-use shank::ShankInstruction;
+use borsh::{BorshDeserialize, BorshSerialize};
+use pinocchio::program_error::ProgramError;
 
-/// Instructions supported by the Lazorkit V2 wallet program.
-#[derive(Clone, Copy, Debug, ShankInstruction, FromPrimitive, IntoPrimitive)]
-#[rustfmt::skip]
-#[repr(u16)]
-pub enum LazorkitInstruction {
-    /// Creates a new Lazorkit wallet.
+/// Instruction discriminators (matching docs/ARCHITECTURE.md)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum InstructionDiscriminator {
+    CreateWallet = 0,
+    AddAuthority = 1,
+    RemoveAuthority = 2,
+    UpdateAuthority = 3,
+    CreateSession = 4,
+    Execute = 5,
+    TransferOwnership = 6,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum LazorKitInstruction {
+    /// Create a new LazorKit wallet
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account to create
-    /// 2. `[writable, signer]` Payer account for rent
-    /// 3. `[writable]` Smart wallet PDA to create
-    /// 4. `[writable]` System program account
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="payer", desc="the payer")]
-    #[account(2, writable, name="smart_wallet", desc="the smart wallet PDA")]
-    #[account(3, name="system_program", desc="the system program")]
-    #[num_enum(default)]
-    CreateSmartWallet = 0,
-    
-    /// Signs and executes a transaction with plugin checks.
+    /// Accounts:
+    /// 0. `[writable]` LazorKit Config account (PDA: ["lazorkit", id])
+    /// 1. `[writable, signer]` Payer
+    /// 2. `[writable]` WalletAddress (Vault PDA: ["lazorkit-wallet-address", config_key])
+    /// 3. `[]` System program
+    CreateWallet {
+        /// Unique wallet ID (32 bytes)
+        id: [u8; 32],
+        /// PDA bump seed for Config
+        bump: u8,
+        /// PDA bump seed for Vault
+        wallet_bump: u8,
+        /// Owner authority type (1-8)
+        owner_authority_type: u16,
+        /// Owner authority data (pubkey or key data)
+        owner_authority_data: Vec<u8>,
+    },
+
+    /// Add a new authority (role) to the wallet
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[writable, signer]` Smart wallet PDA
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    Sign = 1,
-    
-    /// Adds a new authority to the wallet.
+    /// Accounts:
+    /// 0. `[writable, signer]` LazorKit Config account
+    /// 1. `[writable, signer]` Payer
+    /// 2. `[]` System program
+    AddAuthority {
+        /// Acting role ID (caller must have ManageAuthority permission)
+        acting_role_id: u32,
+        /// New authority type (1-8)
+        authority_type: u16,
+        /// New authority data
+        authority_data: Vec<u8>,
+        /// Serialized plugin configs (PluginHeader + State blobs)
+        /// Format: [PluginHeader (40 bytes)][State Data]...
+        plugins_config: Vec<u8>,
+        /// Authorization signature data
+        authorization_data: Vec<u8>,
+    },
+
+    /// Remove an authority from the wallet
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[writable, signer]` Payer account
-    /// 3. `[writable]` System program account
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="payer", desc="the payer")]
-    #[account(2, name="system_program", desc="the system program")]
-    AddAuthority = 2,
-    
-    /// Updates an existing authority in the wallet.
+    /// Accounts:
+    /// 0. `[writable, signer]` LazorKit Config account
+    /// 1. `[writable, signer]` Payer
+    /// 2. `[]` System program
+    RemoveAuthority {
+        /// Acting role ID (caller)
+        acting_role_id: u32,
+        /// Role ID to remove
+        target_role_id: u32,
+    },
+
+    /// Update an authority's plugins
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[signer]` Smart wallet PDA
-    /// 3. `[writable]` Authority to update
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    #[account(2, writable, name="authority_to_update", desc="the authority to update")]
-    UpdateAuthority = 6,
-    
-    /// Removes an authority from the wallet.
+    /// Accounts:
+    /// 0. `[writable, signer]` LazorKit Config account
+    /// 1. `[writable, signer]` Payer
+    /// 2. `[]` System program
+    UpdateAuthority {
+        /// Acting role ID
+        acting_role_id: u32,
+        /// Role ID to update
+        target_role_id: u32,
+        /// Operation: 0=ReplaceAll, 1=AddPlugins, 2=RemoveByType, 3=RemoveByIndex
+        operation: u8,
+        /// Payload (new plugins or indices to remove)
+        payload: Vec<u8>,
+    },
+
+    /// Create a session key for an authority
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[writable, signer]` Payer account (to receive refunded lamports)
-    /// 3. `[signer]` Smart wallet PDA
-    /// 4. `[writable]` Authority to remove
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="payer", desc="the payer")]
-    #[account(2, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    #[account(3, writable, name="authority_to_remove", desc="the authority to remove")]
-    RemoveAuthority = 7,
-    
-    /// Adds a plugin to the wallet's plugin registry.
+    /// Accounts:
+    /// 0. `[writable, signer]` LazorKit Config account
+    /// 1. `[signer]` Payer (must be the role owner)
+    /// 2. `[]` System program
+    CreateSession {
+        /// Role ID to create session for
+        role_id: u32,
+        /// New session public key (Ed25519)
+        session_key: [u8; 32],
+        /// Duration in slots
+        duration: u64,
+    },
+
+    /// Execute a transaction (Bounce Flow)
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[writable, signer]` Payer account
-    /// 3. `[signer]` Smart wallet PDA
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="payer", desc="the payer")]
-    #[account(2, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    AddPlugin = 3,
-    
-    /// Removes a plugin from the wallet's plugin registry.
+    /// Accounts:
+    /// 0. `[writable]` LazorKit Config account
+    /// 1. `[writable, signer]` WalletAddress (Vault - PDA signer)
+    /// 2. `[]` System program
+    /// 3+ `[]` Plugin programs and target accounts (dynamic)
+    Execute {
+        /// Role ID executing this operation
+        role_id: u32,
+        /// Serialized instruction payload to execute
+        instruction_payload: Vec<u8>,
+    },
+
+    /// Transfer ownership to a new owner
     ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[signer]` Smart wallet PDA
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    RemovePlugin = 4,
-    
-    /// Updates a plugin in the wallet's plugin registry.
-    ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[signer]` Smart wallet PDA
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, signer, name="smart_wallet", desc="the smart wallet PDA")]
-    UpdatePlugin = 5,
-    
-    /// Creates a new authentication session for a wallet authority.
-    ///
-    /// Required accounts:
-    /// 1. `[writable]` WalletState account
-    /// 2. `[writable, signer]` Payer account
-    #[account(0, writable, name="wallet_state", desc="the wallet state account")]
-    #[account(1, writable, signer, name="payer", desc="the payer")]
-    CreateSession = 8,
+    /// Accounts:
+    /// 0. `[writable, signer]` LazorKit Config account
+    /// 1. `[signer]` Current owner (Role 0)
+    TransferOwnership {
+        /// New owner authority type
+        new_owner_authority_type: u16,
+        /// New owner authority data
+        new_owner_authority_data: Vec<u8>,
+    },
+}
+
+impl LazorKitInstruction {
+    pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
+        Self::try_from_slice(input).map_err(|_| ProgramError::InvalidInstructionData)
+    }
+}
+
+/// Authority update operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum UpdateOperation {
+    /// Replace all plugins
+    ReplaceAll = 0,
+    /// Add plugins to end
+    AddPlugins = 1,
+    /// Remove plugins by program ID
+    RemoveByType = 2,
+    /// Remove plugins by index
+    RemoveByIndex = 3,
+}
+
+impl TryFrom<u8> for UpdateOperation {
+    type Error = ProgramError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(UpdateOperation::ReplaceAll),
+            1 => Ok(UpdateOperation::AddPlugins),
+            2 => Ok(UpdateOperation::RemoveByType),
+            3 => Ok(UpdateOperation::RemoveByIndex),
+            _ => Err(ProgramError::InvalidInstructionData),
+        }
+    }
 }

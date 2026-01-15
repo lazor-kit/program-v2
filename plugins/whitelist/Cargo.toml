@@ -1,0 +1,20 @@
+[package]
+name = "lazorkit-whitelist-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+borsh = "1.5"
+pinocchio = { version = "0.9" }
+lazorkit-interface = { path = "../../interface" }
+no-padding = { path = "../../no-padding" }
+
+[dev-dependencies]
+solana-program-test = "2.2"
+solana-sdk = "2.2"
+
+[features]
+no-entrypoint = []

@@ -9,8 +9,8 @@ use super::{
     program_exec_authenticate, MAX_INSTRUCTION_PREFIX_LEN,
 };
 use crate::{
-    authority::programexec::assert_program_exec_cant_be_lazorkit, IntoBytes, LazorkitAuthenticateError,
-    LazorkitStateError, Transmutable, TransmutableMut,
+    authority::programexec::assert_program_exec_cant_be_lazor, IntoBytes, LazorAuthenticateError,
+    LazorStateError, Transmutable, TransmutableMut,
 };
 
 /// Creation parameters for a session-based program execution authority.
@@ -146,15 +146,15 @@ impl Authority for ProgramExecSessionAuthority {
         let authority = unsafe { ProgramExecSessionAuthority::load_mut_unchecked(bytes)? };
 
         if create_data.len() != Self::LEN {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
 
         let prefix_len = create_data[32] as usize;
         if prefix_len > MAX_INSTRUCTION_PREFIX_LEN {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
         let create_data_program_id = &create_data[..32];
-        assert_program_exec_cant_be_lazorkit(create_data_program_id)?;
+        assert_program_exec_cant_be_lazor(create_data_program_id)?;
         authority.program_id = create.program_id;
         authority.instruction_prefix = create.instruction_prefix;
         authority.instruction_prefix_len = create.instruction_prefix_len;
@@ -192,7 +192,7 @@ impl AuthorityInfo for ProgramExecSessionAuthority {
     }
 
     fn match_data(&self, data: &[u8]) -> bool {
-        use lazorkit_v2_assertions::sol_assert_bytes_eq;
+        use lazor_assertions::sol_assert_bytes_eq;
 
         if data.len() < 33 {
             return false;
@@ -219,7 +219,7 @@ impl AuthorityInfo for ProgramExecSessionAuthority {
         duration: u64,
     ) -> Result<(), ProgramError> {
         if duration > self.max_session_length {
-            return Err(LazorkitAuthenticateError::InvalidSessionDuration.into());
+            return Err(LazorAuthenticateError::InvalidSessionDuration.into());
         }
         self.current_session_expiration = current_slot + duration;
         self.session_key = session_key;
@@ -234,10 +234,10 @@ impl AuthorityInfo for ProgramExecSessionAuthority {
         slot: u64,
     ) -> Result<(), ProgramError> {
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
         if slot > self.current_session_expiration {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSessionExpired.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -255,7 +255,7 @@ impl AuthorityInfo for ProgramExecSessionAuthority {
     ) -> Result<(), ProgramError> {
         // authority_payload format: [instruction_sysvar_index: 1 byte]
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
 
         let instruction_sysvar_index = authority_payload[0] as usize;

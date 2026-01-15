@@ -1,220 +1,138 @@
-//! SOL Limit Plugin for Lazorkit V2
-//!
-//! This plugin enforces a maximum SOL transfer limit per authority.
-//! It tracks the remaining SOL that can be transferred and decreases
-//! the limit as operations are performed.
-
+use lazorkit_interface::{VerifyInstruction, INSTRUCTION_VERIFY};
+use lazorkit_state::{IntoBytes, Transmutable, TransmutableMut};
+use no_padding::NoPadding;
 use pinocchio::{
-    account_info::AccountInfo,
-    entrypoint,
-    program_error::ProgramError,
-    pubkey::Pubkey,
-    ProgramResult,
+    account_info::AccountInfo, entrypoint, msg, program_error::ProgramError, pubkey::Pubkey,
 };
-use lazorkit_v2_assertions::check_self_owned;
-use lazorkit_v2_state::{Transmutable, TransmutableMut};
 
-/// Plugin instruction discriminator
-#[repr(u8)]
-pub enum PluginInstruction {
-    CheckPermission = 0,
-    UpdateConfig = 1,
-}
-
-/// Plugin config account structure
+/// State for the SOL limit plugin.
+///
+/// This struct tracks and enforces a maximum amount of SOL that can be
+/// used in operations. The limit is decreased as operations are performed.
+///
+/// This corresponds to the opaque state_blob stored after the PluginHeader.
 #[repr(C, align(8))]
-#[derive(Debug)]
-pub struct SolLimitConfig {
-    pub discriminator: u8,
-    pub bump: u8,
-    pub wallet_state: Pubkey,  // WalletState account this config belongs to
-    pub remaining_amount: u64,  // Remaining SOL limit in lamports
-    pub _padding: [u8; 6],
+#[derive(Debug, Clone, Copy, NoPadding)]
+pub struct SolLimitState {
+    /// The remaining amount of SOL that can be used (in lamports)
+    pub amount: u64,
 }
 
-impl SolLimitConfig {
-    pub const LEN: usize = core::mem::size_of::<Self>();
-    pub const SEED: &'static [u8] = b"sol_limit_config";
+impl SolLimitState {
+    /// Size of the SolLimitState struct in bytes
+    pub const LEN: usize = 8;
 }
 
-impl Transmutable for SolLimitConfig {
+impl TryFrom<&[u8]> for SolLimitState {
+    type Error = ProgramError;
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() != Self::LEN {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        // Safety: We checked length, and SolLimitState is Pod (NoPadding + repr(C))
+        Ok(unsafe { *bytes.as_ptr().cast::<SolLimitState>() })
+    }
+}
+
+impl Transmutable for SolLimitState {
     const LEN: usize = Self::LEN;
 }
 
-impl TransmutableMut for SolLimitConfig {}
+impl TransmutableMut for SolLimitState {}
 
-/// CheckPermission instruction arguments
-#[repr(C, align(8))]
-pub struct CheckPermissionArgs {
-    pub instruction_data_len: u16,
-    // Followed by: instruction_data (raw instruction bytes)
-}
-
-impl CheckPermissionArgs {
-    pub const LEN: usize = 2;
-}
-
-/// UpdateConfig instruction arguments
-#[repr(C, align(8))]
-pub struct UpdateConfigArgs {
-    pub instruction: u8,  // PluginInstruction::UpdateConfig
-    pub new_limit: u64,   // New SOL limit in lamports
-}
-
-impl UpdateConfigArgs {
-    pub const LEN: usize = 9;
-}
-
-/// Parse instruction discriminator
-fn parse_instruction(data: &[u8]) -> Result<PluginInstruction, ProgramError> {
-    if data.is_empty() {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    match data[0] {
-        0 => Ok(PluginInstruction::CheckPermission),
-        1 => Ok(PluginInstruction::UpdateConfig),
-        _ => Err(ProgramError::InvalidInstructionData),
+impl IntoBytes for SolLimitState {
+    fn into_bytes(&self) -> Result<&[u8], ProgramError> {
+        Ok(unsafe { core::slice::from_raw_parts(self as *const Self as *const u8, Self::LEN) })
     }
 }
 
-/// Check if a SOL transfer instruction is within limits
-fn check_sol_transfer(
-    config: &mut SolLimitConfig,
-    instruction_data: &[u8],
-    accounts: &[AccountInfo],
-) -> ProgramResult {
-    use pinocchio_system::instructions::Transfer;
-    
-    // Parse system transfer instruction
-    // System transfer: program_id (32) + lamports (8) + from (32) + to (32)
-    if instruction_data.len() < 8 {
-        return Ok(()); // Not a transfer, allow
-    }
-    
-    // Check if this is a system transfer
-    // For simplicity, we'll check if lamports are being transferred
-    // In a real implementation, you'd parse the instruction properly
-    let lamports = u64::from_le_bytes(
-        instruction_data[0..8].try_into().map_err(|_| ProgramError::InvalidInstructionData)?
-    );
-    
-    // Check if transfer exceeds limit
-    if lamports > config.remaining_amount {
-        return Err(ProgramError::InsufficientFunds);
-    }
-    
-    // Decrease remaining amount
-    config.remaining_amount = config.remaining_amount.saturating_sub(lamports);
-    
-    Ok(())
-}
+#[cfg(not(feature = "no-entrypoint"))]
+entrypoint!(process_instruction);
 
-/// Handle CheckPermission instruction
-fn handle_check_permission(
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    if accounts.len() < 2 {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    
-    let config_account = &accounts[0];
-    let wallet_state = &accounts[1];
-    
-    // Validate config account
-    check_self_owned(config_account, ProgramError::InvalidAccountOwner)?;
-    let config_data = unsafe { config_account.borrow_mut_data_unchecked() };
-    
-    if config_data.len() < SolLimitConfig::LEN {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    
-    // Load config
-    let mut config = unsafe {
-        SolLimitConfig::load_mut_unchecked(config_data)?
-    };
-    
-    // Parse CheckPermission args
-    if instruction_data.len() < CheckPermissionArgs::LEN {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    
-    let args_len = u16::from_le_bytes([
-        instruction_data[1],
-        instruction_data[2],
-    ]) as usize;
-    
-    if instruction_data.len() < CheckPermissionArgs::LEN + args_len {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    
-    let inner_instruction_data = &instruction_data[CheckPermissionArgs::LEN..CheckPermissionArgs::LEN + args_len];
-    
-    // Check SOL transfer limits
-    check_sol_transfer(&mut config, inner_instruction_data, accounts)?;
-    
-    Ok(())
-}
-
-/// Handle UpdateConfig instruction
-fn handle_update_config(
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    if accounts.len() < 1 {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    
-    let config_account = &accounts[0];
-    
-    // Validate config account
-    check_self_owned(config_account, ProgramError::InvalidAccountOwner)?;
-    let config_data = unsafe { config_account.borrow_mut_data_unchecked() };
-    
-    if config_data.len() < SolLimitConfig::LEN {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    
-    // Parse UpdateConfig args
-    if instruction_data.len() < UpdateConfigArgs::LEN {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    
-    let new_limit = u64::from_le_bytes(
-        instruction_data[1..9].try_into().map_err(|_| ProgramError::InvalidInstructionData)?
-    );
-    
-    // Load and update config
-    let mut config = unsafe {
-        SolLimitConfig::load_mut_unchecked(config_data)?
-    };
-    
-    config.remaining_amount = new_limit;
-    
-    Ok(())
-}
-
-/// Program entrypoint
-#[entrypoint]
 pub fn process_instruction(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
-) -> ProgramResult {
-    // Parse instruction
-    let instruction = parse_instruction(instruction_data)?;
-    
-    match instruction {
-        PluginInstruction::CheckPermission => {
-            handle_check_permission(accounts, instruction_data)
-        },
-        PluginInstruction::UpdateConfig => {
-            handle_update_config(accounts, instruction_data)
-        },
+) -> Result<(), ProgramError> {
+    // 1. Parse instruction data (Zero-Copy)
+    if instruction_data.len() < VerifyInstruction::LEN {
+        msg!("Instruction data too short: {}", instruction_data.len());
+        return Err(ProgramError::InvalidInstructionData);
     }
+
+    // Safety: VerifyInstruction is #[repr(C)] (Verify using pointer cast)
+    // Note: In a production environment, ensure alignment or use read_unaligned
+    let instruction = unsafe { &*(instruction_data.as_ptr() as *const VerifyInstruction) };
+
+    // 2. Verify discriminator
+    if instruction.discriminator != INSTRUCTION_VERIFY {
+        msg!(
+            "Invalid instruction discriminator: {:x}",
+            instruction.discriminator
+        );
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    // 3. Get the account containing the state (LazorKit wallet account)
+    if accounts.is_empty() {
+        msg!("No accounts provided");
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+    let wallet_account = &accounts[0];
+
+    // 4. Load state from the specified offset (READ ONLY)
+    let offset = instruction.state_offset as usize;
+    let data = wallet_account.try_borrow_data()?;
+
+    // Ensure we don't read past end of data
+    if offset + SolLimitState::LEN > data.len() {
+        msg!("Account data too small for state offset {}", offset);
+        return Err(ProgramError::AccountDataTooSmall);
+    }
+
+    // Load state reference
+    let state_ref =
+        unsafe { SolLimitState::load_unchecked(&data[offset..offset + SolLimitState::LEN])? };
+
+    // Create local copy to modify
+    let mut state = unsafe { core::ptr::read(state_ref as *const SolLimitState) };
+
+    // 5. Enforce logic
+    if instruction.amount > state.amount {
+        msg!(
+            "SolLimit exceeded: remaining {}, requested {}",
+            state.amount,
+            instruction.amount
+        );
+        return Err(ProgramError::Custom(0x1001)); // Insufficient balance error
+    }
+
+    // 6. Update state locally
+    state.amount = state.amount.saturating_sub(instruction.amount);
+
+    msg!("SolLimit approved. New amount: {}", state.amount);
+
+    // 7. Return new state via Return Data
+    let state_bytes = unsafe {
+        core::slice::from_raw_parts(
+            &state as *const SolLimitState as *const u8,
+            SolLimitState::LEN,
+        )
+    };
+
+    unsafe {
+        sol_set_return_data(state_bytes.as_ptr(), state_bytes.len() as u64);
+    }
+
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[cfg(target_os = "solana")]
+extern "C" {
+    fn sol_set_return_data(data: *const u8, length: u64);
+}
+
+#[cfg(not(target_os = "solana"))]
+unsafe fn sol_set_return_data(_data: *const u8, _length: u64) {
+    // No-op on host
 }
