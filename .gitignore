@@ -26,4 +26,4 @@ test-ledger
 
 # Misc
 .surfpool
-.yarn
+.yarn.idea/

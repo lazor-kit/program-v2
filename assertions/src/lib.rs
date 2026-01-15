@@ -9,7 +9,7 @@ use pinocchio::{
 use pinocchio_pubkey::declare_id;
 use pinocchio_system::ID as SYSTEM_ID;
 
-declare_id!("BAXwCwbBbs5WmdUkG9EEtFoLsYq2vRADBkdShbRN7w1P");
+declare_id!("swigypWHEksbC64pWKwah1WTeh9JXwx8H1rJHLdbQMB");
 
 #[allow(unused_imports)]
 use std::mem::MaybeUninit;
@@ -56,6 +56,30 @@ macro_rules! sol_assert_return {
           } else {
             //need this branch to avoid the msg when we run into
               Err(error.into())
+          }
+      }
+  };
+}
+macro_rules! assert_combine {
+  ($op:ident, $($assertion:expr),+ $(,)?) => {
+      || -> ProgramResult {
+          let results = vec![$($assertion)?,+];
+          match stringify!($op) {
+              "and" => {
+                  for result in results {
+                      result?;
+                  }
+                  Ok(())
+              },
+              "or" => {
+                  for result in results {
+                      if result.is_ok() {
+                          return Ok(());
+                      }
+                  }
+                  Err(AssertionError::BytesMismatch.into())
+              },
+              _ => panic!("Unsupported operation"),
           }
       }
   };

@@ -1,15 +1,17 @@
 //! Program execution authority implementation.
 //!
 //! This module provides implementations for program execution-based authority
-//! types in the wallet system. This authority type validates that a
+//! types in the Swig wallet system. This authority type validates that a
 //! preceding instruction in the transaction matches configured program and
 //! instruction prefix requirements, and that the instruction was successful.
 
 pub mod session;
 
+pub use session::*;
+
 use core::any::Any;
 
-use lazorkit_v2_assertions::sol_assert_bytes_eq;
+use lazor_assertions::sol_assert_bytes_eq;
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -17,9 +19,7 @@ use pinocchio::{
 };
 
 use super::{Authority, AuthorityInfo, AuthorityType};
-use crate::{
-    IntoBytes, LazorkitAuthenticateError, LazorkitStateError, Transmutable, TransmutableMut,
-};
+use crate::{IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable, TransmutableMut};
 
 const MAX_INSTRUCTION_PREFIX_LEN: usize = 40;
 const IX_PREFIX_OFFSET: usize = 32 + 1 + 7; // program_id + instruction_prefix_len + padding
@@ -105,17 +105,17 @@ impl Authority for ProgramExecAuthority {
 
     fn set_into_bytes(create_data: &[u8], bytes: &mut [u8]) -> Result<(), ProgramError> {
         if create_data.len() != Self::LEN {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
 
         let prefix_len = create_data[32] as usize;
         if prefix_len > MAX_INSTRUCTION_PREFIX_LEN {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
 
         let authority = unsafe { ProgramExecAuthority::load_mut_unchecked(bytes)? };
         let create_data_program_id = &create_data[..32];
-        assert_program_exec_cant_be_lazorkit(create_data_program_id)?;
+        assert_program_exec_cant_be_lazor(create_data_program_id)?;
         authority.program_id.copy_from_slice(create_data_program_id);
         authority.instruction_prefix_len = prefix_len as u8;
         authority.instruction_prefix[..prefix_len]
@@ -179,12 +179,12 @@ impl AuthorityInfo for ProgramExecAuthority {
         // authority_payload format: [instruction_sysvar_index: 1 byte]
         // Config is always at index 0, wallet is always at index 0 (same as config)
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
 
         let instruction_sysvar_index = authority_payload[0] as usize;
-        let config_account_index = 0; // Config is always the first account (lazorkit account)
-        let wallet_account_index = 1; // Wallet is the second account (lazorkit wallet address)
+        let config_account_index = 0; // Config is always the first account (swig account)
+        let wallet_account_index = 1; // Wallet is the second account (swig wallet address)
 
         program_exec_authenticate(
             account_infos,
@@ -206,9 +206,9 @@ impl IntoBytes for ProgramExecAuthority {
     }
 }
 
-fn assert_program_exec_cant_be_lazorkit(program_id: &[u8]) -> Result<(), ProgramError> {
-    if sol_assert_bytes_eq(program_id, &lazorkit_v2_assertions::id(), 32) {
-        return Err(LazorkitAuthenticateError::PermissionDeniedProgramExecCannotBeLazorkit.into());
+fn assert_program_exec_cant_be_lazor(program_id: &[u8]) -> Result<(), ProgramError> {
+    if sol_assert_bytes_eq(program_id, &lazor_assertions::id(), 32) {
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecCannotBeLazor.into());
     }
     Ok(())
 }
@@ -241,22 +241,20 @@ pub fn program_exec_authenticate(
     // Get the sysvar instructions account
     let sysvar_instructions = account_infos
         .get(instruction_sysvar_index)
-        .ok_or(LazorkitAuthenticateError::InvalidAuthorityPayload)?;
+        .ok_or(LazorAuthenticateError::InvalidAuthorityPayload)?;
 
     // Verify this is the sysvar instructions account
     if sysvar_instructions.key().as_ref() != &INSTRUCTIONS_ID {
-        return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidInstruction.into(),
-        );
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecInvalidInstruction.into());
     }
 
     // Get the config and wallet accounts
     let config_account = account_infos
         .get(config_account_index)
-        .ok_or(LazorkitAuthenticateError::InvalidAuthorityPayload)?;
+        .ok_or(LazorAuthenticateError::InvalidAuthorityPayload)?;
     let wallet_account = account_infos
         .get(wallet_account_index)
-        .ok_or(LazorkitAuthenticateError::InvalidAuthorityPayload)?;
+        .ok_or(LazorAuthenticateError::InvalidAuthorityPayload)?;
 
     // Load instructions sysvar
     let sysvar_instructions_data = unsafe { sysvar_instructions.borrow_data_unchecked() };
@@ -265,9 +263,7 @@ pub fn program_exec_authenticate(
 
     // Must have at least one preceding instruction
     if current_index == 0 {
-        return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidInstruction.into(),
-        );
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecInvalidInstruction.into());
     }
 
     // Get the preceding instruction
@@ -277,20 +273,20 @@ pub fn program_exec_authenticate(
     });
     if num_accounts < 2 {
         return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
+            LazorAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
         );
     }
 
     // Verify the instruction is calling the expected program
     if !sol_assert_bytes_eq(preceding_ix.get_program_id(), expected_program_id, 32) {
-        return Err(LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidProgram.into());
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecInvalidProgram.into());
     }
 
     // Verify the instruction data prefix matches
     let instruction_data = preceding_ix.get_instruction_data();
     if instruction_data.len() < prefix_len {
         return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
+            LazorAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
         );
     }
 
@@ -300,7 +296,7 @@ pub fn program_exec_authenticate(
         prefix_len,
     ) {
         return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
+            LazorAuthenticateError::PermissionDeniedProgramExecInvalidInstructionData.into(),
         );
     }
 
@@ -311,15 +307,11 @@ pub fn program_exec_authenticate(
 
     // Verify the accounts match the config and wallet keys
     if !sol_assert_bytes_eq(account_0.key.as_ref(), config_account.key(), 32) {
-        return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidConfigAccount.into(),
-        );
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecInvalidConfigAccount.into());
     }
 
     if !sol_assert_bytes_eq(account_1.key.as_ref(), wallet_account.key(), 32) {
-        return Err(
-            LazorkitAuthenticateError::PermissionDeniedProgramExecInvalidWalletAccount.into(),
-        );
+        return Err(LazorAuthenticateError::PermissionDeniedProgramExecInvalidWalletAccount.into());
     }
 
     // If we get here, all checks passed - the instruction executed successfully

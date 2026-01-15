@@ -1,76 +1,67 @@
-//! Lazorkit V2 Program Implementation
+//! LazorKit Program - Main Entry Point
 //!
-//! This module provides the core program implementation for the Lazorkit V2 wallet
-//! system. It handles instruction processing and program state management.
+//! Modular smart wallet protocol with pluggable validation logic.
+
+extern crate alloc;
 
 pub mod actions;
-mod error;
+pub mod error;
 pub mod instruction;
-pub mod util;
+pub mod processor;
 
-use actions::process_action;
-use error::LazorkitError;
-use lazorkit_v2_state::{wallet_account::WalletAccount, Discriminator};
-#[cfg(not(feature = "no-entrypoint"))]
-use pinocchio::lazy_program_entrypoint;
+use core::mem::MaybeUninit;
 use pinocchio::{
     account_info::AccountInfo,
     lazy_entrypoint::{InstructionContext, MaybeAccount},
+    lazy_program_entrypoint,
     program_error::ProgramError,
+    pubkey::Pubkey,
     ProgramResult,
 };
 use pinocchio_pubkey::declare_id;
-#[cfg(not(feature = "no-entrypoint"))]
-use {default_env::default_env, solana_security_txt::security_txt};
 
-declare_id!("CmF46cm89WjdfCDDDTx5X2kQLc2mFVUhP3k7k3txgAFE");
+declare_id!("LazorKit11111111111111111111111111111111111");
 
-pinocchio::default_allocator!();
-pinocchio::default_panic_handler!();
+lazy_program_entrypoint!(process_instruction);
 
-#[cfg(target_os = "solana")]
-use getrandom::{register_custom_getrandom, Error};
+fn process_instruction(mut ctx: InstructionContext) -> ProgramResult {
+    // Collect accounts into a stack array
+    // We assume a reasonable max accounts
+    const MAX_ACCOUNTS: usize = 64;
+    const AI: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+    let mut accounts_storage = [AI; MAX_ACCOUNTS];
+    let mut accounts_len = 0;
 
-#[cfg(target_os = "solana")]
-pub fn custom_getrandom(_buf: &mut [u8]) -> Result<(), Error> {
-    panic!("getrandom not supported on solana");
-}
-
-#[cfg(target_os = "solana")]
-register_custom_getrandom!(custom_getrandom);
-
-// Manual entrypoint implementation to avoid `pinocchio::entrypoint!` macro issues
-// which can cause "Entrypoint out of bounds" errors due to `cfg` attributes or
-// excessive stack allocation (MAX_ACCOUNTS).
-// We manually allocate a smaller buffer (32 accounts) to keep stack usage safe (SBF stack is 4KB).
-#[no_mangle]
-pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-    const MAX_ACCOUNTS: usize = 32;
-    let mut accounts_buffer = [core::mem::MaybeUninit::<AccountInfo>::uninit(); MAX_ACCOUNTS];
-    let (program_id, num_accounts, instruction_data) =
-        pinocchio::entrypoint::deserialize(input, &mut accounts_buffer);
-    let accounts =
-        core::slice::from_raw_parts(accounts_buffer.as_ptr() as *const AccountInfo, num_accounts);
-    match process_instruction(&program_id, accounts, &instruction_data) {
-        Ok(()) => pinocchio::SUCCESS,
-        Err(e) => e.into(),
+    while let Ok(acc) = ctx.next_account() {
+        if accounts_len >= MAX_ACCOUNTS {
+            return Err(ProgramError::NotEnoughAccountKeys);
+        }
+        match acc {
+            MaybeAccount::Account(account) => {
+                accounts_storage[accounts_len].write(account);
+            },
+            MaybeAccount::Duplicated(idx) => {
+                // Pinocchio optimization: duplicated account references a previous index
+                let original = unsafe { accounts_storage[idx as usize].assume_init_ref().clone() };
+                accounts_storage[accounts_len].write(original);
+            },
+        }
+        accounts_len += 1;
     }
-}
 
-pub fn process_instruction(
-    _program_id: &pinocchio::pubkey::Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    process_action(accounts, instruction_data)
-}
+    // Create slice from initialized accounts
+    let accounts = unsafe {
+        core::slice::from_raw_parts(
+            accounts_storage.as_ptr() as *const AccountInfo,
+            accounts_len,
+        )
+    };
 
-#[cfg(not(feature = "no-entrypoint"))]
-security_txt! {
-    name: "Lazorkit V2",
-    project_url: "https://lazorkit.com",
-    contacts: "email:security@lazorkit.com",
-    policy: "https://github.com/lazorkit/lazorkit-v2/security/policy",
-    preferred_languages: "en",
-    source_code: "https://github.com/lazorkit/lazorkit-v2"
+    // Get instruction data
+    let instruction_data = unsafe { ctx.instruction_data_unchecked() };
+
+    // Delegate to processor
+    // Pinocchio doesn't pass program_id dynamically in InstructionContext,
+    // so we pass our own ID (checks should verify program_id against this if needed).
+    processor::process_instruction(&crate::ID, accounts, instruction_data)
 }

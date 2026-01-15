@@ -1,30 +1,14 @@
 [package]
 name = "lazorkit-sol-limit-plugin"
 version = "0.1.0"
-description = "SOL Limit Plugin for Lazorkit V2"
 edition = "2021"
-
-[workspace]
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "lazorkit_sol_limit_plugin"
-
-[features]
-no-entrypoint = []
-no-idl = []
-no-log-ix-name = []
-cpi = ["no-entrypoint"]
-default = []
 
 [dependencies]
-pinocchio = { version = "0.9", features = ["std"] }
-pinocchio-system = { version = "0.9", features = ["std"] }
-lazorkit-v2-interface = { path = "../../lazorkit-v2/interface" }
-lazorkit-v2-state = { path = "../../lazorkit-v2/state" }
-lazorkit-v2-assertions = { path = "../../lazorkit-v2/assertions" }
-
-[dev-dependencies]
-solana-program-test = "~2.0"
-solana-sdk = "~2.0"
-test-log = { version = "0.2", default-features = false }
+pinocchio = "0.9"
+pinocchio-system = "0.3"
+lazorkit-state = { path = "../../state" }
+lazorkit-interface = { path = "../../interface" }
+no-padding = { path = "../../no-padding", version = "0.1" }

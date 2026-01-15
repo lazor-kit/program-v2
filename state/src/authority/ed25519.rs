@@ -1,21 +1,19 @@
 //! Ed25519 authority implementation.
 //!
 //! This module provides implementations for Ed25519-based authority types in
-//! the wallet system. It includes both standard Ed25519 authority and
+//! the Swig wallet system. It includes both standard Ed25519 authority and
 //! session-based Ed25519 authority with expiration support.
 
 use core::any::Any;
 
 #[cfg(feature = "client")]
 use bs58;
-use lazorkit_v2_assertions::sol_assert_bytes_eq;
+use lazor_assertions::sol_assert_bytes_eq;
 use no_padding::NoPadding;
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
 
 use super::{Authority, AuthorityInfo, AuthorityType};
-use crate::{
-    IntoBytes, LazorkitAuthenticateError, LazorkitStateError, Transmutable, TransmutableMut,
-};
+use crate::{IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable, TransmutableMut};
 
 /// Standard Ed25519 authority implementation.
 ///
@@ -23,44 +21,49 @@ use crate::{
 /// signature verification.
 #[repr(C, align(8))]
 #[derive(Debug, PartialEq, NoPadding)]
-pub struct ED25519Authority {
+pub struct Ed25519Authority {
     /// The Ed25519 public key used for signature verification
     pub public_key: [u8; 32],
 }
 
-impl ED25519Authority {
-    /// Creates a new ED25519Authority from raw bytes.
+impl Ed25519Authority {
+    /// Creates a new Ed25519Authority from a public key.
+    pub fn new(public_key: [u8; 32]) -> Self {
+        Self { public_key }
+    }
+
+    /// Creates a new Ed25519Authority from raw bytes.
     ///
     /// # Arguments
     /// * `bytes` - The raw bytes containing the public key (must be 32 bytes)
     ///
     /// # Returns
-    /// * `Ok(ED25519Authority)` - If the bytes are valid
+    /// * `Ok(Ed25519Authority)` - If the bytes are valid
     /// * `Err(ProgramError)` - If the bytes are invalid
     pub fn from_create_bytes(bytes: &[u8]) -> Result<Self, ProgramError> {
         if bytes.len() != 32 {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
         let public_key = bytes.try_into().unwrap();
         Ok(Self { public_key })
     }
 }
 
-impl Authority for ED25519Authority {
+impl Authority for Ed25519Authority {
     const TYPE: AuthorityType = AuthorityType::Ed25519;
     const SESSION_BASED: bool = false;
 
     fn set_into_bytes(create_data: &[u8], bytes: &mut [u8]) -> Result<(), ProgramError> {
         if create_data.len() != 32 {
-            return Err(LazorkitStateError::InvalidRoleData.into());
+            return Err(LazorStateError::InvalidRoleData.into());
         }
-        let authority = unsafe { ED25519Authority::load_mut_unchecked(bytes)? };
+        let authority = unsafe { Ed25519Authority::load_mut_unchecked(bytes)? };
         authority.public_key = create_data.try_into().unwrap();
         Ok(())
     }
 }
 
-impl AuthorityInfo for ED25519Authority {
+impl AuthorityInfo for Ed25519Authority {
     fn authority_type(&self) -> AuthorityType {
         Self::TYPE
     }
@@ -97,7 +100,7 @@ impl AuthorityInfo for ED25519Authority {
         _slot: u64,
     ) -> Result<(), ProgramError> {
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -107,13 +110,13 @@ impl AuthorityInfo for ED25519Authority {
     }
 }
 
-impl Transmutable for ED25519Authority {
-    const LEN: usize = core::mem::size_of::<ED25519Authority>();
+impl Transmutable for Ed25519Authority {
+    const LEN: usize = core::mem::size_of::<Ed25519Authority>();
 }
 
-impl TransmutableMut for ED25519Authority {}
+impl TransmutableMut for Ed25519Authority {}
 
-impl IntoBytes for ED25519Authority {
+impl IntoBytes for Ed25519Authority {
     fn into_bytes(&self) -> Result<&[u8], ProgramError> {
         let bytes =
             unsafe { core::slice::from_raw_parts(self as *const Self as *const u8, Self::LEN) };
@@ -260,7 +263,7 @@ impl AuthorityInfo for Ed25519SessionAuthority {
         duration: u64,
     ) -> Result<(), ProgramError> {
         if duration > self.max_session_length {
-            return Err(LazorkitAuthenticateError::InvalidSessionDuration.into());
+            return Err(LazorAuthenticateError::InvalidSessionDuration.into());
         }
         self.current_session_expiration = current_slot + duration;
         self.session_key = session_key;
@@ -275,10 +278,10 @@ impl AuthorityInfo for Ed25519SessionAuthority {
         slot: u64,
     ) -> Result<(), ProgramError> {
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
         if slot > self.current_session_expiration {
-            return Err(LazorkitAuthenticateError::PermissionDeniedSessionExpired.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -295,7 +298,7 @@ impl AuthorityInfo for Ed25519SessionAuthority {
         _slot: u64,
     ) -> Result<(), ProgramError> {
         if authority_payload.len() != 1 {
-            return Err(LazorkitAuthenticateError::InvalidAuthorityPayload.into());
+            return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
         ed25519_authenticate(
             account_infos,
@@ -322,11 +325,9 @@ pub fn ed25519_authenticate(
 ) -> Result<(), ProgramError> {
     let auth_account = account_infos
         .get(authority_index)
-        .ok_or(LazorkitAuthenticateError::InvalidAuthorityEd25519MissingAuthorityAccount)?;
-
+        .ok_or(LazorAuthenticateError::InvalidAuthorityEd25519MissingAuthorityAccount)?;
     if sol_assert_bytes_eq(public_key, auth_account.key(), 32) && auth_account.is_signer() {
         return Ok(());
     }
-
-    Err(LazorkitAuthenticateError::PermissionDenied.into())
+    Err(LazorAuthenticateError::PermissionDenied.into())
 }

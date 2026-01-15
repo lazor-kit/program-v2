@@ -1,7 +1,7 @@
 //! Authority module for the state crate.
 //!
 //! This module provides functionality for managing different types of
-//! authorities in the wallet system. It includes support for various
+//! authorities in the Swig wallet system. It includes support for various
 //! authentication methods like Ed25519 and Secp256k1, with both standard and
 //! session-based variants.
 
@@ -12,13 +12,13 @@ pub mod secp256r1;
 
 use std::any::Any;
 
-use ed25519::{ED25519Authority, Ed25519SessionAuthority};
+use ed25519::{Ed25519Authority, Ed25519SessionAuthority};
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
 use programexec::{session::ProgramExecSessionAuthority, ProgramExecAuthority};
 use secp256k1::{Secp256k1Authority, Secp256k1SessionAuthority};
 use secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority};
 
-use crate::{IntoBytes, LazorkitAuthenticateError, Transmutable, TransmutableMut};
+use crate::{IntoBytes, LazorAuthenticateError, Transmutable, TransmutableMut};
 
 /// Trait for authority data structures.
 ///
@@ -79,7 +79,7 @@ pub trait AuthorityInfo {
         _data_payload: &[u8],
         _slot: u64,
     ) -> Result<(), ProgramError> {
-        Err(LazorkitAuthenticateError::AuthorityDoesNotSupportSessionBasedAuth.into())
+        Err(LazorAuthenticateError::AuthorityDoesNotSupportSessionBasedAuth.into())
     }
 
     /// Starts a new authentication session.
@@ -94,7 +94,7 @@ pub trait AuthorityInfo {
         _current_slot: u64,
         _duration: u64,
     ) -> Result<(), ProgramError> {
-        Err(LazorkitAuthenticateError::AuthorityDoesNotSupportSessionBasedAuth.into())
+        Err(LazorAuthenticateError::AuthorityDoesNotSupportSessionBasedAuth.into())
     }
 
     /// Authenticates a standard (non-session) operation.
@@ -169,7 +169,7 @@ pub const fn authority_type_to_length(
     authority_type: &AuthorityType,
 ) -> Result<usize, ProgramError> {
     match authority_type {
-        AuthorityType::Ed25519 => Ok(ED25519Authority::LEN),
+        AuthorityType::Ed25519 => Ok(Ed25519Authority::LEN),
         AuthorityType::Ed25519Session => Ok(Ed25519SessionAuthority::LEN),
         AuthorityType::Secp256k1 => Ok(Secp256k1Authority::LEN),
         AuthorityType::Secp256k1Session => Ok(Secp256k1SessionAuthority::LEN),

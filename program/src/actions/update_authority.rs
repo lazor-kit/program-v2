@@ -1,425 +1,510 @@
-//! Update Authority instruction handler - Pure External Architecture
+//! UpdateAuthority instruction handler
 
-use lazorkit_v2_assertions::check_self_owned;
-use lazorkit_v2_state::{
-    authority::{authority_type_to_length, AuthorityType},
-    plugin_ref::PluginRef,
-    position::Position,
-    wallet_account::WalletAccount,
-    Discriminator, Transmutable,
+use lazorkit_interface::{VerifyInstruction, INSTRUCTION_VERIFY};
+use lazorkit_state::{
+    plugin::PluginHeader, IntoBytes, LazorKitWallet, Position, RoleIterator, Transmutable,
+    TransmutableMut,
 };
-use pinocchio::msg;
 use pinocchio::{
     account_info::AccountInfo,
+    instruction::{AccountMeta, Instruction},
+    msg,
+    program::{invoke, invoke_signed},
     program_error::ProgramError,
+    pubkey::Pubkey,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 use pinocchio_system::instructions::Transfer;
 
-use crate::error::LazorkitError;
-use crate::util::permission::check_role_permission_for_authority_management;
+use crate::error::LazorKitError;
+use crate::instruction::UpdateOperation;
 
-/// Arguments for UpdateAuthority instruction (Pure External)
-/// Note: instruction discriminator is already parsed in process_action
-#[repr(C, align(8))]
-#[derive(Debug)]
-pub struct UpdateAuthorityArgs {
-    pub acting_authority_id: u32, // Authority ID performing this action (for authentication & permission check)
-    pub authority_id: u32,        // Authority ID to update
-    pub new_authority_type: u16,
-    pub new_authority_data_len: u16,
-    pub num_plugin_refs: u16, // New number of plugin refs
-    pub _padding: [u8; 2],
-}
+pub fn process_update_authority(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    acting_role_id: u32,
+    target_role_id: u32,
+    operation: u8,
+    payload: Vec<u8>,
+) -> ProgramResult {
+    let mut account_info_iter = accounts.iter();
+    let config_account = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let payer_account = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let _system_program = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-impl UpdateAuthorityArgs {
-    pub const LEN: usize = core::mem::size_of::<Self>();
-}
-
-impl Transmutable for UpdateAuthorityArgs {
-    const LEN: usize = Self::LEN;
-}
-
-/// Updates an authority in the wallet (Pure External architecture).
-///
-/// Accounts:
-/// 0. wallet_account (writable)
-/// 1. payer (writable, signer) - for rent if account grows
-/// 2. system_program
-/// 3..N. Additional accounts for authority authentication (signature, etc.)
-pub fn update_authority(accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
-    if accounts.len() < 3 {
-        return Err(LazorkitError::InvalidAccountsLength.into());
+    if !payer_account.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let wallet_account_info = &accounts[0];
-    let payer = &accounts[1];
-    let system_program = &accounts[2];
-
-    // Validate system program
-    if system_program.key() != &pinocchio_system::ID {
-        return Err(LazorkitError::InvalidSystemProgram.into());
+    if config_account.owner() != program_id {
+        return Err(ProgramError::IllegalOwner);
     }
 
-    // Validate wallet account
-    check_self_owned(wallet_account_info, LazorkitError::OwnerMismatchWalletState)?;
+    let op = UpdateOperation::try_from(operation)?;
 
-    let wallet_account_data = unsafe { wallet_account_info.borrow_data_unchecked() };
-    if wallet_account_data.is_empty()
-        || wallet_account_data[0] != Discriminator::WalletAccount as u8
-    {
-        return Err(LazorkitError::InvalidWalletStateDiscriminator.into());
+    // Only Owner can update authorities for now
+    if acting_role_id != 0 {
+        msg!("Only Owner can update authorities");
+        return Err(LazorKitError::Unauthorized.into());
     }
 
-    let wallet_account =
-        unsafe { WalletAccount::load_unchecked(&wallet_account_data[..WalletAccount::LEN])? };
+    msg!(
+        "UpdateAuthority: target={}, operation={:?}, payload_len={}",
+        target_role_id,
+        op,
+        payload.len()
+    );
 
-    // Parse instruction args
-    // Note: instruction discriminator (2 bytes) is already parsed in process_action
-    // Parse instruction args
-    // Note: instruction discriminator (2 bytes) is already parsed in process_action
-    if instruction_data.len() < UpdateAuthorityArgs::LEN {
+    match op {
+        UpdateOperation::ReplaceAll => {
+            process_replace_all(config_account, payer_account, target_role_id, &payload)
+        },
+        UpdateOperation::AddPlugins => {
+            process_add_plugins(config_account, payer_account, target_role_id, &payload)
+        },
+        UpdateOperation::RemoveByType => {
+            process_remove_by_type(config_account, payer_account, target_role_id, &payload)
+        },
+        UpdateOperation::RemoveByIndex => {
+            process_remove_by_index(config_account, payer_account, target_role_id, &payload)
+        },
+    }
+}
+
+fn process_replace_all(
+    config_account: &AccountInfo,
+    payer_account: &AccountInfo,
+    target_role_id: u32,
+    payload: &[u8],
+) -> ProgramResult {
+    let mut cursor = 0;
+    if payload.len() < 4 {
         return Err(ProgramError::InvalidInstructionData);
     }
+    let num_new_plugins = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+    cursor += 4;
 
-    // Parse args manually to avoid alignment issues
-    let acting_authority_id = u32::from_le_bytes([
-        instruction_data[0],
-        instruction_data[1],
-        instruction_data[2],
-        instruction_data[3],
-    ]);
-    let authority_id = u32::from_le_bytes([
-        instruction_data[4],
-        instruction_data[5],
-        instruction_data[6],
-        instruction_data[7],
-    ]);
+    let mut new_plugins_total_size = 0;
+    let mut new_plugins_regions = Vec::new();
 
-    let new_authority_type = u16::from_le_bytes([instruction_data[8], instruction_data[9]]);
-    let new_authority_data_len = u16::from_le_bytes([instruction_data[10], instruction_data[11]]);
-    let num_plugin_refs = u16::from_le_bytes([instruction_data[12], instruction_data[13]]);
-    // padding at [14..16] - ignore
+    for _ in 0..num_new_plugins {
+        if cursor + 34 > payload.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        let data_len =
+            u16::from_le_bytes(payload[cursor + 32..cursor + 34].try_into().unwrap()) as usize;
+        let plugin_total_len = 32 + 2 + data_len;
 
-    // Parse new authority data
-    let authority_data_start = UpdateAuthorityArgs::LEN;
-    let authority_data_end = authority_data_start + new_authority_data_len as usize;
-
-    if instruction_data.len() < authority_data_end {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    let new_authority_data = &instruction_data[authority_data_start..authority_data_end];
-
-    // Validate authority type
-    let authority_type = AuthorityType::try_from(new_authority_type)
-        .map_err(|_| LazorkitError::InvalidAuthorityType)?;
-
-    // Get acting authority data (for authentication & permission check)
-    // Get acting authority data (for authentication & permission check)
-    let acting_authority_data = wallet_account
-        .get_authority(wallet_account_data, acting_authority_id)?
-        .ok_or_else(|| LazorkitError::InvalidAuthorityNotFoundByRoleId)?;
-
-    // Get current authority data (to update)
-    // Get current authority data (to update)
-    let current_authority_data = wallet_account
-        .get_authority(wallet_account_data, authority_id)?
-        .ok_or_else(|| LazorkitError::InvalidAuthorityNotFoundByRoleId)?;
-    let current_role_perm = current_authority_data
-        .position
-        .role_permission()
-        .map_err(|_| LazorkitError::InvalidRolePermission)?;
-
-    // Pattern: Authenticate → Check Permission → Execute
-    // Step 1: Authenticate acting authority (verify signature)
-    let authority_payload = accounts
-        .get(3)
-        .map(|acc| unsafe { acc.borrow_data_unchecked() });
-    crate::util::authenticate::authenticate_authority(
-        &acting_authority_data,
-        accounts,
-        authority_payload,
-        Some(instruction_data),
-    )?;
-
-    // HYBRID ARCHITECTURE: Step 2 - Check inline role permission
-    // Check if acting authority has permission to manage authorities
-    check_role_permission_for_authority_management(&acting_authority_data)?;
-
-    // Find the exact offset of this authority
-    let authorities_offset = wallet_account.authorities_offset();
-    let num_authorities = wallet_account.num_authorities(wallet_account_data)?;
-    let mut authority_offset = authorities_offset;
-    let mut found_offset = false;
-
-    for _ in 0..num_authorities {
-        if authority_offset + Position::LEN > wallet_account_data.len() {
-            break;
+        if cursor + plugin_total_len > payload.len() {
+            return Err(ProgramError::InvalidInstructionData);
         }
 
-        // Parse Position manually
-        let position_id = u32::from_le_bytes([
-            wallet_account_data[authority_offset + 8],
-            wallet_account_data[authority_offset + 9],
-            wallet_account_data[authority_offset + 10],
-            wallet_account_data[authority_offset + 11],
-        ]);
-        let position_boundary = u32::from_le_bytes([
-            wallet_account_data[authority_offset + 12],
-            wallet_account_data[authority_offset + 13],
-            wallet_account_data[authority_offset + 14],
-            wallet_account_data[authority_offset + 15],
-        ]);
+        let storage_len = PluginHeader::LEN + data_len;
+        new_plugins_total_size += storage_len;
 
-        if position_id == authority_id {
-            found_offset = true;
-            break;
+        new_plugins_regions.push((cursor, plugin_total_len));
+        cursor += plugin_total_len;
+    }
+
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+
+    // Find role info
+    let (role_offset, mut role_pos, current_plugins_size) = {
+        let mut offset = LazorKitWallet::LEN;
+        let mut found = None;
+
+        for (pos, _, plugins_data) in
+            RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN)
+        {
+            if pos.id == target_role_id {
+                // role_offset needs to point to Role start (where Position is).
+                // RoleIterator consumes it.
+                // We know iterate offset.
+                // But RoleIterator doesn't return offset.
+                // We calculated offset manually.
+                found = Some((offset, pos, plugins_data.len()));
+                break;
+            }
+            offset = pos.boundary as usize;
         }
+        found.ok_or(LazorKitError::AuthorityNotFound)?
+    };
 
-        authority_offset = position_boundary as usize;
+    let size_diff = new_plugins_total_size as isize - current_plugins_size as isize;
+
+    drop(config_data);
+    if size_diff > 0 {
+        let new_len = (config_account.data_len() as isize + size_diff) as usize;
+        reallocate_account(config_account, payer_account, new_len)?;
     }
 
-    if !found_offset {
-        return Err(LazorkitError::InvalidAuthorityNotFoundByRoleId.into());
-    }
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let plugins_start_offset = role_offset + Position::LEN + role_pos.authority_length as usize;
+    let shift_start_index = plugins_start_offset + current_plugins_size;
 
-    // Get old authority size
-    let position_boundary = u32::from_le_bytes([
-        wallet_account_data[authority_offset + 12],
-        wallet_account_data[authority_offset + 13],
-        wallet_account_data[authority_offset + 14],
-        wallet_account_data[authority_offset + 15],
-    ]);
-    let old_authority_size = position_boundary as usize - authority_offset;
-
-    // Calculate new authority size
-    let plugin_refs_size = num_plugin_refs as usize * PluginRef::LEN;
-    let new_authority_size = Position::LEN + new_authority_data_len as usize + plugin_refs_size;
-
-    // Parse plugin refs from instruction_data (if provided)
-    // Format: [UpdateAuthorityArgs] + [authority_data] + [plugin_refs]
-    let plugin_refs_start = authority_data_end;
-    let mut plugin_refs_data: Vec<u8> = Vec::new();
-
-    // Parse plugin refs from instruction_data (if provided)
-    // Format: [UpdateAuthorityArgs] + [authority_data] + [plugin_refs]
-    let plugin_refs_start = authority_data_end;
-    let mut plugin_refs_data = Vec::new();
-
-    // Check if plugin refs are provided
-    let required_len = plugin_refs_start + (num_plugin_refs as usize * PluginRef::LEN);
-    if instruction_data.len() >= required_len {
-        let plugin_refs_end = plugin_refs_start + (num_plugin_refs as usize * PluginRef::LEN);
-        plugin_refs_data = instruction_data[plugin_refs_start..plugin_refs_end].to_vec();
-    } else {
-    }
-
-    // Calculate size difference
-    let size_diff = new_authority_size as i32 - old_authority_size as i32;
-    let current_size = wallet_account_data.len();
-    let new_account_size = (current_size as i32 + size_diff) as usize;
-
-    // Preserve role_permission from current authority BEFORE any resize/modification
-    let current_role_permission = wallet_account_data[authority_offset + 6];
-    // Preserve role_permission from current authority BEFORE any resize/modification
-    let current_role_permission = wallet_account_data[authority_offset + 6];
-
-    // Get mutable access
-    let wallet_account_mut_data = unsafe { wallet_account_info.borrow_mut_data_unchecked() };
-
-    if size_diff == 0 {
-        // Size unchanged, just update data in place
-        // Update Position
-        let new_boundary = position_boundary as usize;
-        // role_permission already preserved above
-        let mut position_bytes = [0u8; Position::LEN];
-        position_bytes[0..2].copy_from_slice(&new_authority_type.to_le_bytes());
-        position_bytes[2..4].copy_from_slice(&new_authority_data_len.to_le_bytes());
-        position_bytes[4..6].copy_from_slice(&num_plugin_refs.to_le_bytes());
-        position_bytes[6] = current_role_permission; // Preserve role_permission
-        position_bytes[4..6].copy_from_slice(&num_plugin_refs.to_le_bytes());
-        position_bytes[6] = current_role_permission; // Preserve role_permission
-                                                     // padding at 7 is already 0
-        position_bytes[8..12].copy_from_slice(&authority_id.to_le_bytes());
-        position_bytes[12..16].copy_from_slice(&(new_boundary as u32).to_le_bytes());
-
-        wallet_account_mut_data[authority_offset..authority_offset + Position::LEN]
-            .copy_from_slice(&position_bytes);
-
-        // Write new authority data
-        let auth_data_offset = authority_offset + Position::LEN;
-        wallet_account_mut_data[auth_data_offset..auth_data_offset + new_authority_data.len()]
-            .copy_from_slice(new_authority_data);
-
-        // Write plugin refs
-        let plugin_refs_offset = auth_data_offset + new_authority_data.len();
-        // Write plugin refs
-        let plugin_refs_offset = auth_data_offset + new_authority_data.len();
-        if !plugin_refs_data.is_empty() {
-            wallet_account_mut_data
-                [plugin_refs_offset..plugin_refs_offset + plugin_refs_data.len()]
-                .copy_from_slice(&plugin_refs_data);
+    if size_diff != 0 {
+        if size_diff > 0 {
+            let move_amt = size_diff as usize;
+            let src_end = config_data.len() - move_amt;
+            config_data.copy_within(shift_start_index..src_end, shift_start_index + move_amt);
         } else {
+            let move_amt = (-size_diff) as usize;
+            config_data.copy_within(shift_start_index.., shift_start_index - move_amt);
         }
 
-        return Ok(());
-    } else if size_diff > 0 {
-        // Authority is growing, need to resize account
-        let new_account_size_aligned = core::alloc::Layout::from_size_align(new_account_size, 8)
-            .map_err(|_| LazorkitError::InvalidAlignment)?
-            .pad_to_align()
-            .size();
+        role_pos.num_actions = num_new_plugins as u16;
+        let mut dest = &mut config_data[role_offset..role_offset + Position::LEN];
+        dest.copy_from_slice(role_pos.into_bytes()?);
 
-        wallet_account_info.resize(new_account_size_aligned)?;
+        // Update subsequent roles
+        let wallet_header =
+            unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+        let mut apply_diff = false;
+        let mut offset = LazorKitWallet::LEN;
 
-        // Re-borrow after resize
-        let wallet_account_mut_data = unsafe { wallet_account_info.borrow_mut_data_unchecked() };
-
-        // Shift data after authority forward to make room
-        let data_after_authority = authority_offset + old_authority_size;
-        if data_after_authority < current_size {
-            let data_to_move_len = current_size - data_after_authority;
-            let src_start = data_after_authority;
-            let dst_start = authority_offset + new_authority_size;
-
-            // Shift data forward
-            wallet_account_mut_data.copy_within(src_start..src_start + data_to_move_len, dst_start);
-        }
-
-        // Update boundaries of all authorities after this one
-        let mut offset = authorities_offset;
-        for _ in 0..num_authorities {
-            if offset + Position::LEN > new_account_size {
+        for _ in 0..wallet_header.role_count {
+            if offset >= config_data.len() {
                 break;
             }
 
-            let position_boundary = u32::from_le_bytes([
-                wallet_account_mut_data[offset + 12],
-                wallet_account_mut_data[offset + 13],
-                wallet_account_mut_data[offset + 14],
-                wallet_account_mut_data[offset + 15],
-            ]);
+            let pos_slice = &mut config_data[offset..offset + Position::LEN];
+            let mut p = *unsafe { Position::load_unchecked(pos_slice)? };
 
-            // If this authority is after the updated one, adjust boundary
-            if offset > authority_offset {
-                let new_boundary = position_boundary + (size_diff as u32);
-                wallet_account_mut_data[offset + 12..offset + 16]
-                    .copy_from_slice(&new_boundary.to_le_bytes());
+            if apply_diff {
+                p.boundary = (p.boundary as isize + size_diff) as u32;
+                pos_slice.copy_from_slice(p.into_bytes()?);
             }
 
-            offset = position_boundary as usize;
-            if offset > authority_offset {
-                offset = (offset as i32 + size_diff) as usize;
+            if p.id == target_role_id {
+                apply_diff = true;
             }
-        }
 
-        // Ensure rent exemption
-        let current_lamports = wallet_account_info.lamports();
-        let required_lamports = Rent::get()?.minimum_balance(new_account_size_aligned);
-        let lamports_needed = required_lamports.saturating_sub(current_lamports);
-
-        if lamports_needed > 0 {
-            Transfer {
-                from: payer,
-                to: wallet_account_info,
-                lamports: lamports_needed,
-            }
-            .invoke()?;
-        }
-    } else if size_diff < 0 {
-        // Authority is shrinking, compact data
-        let new_account_size_aligned = core::alloc::Layout::from_size_align(new_account_size, 8)
-            .map_err(|_| LazorkitError::InvalidAlignment)?
-            .pad_to_align()
-            .size();
-
-        // Update boundaries first
-        let mut offset = authorities_offset;
-        for _ in 0..num_authorities {
-            if offset + Position::LEN > current_size {
+            if offset >= config_data.len() {
                 break;
             }
 
-            let position_boundary = u32::from_le_bytes([
-                wallet_account_mut_data[offset + 12],
-                wallet_account_mut_data[offset + 13],
-                wallet_account_mut_data[offset + 14],
-                wallet_account_mut_data[offset + 15],
-            ]);
-
-            // If this authority is after the updated one, adjust boundary
-            if offset > authority_offset {
-                let new_boundary = position_boundary.saturating_sub((-size_diff) as u32);
-                wallet_account_mut_data[offset + 12..offset + 16]
-                    .copy_from_slice(&new_boundary.to_le_bytes());
+            offset = p.boundary as usize;
+            if offset >= config_data.len() {
+                break;
             }
-
-            offset = position_boundary as usize;
-        }
-
-        // Shift data backward to compact
-        let data_after_authority = authority_offset + old_authority_size;
-        if data_after_authority < current_size {
-            let data_to_move_len = current_size - data_after_authority;
-            let src_start = data_after_authority;
-            let dst_start = authority_offset + new_authority_size;
-
-            // Shift data backward
-            wallet_account_mut_data.copy_within(src_start..src_start + data_to_move_len, dst_start);
-        }
-
-        // Resize account
-        wallet_account_info.resize(new_account_size_aligned)?;
-
-        // Refund excess lamports
-        let current_lamports = wallet_account_info.lamports();
-        let required_lamports = Rent::get()?.minimum_balance(new_account_size_aligned);
-        let excess_lamports = current_lamports.saturating_sub(required_lamports);
-
-        if excess_lamports > 0 {
-            Transfer {
-                from: wallet_account_info,
-                to: payer,
-                lamports: excess_lamports,
-            }
-            .invoke()?;
         }
     }
 
-    // Re-borrow after potential resize
-    let wallet_account_mut_data = unsafe { wallet_account_info.borrow_mut_data_unchecked() };
+    // Write new plugins
+    let mut write_cursor = plugins_start_offset;
+    for (offset, len) in new_plugins_regions {
+        let item_slice = &payload[offset..offset + len];
+        let program_id_bytes = &item_slice[0..32];
+        let data_len_bytes = &item_slice[32..34];
+        let data_bytes = &item_slice[34..];
 
-    // Update Position
-    let new_boundary = authority_offset + new_authority_size;
-    // role_permission already preserved above (before resize)
-    let mut position_bytes = [0u8; Position::LEN];
-    position_bytes[0..2].copy_from_slice(&new_authority_type.to_le_bytes());
-    position_bytes[2..4].copy_from_slice(&new_authority_data_len.to_le_bytes());
-    position_bytes[4..6].copy_from_slice(&num_plugin_refs.to_le_bytes());
-    position_bytes[6] = current_role_permission; // Preserve role_permission
-                                                 // padding at 7 is already 0
-    position_bytes[8..12].copy_from_slice(&authority_id.to_le_bytes());
-    position_bytes[12..16].copy_from_slice(&(new_boundary as u32).to_le_bytes());
+        config_data[write_cursor..write_cursor + 32].copy_from_slice(program_id_bytes);
+        write_cursor += 32;
 
-    wallet_account_mut_data[authority_offset..authority_offset + Position::LEN]
-        .copy_from_slice(&position_bytes);
+        config_data[write_cursor..write_cursor + 2].copy_from_slice(data_len_bytes);
+        write_cursor += 2;
 
-    // Write new authority data
-    let auth_data_offset = authority_offset + Position::LEN;
-    wallet_account_mut_data[auth_data_offset..auth_data_offset + new_authority_data.len()]
-        .copy_from_slice(new_authority_data);
+        let data_len = data_bytes.len();
+        let boundary = (write_cursor as u32) + 4 + (data_len as u32);
+        config_data[write_cursor..write_cursor + 4].copy_from_slice(&boundary.to_le_bytes());
+        write_cursor += 4;
 
-    // Write plugin refs
-    let plugin_refs_offset = auth_data_offset + new_authority_data.len();
-    if !plugin_refs_data.is_empty() {
-        wallet_account_mut_data[plugin_refs_offset..plugin_refs_offset + plugin_refs_data.len()]
-            .copy_from_slice(&plugin_refs_data);
-    } else if num_plugin_refs > 0 {
-        // Zero-initialize plugin refs space if no data provided
-        // (space is already zero-initialized by resize)
+        config_data[write_cursor..write_cursor + data_len].copy_from_slice(data_bytes);
+        write_cursor += data_len;
     }
 
+    if size_diff < 0 {
+        let new_len = (config_account.data_len() as isize + size_diff) as usize;
+        reallocate_account(config_account, payer_account, new_len)?;
+    }
+
+    msg!("ReplaceAll complete");
+    Ok(())
+}
+
+fn process_add_plugins(
+    config_account: &AccountInfo,
+    payer_account: &AccountInfo,
+    target_role_id: u32,
+    payload: &[u8],
+) -> ProgramResult {
+    let mut cursor = 0;
+    if payload.len() < 4 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let num_new_plugins = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+    cursor += 4;
+
+    let mut new_plugins_total_size = 0;
+    let mut new_plugins_regions = Vec::new();
+
+    for _ in 0..num_new_plugins {
+        if cursor + 34 > payload.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        let data_len =
+            u16::from_le_bytes(payload[cursor + 32..cursor + 34].try_into().unwrap()) as usize;
+        let plugin_total_len = 32 + 2 + data_len;
+        if cursor + plugin_total_len > payload.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        let storage_len = PluginHeader::LEN + data_len;
+        new_plugins_total_size += storage_len;
+        new_plugins_regions.push((cursor, plugin_total_len));
+        cursor += plugin_total_len;
+    }
+
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+
+    let (role_offset, mut role_pos, current_plugins_size) = {
+        let mut offset = LazorKitWallet::LEN;
+        let mut found = None;
+        for (pos, _, plugins_data) in
+            RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN)
+        {
+            if pos.id == target_role_id {
+                found = Some((offset, pos, plugins_data.len()));
+                break;
+            }
+            offset = pos.boundary as usize;
+        }
+        found.ok_or(LazorKitError::AuthorityNotFound)?
+    };
+
+    drop(config_data);
+    let new_len = config_account.data_len() + new_plugins_total_size;
+    reallocate_account(config_account, payer_account, new_len)?;
+
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let base_plugins_offset = role_offset + Position::LEN + role_pos.authority_length as usize;
+    let insert_at_offset = base_plugins_offset + current_plugins_size;
+
+    let src_end = config_data.len() - new_plugins_total_size;
+    config_data.copy_within(
+        insert_at_offset..src_end,
+        insert_at_offset + new_plugins_total_size,
+    );
+
+    let mut role_pos_ref = unsafe {
+        Position::load_mut_unchecked(&mut config_data[role_offset..role_offset + Position::LEN])?
+    };
+    role_pos_ref.boundary += new_plugins_total_size as u32;
+    role_pos_ref.num_actions += num_new_plugins as u16;
+
+    let wallet_header =
+        unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+    let mut apply_diff = false;
+    let mut offset = LazorKitWallet::LEN;
+
+    for _ in 0..wallet_header.role_count {
+        if offset >= config_data.len() {
+            break;
+        }
+        let pos_slice = &mut config_data[offset..offset + Position::LEN];
+        let mut p = unsafe { Position::load_mut_unchecked(pos_slice)? };
+
+        if apply_diff {
+            p.boundary += new_plugins_total_size as u32;
+        }
+
+        if p.id == target_role_id {
+            apply_diff = true;
+        }
+        offset = p.boundary as usize;
+    }
+
+    let mut write_cursor = insert_at_offset;
+    for (offset, len) in new_plugins_regions {
+        let item_slice = &payload[offset..offset + len];
+        let program_id_bytes = &item_slice[0..32];
+        let data_len_bytes = &item_slice[32..34];
+        let data_bytes = &item_slice[34..];
+
+        config_data[write_cursor..write_cursor + 32].copy_from_slice(program_id_bytes);
+        write_cursor += 32;
+        config_data[write_cursor..write_cursor + 2].copy_from_slice(data_len_bytes);
+        write_cursor += 2;
+
+        let data_len = data_bytes.len();
+        let boundary = (write_cursor as u32) + 4 + (data_len as u32);
+        config_data[write_cursor..write_cursor + 4].copy_from_slice(&boundary.to_le_bytes());
+        write_cursor += 4;
+
+        config_data[write_cursor..write_cursor + data_len].copy_from_slice(data_bytes);
+        write_cursor += data_len;
+    }
+
+    msg!("AddPlugins complete");
+    Ok(())
+}
+
+fn process_remove_by_type(
+    config_account: &AccountInfo,
+    payer_account: &AccountInfo,
+    target_role_id: u32,
+    payload: &[u8],
+) -> ProgramResult {
+    if payload.len() < 32 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    // pubkey logic?
+    // Pinocchio Pubkey construction from array?
+    // Pubkey is wrapper struct around [u8; 32].
+    // Assuming standard behavior or direct bytes.
+    let target_plugin_id_bytes = &payload[0..32];
+
+    remove_plugin(
+        config_account,
+        payer_account,
+        target_role_id,
+        |plugin_id, _, _| plugin_id.as_ref() == target_plugin_id_bytes,
+    )
+}
+
+fn process_remove_by_index(
+    config_account: &AccountInfo,
+    payer_account: &AccountInfo,
+    target_role_id: u32,
+    payload: &[u8],
+) -> ProgramResult {
+    if payload.len() < 4 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let target_index = u32::from_le_bytes(payload[0..4].try_into().unwrap());
+
+    let mut current_index = 0;
+    remove_plugin(config_account, payer_account, target_role_id, |_, _, _| {
+        let is_match = current_index == target_index;
+        current_index += 1;
+        is_match
+    })
+}
+
+fn remove_plugin<F>(
+    config_account: &AccountInfo,
+    payer_account: &AccountInfo,
+    target_role_id: u32,
+    mut match_fn: F,
+) -> ProgramResult
+where
+    F: FnMut(&Pubkey, usize, &[u8]) -> bool,
+{
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+
+    let (role_offset, mut role_pos, plugins_data_len) = {
+        let mut offset = LazorKitWallet::LEN;
+        let mut found = None;
+        for (pos, _, plugins_data) in
+            RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN)
+        {
+            if pos.id == target_role_id {
+                found = Some((offset, pos, plugins_data.len()));
+                break;
+            }
+            offset = pos.boundary as usize;
+        }
+        found.ok_or(LazorKitError::AuthorityNotFound)?
+    };
+
+    let plugins_start_offset = role_offset + Position::LEN + role_pos.authority_length as usize;
+    let mut cursor = 0;
+    let mut plugin_region = None;
+
+    while cursor < plugins_data_len {
+        let abs_cursor = plugins_start_offset + cursor;
+        if abs_cursor + 38 > config_data.len() {
+            break;
+        }
+
+        // Read header without try_into unwraps if possible?
+        // Pubkey from bytes
+        let mut pk_arr = [0u8; 32];
+        pk_arr.copy_from_slice(&config_data[abs_cursor..abs_cursor + 32]);
+        let plugin_id = Pubkey::from(pk_arr);
+
+        let data_len = u16::from_le_bytes(
+            config_data[abs_cursor + 32..abs_cursor + 34]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let total_len = 32 + 2 + 4 + data_len;
+
+        if match_fn(&plugin_id, data_len, &[]) {
+            plugin_region = Some((cursor, total_len));
+            break;
+        }
+        cursor += total_len;
+    }
+
+    let (remove_offset, remove_len) = plugin_region.ok_or(ProgramError::InvalidArgument)?;
+    let remove_start_abs = plugins_start_offset + remove_offset;
+    let src_start = remove_start_abs + remove_len;
+    config_data.copy_within(src_start.., remove_start_abs);
+
+    let mut role_pos_ref = unsafe {
+        Position::load_mut_unchecked(&mut config_data[role_offset..role_offset + Position::LEN])?
+    };
+    role_pos_ref.boundary = role_pos_ref.boundary.saturating_sub(remove_len as u32);
+    role_pos_ref.num_actions = role_pos_ref.num_actions.saturating_sub(1);
+
+    let wallet_header =
+        unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
+    let mut apply_diff = false;
+    let mut offset = LazorKitWallet::LEN;
+
+    for _ in 0..wallet_header.role_count {
+        if offset >= config_data.len() {
+            break;
+        }
+        let pos_slice = &mut config_data[offset..offset + Position::LEN];
+        let mut p = unsafe { Position::load_mut_unchecked(pos_slice)? };
+
+        if apply_diff {
+            p.boundary = p.boundary.saturating_sub(remove_len as u32);
+        }
+
+        if p.id == target_role_id {
+            apply_diff = true;
+        }
+        offset = p.boundary as usize;
+    }
+
+    drop(config_data);
+    let new_len = config_account.data_len().saturating_sub(remove_len);
+    reallocate_account(config_account, payer_account, new_len)?;
+
+    msg!("RemovePlugin complete");
+    Ok(())
+}
+
+fn reallocate_account(
+    account: &AccountInfo,
+    payer: &AccountInfo,
+    new_size: usize,
+) -> ProgramResult {
+    let rent = Rent::get()?;
+    let new_minimum_balance = rent.minimum_balance(new_size);
+    let lamports_diff = new_minimum_balance.saturating_sub(account.lamports());
+
+    if lamports_diff > 0 {
+        Transfer {
+            from: payer,
+            to: account,
+            lamports: lamports_diff,
+        }
+        .invoke()?;
+    }
+
+    account.resize(new_size)?;
     Ok(())
 }
