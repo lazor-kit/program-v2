@@ -16,6 +16,8 @@ pub enum InstructionDiscriminator {
     CreateSession = 4,
     Execute = 5,
     TransferOwnership = 6,
+    RegisterPolicy = 7,
+    DeactivatePolicy = 8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -53,9 +55,9 @@ pub enum LazorKitInstruction {
         authority_type: u16,
         /// New authority data
         authority_data: Vec<u8>,
-        /// Serialized plugin configs (PluginHeader + State blobs)
-        /// Format: [PluginHeader (40 bytes)][State Data]...
-        plugins_config: Vec<u8>,
+        /// Serialized policy configs (PolicyHeader + State blobs)
+        /// Format: [PolicyHeader (40 bytes)][State Data]...
+        policies_config: Vec<u8>,
         /// Authorization signature data
         authorization_data: Vec<u8>,
     },
@@ -103,6 +105,8 @@ pub enum LazorKitInstruction {
         session_key: [u8; 32],
         /// Duration in slots
         duration: u64,
+        /// Authorization signature data (needed for non-native authorities)
+        authorization_data: Vec<u8>,
     },
 
     /// Execute a transaction (Bounce Flow)
@@ -130,6 +134,27 @@ pub enum LazorKitInstruction {
         /// New owner authority data
         new_owner_authority_data: Vec<u8>,
     },
+
+    /// Register a verified policy in the system
+    ///
+    /// Accounts:
+    /// 0. `[writable]` Registry Entry PDA: ["policy-registry", program_id]
+    /// 1. `[writable, signer]` Payer/Admin
+    /// 2. `[]` System Program
+    RegisterPolicy {
+        /// The program ID of the policy to register
+        policy_program_id: [u8; 32],
+    },
+
+    /// Deactivate a policy in the registry
+    ///
+    /// Accounts:
+    /// 0. `[writable]` Registry Entry PDA: ["policy-registry", program_id]
+    /// 1. `[writable, signer]` Payer/Admin
+    DeactivatePolicy {
+        /// The program ID of the policy to deactivate
+        policy_program_id: [u8; 32],
+    },
 }
 
 impl LazorKitInstruction {
@@ -142,13 +167,13 @@ impl LazorKitInstruction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum UpdateOperation {
-    /// Replace all plugins
+    /// Replace all policies
     ReplaceAll = 0,
-    /// Add plugins to end
-    AddPlugins = 1,
-    /// Remove plugins by program ID
+    /// Add policies to end
+    AddPolicies = 1,
+    /// Remove policies by program ID
     RemoveByType = 2,
-    /// Remove plugins by index
+    /// Remove policies by index
     RemoveByIndex = 3,
 }
 
@@ -158,7 +183,7 @@ impl TryFrom<u8> for UpdateOperation {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(UpdateOperation::ReplaceAll),
-            1 => Ok(UpdateOperation::AddPlugins),
+            1 => Ok(UpdateOperation::AddPolicies),
             2 => Ok(UpdateOperation::RemoveByType),
             3 => Ok(UpdateOperation::RemoveByIndex),
             _ => Err(ProgramError::InvalidInstructionData),

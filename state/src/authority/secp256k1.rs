@@ -297,7 +297,7 @@ impl AuthorityInfo for Secp256k1SessionAuthority {
         _data_payload: &[u8],
         slot: u64,
     ) -> Result<(), ProgramError> {
-        if slot > self.current_session_expiration {
+        if slot >= self.current_session_expiration {
             return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(

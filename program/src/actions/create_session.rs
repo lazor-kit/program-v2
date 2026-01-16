@@ -25,6 +25,7 @@ pub fn process_create_session(
     role_id: u32,
     session_key: [u8; 32],
     duration: u64,
+    authorization_data: &[u8],
 ) -> ProgramResult {
     let mut account_info_iter = accounts.iter();
     let config_account = account_info_iter
@@ -79,13 +80,13 @@ pub fn process_create_session(
                         }
                         found_internal = true;
                     },
-                    AuthorityType::Secp256k1Session
-                    | AuthorityType::Secp256r1Session
-                    | AuthorityType::ProgramExecSession => {
-                        // TODO: Implement signature verification for non-native chains
-                        // This requires instruction payload with signature, which CreateSession currently lacks.
-                        msg!("Session creation for non-native keys not yet supported (requires payload sig)");
-                        return Err(ProgramError::InvalidInstructionData);
+                    AuthorityType::Secp256k1Session | AuthorityType::Secp256r1Session => {
+                        // Stateful authentication, verified in mutable phase
+                        found_internal = true;
+                    },
+                    AuthorityType::ProgramExecSession => {
+                        // TODO: ProgramExec might need customized verification
+                        found_internal = true;
                     },
                     _ => {
                         msg!("Authority type {:?} does not support sessions", auth_type);
@@ -139,6 +140,12 @@ pub fn process_create_session(
 
             let auth_slice = &mut config_data[auth_start..auth_end];
 
+            // Construct data payload for authentication (Role + Session Params)
+            let mut data_payload = [0u8; 4 + 32 + 8];
+            data_payload[0..4].copy_from_slice(&role_id.to_le_bytes());
+            data_payload[4..36].copy_from_slice(&session_key);
+            data_payload[36..44].copy_from_slice(&duration.to_le_bytes());
+
             // Update logic (Zero-Copy)
             let auth_type = AuthorityType::try_from(pos.authority_type)?;
             match auth_type {
@@ -150,12 +157,21 @@ pub fn process_create_session(
                 AuthorityType::Secp256k1Session => {
                     let auth =
                         unsafe { Secp256k1SessionAuthority::load_mut_unchecked(auth_slice)? };
+
+                    // Verify Signature
+                    // Secp256k1SessionAuthority implements AuthorityInfo::authenticate which refers to the MASTER key
+                    auth.authenticate(accounts, authorization_data, &data_payload, current_slot)?;
+
                     auth.start_session(session_key, current_slot, duration)?;
                     msg!("Secp256k1 session created");
                 },
                 AuthorityType::Secp256r1Session => {
                     let auth =
                         unsafe { Secp256r1SessionAuthority::load_mut_unchecked(auth_slice)? };
+
+                    // Verify Signature
+                    auth.authenticate(accounts, authorization_data, &data_payload, current_slot)?;
+
                     auth.start_session(session_key, current_slot, duration)?;
                     msg!("Secp256r1 session created");
                 },

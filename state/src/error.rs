@@ -106,8 +106,8 @@ pub enum LazorStateError {
     RoleNotFound,
     /// Error loading permissions
     PermissionLoadError,
-    /// Adding an authority requires at least one action
-    InvalidAuthorityMustHaveAtLeastOneAction,
+    /// Adding an authority requires at least one policy
+    InvalidAuthorityMustHaveAtLeastOnePolicy,
 }
 
 impl From<LazorStateError> for ProgramError {

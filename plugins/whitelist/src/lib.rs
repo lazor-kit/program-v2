@@ -89,36 +89,29 @@ pub fn process_instruction(
         WhitelistState::load_mut_unchecked(&mut data[offset..offset + WhitelistState::LEN])?
     };
 
-    msg!(
-        "Whitelist Plugin - Checking {} whitelisted addresses",
-        state.count
-    );
+    msg!("Whitelist Plugin - Checking whitelisted addresses");
 
-    // 5. Parse recipient from ORIGINAL execution data
-    // execution_data follows VerifyInstruction in instruction_data
-    let execution_data = &instruction_data[VerifyInstruction::LEN..];
+    // 5. Verify ALL target accounts (index 2+) against whitelist
+    // Accounts 0 (Config) and 1 (Vault) are trusted context provided by the Wallet Program.
+    // Any other account passed to this instruction (which represents the target instruction's accounts)
+    // MUST be in the whitelist. This includes the Target Program itself and any accounts it uses.
 
-    // Parse recipient using heuristic (same as before)
-    if execution_data.len() < 32 {
-        // Maybe it's not a transfer? If we can't parse recipient, what to do?
-        // For security, if we can't verify, we should probably fail if this plugin is mandatory.
-        // But maybe it's valid for non-transfer instructions?
-        // Assuming this plugin intends to block UNKNOWN transfers.
-        msg!("Instruction data too short to contain recipient");
-        return Err(ProgramError::InvalidInstructionData);
+    if accounts.len() > 2 {
+        for (_i, acc) in accounts[2..].iter().enumerate() {
+            // Note: We check key() which returns &Pubkey
+            if !state.is_whitelisted(acc.key()) {
+                msg!("Account not in whitelist");
+                return Err(ProgramError::Custom(1000)); // VerificationFailed
+            }
+        }
+    } else {
+        // If no target accounts are passed, it might be an empty instruction?
+        // Or just checking the plugin itself?
+        // Generally usually at least the target program is passed.
+        // We permit "empty" target interactions if they don't touch any external accounts
+        // (which is impossible for an invoke, but theoretically safe).
     }
 
-    let recipient_bytes: [u8; 32] = execution_data[0..32].try_into().unwrap();
-    let recipient = Pubkey::from(recipient_bytes);
-
-    msg!("Checking recipient: {:?}", recipient);
-
-    if !state.is_whitelisted(&recipient) {
-        msg!("Recipient {:?} is not in whitelist", recipient);
-        // Fail
-        return Err(ProgramError::Custom(1000)); // VerificationFailed
-    }
-
-    msg!("Whitelist check passed");
+    msg!("Whitelist check passed: All accounts verified");
     Ok(())
 }

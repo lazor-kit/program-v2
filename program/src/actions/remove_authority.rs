@@ -39,9 +39,14 @@ pub fn process_remove_authority(
         return Err(LazorKitError::Unauthorized.into());
     }
 
-    // Only Owner can remove roles for now
-    if acting_role_id != 0 {
-        msg!("Only Owner can remove authorities");
+    // Only Owner or Admin can remove authorities
+    if acting_role_id != 0 && acting_role_id != 1 {
+        msg!("Only Owner or Admin can remove authorities");
+        return Err(LazorKitError::Unauthorized.into());
+    }
+
+    if acting_role_id == target_role_id {
+        msg!("Cannot remove self");
         return Err(LazorKitError::Unauthorized.into());
     }
 

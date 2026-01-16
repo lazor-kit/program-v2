@@ -17,8 +17,8 @@ pub enum LazorKitError {
     #[error("Authority not found")]
     AuthorityNotFound,
 
-    #[error("Plugin verification failed")]
-    PluginVerificationFailed,
+    #[error("Policy verification failed")]
+    PolicyVerificationFailed,
 
     #[error("Invalid wallet account")]
     InvalidWalletAccount,
@@ -26,17 +26,23 @@ pub enum LazorKitError {
     #[error("Account data too small")]
     AccountDataTooSmall,
 
-    #[error("Plugin did not return data")]
-    PluginReturnDataMissing,
+    #[error("Policy did not return data")]
+    PolicyReturnDataMissing,
 
-    #[error("Invalid plugin response")]
-    InvalidPluginResponse,
+    #[error("Invalid policy response")]
+    InvalidPolicyResponse,
 
-    #[error("Plugin state size changed")]
-    PluginStateSizeChanged,
+    #[error("Policy state size changed")]
+    PolicyStateSizeChanged,
 
     #[error("Invalid session duration")]
     InvalidSessionDuration,
+
+    #[error("Policy not found in registry")]
+    UnverifiedPolicy,
+
+    #[error("Policy has been deactivated")]
+    PolicyDeactivated,
 }
 
 impl From<LazorKitError> for ProgramError {

@@ -6,7 +6,8 @@
 pub mod authority;
 pub mod builder;
 pub mod error;
-pub mod plugin;
+pub mod policy;
+pub mod registry;
 pub mod transmute;
 use pinocchio::{program_error::ProgramError, pubkey::Pubkey};
 
@@ -18,6 +19,8 @@ pub use authority::secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority};
 pub use authority::{AuthorityInfo, AuthorityType};
 pub use builder::LazorKitBuilder;
 pub use error::{LazorAuthenticateError, LazorStateError};
+pub use policy::PolicyHeader;
+pub use registry::PolicyRegistryEntry;
 pub use transmute::{IntoBytes, Transmutable, TransmutableMut};
 
 /// Represents the type discriminator for different account types in the system.
@@ -106,7 +109,7 @@ impl IntoBytes for LazorKitWallet {
 /// Memory layout (16 bytes):
 /// - authority_type: u16 (2 bytes)
 /// - authority_length: u16 (2 bytes)
-/// - num_actions: u16 (2 bytes)
+/// - num_policies: u16 (2 bytes)
 /// - padding: u16 (2 bytes)
 /// - id: u32 (4 bytes)
 /// - boundary: u32 (4 bytes)
@@ -119,8 +122,8 @@ pub struct Position {
     /// Length of authority data in bytes
     pub authority_length: u16,
 
-    /// Number of plugins attached to this role
-    pub num_actions: u16,
+    /// Number of policies attached to this role
+    pub num_policies: u16,
 
     /// Padding for alignment
     pub padding: u16,
@@ -138,13 +141,13 @@ impl Position {
     pub fn new(
         authority_type: AuthorityType,
         authority_length: u16,
-        num_actions: u16,
+        num_policies: u16,
         id: u32,
     ) -> Self {
         Self {
             authority_type: authority_type as u16,
             authority_length,
-            num_actions,
+            num_policies,
             padding: 0,
             id,
             boundary: 0, // Will be set during serialization
@@ -210,7 +213,7 @@ impl<'a> RoleIterator<'a> {
 }
 
 impl<'a> Iterator for RoleIterator<'a> {
-    type Item = (Position, &'a [u8], &'a [u8]); // (header, authority_data, actions_data)
+    type Item = (Position, &'a [u8], &'a [u8]); // (header, authority_data, policies_data)
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -225,18 +228,18 @@ impl<'a> Iterator for RoleIterator<'a> {
 
         let authority_start = self.cursor + Position::LEN;
         let authority_end = authority_start + position.authority_length as usize;
-        let actions_end = position.boundary as usize;
+        let policies_end = position.boundary as usize;
 
-        if actions_end > self.buffer.len() {
+        if policies_end > self.buffer.len() {
             return None;
         }
 
         let authority_data = &self.buffer[authority_start..authority_end];
-        let actions_data = &self.buffer[authority_end..actions_end];
+        let policies_data = &self.buffer[authority_end..policies_end];
 
-        self.cursor = actions_end;
+        self.cursor = policies_end;
         self.remaining -= 1;
 
-        Some((position, authority_data, actions_data))
+        Some((position, authority_data, policies_data))
     }
 }

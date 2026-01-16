@@ -126,14 +126,15 @@ Role Data in Buffer:
 └────────────────────────────────────────┘
 ```
 
-### 3.2 Plugin Header Layout (38+ bytes mỗi plugin)
+### 3.2 Plugin Header Layout (40 bytes per plugin - Aligned)
 
-| Offset | Field | Size | Mô tả |
-|--------|-------|------|-------|
+| Offset | Field | Size | Description |
+|--------|-------|------|-------------|
 | 0 | `program_id` | 32 | Plugin Program ID |
-| 32 | `data_length` | 2 | Size của state_blob |
-| 34 | `boundary` | 4 | Offset đến plugin tiếp theo |
-| 38 | `state_blob` | variable | Dữ liệu plugin (opaque) |
+| 32 | `data_length` | 2 | Size of state_blob |
+| 34 | `_padding` | 2 | Explicit padding for 8-byte alignment |
+| 36 | `boundary` | 4 | Offset to next plugin |
+| 40 | `state_blob` | var | Plugin Data (Opaque) |
 
 ### 3.3 Iterate qua plugins
 
@@ -198,44 +199,69 @@ flowchart TD
 
 ---
 
-## 5. Role Types
+## 5. Role Types (Recommended Hierarchy)
 
-### 5.1 Owner (Role ID = 0)
-- **Authority:** Cold Wallet (Ed25519 hoặc Secp256r1)
-- **Plugins:** Không cần (full power)
-- **Quyền:**
-  - TransferOwnership
-  - Add/Remove/Update Authority
-  - Execute không giới hạn
+### 5.1 Owner (Role ID = 0) - "Super Admin"
+- **Authority:** Cold Wallet (Ledger/Trezor) or Multisig.
+- **Plugins:** None (Full Power).
+- **Permissions:**
+  - Full access to all instructions.
+  - Exclusive right to `TransferOwnership` (changing Role 0).
+  - Can Add/Remove/Update any role.
 
-### 5.2 Admin
-- **Authority:** Hot Wallet hoặc Multi-sig
-- **Plugins:** AuditLogPlugin (optional)
-- **Quyền:**
-  - Add/Remove Spender roles
-  - Update plugin config cho roles khác
-  - Execute không giới hạn
-  - **KHÔNG được:** TransferOwnership
+### 5.2 Admin (Role ID = 1) - "Manager"
+- **Authority:** Hot Wallet (Laptop/Desktop).
+- **Plugins:** `AuditLogPlugin` (optional).
+- **Permissions:**
+  - **Can:** `AddAuthority`, `RemoveAuthority`, `UpdateAuthority` for lower roles (Spender/Operator).
+  - **Cannot:** Change Owner (Role 0) or delete themselves (anti-lockout).
+  - **Cannot:** `Execute` funds directly (unless explicitly authorized).
 
-### 5.3 Spender
-- **Authority:** Mobile wallet, Session key
+### 5.3 Spender (Role ID = 2...99) - "User/Mobile"
+- **Authority:** Mobile Key or Session Key.
 - **Plugins:**
-  - SolLimitPlugin: `{limit, spent, reset_interval}`
-  - TokenLimitPlugin: `{mint, limit, spent}`
-  - WhitelistPlugin: `{allowed_addresses[]}`
-- **Quyền:**
-  - Execute (bị giới hạn bởi plugins)
-  - CreateSession cho chính mình
+  - `SolLimitPlugin`: Daily spending limits.
+  - `WhitelistPlugin`: Approved destination addresses.
+- **Permissions:**
+  - `Execute`: Subject to plugin validation.
+  - `CreateSession`: Can create session keys for themselves.
 
-### 5.4 Operator (Bot)
-- **Authority:** ProgramExec hoặc Ed25519Session
+### 5.4 Operator (Role ID >= 100) - "Automation/Bot"
+- **Authority:** `Ed25519Session` or `ProgramExecSession` (Hot Wallet on Server).
 - **Plugins:**
-  - GasLimitPlugin
-  - ProgramWhitelistPlugin
-- **Quyền:**
-  - Execute chỉ với programs trong whitelist
+  - `ProgramWhitelist`: Restricted to specific DeFi protocols.
+- **Permissions:**
+  - `Execute`: Strictly limited automated tasks.
 
 ---
+## 6. Plugin Registry System ("App Store" for Plugins)
+
+LazorKit enforces security by requiring plugins to be verified before they can be added to a wallet. This prevents users from accidentally installing malicious or unverified code.
+
+### 6.1 Registry Entry PDA
+Each verified plugin has a corresponding `PluginRegistryEntry` PDA controlled by the LazorKit Protocol (Factory).
+
+- **Seeds**: `["plugin-registry", plugin_program_id]`
+- **Authority**: Protocol Admin / DAO.
+
+### 6.2 Data Structure
+```rust
+struct PluginRegistryEntry {
+    pub program_id: Pubkey,    // 32
+    pub is_active: bool,       // 1 (Can be deactivated to ban malicious plugins)
+    pub added_at: i64,         // 8
+    pub bump: u8,              // 1
+}
+```
+
+### 6.3 Enforcement Flow
+When `AddAuthority` or `UpdateAuthority` is called to add a plugin:
+1.  Contract derives the `PluginRegistryEntry` PDA for that plugin's Program ID.
+2.  Checks if the account exists and `is_active == true`.
+3.  If valid -> Allow addition.
+4.  If invalid -> Revert with `UnverifiedPlugin`.
+
+*(Future: Wallets can have a `developer_mode` flag to bypass this for testing purposes, but default is Secure).*
 
 ## 6. Instruction Set
 
