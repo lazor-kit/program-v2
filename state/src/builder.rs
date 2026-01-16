@@ -8,7 +8,7 @@ use crate::{
         secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority},
         Authority, AuthorityType,
     },
-    plugin::count_plugins,
+    policy::count_policies,
     IntoBytes, LazorKitWallet, Position, Transmutable, TransmutableMut,
 };
 use pinocchio::program_error::ProgramError;
@@ -61,7 +61,7 @@ impl<'a> LazorKitBuilder<'a> {
         &mut self,
         authority_type: AuthorityType,
         authority_data: &[u8],
-        _actions_data: &'a [u8], // For future plugin support
+        _policies_data: &'a [u8], // For future policy support
     ) -> Result<(), ProgramError> {
         // Find cursor position (end of last role or start if no roles)
         let mut cursor = 0;
@@ -140,18 +140,18 @@ impl<'a> LazorKitBuilder<'a> {
             _ => return Err(ProgramError::InvalidInstructionData),
         };
 
-        // Calculate actions offset and copy plugin data to buffer
+        // Calculate policies offset and copy policy data to buffer
         // NOTE: This is opaque storage - no validation at builder level
-        // TODO: Plugin validation happens via CPI during Execute flow
-        //       Core will CPI to each plugin's verify() to validate state
-        let actions_offset = auth_offset + authority_length;
-        if !_actions_data.is_empty() {
-            self.role_buffer[actions_offset..actions_offset + _actions_data.len()]
-                .copy_from_slice(_actions_data);
+        // TODO: Policy validation happens via CPI during Execute flow
+        //       Core will CPI to each policy's verify() to validate state
+        let policies_offset = auth_offset + authority_length;
+        if !_policies_data.is_empty() {
+            self.role_buffer[policies_offset..policies_offset + _policies_data.len()]
+                .copy_from_slice(_policies_data);
         }
 
-        // Calculate boundary: Position + Authority + Actions (plugins)
-        let size = authority_length + _actions_data.len();
+        // Calculate boundary: Position + Authority + Policies
+        let size = authority_length + _policies_data.len();
         let relative_boundary = cursor + Position::LEN + size;
         let absolute_boundary = relative_boundary + LazorKitWallet::LEN;
 
@@ -161,10 +161,10 @@ impl<'a> LazorKitBuilder<'a> {
         };
         position.authority_type = authority_type as u16;
         position.authority_length = authority_length as u16;
-        position.num_actions = if _actions_data.is_empty() {
+        position.num_policies = if _policies_data.is_empty() {
             0
         } else {
-            count_plugins(_actions_data)?
+            count_policies(_policies_data)?
         };
         position.padding = 0;
         position.id = self.wallet.role_counter;

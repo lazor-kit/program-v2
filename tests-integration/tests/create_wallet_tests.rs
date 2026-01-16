@@ -1,12 +1,12 @@
 mod common;
-use common::{get_program_path, setup_env, TestEnv};
+use common::{bridge_tx, create_wallet, setup_env, to_sdk_hash};
 
 use lazorkit_program::instruction::LazorKitInstruction;
 use lazorkit_state::{
     authority::{ed25519::Ed25519Authority, AuthorityType},
     LazorKitWallet, Position,
 };
-use litesvm::LiteSVM;
+use solana_address::Address;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     message::Message,
@@ -15,7 +15,6 @@ use solana_sdk::{
     system_program,
     transaction::Transaction,
 };
-use std::path::PathBuf;
 
 #[test]
 fn test_create_wallet_success() {
@@ -23,7 +22,6 @@ fn test_create_wallet_success() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id; // Same type now
 
     let wallet_id = [7u8; 32];
     let (config_pda, bump) = Pubkey::find_program_address(&[b"lazorkit", &wallet_id], &program_id);
@@ -89,21 +87,22 @@ fn test_create_wallet_success() {
     let transaction = Transaction::new(
         &[&payer],
         Message::new(&[create_ix], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let res = svm.send_transaction(transaction);
+    let res = svm.send_transaction(bridge_tx(transaction));
     assert!(res.is_ok(), "Transaction failed: {:?}", res);
 
     // Verify On-Chain Data
 
     // Verify Vault
-    let vault_account = svm.get_account(&vault_pda);
+    let vault_account = svm.get_account(&Address::from(vault_pda.to_bytes()));
     match vault_account {
         Some(acc) => {
             assert_eq!(acc.data.len(), 0, "Vault should have 0 data");
             assert_eq!(
-                acc.owner, system_program_id,
+                acc.owner.to_string(),
+                system_program_id.to_string(),
                 "Vault owned by System Program"
             );
         },
@@ -112,10 +111,11 @@ fn test_create_wallet_success() {
 
     // Verify Config
     let config_account = svm
-        .get_account(&config_pda)
+        .get_account(&Address::from(config_pda.to_bytes()))
         .expect("Config account not found");
     assert_eq!(
-        config_account.owner, program_id,
+        config_account.owner.to_string(),
+        program_id.to_string(),
         "Config owner should be LazorKit program"
     );
 
@@ -143,7 +143,7 @@ fn test_create_wallet_success() {
     let pos_data = &data[pos_start..pos_end];
     let auth_type_val = u16::from_le_bytes(pos_data[0..2].try_into().unwrap());
     let auth_len_val = u16::from_le_bytes(pos_data[2..4].try_into().unwrap());
-    let num_actions = u16::from_le_bytes(pos_data[4..6].try_into().unwrap());
+    let num_policies = u16::from_le_bytes(pos_data[4..6].try_into().unwrap());
     let id_val = u32::from_le_bytes(pos_data[8..12].try_into().unwrap());
     let boundary = u32::from_le_bytes(pos_data[12..16].try_into().unwrap());
 
@@ -157,7 +157,7 @@ fn test_create_wallet_success() {
         auth_blob.len(),
         "Position auth len mismatch"
     );
-    assert_eq!(num_actions, 0, "Initial plugins should be 0");
+    assert_eq!(num_policies, 0, "Initial policies should be 0");
     assert_eq!(id_val, 0, "Owner Role ID must be 0");
 
     let expected_boundary = pos_len_check(pos_end, auth_blob.len());
@@ -184,7 +184,6 @@ fn test_create_wallet_with_secp256k1_authority() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id;
 
     let wallet_id = [9u8; 32];
     let (config_pda, bump) = Pubkey::find_program_address(&[b"lazorkit", &wallet_id], &program_id);
@@ -253,15 +252,15 @@ fn test_create_wallet_with_secp256k1_authority() {
     let transaction = Transaction::new(
         &[&payer],
         Message::new(&[create_ix], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let res = svm.send_transaction(transaction);
+    let res = svm.send_transaction(bridge_tx(transaction));
     assert!(res.is_ok(), "Transaction failed: {:?}", res);
 
     // Verify storage
     let config_account = svm
-        .get_account(&config_pda)
+        .get_account(&Address::from(config_pda.to_bytes()))
         .expect("Config account not found");
     let data = config_account.data;
 
@@ -301,7 +300,6 @@ fn test_create_wallet_fail_invalid_seeds() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id;
 
     let wallet_id = [8u8; 32];
     let (valid_config_pub, w_bump) =
@@ -359,10 +357,10 @@ fn test_create_wallet_fail_invalid_seeds() {
     let tx_bad_config = Transaction::new(
         &[&payer],
         Message::new(&[ix_bad_config], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let err = svm.send_transaction(tx_bad_config);
+    let err = svm.send_transaction(bridge_tx(tx_bad_config));
     assert!(err.is_err(), "Should verify seeds and fail on bad config");
 
     // CASE 2: Wrong Vault Account
@@ -396,10 +394,10 @@ fn test_create_wallet_fail_invalid_seeds() {
     let tx_bad_vault = Transaction::new(
         &[&payer],
         Message::new(&[ix_bad_vault], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let err_vault = svm.send_transaction(tx_bad_vault);
+    let err_vault = svm.send_transaction(bridge_tx(tx_bad_vault));
     assert!(
         err_vault.is_err(),
         "Should verify seeds and fail on bad vault"
@@ -412,7 +410,6 @@ fn test_create_wallet_with_secp256r1_authority() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id;
 
     let wallet_id = [5u8; 32];
     let (config_pda, bump) = Pubkey::find_program_address(&[b"lazorkit", &wallet_id], &program_id);
@@ -470,15 +467,15 @@ fn test_create_wallet_with_secp256r1_authority() {
     let transaction = Transaction::new(
         &[&payer],
         Message::new(&[create_ix], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let res = svm.send_transaction(transaction);
+    let res = svm.send_transaction(bridge_tx(transaction));
     assert!(res.is_ok(), "Transaction failed: {:?}", res);
 
     // Verify storage
     let config_account = svm
-        .get_account(&config_pda)
+        .get_account(&Address::from(config_pda.to_bytes()))
         .expect("Config account not found");
     let data = config_account.data;
 
@@ -508,7 +505,6 @@ fn test_create_wallet_fail_invalid_authority_type() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id;
 
     let wallet_id = [12u8; 32];
     let (config_pda, bump) = Pubkey::find_program_address(&[b"lazorkit", &wallet_id], &program_id);
@@ -559,10 +555,10 @@ fn test_create_wallet_fail_invalid_authority_type() {
     let tx = Transaction::new(
         &[&payer],
         Message::new(&[ix], Some(&payer.pubkey())),
-        svm.latest_blockhash(),
+        to_sdk_hash(svm.latest_blockhash()),
     );
 
-    let res = svm.send_transaction(tx);
+    let res = svm.send_transaction(bridge_tx(tx));
     // Should fail with InvalidInstructionData due to try_from failure
     assert!(res.is_err());
     let err = res.err().unwrap();
@@ -577,7 +573,6 @@ fn test_create_wallet_fail_invalid_authority_data_length() {
     let payer = env.payer;
     let mut svm = env.svm;
     let program_id = env.program_id;
-    let program_id_pubkey = env.program_id;
     let system_program_id = system_program::id();
 
     // Subtest: Ed25519 invalid length (31 bytes instead of 32)
@@ -630,10 +625,10 @@ fn test_create_wallet_fail_invalid_authority_data_length() {
         let tx = Transaction::new(
             &[&payer],
             Message::new(&[ix], Some(&payer.pubkey())),
-            svm.latest_blockhash(),
+            to_sdk_hash(svm.latest_blockhash()),
         );
 
-        let res = svm.send_transaction(tx);
+        let res = svm.send_transaction(bridge_tx(tx));
         assert!(res.is_err(), "Should fail Ed25519 with 31 bytes");
         // Expect LazorStateError::InvalidRoleData = 1002 + 2000 = 3002
         println!("Ed25519 Invalid Len Error: {:?}", res.err());
@@ -689,10 +684,10 @@ fn test_create_wallet_fail_invalid_authority_data_length() {
         let tx = Transaction::new(
             &[&payer],
             Message::new(&[ix], Some(&payer.pubkey())),
-            svm.latest_blockhash(),
+            to_sdk_hash(svm.latest_blockhash()),
         );
 
-        let res = svm.send_transaction(tx);
+        let res = svm.send_transaction(bridge_tx(tx));
         assert!(res.is_err(), "Should fail Secp256k1 with 63 bytes");
         println!("Secp256k1 Invalid Len Error: {:?}", res.err());
     }

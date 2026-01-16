@@ -4,6 +4,7 @@ use lazorkit_state::{
     IntoBytes,
 };
 use litesvm::LiteSVM;
+use solana_address::Address;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     message::Message,
@@ -62,23 +63,34 @@ pub fn get_sol_limit_plugin_path() -> PathBuf {
     panic!("Could not find lazorkit_sol_limit_plugin.so");
 }
 
+// Helper for Hash
+pub fn to_sdk_hash(h: solana_hash::Hash) -> solana_sdk::hash::Hash {
+    solana_sdk::hash::Hash::new_from_array(h.to_bytes())
+}
+
+// Helper to bridge SDK Transaction to Litesvm (VersionedTransaction)
+pub fn bridge_tx(tx: Transaction) -> solana_transaction::versioned::VersionedTransaction {
+    let bytes = bincode::serialize(&tx).unwrap();
+    bincode::deserialize(&bytes).unwrap()
+}
+
 pub fn setup_env() -> TestEnv {
     let mut svm = LiteSVM::new();
     let payer = Keypair::new();
-    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+    svm.airdrop(&Address::from(payer.pubkey().to_bytes()), 10_000_000_000)
+        .unwrap();
 
     // 1. Setup LazorKit Program
     let program_id_str = "LazorKit11111111111111111111111111111111111";
-    let program_id = std::str::FromStr::from_str(program_id_str).unwrap();
+    let program_id: Pubkey = std::str::FromStr::from_str(program_id_str).unwrap();
     let program_bytes = std::fs::read(get_program_path()).expect("Failed to read program binary");
-    let _ = svm.add_program(program_id, &program_bytes);
+    let _ = svm.add_program(Address::from(program_id.to_bytes()), &program_bytes);
 
     // 2. Setup Sol Limit Plugin Program
     let sol_limit_id_pubkey = Keypair::new().pubkey();
-
     let plugin_bytes =
         std::fs::read(get_sol_limit_plugin_path()).expect("Failed to read sol_limit plugin binary");
-    let _ = svm.add_program(sol_limit_id_pubkey, &plugin_bytes);
+    let _ = svm.add_program(Address::from(sol_limit_id_pubkey.to_bytes()), &plugin_bytes);
 
     let system_program_id = solana_sdk::system_program::id();
 
@@ -143,19 +155,20 @@ pub fn create_wallet(
             is_writable: false,
         },
     ];
+    let create_ix = Instruction {
+        program_id: env.program_id,
+        accounts: create_accounts,
+        data: create_ix_data,
+    };
     let create_tx = Transaction::new(
         &[&env.payer],
-        Message::new(
-            &[Instruction {
-                program_id: env.program_id,
-                accounts: create_accounts,
-                data: create_ix_data,
-            }],
-            Some(&env.payer.pubkey()),
-        ),
-        env.svm.latest_blockhash(),
+        Message::new(&[create_ix], Some(&env.payer.pubkey())),
+        to_sdk_hash(env.svm.latest_blockhash()),
     );
-    env.svm.send_transaction(create_tx).unwrap();
+    let bytes = bincode::serialize(&create_tx).unwrap();
+    let v_tx: solana_transaction::versioned::VersionedTransaction =
+        bincode::deserialize(&bytes).unwrap();
+    env.svm.send_transaction(v_tx).unwrap();
 
     (config_pda, vault_pda)
 }

@@ -17,6 +17,7 @@ use pinocchio::{
 };
 use pinocchio_system::instructions::Transfer;
 
+use crate::actions::verify_policy_registry;
 use crate::error::LazorKitError;
 
 pub fn process_add_authority(
@@ -25,7 +26,7 @@ pub fn process_add_authority(
     acting_role_id: u32,
     authority_type: u16,
     authority_data: Vec<u8>,
-    plugins_config: Vec<u8>,
+    policies_config: Vec<u8>,
     authorization_data: Vec<u8>,
 ) -> ProgramResult {
     let mut account_info_iter = accounts.iter();
@@ -81,14 +82,14 @@ pub fn process_add_authority(
                     acting_role_id: u32,
                     authority_type: u16,
                     authority_data: &'a [u8],
-                    plugins_config: &'a [u8],
+                    policies_config: &'a [u8],
                 }
 
                 let payload_struct = AddAuthPayload {
                     acting_role_id,
                     authority_type,
                     authority_data: &authority_data,
-                    plugins_config: &plugins_config,
+                    policies_config: &policies_config,
                 };
                 let data_payload = borsh::to_vec(&payload_struct)
                     .map_err(|_| ProgramError::InvalidInstructionData)?;
@@ -145,7 +146,9 @@ pub fn process_add_authority(
     }
 
     // Permission check
-    if acting_role_id != 0 {
+    // Allow Owner (0) and Admin (1)
+    if acting_role_id != 0 && acting_role_id != 1 {
+        msg!("Only Owner or Admin can add authorities");
         return Err(LazorKitError::Unauthorized.into());
     }
 
@@ -156,8 +159,18 @@ pub fn process_add_authority(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    let plugins_len = plugins_config.len();
-    let num_actions = lazorkit_state::plugin::parse_plugins(&plugins_config).count() as u16;
+    let policies_len = policies_config.len();
+    let num_policies = lazorkit_state::policy::parse_policies(&policies_config).count() as u16;
+
+    // Registry Verification
+    if num_policies > 0 {
+        let registry_accounts = &accounts[3..];
+        for policy in lazorkit_state::policy::parse_policies(&policies_config) {
+            let p = policy.map_err(|_| ProgramError::InvalidInstructionData)?;
+            let pid = Pubkey::from(p.header.program_id);
+            verify_policy_registry(program_id, &pid, registry_accounts)?;
+        }
+    }
 
     // 3. Resize and Append
     let new_role_id = {
@@ -168,7 +181,7 @@ pub fn process_add_authority(
     };
 
     let position_len = Position::LEN;
-    let required_space = position_len + expected_len + plugins_len;
+    let required_space = position_len + expected_len + policies_len;
     let new_len = config_account.data_len() + required_space;
 
     reallocate_account(config_account, payer_account, new_len)?;
@@ -185,7 +198,7 @@ pub fn process_add_authority(
     let new_pos = Position {
         authority_type,
         authority_length: expected_len as u16,
-        num_actions,
+        num_policies,
         padding: 0,
         id: new_role_id,
         boundary: (total_len as u32),
@@ -199,20 +212,20 @@ pub fn process_add_authority(
     remainder_slice[auth_offset_rel..auth_offset_rel + expected_len]
         .copy_from_slice(&authority_data);
 
-    let plugins_offset_rel = auth_offset_rel + expected_len;
-    if plugins_len > 0 {
-        remainder_slice[plugins_offset_rel..plugins_offset_rel + plugins_len]
-            .copy_from_slice(&plugins_config);
+    let policies_offset_rel = auth_offset_rel + expected_len;
+    if policies_len > 0 {
+        remainder_slice[policies_offset_rel..policies_offset_rel + policies_len]
+            .copy_from_slice(&policies_config);
     }
 
     wallet.role_counter += 1;
     wallet.role_count += 1;
 
     msg!(
-        "Added role {} with type {:?} and {} plugins",
+        "Added role {} with type {:?} and {} policies",
         new_role_id,
         auth_type,
-        num_actions
+        num_policies
     );
 
     Ok(())

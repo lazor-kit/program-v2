@@ -54,74 +54,68 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
-    // 1. Parse instruction data (Zero-Copy)
+    msg!("SolLimit: processing verification");
+
     if instruction_data.len() < VerifyInstruction::LEN {
-        msg!("Instruction data too short: {}", instruction_data.len());
+        msg!("SolLimit: instruction data too short");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    // Safety: VerifyInstruction is #[repr(C)] (Verify using pointer cast)
-    // Note: In a production environment, ensure alignment or use read_unaligned
-    let instruction = unsafe { &*(instruction_data.as_ptr() as *const VerifyInstruction) };
+    // Cast instruction data to VerifyInstruction
+    let verify_ix = unsafe { &*(instruction_data.as_ptr() as *const VerifyInstruction) };
 
-    // 2. Verify discriminator
-    if instruction.discriminator != INSTRUCTION_VERIFY {
-        msg!(
-            "Invalid instruction discriminator: {:x}",
-            instruction.discriminator
-        );
+    if verify_ix.discriminator != INSTRUCTION_VERIFY {
+        msg!("SolLimit: invalid instruction discriminator");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    // 3. Get the account containing the state (LazorKit wallet account)
-    if accounts.is_empty() {
-        msg!("No accounts provided");
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    let wallet_account = &accounts[0];
+    // accounts[0] is the LazorKit wallet config account
+    let config_account = &accounts[0];
+    msg!("SolLimit: config account: {:?}", config_account.key());
 
-    // 4. Load state from the specified offset (READ ONLY)
-    let offset = instruction.state_offset as usize;
-    let data = wallet_account.try_borrow_data()?;
+    let state_offset = verify_ix.state_offset as usize;
+    msg!("SolLimit: state offset: {}", state_offset);
 
-    // Ensure we don't read past end of data
-    if offset + SolLimitState::LEN > data.len() {
-        msg!("Account data too small for state offset {}", offset);
-        return Err(ProgramError::AccountDataTooSmall);
-    }
-
-    // Load state reference
-    let state_ref =
-        unsafe { SolLimitState::load_unchecked(&data[offset..offset + SolLimitState::LEN])? };
-
-    // Create local copy to modify
-    let mut state = unsafe { core::ptr::read(state_ref as *const SolLimitState) };
-
-    // 5. Enforce logic
-    if instruction.amount > state.amount {
+    // Safety check for offset
+    let config_data_len = config_account.data_len();
+    msg!("SolLimit: config data len: {}", config_data_len);
+    if state_offset + SolLimitState::LEN > config_data_len {
         msg!(
-            "SolLimit exceeded: remaining {}, requested {}",
-            state.amount,
-            instruction.amount
+            "SolLimit: state offset out of bounds. Offset + Len: {}",
+            state_offset + SolLimitState::LEN
         );
-        return Err(ProgramError::Custom(0x1001)); // Insufficient balance error
+        return Err(ProgramError::InvalidAccountData);
     }
 
-    // 6. Update state locally
-    state.amount = state.amount.saturating_sub(instruction.amount);
+    // Read state (read-only)
+    let config_data = unsafe { config_account.borrow_data_unchecked() };
+    let state_ptr = unsafe { config_data[state_offset..].as_ptr() as *const SolLimitState };
+    let mut state = unsafe { *state_ptr };
 
-    msg!("SolLimit approved. New amount: {}", state.amount);
+    msg!(
+        "SolLimit: Current amount: {}, Spending: {}",
+        state.amount,
+        verify_ix.amount
+    );
 
-    // 7. Return new state via Return Data
-    let state_bytes = unsafe {
-        core::slice::from_raw_parts(
-            &state as *const SolLimitState as *const u8,
-            SolLimitState::LEN,
-        )
-    };
+    if state.amount < verify_ix.amount {
+        msg!(
+            "SolLimit: Insufficient SOL limit. Needed: {}, Rem: {}",
+            verify_ix.amount,
+            state.amount
+        );
+        return Err(lazorkit_interface::PluginError::VerificationFailed.into());
+    }
 
+    state.amount -= verify_ix.amount;
+    msg!("SolLimit: New amount: {}", state.amount);
+
+    // Set return data
     unsafe {
-        sol_set_return_data(state_bytes.as_ptr(), state_bytes.len() as u64);
+        sol_set_return_data(
+            &state as *const SolLimitState as *const u8,
+            SolLimitState::LEN as u64,
+        );
     }
 
     Ok(())

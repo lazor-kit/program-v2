@@ -72,10 +72,14 @@ pub fn process_transfer_ownership(
             }
         },
         _ => {
+            // TransferOwnership currently only supports Ed25519 authorities
+            // Other types (Secp256k1/r1/ProgramExec) require signature payload
+            // which is not included in the current instruction format
             msg!(
-                "Warning: Simplified verification for authority type {:?}",
+                "TransferOwnership only supports Ed25519 authorities (current type: {:?})",
                 current_auth_type
             );
+            return Err(LazorKitError::InvalidInstruction.into());
         },
     }
 
@@ -92,7 +96,7 @@ pub fn process_transfer_ownership(
     let new_pos = Position {
         authority_type: new_owner_authority_type,
         authority_length: new_auth_len as u16,
-        num_actions: current_pos.num_actions,
+        num_policies: current_pos.num_policies,
         padding: 0,
         id: 0,
         boundary: current_pos.boundary,

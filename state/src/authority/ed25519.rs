@@ -280,7 +280,7 @@ impl AuthorityInfo for Ed25519SessionAuthority {
         if authority_payload.len() != 1 {
             return Err(LazorAuthenticateError::InvalidAuthorityPayload.into());
         }
-        if slot > self.current_session_expiration {
+        if slot >= self.current_session_expiration {
             return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(

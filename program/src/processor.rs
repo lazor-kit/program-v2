@@ -3,7 +3,7 @@
 //! Thin dispatcher that routes instructions to individual handlers.
 
 use pinocchio::{
-    account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+    account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
 };
 
 use crate::actions;
@@ -36,7 +36,7 @@ pub fn process_instruction(
             acting_role_id,
             authority_type,
             authority_data,
-            plugins_config,
+            policies_config,
             authorization_data,
         } => actions::process_add_authority(
             program_id,
@@ -44,7 +44,7 @@ pub fn process_instruction(
             acting_role_id,
             authority_type,
             authority_data,
-            plugins_config,
+            policies_config,
             authorization_data,
         ),
 
@@ -73,7 +73,15 @@ pub fn process_instruction(
             role_id,
             session_key,
             duration,
-        } => actions::process_create_session(program_id, accounts, role_id, session_key, duration),
+            authorization_data,
+        } => actions::process_create_session(
+            program_id,
+            accounts,
+            role_id,
+            session_key,
+            duration,
+            &authorization_data,
+        ),
 
         LazorKitInstruction::Execute {
             role_id,
@@ -89,5 +97,23 @@ pub fn process_instruction(
             new_owner_authority_type,
             new_owner_authority_data,
         ),
+
+        LazorKitInstruction::RegisterPolicy { policy_program_id } => {
+            msg!("Instruction: RegisterPolicy");
+            actions::register_policy::process_register_policy(
+                program_id,
+                accounts,
+                policy_program_id,
+            )
+        },
+
+        LazorKitInstruction::DeactivatePolicy { policy_program_id } => {
+            msg!("Instruction: DeactivatePolicy");
+            actions::deactivate_policy::process_deactivate_policy(
+                program_id,
+                accounts,
+                policy_program_id,
+            )
+        },
     }
 }
