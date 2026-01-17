@@ -1,0 +1,12 @@
+[package]
+name = "lazorkit-policy-whitelist"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazorkit-state = { path = "../../../contracts/state" }
+lazorkit-interface = { path = "../../../contracts/interface" }
+no-padding = { path = "../../../contracts/no-padding" }
+pinocchio = "0.9"
+solana-sdk = "2.2.1"
+borsh = "1.0"

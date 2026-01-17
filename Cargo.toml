@@ -1,15 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "program",
-    "interface",
-    "state",
-    "plugins/sol-limit",
-    "plugins/whitelist",
-    "no-padding",
-    "assertions",
+    "contracts/program",
+    "contracts/state",
+    "contracts/interface",
+    "contracts/no-padding",
+    "contracts/assertions",
+    "sdk/lazorkit-sdk",
+    "contracts/policies/sol-limit",
+    "contracts/policies/whitelist",
+    "sdk/policies/sol-limit",
+    "sdk/policies/whitelist",
 ]
-exclude = ["tests-integration"]
+exclude = ["tests"]
 
 [patch.crates-io]
 blake3 = { git = "https://github.com/BLAKE3-team/BLAKE3.git", tag = "1.5.5" }

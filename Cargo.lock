@@ -2086,6 +2086,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazorkit-policy-sol-limit"
+version = "0.1.0"
+dependencies = [
+ "borsh 1.6.0",
+ "lazorkit-state",
+ "no-padding",
+ "pinocchio 0.9.2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "lazorkit-policy-whitelist"
+version = "0.1.0"
+dependencies = [
+ "borsh 1.6.0",
+ "lazorkit-interface",
+ "lazorkit-state",
+ "no-padding",
+ "pinocchio 0.9.2",
+ "solana-sdk",
+]
+
+[[package]]
 name = "lazorkit-program"
 version = "0.1.0"
 dependencies = [
@@ -2098,6 +2121,23 @@ dependencies = [
  "pinocchio-system",
  "pinocchio-token",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "lazorkit-sdk"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "borsh 1.6.0",
+ "lazorkit-policy-sol-limit",
+ "lazorkit-policy-whitelist",
+ "lazorkit-program",
+ "lazorkit-state",
+ "serde",
+ "solana-client",
+ "solana-sdk",
+ "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
@@ -2131,8 +2171,8 @@ dependencies = [
 name = "lazorkit-whitelist-plugin"
 version = "0.1.0"
 dependencies = [
- "borsh 1.6.0",
  "lazorkit-interface",
+ "lazorkit-state",
  "no-padding",
  "pinocchio 0.9.2",
  "solana-program-test",

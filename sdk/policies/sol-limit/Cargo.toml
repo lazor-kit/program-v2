@@ -1,0 +1,11 @@
+[package]
+name = "lazorkit-policy-sol-limit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazorkit-state = { path = "../../../contracts/state" }
+no-padding = { path = "../../../contracts/no-padding" }
+pinocchio = "0.9"
+borsh = "1.0"
+thiserror = "1.0"
