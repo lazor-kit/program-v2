@@ -24,6 +24,10 @@ pub fn get_whitelist_policy_path() -> PathBuf {
     if path.exists() {
         return path;
     }
+    let path = root.join("../../target/deploy/lazorkit_whitelist_plugin.so");
+    if path.exists() {
+        return path;
+    }
     let path = root
         .parent()
         .unwrap()

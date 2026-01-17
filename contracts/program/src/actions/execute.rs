@@ -163,7 +163,11 @@ pub fn process_execute(
             ($auth_type:ty) => {{
                 let mut auth = unsafe { <$auth_type>::load_mut_unchecked(authority_data_slice) }
                     .map_err(|_| ProgramError::InvalidAccountData)?;
-                auth.authenticate(accounts, auth_payload, execution_data, slot)?;
+                if auth.session_based() {
+                    auth.authenticate_session(accounts, auth_payload, execution_data, slot)?;
+                } else {
+                    auth.authenticate(accounts, auth_payload, execution_data, slot)?;
+                }
             }};
         }
 

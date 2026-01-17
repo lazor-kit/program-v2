@@ -60,11 +60,11 @@ impl ProxyBuilder {
             accounts.push(AccountMeta::new_readonly(signer, true));
             // Calculate absolute index
             // Config(0) + accounts.len() - 1 (last element)
-            auth_idx = (accounts.len()) as u8; // accounts is [Vault, ... Signer]. len includes Signer.
-                                               // Config is index 0. Vault is 1.
-                                               // So Signer index is accounts.len().
-                                               // Example: [Vault]. len=1. Real indices: 0:Config, 1:Vault.
-                                               // So AuthIdx = len. Correct.
+            auth_idx = (accounts.len() - 1) as u8; // accounts is [Vault, ... Signer]. len includes Signer.
+                                                   // Config is index 0. Vault is 1.
+                                                   // So Signer index is accounts.len().
+                                                   // Example: [Vault]. len=1. Real indices: 0:Config, 1:Vault.
+                                                   // So AuthIdx = len. Correct.
         } else {
             // If no signer provided, pass 0?
             // Or maybe we don't need auth (e.g. ProgramExec/None).

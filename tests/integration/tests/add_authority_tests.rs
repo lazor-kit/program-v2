@@ -132,7 +132,7 @@ fn test_add_authority_success_ed25519_no_policies() {
         .get_account(&solana_address::Address::from(config_pda.to_bytes()))
         .unwrap();
     let data = acc.data;
-    let wallet_header =
+    let _wallet_header =
         unsafe { LazorKitWallet::load_unchecked(&data[0..LazorKitWallet::LEN]).unwrap() };
 
     let pos0 = unsafe { Position::load_unchecked(&data[LazorKitWallet::LEN..]).unwrap() };
@@ -206,7 +206,7 @@ fn test_add_authority_success_secp256k1_with_policy() {
         .get_account(&solana_address::Address::from(config_pda.to_bytes()))
         .unwrap();
     let data = acc.data;
-    let wallet_header =
+    let _wallet_header =
         unsafe { LazorKitWallet::load_unchecked(&data[0..LazorKitWallet::LEN]).unwrap() };
 
     let pos0 = unsafe { Position::load_unchecked(&data[LazorKitWallet::LEN..]).unwrap() };

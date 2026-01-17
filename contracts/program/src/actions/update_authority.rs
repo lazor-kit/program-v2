@@ -126,7 +126,8 @@ fn process_replace_all(
         }
         let data_len =
             u16::from_le_bytes(payload[cursor + 32..cursor + 34].try_into().unwrap()) as usize;
-        let policy_total_len = 32 + 2 + data_len;
+        // Input payload includes full header (40 bytes)
+        let policy_total_len = PolicyHeader::LEN + data_len;
 
         if cursor + policy_total_len > payload.len() {
             return Err(ProgramError::InvalidInstructionData);
@@ -231,7 +232,8 @@ fn process_replace_all(
         let item_slice = &payload[offset..offset + len];
         let program_id_bytes = &item_slice[0..32];
         let data_len_bytes = &item_slice[32..34];
-        let data_bytes = &item_slice[34..];
+        // Skip Padding(2) + Boundary(4) = 6 bytes from input
+        let data_bytes = &item_slice[PolicyHeader::LEN..];
 
         config_data[write_cursor..write_cursor + 32].copy_from_slice(program_id_bytes);
         write_cursor += 32;
@@ -244,7 +246,7 @@ fn process_replace_all(
         // Structure: [ProgramID(32)] [Len(2)] [Padding(2)] [Boundary(4)] [Data...]
         // Total Header = 40 bytes
 
-        let boundary = (write_cursor - policies_start_offset) as u32 + 8 + (data_len as u32);
+        let boundary = (write_cursor - policies_start_offset) as u32 + 6 + (data_len as u32);
 
         // Write Padding (2 bytes explicitly to 0)
         config_data[write_cursor..write_cursor + 2].fill(0);
@@ -290,7 +292,8 @@ fn process_add_policies(
         }
         let data_len =
             u16::from_le_bytes(payload[cursor + 32..cursor + 34].try_into().unwrap()) as usize;
-        let policy_total_len = 32 + 2 + data_len;
+        // Input payload includes full header (40 bytes)
+        let policy_total_len = PolicyHeader::LEN + data_len;
         if cursor + policy_total_len > payload.len() {
             return Err(ProgramError::InvalidInstructionData);
         }
@@ -370,7 +373,8 @@ fn process_add_policies(
         let item_slice = &payload[offset..offset + len];
         let program_id_bytes = &item_slice[0..32];
         let data_len_bytes = &item_slice[32..34];
-        let data_bytes = &item_slice[34..];
+        // Skip Padding(2) + Boundary(4) = 6 bytes from input
+        let data_bytes = &item_slice[PolicyHeader::LEN..];
 
         config_data[write_cursor..write_cursor + 32].copy_from_slice(program_id_bytes);
         write_cursor += 32;
@@ -380,7 +384,7 @@ fn process_add_policies(
         let data_len = data_bytes.len();
         // Boundary must be relative to base_policies_offset
         // Structure: [ProgramID(32)] [Len(2)] [Padding(2)] [Boundary(4)] [Data...]
-        let boundary = (write_cursor - base_policies_offset) as u32 + 8 + (data_len as u32);
+        let boundary = (write_cursor - base_policies_offset) as u32 + 6 + (data_len as u32);
 
         // Write Padding
         config_data[write_cursor..write_cursor + 2].fill(0);
