@@ -14,6 +14,10 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    msg!(
+        "Processing Instruction. Discriminator: {:?}",
+        instruction_data.get(0)
+    );
     let instruction = LazorKitInstruction::unpack(instruction_data)?;
     match instruction {
         LazorKitInstruction::CreateWallet {

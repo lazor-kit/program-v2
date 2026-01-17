@@ -5,6 +5,9 @@ edition = "2021"
 license = "AGPL-3.0"
 authors.workspace = true
 
+[features]
+client = []
+
 [dependencies]
 pinocchio = { version = "0.9", features = ["std"] }
 pinocchio-pubkey = { version = "0.3" }

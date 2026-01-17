@@ -142,6 +142,24 @@ impl CreateWalletBuilder {
                     }
                     data.clone()
                 },
+                AuthorityType::Ed25519Session => {
+                    if data.len() != 72 {
+                        return Err("Invalid Ed25519Session data length (expected 72)".into());
+                    }
+                    data.clone()
+                },
+                AuthorityType::Secp256k1Session => {
+                    if data.len() != 104 {
+                        return Err("Invalid Secp256k1Session data length (expected 104)".into());
+                    }
+                    data.clone()
+                },
+                AuthorityType::Secp256r1Session => {
+                    if data.len() != 80 {
+                        return Err("Invalid Secp256r1Session data length (expected 80)".into());
+                    }
+                    data.clone()
+                },
                 _ => return Err("Unsupported owner type".into()),
             }
         } else {
@@ -275,6 +293,24 @@ impl<'a> AddAuthorityBuilder<'a> {
             AuthorityType::Secp256r1 => {
                 if key_vec.len() != 33 {
                     return Err("Invalid Secp256r1 key length".to_string());
+                }
+                key_vec.clone()
+            },
+            AuthorityType::Ed25519Session => {
+                if key_vec.len() != 72 {
+                    return Err("Invalid Ed25519Session data length (expected 72)".to_string());
+                }
+                key_vec.clone()
+            },
+            AuthorityType::Secp256k1Session => {
+                if key_vec.len() != 104 {
+                    return Err("Invalid Secp256k1Session data length (expected 104)".to_string());
+                }
+                key_vec.clone()
+            },
+            AuthorityType::Secp256r1Session => {
+                if key_vec.len() != 80 {
+                    return Err("Invalid Secp256r1Session data length (expected 80)".to_string());
                 }
                 key_vec.clone()
             },
@@ -727,4 +763,78 @@ impl DeactivatePolicyBuilder {
             solana_sdk::message::Message::new(&[ix], Some(&payer)),
         ))
     }
+}
+
+// ============================================================================
+// Session Authority Helper Functions
+// ============================================================================
+
+/// Create Ed25519 session authority data
+///
+/// # Arguments
+/// * `pubkey` - The Ed25519 public key (32 bytes)
+/// * `max_session_age` - Maximum allowed session duration in slots
+///
+/// # Returns
+/// A 72-byte vector containing the session authority data:
+/// - 32 bytes: public key
+/// - 32 bytes: initial session key (empty)
+/// - 8 bytes: max_session_age
+pub fn create_ed25519_session_data(pubkey: [u8; 32], max_session_age: u64) -> Vec<u8> {
+    let mut data = Vec::with_capacity(72);
+    data.extend_from_slice(&pubkey);
+    data.extend_from_slice(&[0u8; 32]); // Initial session key is empty
+    data.extend_from_slice(&max_session_age.to_le_bytes());
+    data
+}
+
+/// Create Secp256k1 session authority data
+///
+/// # Arguments
+/// * `pubkey` - The Secp256k1 public key (33 bytes compressed or 64 bytes uncompressed)
+/// * `max_session_age` - Maximum allowed session duration in slots
+///
+/// # Returns
+/// A 104-byte vector containing the session creation data:
+/// - 64 bytes: public key (padded if compressed)
+/// - 32 bytes: initial session key (empty)
+/// - 8 bytes: max_session_length
+pub fn create_secp256k1_session_data(pubkey: &[u8], max_session_age: u64) -> Vec<u8> {
+    let mut data = Vec::with_capacity(104);
+    if pubkey.len() == 33 {
+        data.extend_from_slice(pubkey);
+        data.extend_from_slice(&[0u8; 31]); // Pad to 64
+    } else if pubkey.len() == 64 {
+        data.extend_from_slice(pubkey);
+    } else {
+        // Fallback or panic? For now just pad/truncate
+        let mut padded = [0u8; 64];
+        let len = pubkey.len().min(64);
+        padded[..len].copy_from_slice(&pubkey[..len]);
+        data.extend_from_slice(&padded);
+    }
+    data.extend_from_slice(&[0u8; 32]); // Initial session key is empty
+    data.extend_from_slice(&max_session_age.to_le_bytes());
+    data
+}
+
+/// Create Secp256r1 session authority data
+///
+/// # Arguments
+/// * `pubkey` - The compressed Secp256r1 public key (33 bytes)
+/// * `max_session_age` - Maximum allowed session duration in slots
+///
+/// # Returns
+/// An 80-byte vector containing the session creation data:
+/// - 33 bytes: public key
+/// - 7 bytes: padding
+/// - 32 bytes: initial session key (empty)
+/// - 8 bytes: max_session_length
+pub fn create_secp256r1_session_data(pubkey: [u8; 33], max_session_age: u64) -> Vec<u8> {
+    let mut data = Vec::with_capacity(80);
+    data.extend_from_slice(&pubkey);
+    data.extend_from_slice(&[0u8; 7]); // Padding
+    data.extend_from_slice(&[0u8; 32]); // Initial session key is empty
+    data.extend_from_slice(&max_session_age.to_le_bytes());
+    data
 }

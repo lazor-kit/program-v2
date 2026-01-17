@@ -6,7 +6,7 @@
 //! authority with expiration support. The implementation relies on the Solana
 //! secp256r1 precompile program for signature verification.
 
-#![warn(unexpected_cfgs)]
+#![allow(unexpected_cfgs)]
 
 use core::mem::MaybeUninit;
 
@@ -558,7 +558,9 @@ fn compute_message_hash(
             .copy_from_slice(AccountsPayload::from(account).into_bytes()?);
         cursor = offset;
     }
+    #[allow(unused_mut)]
     let mut hash = MaybeUninit::<[u8; 32]>::uninit();
+    #[allow(unused_variables)]
     let data: &[&[u8]] = &[
         data_payload,
         &accounts_payload[..cursor],
@@ -648,6 +650,7 @@ pub fn verify_secp256r1_instruction_data(
     Ok(())
 }
 
+#[allow(dead_code)]
 fn generate_client_data_json(
     field_order: &[u8],
     challenge: &str,
@@ -785,11 +788,14 @@ fn webauthn_message<'a>(
 
     // Reconstruct the client data JSON using the decoded origin and reconstructed
     // challenge
+    #[allow(unused_variables)]
     let client_data_json =
         reconstruct_client_data_json(field_order, &decoded_origin, &computed_hash)?;
 
     // Compute SHA256 hash of the reconstructed client data JSON
+    #[allow(unused_mut)]
     let mut client_data_hash = [0u8; 32];
+    #[allow(unused_unsafe)]
     unsafe {
         #[cfg(target_os = "solana")]
         let res = pinocchio::syscalls::sol_sha256(

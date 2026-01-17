@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use lazorkit_sdk::basic::actions::CreateWalletBuilder;
 use lazorkit_sdk::core::connection::SolConnection;
 use lazorkit_sdk::state::AuthorityType;
@@ -19,7 +20,6 @@ pub struct TestEnv {
     pub payer: Keypair,
     pub program_id: Pubkey,
     pub sol_limit_id_pubkey: Pubkey,
-    pub system_program_id: Pubkey,
 }
 
 pub struct LiteSVMConnection<'a> {
@@ -110,14 +110,13 @@ pub fn setup_env() -> TestEnv {
         std::fs::read(get_sol_limit_plugin_path()).expect("Failed to read sol_limit plugin binary");
     let _ = svm.add_program(Address::from(sol_limit_id_pubkey.to_bytes()), &plugin_bytes);
 
-    let system_program_id = solana_sdk::system_program::id();
+    // let system_program_id = solana_sdk::system_program::id();
 
     TestEnv {
         svm,
         payer,
         program_id,
         sol_limit_id_pubkey,
-        system_program_id,
     }
 }
 
