@@ -1,0 +1,14 @@
+[package]
+name = "lazorkit-sol-limit-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.9"
+pinocchio-system = "0.3"
+lazorkit-state = { path = "../../state" }
+lazorkit-interface = { path = "../../interface" }
+no-padding = { path = "../../no-padding" }
