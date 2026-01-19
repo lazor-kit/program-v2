@@ -5,7 +5,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use pinocchio::program_error::ProgramError;
 
-/// Instruction discriminators (matching docs/ARCHITECTURE.md)
+/// Instruction discriminators (matching docs/ARCHITECTURE.md v3.0.0)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum InstructionDiscriminator {
@@ -16,8 +16,6 @@ pub enum InstructionDiscriminator {
     CreateSession = 4,
     Execute = 5,
     TransferOwnership = 6,
-    RegisterPolicy = 7,
-    DeactivatePolicy = 8,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -51,13 +49,10 @@ pub enum LazorKitInstruction {
     AddAuthority {
         /// Acting role ID (caller must have ManageAuthority permission)
         acting_role_id: u32,
-        /// New authority type (1-8)
+        /// New authority type (1-6)
         authority_type: u16,
         /// New authority data
         authority_data: Vec<u8>,
-        /// Serialized policy configs (PolicyHeader + State blobs)
-        /// Format: [PolicyHeader (40 bytes)][State Data]...
-        policies_config: Vec<u8>,
         /// Authorization signature data
         authorization_data: Vec<u8>,
     },
@@ -73,23 +68,25 @@ pub enum LazorKitInstruction {
         acting_role_id: u32,
         /// Role ID to remove
         target_role_id: u32,
+        /// Authorization signature data
+        authorization_data: Vec<u8>,
     },
 
-    /// Update an authority's plugins
+    /// Update an existing authority's data
     ///
     /// Accounts:
     /// 0. `[writable, signer]` LazorKit Config account
-    /// 1. `[writable, signer]` Payer
+    /// 1. `[signer]` Payer
     /// 2. `[]` System program
     UpdateAuthority {
-        /// Acting role ID
+        /// Acting role ID (caller must have permission)
         acting_role_id: u32,
         /// Role ID to update
         target_role_id: u32,
-        /// Operation: 0=ReplaceAll, 1=AddPlugins, 2=RemoveByType, 3=RemoveByIndex
-        operation: u8,
-        /// Payload (new plugins or indices to remove)
-        payload: Vec<u8>,
+        /// New authority data (for key rotation, session limits, etc.)
+        new_authority_data: Vec<u8>,
+        /// Authorization signature data
+        authorization_data: Vec<u8>,
     },
 
     /// Create a session key for an authority
@@ -127,33 +124,19 @@ pub enum LazorKitInstruction {
     ///
     /// Accounts:
     /// 0. `[writable, signer]` LazorKit Config account
-    /// 1. `[signer]` Current owner (Role 0)
+    /// 1. `[signer]` Current owner (Role 0) - for Ed25519 only
+    /// 2+ Additional accounts as needed for authentication (e.g., SysvarInstructions for ProgramExec)
     TransferOwnership {
         /// New owner authority type
         new_owner_authority_type: u16,
         /// New owner authority data
         new_owner_authority_data: Vec<u8>,
-    },
-
-    /// Register a verified policy in the system
-    ///
-    /// Accounts:
-    /// 0. `[writable]` Registry Entry PDA: ["policy-registry", program_id]
-    /// 1. `[writable, signer]` Payer/Admin
-    /// 2. `[]` System Program
-    RegisterPolicy {
-        /// The program ID of the policy to register
-        policy_program_id: [u8; 32],
-    },
-
-    /// Deactivate a policy in the registry
-    ///
-    /// Accounts:
-    /// 0. `[writable]` Registry Entry PDA: ["policy-registry", program_id]
-    /// 1. `[writable, signer]` Payer/Admin
-    DeactivatePolicy {
-        /// The program ID of the policy to deactivate
-        policy_program_id: [u8; 32],
+        /// Authentication payload for current owner verification
+        /// Format: [signer_index: 1 byte][signature_data: variable]
+        /// - Ed25519: [index: 1 byte][empty or session sig]
+        /// - Secp256k1/r1: [reserved: 1 byte][signature: 64 bytes][message: variable]
+        /// - ProgramExec: [reserved: 1 byte][previous instruction data]
+        auth_payload: Vec<u8>,
     },
 }
 

@@ -28,3 +28,6 @@ test-ledger
 .surfpool
 .yarn.idea/
 swig-wallet
+*.so
+*.dylib
+sdk/lazorkit-sdk/tests/fixtures/

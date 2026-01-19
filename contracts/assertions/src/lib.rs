@@ -9,7 +9,7 @@ use pinocchio::{
 use pinocchio_pubkey::declare_id;
 use pinocchio_system::ID as SYSTEM_ID;
 
-declare_id!("swigypWHEksbC64pWKwah1WTeh9JXwx8H1rJHLdbQMB");
+declare_id!("LazorKit11111111111111111111111111111111111");
 
 #[allow(unused_imports)]
 use std::mem::MaybeUninit;

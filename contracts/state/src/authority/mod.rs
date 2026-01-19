@@ -2,20 +2,18 @@
 //!
 //! This module provides functionality for managing different types of
 //! authorities in the Swig wallet system. It includes support for various
-//! authentication methods like Ed25519 and Secp256k1, with both standard and
+//! authentication methods like Ed25519 and Secp256k1,//! Defines authorities (Ed25519, Secp256r1) and
 //! session-based variants.
 
+pub mod accounts_payload;
 pub mod ed25519;
-pub mod programexec;
-pub mod secp256k1;
 pub mod secp256r1;
 
 use std::any::Any;
 
+pub use accounts_payload::AccountsPayload;
 pub use ed25519::{Ed25519Authority, Ed25519SessionAuthority};
 use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
-pub use programexec::{session::ProgramExecSessionAuthority, ProgramExecAuthority};
-pub use secp256k1::{Secp256k1Authority, Secp256k1SessionAuthority};
 pub use secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority};
 
 use crate::{IntoBytes, LazorAuthenticateError, Transmutable, TransmutableMut};
@@ -123,18 +121,10 @@ pub enum AuthorityType {
     Ed25519,
     /// Session-based Ed25519 authority
     Ed25519Session,
-    /// Standard Secp256k1 authority
-    Secp256k1,
-    /// Session-based Secp256k1 authority
-    Secp256k1Session,
     /// Standard Secp256r1 authority (for passkeys)
     Secp256r1,
     /// Session-based Secp256r1 authority
     Secp256r1Session,
-    /// Program execution authority
-    ProgramExec,
-    /// Session-based Program execution authority
-    ProgramExecSession,
 }
 
 impl TryFrom<u16> for AuthorityType {
@@ -143,15 +133,10 @@ impl TryFrom<u16> for AuthorityType {
     #[inline(always)]
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            // SAFETY: `value` is guaranteed to be in the range of the enum variants.
             1 => Ok(AuthorityType::Ed25519),
             2 => Ok(AuthorityType::Ed25519Session),
-            3 => Ok(AuthorityType::Secp256k1),
-            4 => Ok(AuthorityType::Secp256k1Session),
             5 => Ok(AuthorityType::Secp256r1),
             6 => Ok(AuthorityType::Secp256r1Session),
-            7 => Ok(AuthorityType::ProgramExec),
-            8 => Ok(AuthorityType::ProgramExecSession),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
@@ -171,12 +156,8 @@ pub const fn authority_type_to_length(
     match authority_type {
         AuthorityType::Ed25519 => Ok(Ed25519Authority::LEN),
         AuthorityType::Ed25519Session => Ok(Ed25519SessionAuthority::LEN),
-        AuthorityType::Secp256k1 => Ok(Secp256k1Authority::LEN),
-        AuthorityType::Secp256k1Session => Ok(Secp256k1SessionAuthority::LEN),
         AuthorityType::Secp256r1 => Ok(Secp256r1Authority::LEN),
         AuthorityType::Secp256r1Session => Ok(Secp256r1SessionAuthority::LEN),
-        AuthorityType::ProgramExec => Ok(ProgramExecAuthority::LEN),
-        AuthorityType::ProgramExecSession => Ok(ProgramExecSessionAuthority::LEN),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }

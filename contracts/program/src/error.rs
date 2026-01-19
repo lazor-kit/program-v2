@@ -43,6 +43,9 @@ pub enum LazorKitError {
 
     #[error("Policy has been deactivated")]
     PolicyDeactivated,
+
+    #[error("Invalid PDA derivation")]
+    InvalidPDA,
 }
 
 impl From<LazorKitError> for ProgramError {

@@ -21,7 +21,10 @@ use pinocchio::{
 use pinocchio_pubkey::pubkey;
 
 use super::{Authority, AuthorityInfo, AuthorityType};
-use crate::{IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable, TransmutableMut};
+use crate::{
+    authority::AccountsPayload, IntoBytes, LazorAuthenticateError, LazorStateError, Transmutable,
+    TransmutableMut,
+};
 
 /// Maximum age (in slots) for a Secp256r1 signature to be considered valid
 const MAX_SIGNATURE_AGE_IN_SLOTS: u64 = 60;
@@ -324,7 +327,7 @@ impl AuthorityInfo for Secp256r1SessionAuthority {
     ) -> Result<(), ProgramError> {
         use super::ed25519::ed25519_authenticate;
 
-        if slot >= self.current_session_expiration {
+        if slot > self.current_session_expiration {
             return Err(LazorAuthenticateError::PermissionDeniedSessionExpired.into());
         }
         ed25519_authenticate(
@@ -483,7 +486,7 @@ fn secp256r1_authenticate(
 ) -> Result<(), ProgramError> {
     // Validate signature age
     if current_slot < authority_slot || current_slot - authority_slot > MAX_SIGNATURE_AGE_IN_SLOTS {
-        return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidSignatureAge.into());
+        return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidSignatureAge.into());
     }
 
     // Compute our expected message hash
@@ -548,8 +551,6 @@ fn compute_message_hash(
     authority_slot: u64,
     counter: u32,
 ) -> Result<[u8; 32], ProgramError> {
-    use super::secp256k1::AccountsPayload;
-
     let mut accounts_payload = [0u8; 64 * AccountsPayload::LEN];
     let mut cursor = 0;
     for account in account_infos {
@@ -578,7 +579,7 @@ fn compute_message_hash(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidHash.into());
         }
 
         Ok(hash.assume_init())
@@ -806,7 +807,7 @@ fn webauthn_message<'a>(
         #[cfg(not(target_os = "solana"))]
         let res = 0;
         if res != 0 {
-            return Err(LazorAuthenticateError::PermissionDeniedSecp256k1InvalidHash.into());
+            return Err(LazorAuthenticateError::PermissionDeniedSecp256r1InvalidHash.into());
         }
     }
 

@@ -123,7 +123,7 @@ pub fn process_create_wallet(
 
     // Add initial owner role with authority data
     // Empty actions array means no plugins are attached to this role initially
-    wallet_builder.add_role(auth_type, &owner_authority_data, &[])?;
+    wallet_builder.add_role(auth_type, &owner_authority_data)?;
 
     Ok(())
 }

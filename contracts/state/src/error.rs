@@ -32,24 +32,18 @@ pub enum LazorAuthenticateError {
     PermissionDeniedCannotUpdateRootAuthority,
     /// Session has expired
     PermissionDeniedSessionExpired,
-    /// Invalid Secp256k1 signature
-    PermissionDeniedSecp256k1InvalidSignature,
-    /// Secp256k1 signature age is invalid
-    PermissionDeniedSecp256k1InvalidSignatureAge,
-    /// Secp256k1 signature has been reused
-    PermissionDeniedSecp256k1SignatureReused,
-    /// Invalid Secp256k1 hash
-    PermissionDeniedSecp256k1InvalidHash,
+    /// Invalid Secp256r1 signature
+    PermissionDeniedSecp256r1InvalidSignature,
+    /// Secp256r1 signature age is invalid
+    PermissionDeniedSecp256r1InvalidSignatureAge,
     /// Secp256r1 signature has been reused
     PermissionDeniedSecp256r1SignatureReused,
-    /// Stake account is in an invalid state
-    PermissionDeniedStakeAccountInvalidState,
+    /// Invalid Secp256r1 hash
+    PermissionDeniedSecp256r1InvalidHash,
     /// Cannot reuse session key
     InvalidSessionKeyCannotReuseSessionKey,
     /// Invalid session duration
     InvalidSessionDuration,
-    /// Token account authority is not the Lazor account
-    PermissionDeniedTokenAccountAuthorityNotLazor,
     /// Invalid Secp256r1 instruction
     PermissionDeniedSecp256r1InvalidInstruction,
     /// Invalid Secp256r1 public key
@@ -60,28 +54,6 @@ pub enum LazorAuthenticateError {
     PermissionDeniedSecp256r1InvalidMessage,
     /// Invalid Secp256r1 authentication kind
     PermissionDeniedSecp256r1InvalidAuthenticationKind,
-    /// SOL destination limit exceeded
-    PermissionDeniedSolDestinationLimitExceeded,
-    /// SOL destination recurring limit exceeded
-    PermissionDeniedSolDestinationRecurringLimitExceeded,
-    /// Token destination limit exceeded
-    PermissionDeniedTokenDestinationLimitExceeded,
-    /// Token destination recurring limit exceeded
-    PermissionDeniedRecurringTokenDestinationLimitExceeded,
-    /// Program execution instruction is invalid
-    PermissionDeniedProgramExecInvalidInstruction,
-    /// Program execution program ID does not match
-    PermissionDeniedProgramExecInvalidProgram,
-    /// Program execution instruction data does not match prefix
-    PermissionDeniedProgramExecInvalidInstructionData,
-    /// Program execution missing required accounts
-    PermissionDeniedProgramExecMissingAccounts,
-    /// Program execution config account index mismatch
-    PermissionDeniedProgramExecInvalidConfigAccount,
-    /// Program execution wallet account index mismatch
-    PermissionDeniedProgramExecInvalidWalletAccount,
-    /// Program execution cannot be the Lazor program
-    PermissionDeniedProgramExecCannotBeLazor,
 }
 
 impl From<LazorAuthenticateError> for ProgramError {
@@ -94,20 +66,12 @@ impl From<LazorAuthenticateError> for ProgramError {
 pub enum LazorStateError {
     /// Account data is invalid or corrupted
     InvalidAccountData = 1000,
-    /// Action data is invalid or malformed
-    InvalidActionData,
     /// Authority data is invalid or malformed
     InvalidAuthorityData,
     /// Role data is invalid or malformed
     InvalidRoleData,
-    /// Lazor account data is invalid or malformed
-    InvalidLazorData,
     /// Specified role could not be found
     RoleNotFound,
-    /// Error loading permissions
-    PermissionLoadError,
-    /// Adding an authority requires at least one policy
-    InvalidAuthorityMustHaveAtLeastOnePolicy,
 }
 
 impl From<LazorStateError> for ProgramError {

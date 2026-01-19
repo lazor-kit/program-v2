@@ -15,10 +15,14 @@ pub fn process_instruction(
     instruction_data: &[u8],
 ) -> ProgramResult {
     msg!(
-        "Processing Instruction. Discriminator: {:?}",
+        "Processing Instruction. Raw: {:?}, Discriminator: {:?}",
+        instruction_data,
         instruction_data.get(0)
     );
-    let instruction = LazorKitInstruction::unpack(instruction_data)?;
+    let instruction = LazorKitInstruction::unpack(instruction_data).map_err(|e| {
+        msg!("Failed to unpack instruction: {:?}", e);
+        e
+    })?;
     match instruction {
         LazorKitInstruction::CreateWallet {
             id,
@@ -40,7 +44,6 @@ pub fn process_instruction(
             acting_role_id,
             authority_type,
             authority_data,
-            policies_config,
             authorization_data,
         } => actions::process_add_authority(
             program_id,
@@ -48,29 +51,33 @@ pub fn process_instruction(
             acting_role_id,
             authority_type,
             authority_data,
-            policies_config,
             authorization_data,
         ),
 
         LazorKitInstruction::RemoveAuthority {
             acting_role_id,
             target_role_id,
-        } => {
-            actions::process_remove_authority(program_id, accounts, acting_role_id, target_role_id)
-        },
+            authorization_data,
+        } => actions::process_remove_authority(
+            program_id,
+            accounts,
+            acting_role_id,
+            target_role_id,
+            &authorization_data,
+        ),
 
         LazorKitInstruction::UpdateAuthority {
             acting_role_id,
             target_role_id,
-            operation,
-            payload,
+            new_authority_data,
+            authorization_data,
         } => actions::process_update_authority(
             program_id,
             accounts,
             acting_role_id,
             target_role_id,
-            operation,
-            payload,
+            new_authority_data,
+            authorization_data,
         ),
 
         LazorKitInstruction::CreateSession {
@@ -95,29 +102,13 @@ pub fn process_instruction(
         LazorKitInstruction::TransferOwnership {
             new_owner_authority_type,
             new_owner_authority_data,
+            auth_payload,
         } => actions::process_transfer_ownership(
             program_id,
             accounts,
             new_owner_authority_type,
             new_owner_authority_data,
+            auth_payload,
         ),
-
-        LazorKitInstruction::RegisterPolicy { policy_program_id } => {
-            msg!("Instruction: RegisterPolicy");
-            actions::register_policy::process_register_policy(
-                program_id,
-                accounts,
-                policy_program_id,
-            )
-        },
-
-        LazorKitInstruction::DeactivatePolicy { policy_program_id } => {
-            msg!("Instruction: DeactivatePolicy");
-            actions::deactivate_policy::process_deactivate_policy(
-                program_id,
-                accounts,
-                policy_program_id,
-            )
-        },
     }
 }

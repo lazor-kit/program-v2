@@ -6,6 +6,7 @@ use pinocchio::{
     account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
 };
 
+use crate::actions::{authenticate_role, find_role};
 use crate::error::LazorKitError;
 
 pub fn process_remove_authority(
@@ -13,6 +14,7 @@ pub fn process_remove_authority(
     accounts: &[AccountInfo],
     acting_role_id: u32,
     target_role_id: u32,
+    authorization_data: &[u8],
 ) -> ProgramResult {
     let mut account_info_iter = accounts.iter();
     let config_account = account_info_iter
@@ -38,7 +40,32 @@ pub fn process_remove_authority(
         return Err(LazorKitError::Unauthorized.into());
     }
 
-    // Only Owner or Admin can remove authorities
+    // 1. Authenticate acting role
+    {
+        #[derive(borsh::BorshSerialize)]
+        struct RemoveAuthPayload {
+            acting_role_id: u32,
+            target_role_id: u32,
+        }
+
+        let payload_struct = RemoveAuthPayload {
+            acting_role_id,
+            target_role_id,
+        };
+        let data_payload =
+            borsh::to_vec(&payload_struct).map_err(|_| ProgramError::InvalidInstructionData)?;
+
+        authenticate_role(
+            config_account,
+            acting_role_id,
+            accounts,
+            authorization_data,
+            &data_payload,
+        )?;
+    }
+
+    // Permission check
+    // Only Owner (0) or Admin (1) can remove authorities
     if acting_role_id != 0 && acting_role_id != 1 {
         return Err(LazorKitError::Unauthorized.into());
     }
@@ -48,16 +75,16 @@ pub fn process_remove_authority(
     }
 
     let mut config_data = config_account.try_borrow_mut_data()?;
-    let role_count = {
+    let (role_count, mut admin_count) = {
         let wallet =
             unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
-        wallet.role_count
+        (wallet.role_count, 0u32)
     };
 
     // Find target role and calculate shift
-    // Find target role and calculate shift
     let mut target_start: Option<usize> = None;
     let mut target_end: Option<usize> = None;
+    let mut target_is_admin = false;
     let mut total_data_end = 0usize;
 
     let mut cursor = LazorKitWallet::LEN;
@@ -69,13 +96,32 @@ pub fn process_remove_authority(
 
         let pos = read_position(&config_data[cursor..])?;
 
+        // All non-owner roles are admins in simplified architecture
+        if pos.id != 0 {
+            admin_count += 1;
+        }
+
         if pos.id == target_role_id {
             target_start = Some(cursor);
             target_end = Some(pos.boundary as usize);
+            target_is_admin = pos.id != 0; // All non-owner roles are admins
         }
 
         total_data_end = pos.boundary as usize;
         cursor = pos.boundary as usize;
+    }
+
+    // Permission check: Only Owner (0) or Admin (1) can remove authorities
+    let is_acting_admin = acting_role_id == 0 || acting_role_id == 1;
+    if !is_acting_admin {
+        return Err(LazorKitError::Unauthorized.into());
+    }
+
+    // Last Admin Protection:
+    // If we are removing an admin role, ensure it's not the last one.
+    if target_is_admin && admin_count <= 1 {
+        msg!("Cannot remove the last administrative role");
+        return Err(LazorKitError::Unauthorized.into());
     }
 
     let (target_start, target_end) = match (target_start, target_end) {

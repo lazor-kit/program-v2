@@ -3,12 +3,9 @@
 use crate::{
     authority::{
         ed25519::{Ed25519Authority, Ed25519SessionAuthority},
-        programexec::{ProgramExecAuthority, ProgramExecSessionAuthority},
-        secp256k1::{Secp256k1Authority, Secp256k1SessionAuthority},
         secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority},
         Authority, AuthorityType,
     },
-    policy::count_policies,
     IntoBytes, LazorKitWallet, Position, Transmutable, TransmutableMut,
 };
 use pinocchio::program_error::ProgramError;
@@ -53,7 +50,6 @@ impl<'a> LazorKitBuilder<'a> {
     /// # Arguments
     /// * `authority_type` - The type of authority for this role
     /// * `authority_data` - Raw bytes containing the authority data
-    /// * `actions_data` - Raw bytes containing the actions data (can be empty for no plugins)
     ///
     /// # Returns
     /// * `Result<(), ProgramError>` - Success or error status
@@ -61,7 +57,6 @@ impl<'a> LazorKitBuilder<'a> {
         &mut self,
         authority_type: AuthorityType,
         authority_data: &[u8],
-        _policies_data: &'a [u8], // For future policy support
     ) -> Result<(), ProgramError> {
         // Find cursor position (end of last role or start if no roles)
         let mut cursor = 0;
@@ -92,21 +87,6 @@ impl<'a> LazorKitBuilder<'a> {
                 )?;
                 Ed25519SessionAuthority::LEN
             },
-            AuthorityType::Secp256k1 => {
-                Secp256k1Authority::set_into_bytes(
-                    authority_data,
-                    &mut self.role_buffer[auth_offset..auth_offset + Secp256k1Authority::LEN],
-                )?;
-                Secp256k1Authority::LEN
-            },
-            AuthorityType::Secp256k1Session => {
-                Secp256k1SessionAuthority::set_into_bytes(
-                    authority_data,
-                    &mut self.role_buffer
-                        [auth_offset..auth_offset + Secp256k1SessionAuthority::LEN],
-                )?;
-                Secp256k1SessionAuthority::LEN
-            },
             AuthorityType::Secp256r1 => {
                 Secp256r1Authority::set_into_bytes(
                     authority_data,
@@ -122,36 +102,11 @@ impl<'a> LazorKitBuilder<'a> {
                 )?;
                 Secp256r1SessionAuthority::LEN
             },
-            AuthorityType::ProgramExec => {
-                ProgramExecAuthority::set_into_bytes(
-                    authority_data,
-                    &mut self.role_buffer[auth_offset..auth_offset + ProgramExecAuthority::LEN],
-                )?;
-                ProgramExecAuthority::LEN
-            },
-            AuthorityType::ProgramExecSession => {
-                ProgramExecSessionAuthority::set_into_bytes(
-                    authority_data,
-                    &mut self.role_buffer
-                        [auth_offset..auth_offset + ProgramExecSessionAuthority::LEN],
-                )?;
-                ProgramExecSessionAuthority::LEN
-            },
             _ => return Err(ProgramError::InvalidInstructionData),
         };
 
-        // Calculate policies offset and copy policy data to buffer
-        // NOTE: This is opaque storage - no validation at builder level
-        // TODO: Policy validation happens via CPI during Execute flow
-        //       Core will CPI to each policy's verify() to validate state
-        let policies_offset = auth_offset + authority_length;
-        if !_policies_data.is_empty() {
-            self.role_buffer[policies_offset..policies_offset + _policies_data.len()]
-                .copy_from_slice(_policies_data);
-        }
-
-        // Calculate boundary: Position + Authority + Policies
-        let size = authority_length + _policies_data.len();
+        // Calculate boundary: Position + Authority
+        let size = authority_length;
         let relative_boundary = cursor + Position::LEN + size;
         let absolute_boundary = relative_boundary + LazorKitWallet::LEN;
 
@@ -161,12 +116,6 @@ impl<'a> LazorKitBuilder<'a> {
         };
         position.authority_type = authority_type as u16;
         position.authority_length = authority_length as u16;
-        position.num_policies = if _policies_data.is_empty() {
-            0
-        } else {
-            count_policies(_policies_data)?
-        };
-        position.padding = 0;
         position.id = self.wallet.role_counter;
         position.boundary = absolute_boundary as u32;
 

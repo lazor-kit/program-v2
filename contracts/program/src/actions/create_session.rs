@@ -1,8 +1,6 @@
 //! CreateSession instruction handler
 
 use lazorkit_state::authority::ed25519::Ed25519SessionAuthority;
-use lazorkit_state::authority::programexec::ProgramExecSessionAuthority;
-use lazorkit_state::authority::secp256k1::Secp256k1SessionAuthority;
 use lazorkit_state::authority::secp256r1::Secp256r1SessionAuthority;
 use lazorkit_state::{
     read_position, AuthorityInfo, AuthorityType, LazorKitWallet, Position, RoleIterator,
@@ -55,7 +53,7 @@ pub fn process_create_session(
         let mut found_internal = false;
         let mut boundary = 0;
 
-        for (pos, auth_data, _plugins_data) in
+        for (pos, auth_data) in
             RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN)
         {
             if pos.id == role_id {
@@ -78,14 +76,6 @@ pub fn process_create_session(
                             msg!("Missing signature from role master key");
                             return Err(ProgramError::MissingRequiredSignature);
                         }
-                        found_internal = true;
-                    },
-                    AuthorityType::Secp256k1Session | AuthorityType::Secp256r1Session => {
-                        // Stateful authentication, verified in mutable phase
-                        found_internal = true;
-                    },
-                    AuthorityType::ProgramExecSession => {
-                        // TODO: ProgramExec might need customized verification
                         found_internal = true;
                     },
                     _ => {
@@ -154,17 +144,6 @@ pub fn process_create_session(
                     auth.start_session(session_key, current_slot, duration)?;
                     msg!("Ed25519 session created");
                 },
-                AuthorityType::Secp256k1Session => {
-                    let auth =
-                        unsafe { Secp256k1SessionAuthority::load_mut_unchecked(auth_slice)? };
-
-                    // Verify Signature
-                    // Secp256k1SessionAuthority implements AuthorityInfo::authenticate which refers to the MASTER key
-                    auth.authenticate(accounts, authorization_data, &data_payload, current_slot)?;
-
-                    auth.start_session(session_key, current_slot, duration)?;
-                    msg!("Secp256k1 session created");
-                },
                 AuthorityType::Secp256r1Session => {
                     let auth =
                         unsafe { Secp256r1SessionAuthority::load_mut_unchecked(auth_slice)? };
@@ -174,12 +153,6 @@ pub fn process_create_session(
 
                     auth.start_session(session_key, current_slot, duration)?;
                     msg!("Secp256r1 session created");
-                },
-                AuthorityType::ProgramExecSession => {
-                    let auth =
-                        unsafe { ProgramExecSessionAuthority::load_mut_unchecked(auth_slice)? };
-                    auth.start_session(session_key, current_slot, duration)?;
-                    msg!("ProgramExec session created");
                 },
                 _ => return Err(LazorKitError::InvalidInstruction.into()),
             }
