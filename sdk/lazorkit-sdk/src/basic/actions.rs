@@ -2,59 +2,10 @@ use crate::advanced::instructions;
 use crate::basic::proxy::ProxyBuilder;
 use crate::basic::wallet::LazorWallet;
 use crate::core::connection::SolConnection;
-use lazorkit_state::authority::{
-    AuthorityType, Ed25519Authority, Secp256k1Authority, Secp256r1Authority,
-};
-use lazorkit_state::IntoBytes;
+use lazorkit_state::authority::AuthorityType;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
-
 use solana_sdk::transaction::Transaction;
-
-pub struct RegisterPolicyBuilder {
-    program_id: Pubkey,
-    payer: Option<Pubkey>,
-    policy_program_id: Option<[u8; 32]>,
-}
-
-impl RegisterPolicyBuilder {
-    pub fn new(program_id: Pubkey) -> Self {
-        Self {
-            program_id,
-            payer: None,
-            policy_program_id: None,
-        }
-    }
-
-    pub fn with_payer(mut self, payer: Pubkey) -> Self {
-        self.payer = Some(payer);
-        self
-    }
-
-    pub fn with_policy(mut self, policy: Pubkey) -> Self {
-        self.policy_program_id = Some(policy.to_bytes());
-        self
-    }
-
-    pub async fn build_transaction(
-        &self,
-        connection: &impl SolConnection,
-    ) -> Result<Transaction, String> {
-        let payer = self.payer.ok_or("Payer required")?;
-        let policy_id = self.policy_program_id.ok_or("Policy ID required")?;
-
-        let ix = instructions::register_policy(&self.program_id, &payer, policy_id);
-
-        let _recent_blockhash = connection
-            .get_latest_blockhash()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(Transaction::new_unsigned(
-            solana_sdk::message::Message::new(&[ix], Some(&payer)),
-        ))
-    }
-}
 
 pub struct CreateWalletBuilder {
     payer: Option<Pubkey>,
@@ -130,12 +81,6 @@ impl CreateWalletBuilder {
                     }
                     data.clone()
                 },
-                AuthorityType::Secp256k1 => {
-                    if data.len() != 64 && data.len() != 33 {
-                        return Err("Invalid Secp256k1 key length".into());
-                    }
-                    data.clone()
-                },
                 AuthorityType::Secp256r1 => {
                     if data.len() != 33 {
                         return Err("Invalid Secp256r1 key length".into());
@@ -145,12 +90,6 @@ impl CreateWalletBuilder {
                 AuthorityType::Ed25519Session => {
                     if data.len() != 72 {
                         return Err("Invalid Ed25519Session data length (expected 72)".into());
-                    }
-                    data.clone()
-                },
-                AuthorityType::Secp256k1Session => {
-                    if data.len() != 104 {
-                        return Err("Invalid Secp256k1Session data length (expected 104)".into());
                     }
                     data.clone()
                 },
@@ -188,10 +127,10 @@ impl CreateWalletBuilder {
 pub struct AddAuthorityBuilder<'a> {
     wallet: &'a LazorWallet,
     new_authority: Option<Vec<u8>>,
+    authorized_account: Option<Pubkey>,
     auth_type: AuthorityType,
     authorization_data: Vec<u8>,
     role: u32,
-    policies_config: Vec<u8>, // Accumulated bytes
     additional_accounts: Vec<solana_sdk::instruction::AccountMeta>,
     acting_role_id: u32,
 }
@@ -201,12 +140,12 @@ impl<'a> AddAuthorityBuilder<'a> {
         Self {
             wallet,
             new_authority: None,
+            authorized_account: None,
             auth_type: AuthorityType::Ed25519,
             authorization_data: vec![],
-            role: 1, // Default to a standard role, user can change
-            policies_config: vec![],
+            role: 1,
             additional_accounts: Vec::new(),
-            acting_role_id: 0, // Default to owner as acting
+            acting_role_id: 0,
         }
     }
 
@@ -240,32 +179,11 @@ impl<'a> AddAuthorityBuilder<'a> {
         self
     }
 
-    pub fn with_policy_config(mut self, config: Vec<u8>) -> Self {
-        self.policies_config.extend(config);
-        self
-    }
-
-    pub fn with_additional_accounts(
-        mut self,
-        accounts: Vec<solana_sdk::instruction::AccountMeta>,
-    ) -> Self {
-        self.additional_accounts.extend(accounts);
-        self
-    }
-
-    pub fn with_authorizer(mut self, pubkey: Pubkey) -> Self {
+    pub fn with_authorizer(mut self, authorizer: Pubkey) -> Self {
+        self.authorized_account = Some(authorizer);
         self.additional_accounts
             .push(solana_sdk::instruction::AccountMeta::new_readonly(
-                pubkey, true,
-            ));
-        self
-    }
-
-    pub fn with_registry(mut self, registry_pda: Pubkey) -> Self {
-        self.additional_accounts
-            .push(solana_sdk::instruction::AccountMeta::new_readonly(
-                registry_pda,
-                false,
+                authorizer, true,
             ));
         self
     }
@@ -284,12 +202,6 @@ impl<'a> AddAuthorityBuilder<'a> {
                 }
                 key_vec.clone()
             },
-            AuthorityType::Secp256k1 => {
-                if key_vec.len() != 33 && key_vec.len() != 64 {
-                    return Err("Invalid Secp256k1 key length".to_string());
-                }
-                key_vec.clone()
-            },
             AuthorityType::Secp256r1 => {
                 if key_vec.len() != 33 {
                     return Err("Invalid Secp256r1 key length".to_string());
@@ -299,12 +211,6 @@ impl<'a> AddAuthorityBuilder<'a> {
             AuthorityType::Ed25519Session => {
                 if key_vec.len() != 72 {
                     return Err("Invalid Ed25519Session data length (expected 72)".to_string());
-                }
-                key_vec.clone()
-            },
-            AuthorityType::Secp256k1Session => {
-                if key_vec.len() != 104 {
-                    return Err("Invalid Secp256k1Session data length (expected 104)".to_string());
                 }
                 key_vec.clone()
             },
@@ -324,7 +230,6 @@ impl<'a> AddAuthorityBuilder<'a> {
             self.acting_role_id,
             self.auth_type,
             auth_data,
-            self.policies_config.clone(),
             self.authorization_data.clone(),
             self.additional_accounts.clone(),
         );
@@ -391,6 +296,14 @@ impl<'a> ExecuteBuilder<'a> {
         self
     }
 
+    pub fn with_registry(mut self, registry: Pubkey) -> Self {
+        self.additional_accounts
+            .push(solana_sdk::instruction::AccountMeta::new_readonly(
+                registry, false,
+            ));
+        self
+    }
+
     pub fn with_authorizer(mut self, pubkey: Pubkey) -> Self {
         self.additional_accounts
             .push(solana_sdk::instruction::AccountMeta::new_readonly(
@@ -444,6 +357,7 @@ pub struct RemoveAuthorityBuilder<'a> {
     wallet: &'a LazorWallet,
     acting_role_id: u32,
     target_role_id: Option<u32>,
+    authorization_data: Vec<u8>,
     additional_accounts: Vec<solana_sdk::instruction::AccountMeta>,
 }
 
@@ -453,6 +367,7 @@ impl<'a> RemoveAuthorityBuilder<'a> {
             wallet,
             acting_role_id: 0,
             target_role_id: None,
+            authorization_data: Vec::new(),
             additional_accounts: Vec::new(),
         }
     }
@@ -464,6 +379,11 @@ impl<'a> RemoveAuthorityBuilder<'a> {
 
     pub fn with_target_role(mut self, role: u32) -> Self {
         self.target_role_id = Some(role);
+        self
+    }
+
+    pub fn with_authorization_data(mut self, data: Vec<u8>) -> Self {
+        self.authorization_data = data;
         self
     }
 
@@ -488,6 +408,7 @@ impl<'a> RemoveAuthorityBuilder<'a> {
             &payer,
             self.acting_role_id,
             target_role,
+            self.authorization_data.clone(),
             self.additional_accounts.clone(),
         );
 
@@ -505,8 +426,8 @@ pub struct UpdateAuthorityBuilder<'a> {
     wallet: &'a LazorWallet,
     acting_role_id: u32,
     target_role_id: Option<u32>,
-    operation: u8,
-    payload: Vec<u8>,
+    new_authority_data: Vec<u8>,
+    authorization_data: Vec<u8>,
     additional_accounts: Vec<solana_sdk::instruction::AccountMeta>,
 }
 
@@ -516,8 +437,8 @@ impl<'a> UpdateAuthorityBuilder<'a> {
             wallet,
             acting_role_id: 0,
             target_role_id: None,
-            operation: 0,
-            payload: Vec::new(),
+            new_authority_data: Vec::new(),
+            authorization_data: Vec::new(),
             additional_accounts: Vec::new(),
         }
     }
@@ -532,13 +453,13 @@ impl<'a> UpdateAuthorityBuilder<'a> {
         self
     }
 
-    pub fn with_operation(mut self, op: u8) -> Self {
-        self.operation = op;
+    pub fn with_new_authority_data(mut self, data: Vec<u8>) -> Self {
+        self.new_authority_data = data;
         self
     }
 
-    pub fn with_payload(mut self, payload: Vec<u8>) -> Self {
-        self.payload = payload;
+    pub fn with_authorization_data(mut self, data: Vec<u8>) -> Self {
+        self.authorization_data = data;
         self
     }
 
@@ -572,8 +493,8 @@ impl<'a> UpdateAuthorityBuilder<'a> {
             &payer,
             self.acting_role_id,
             target_role,
-            self.operation,
-            self.payload.clone(),
+            self.new_authority_data.clone(),
+            self.authorization_data.clone(),
             self.additional_accounts.clone(),
         );
 
@@ -720,56 +641,6 @@ impl<'a> TransferOwnershipBuilder<'a> {
     }
 }
 
-pub struct DeactivatePolicyBuilder {
-    program_id: Pubkey,
-    payer: Option<Pubkey>,
-    policy_program_id: Option<[u8; 32]>,
-}
-
-impl DeactivatePolicyBuilder {
-    pub fn new(program_id: Pubkey) -> Self {
-        Self {
-            program_id,
-            payer: None,
-            policy_program_id: None,
-        }
-    }
-
-    pub fn with_payer(mut self, payer: Pubkey) -> Self {
-        self.payer = Some(payer);
-        self
-    }
-
-    pub fn with_policy(mut self, policy: Pubkey) -> Self {
-        self.policy_program_id = Some(policy.to_bytes());
-        self
-    }
-
-    pub async fn build_transaction(
-        &self,
-        connection: &impl SolConnection,
-    ) -> Result<Transaction, String> {
-        let payer = self.payer.ok_or("Payer required")?;
-        let policy_id = self.policy_program_id.ok_or("Policy ID required")?;
-
-        let ix = instructions::deactivate_policy(&self.program_id, &payer, policy_id);
-
-        let _recent_blockhash = connection
-            .get_latest_blockhash()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(Transaction::new_unsigned(
-            solana_sdk::message::Message::new(&[ix], Some(&payer)),
-        ))
-    }
-}
-
-// ============================================================================
-// Session Authority Helper Functions
-// ============================================================================
-
-/// Create Ed25519 session authority data
 ///
 /// # Arguments
 /// * `pubkey` - The Ed25519 public key (32 bytes)
@@ -788,37 +659,6 @@ pub fn create_ed25519_session_data(pubkey: [u8; 32], max_session_age: u64) -> Ve
     data
 }
 
-/// Create Secp256k1 session authority data
-///
-/// # Arguments
-/// * `pubkey` - The Secp256k1 public key (33 bytes compressed or 64 bytes uncompressed)
-/// * `max_session_age` - Maximum allowed session duration in slots
-///
-/// # Returns
-/// A 104-byte vector containing the session creation data:
-/// - 64 bytes: public key (padded if compressed)
-/// - 32 bytes: initial session key (empty)
-/// - 8 bytes: max_session_length
-pub fn create_secp256k1_session_data(pubkey: &[u8], max_session_age: u64) -> Vec<u8> {
-    let mut data = Vec::with_capacity(104);
-    if pubkey.len() == 33 {
-        data.extend_from_slice(pubkey);
-        data.extend_from_slice(&[0u8; 31]); // Pad to 64
-    } else if pubkey.len() == 64 {
-        data.extend_from_slice(pubkey);
-    } else {
-        // Fallback or panic? For now just pad/truncate
-        let mut padded = [0u8; 64];
-        let len = pubkey.len().min(64);
-        padded[..len].copy_from_slice(&pubkey[..len]);
-        data.extend_from_slice(&padded);
-    }
-    data.extend_from_slice(&[0u8; 32]); // Initial session key is empty
-    data.extend_from_slice(&max_session_age.to_le_bytes());
-    data
-}
-
-/// Create Secp256r1 session authority data
 ///
 /// # Arguments
 /// * `pubkey` - The compressed Secp256r1 public key (33 bytes)

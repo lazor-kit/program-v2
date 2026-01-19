@@ -17,7 +17,6 @@ borsh = { version = "1.5", features = ["derive"] }
 thiserror = "1.0"
 lazor-assertions = { path = "../assertions" }
 lazorkit-state = { path = "../state" }
-lazorkit-interface = { path = "../interface" }
 
 [lints]
 workspace = true

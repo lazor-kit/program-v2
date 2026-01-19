@@ -14,16 +14,9 @@ async-trait = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 
-[dependencies.lazorkit-policy-sol-limit]
-path = "../policies/sol-limit"
-optional = true
-
-[dependencies.lazorkit-policy-whitelist]
-path = "../policies/whitelist"
-optional = true
-
-[features]
-default = []
-sol-limit = ["dep:lazorkit-policy-sol-limit"]
-whitelist = ["dep:lazorkit-policy-whitelist"]
-all-policies = ["sol-limit", "whitelist"]
+[dev-dependencies]
+solana-program-test = "2.2.1"
+tokio = { version = "1.0", features = ["full", "test-util"] }
+anyhow = "1.0"
+rand = "0.8"
+hex = "0.4"

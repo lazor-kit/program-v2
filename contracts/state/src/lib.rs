@@ -6,21 +6,15 @@
 pub mod authority;
 pub mod builder;
 pub mod error;
-pub mod policy;
-pub mod registry;
 pub mod transmute;
 use pinocchio::{program_error::ProgramError, pubkey::Pubkey};
 
 pub use authority::ed25519::{Ed25519Authority, Ed25519SessionAuthority};
-pub use authority::programexec::{ProgramExecAuthority, ProgramExecSessionAuthority};
-pub use authority::secp256k1::{Secp256k1Authority, Secp256k1SessionAuthority};
 pub use authority::secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority};
 
 pub use authority::{AuthorityInfo, AuthorityType};
 pub use builder::LazorKitBuilder;
 pub use error::{LazorAuthenticateError, LazorStateError};
-pub use policy::PolicyHeader;
-pub use registry::PolicyRegistryEntry;
 pub use transmute::{IntoBytes, Transmutable, TransmutableMut};
 
 /// Represents the type discriminator for different account types in the system.
@@ -118,19 +112,12 @@ impl IntoBytes for LazorKitWallet {
 pub struct Position {
     /// Type of authority (see AuthorityType enum)
     pub authority_type: u16,
-
     /// Length of authority data in bytes
     pub authority_length: u16,
-
-    /// Number of policies attached to this role
-    pub num_policies: u16,
-
-    /// Padding for alignment
-    pub padding: u16,
-
+    /// Padding for 8-byte alignment
+    _padding: u32,
     /// Unique role ID
     pub id: u32,
-
     /// Absolute offset to the next role (boundary)
     pub boundary: u32,
 }
@@ -138,17 +125,11 @@ pub struct Position {
 impl Position {
     pub const LEN: usize = 16;
 
-    pub fn new(
-        authority_type: AuthorityType,
-        authority_length: u16,
-        num_policies: u16,
-        id: u32,
-    ) -> Self {
+    pub fn new(authority_type: AuthorityType, authority_length: u16, id: u32) -> Self {
         Self {
             authority_type: authority_type as u16,
             authority_length,
-            num_policies,
-            padding: 0,
+            _padding: 0,
             id,
             boundary: 0, // Will be set during serialization
         }
@@ -213,7 +194,7 @@ impl<'a> RoleIterator<'a> {
 }
 
 impl<'a> Iterator for RoleIterator<'a> {
-    type Item = (Position, &'a [u8], &'a [u8]); // (header, authority_data, policies_data)
+    type Item = (Position, &'a [u8]); // (position_header, authority_data)
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -228,18 +209,16 @@ impl<'a> Iterator for RoleIterator<'a> {
 
         let authority_start = self.cursor + Position::LEN;
         let authority_end = authority_start + position.authority_length as usize;
-        let policies_end = position.boundary as usize;
 
-        if policies_end > self.buffer.len() {
+        if position.boundary as usize > self.buffer.len() {
             return None;
         }
 
         let authority_data = &self.buffer[authority_start..authority_end];
-        let policies_data = &self.buffer[authority_end..policies_end];
 
-        self.cursor = policies_end;
+        self.cursor = position.boundary as usize;
         self.remaining -= 1;
 
-        Some((position, authority_data, policies_data))
+        Some((position, authority_data))
     }
 }

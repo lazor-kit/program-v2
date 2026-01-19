@@ -1,9 +1,7 @@
 pub mod add_authority;
 pub mod create_session;
 pub mod create_wallet;
-pub mod deactivate_policy;
 pub mod execute;
-pub mod register_policy;
 pub mod remove_authority;
 pub mod transfer_ownership;
 pub mod update_authority;
@@ -11,59 +9,77 @@ pub mod update_authority;
 pub use add_authority::*;
 pub use create_session::*;
 pub use create_wallet::*;
-pub use deactivate_policy::*;
 pub use execute::*;
-pub use register_policy::*;
 pub use remove_authority::*;
 pub use transfer_ownership::*;
 pub use update_authority::*;
 
 use crate::error::LazorKitError;
-use lazorkit_state::registry::PolicyRegistryEntry;
-use pinocchio::{account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey};
+use lazorkit_state::authority::AuthorityInfo;
+use lazorkit_state::{read_position, LazorKitWallet, Position, Transmutable, TransmutableMut};
+use pinocchio::{
+    account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey, sysvars::Sysvar,
+    ProgramResult,
+};
 
-pub fn verify_policy_registry(
-    program_id: &Pubkey,
-    policy_program_id: &Pubkey,
-    registry_accounts: &[AccountInfo],
-) -> Result<(), ProgramError> {
-    let (expected_pda, _) = pinocchio::pubkey::find_program_address(
-        &[PolicyRegistryEntry::SEED_PREFIX, policy_program_id.as_ref()],
-        program_id,
-    );
+/// Helper to scan for a specific role in the wallet registry.
+pub fn find_role(config_data: &[u8], role_id: u32) -> Result<(Position, usize), ProgramError> {
+    let mut current_cursor = LazorKitWallet::LEN;
+    let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN]) }
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    let mut remaining = wallet.role_count;
 
-    let registry_acc = registry_accounts
-        .iter()
-        .find(|acc| acc.key() == &expected_pda)
-        .ok_or_else(|| {
+    while remaining > 0 {
+        if current_cursor + Position::LEN > config_data.len() {
+            break;
+        }
+        let pos_ref = read_position(&config_data[current_cursor..])?;
+        if pos_ref.id == role_id {
+            return Ok((*pos_ref, current_cursor));
+        }
+        current_cursor = pos_ref.boundary as usize;
+        remaining -= 1;
+    }
+    Err(LazorKitError::AuthorityNotFound.into())
+}
+
+pub fn authenticate_role(
+    config_account: &AccountInfo,
+    acting_role_id: u32,
+    accounts: &[AccountInfo],
+    authorization_data: &[u8],
+    data_payload: &[u8],
+) -> ProgramResult {
+    let mut config_data = config_account.try_borrow_mut_data()?;
+    let (pos, role_abs_offset) = find_role(&config_data, acting_role_id)?;
+
+    let auth_start = role_abs_offset + Position::LEN;
+    let auth_end = auth_start + pos.authority_length as usize;
+    if auth_end > config_data.len() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    let auth_type_enum = lazorkit_state::AuthorityType::try_from(pos.authority_type)?;
+    let roles_data = &mut config_data[auth_start..auth_end];
+
+    match auth_type_enum {
+        lazorkit_state::AuthorityType::Ed25519 => {
+            let auth = unsafe { lazorkit_state::Ed25519Authority::load_mut_unchecked(roles_data)? };
+            auth.authenticate(accounts, authorization_data, data_payload, 0)?;
+        },
+        lazorkit_state::AuthorityType::Secp256r1 => {
+            let clock = pinocchio::sysvars::clock::Clock::get()?;
+            let auth =
+                unsafe { lazorkit_state::Secp256r1Authority::load_mut_unchecked(roles_data)? };
+            auth.authenticate(accounts, authorization_data, data_payload, clock.slot)?;
+        },
+        _ => {
             msg!(
-                "Registry account not provided for policy {:?}",
-                policy_program_id
+                "AuthenticateRole: Unsupported authority type {:?}",
+                auth_type_enum
             );
-            LazorKitError::UnverifiedPolicy // TODO: Rename Error Variant
-        })?;
-
-    if registry_acc.data_is_empty() {
-        msg!("Registry account empty for policy {:?}", policy_program_id);
-        return Err(LazorKitError::UnverifiedPolicy.into());
-    }
-
-    let data = registry_acc.try_borrow_data()?;
-    if data.len() < PolicyRegistryEntry::LEN {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
-    // Verify program_id matches (offset 16..48)
-    if &data[16..48] != policy_program_id.as_ref() {
-        msg!("Registry program_id mismatch");
-        return Err(ProgramError::InvalidAccountData);
-    }
-
-    // Verify is_active (offset 48)
-    let is_active = data[48] != 0;
-    if !is_active {
-        msg!("Policy deactivated: {:?}", policy_program_id);
-        return Err(LazorKitError::PolicyDeactivated.into()); // TODO: Rename Error Variant
+            return Err(ProgramError::InvalidInstructionData);
+        },
     }
 
     Ok(())

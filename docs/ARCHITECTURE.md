@@ -1,370 +1,516 @@
-# Tài liệu Kiến trúc LazorKit (Complete)
+# LazorKit Wallet Contract - Architecture v3.0.0
 
-**Phiên bản:** 2.1.0  
-**Trạng thái:** Production Ready  
-**Dựa trên:** Swig Wallet Protocol (99% logic core)
-
----
-
-## 1. Tổng quan
-
-LazorKit là smart contract wallet protocol trên Solana:
-- **Multi-signature**: Nhiều người quản lý một ví
-- **Role-Based Access Control (RBAC)**: Phân quyền chi tiết
-- **Plugin-based Permissions**: Logic bảo mật mở rộng
-- **Single-Account Storage**: Tiết kiệm rent
+**Version**: 3.0.0  
+**Last Updated**: 2026-01-20  
+**Status**: Simplified Architecture - Production Ready
 
 ---
 
-## 2. Authority Types (8 loại)
+## Overview
 
-Hệ thống hỗ trợ đầy đủ 8 loại authority từ Swig:
+LazorKit is a simplified smart contract wallet on Solana featuring **Role-Based Access Control (RBAC)** and **Session Keys**. Version 3.0.0 focuses on a clean, minimal implementation supporting only essential authority types and a straightforward permission hierarchy.
 
-### 2.1 Ed25519 (Type = 1)
-- **Mô tả:** Keypair Solana tiêu chuẩn
-- **Size:** 32 bytes
-- **Layout:**
-  ```rust
-  public_key: [u8; 32]
-  ```
-- **Auth:** Verify signer matches public_key
+### Key Features
 
-### 2.2 Ed25519Session (Type = 2)
-- **Mô tả:** Ed25519 với session key tạm thời
-- **Size:** 80 bytes
-- **Layout:**
-  ```rust
-  public_key: [u8; 32]           // Root key (Master)
-  session_key: [u8; 32]          // Current session key
-  max_session_length: u64        // Max duration (slots)
-  current_session_expiration: u64 // Expiry slot
-  ```
-- **Auth:** 
-  - Session mode: Check `slot < expiration` + verify session_key
-  - Master mode: Verify public_key directly
-
-### 2.3 Secp256k1 (Type = 3)
-- **Mô tả:** Ethereum-style keypair
-- **Size:** 40 bytes (Compressed pubkey + padding + odometer)
-- **Layout:**
-  ```rust
-  public_key: [u8; 33]           // Compressed
-  _padding: [u8; 3]
-  signature_odometer: u32
-  ```
-- **Auth:** ecrecover signature verification
-
-### 2.4 Secp256k1Session (Type = 4)
-- **Mô tả:** Secp256k1 với session
-- **Size:** 88 bytes
-- **Layout:** Similar to Ed25519Session but with compressed pubkey
-
-### 2.5 Secp256r1 (Type = 5)
-- **Mô tả:** Hardware Enclave (Apple Secure Enclave, Android StrongBox)
-- **Use case:** Passkey/WebAuthn wallets
-- **Size:** 40 bytes (Compressed pubkey + padding + odometer)
-
-### 2.6 Secp256r1Session (Type = 6)
-- **Mô tả:** Secp256r1 với session
-- **Size:** 88 bytes
-
-### 2.7 ProgramExec (Type = 7)
-- **Mô tả:** Cho phép program khác làm authority (CPI-based)
-- **Size:** 80 bytes
-- **Layout:**
-  ```rust
-  program_id: [u8; 32]              // Program phải gọi trước
-  instruction_prefix_len: u8        // Độ dài prefix cần match
-  _padding: [u8; 7]
-  instruction_prefix: [u8; 40]      // Discriminator cần match
-  ```
-- **Auth Flow:**
-  1. Kiểm tra instruction trước đó (SysvarInstructions)
-  2. Verify program_id match
-  3. Verify instruction data prefix match
-  4. Verify accounts[0,1] là config + wallet
-
-### 2.8 ProgramExecSession (Type = 8)
-- **Mô tả:** ProgramExec với session
-- **Size:** 128 bytes
+- ✅ **Role-Based Access Control**: Owner, Admin, and Spender roles
+- ✅ **Session Keys**: Temporary keys with expiration for Ed25519 and Secp256r1
+- ✅ **Multi-Authority**: Multiple signers per wallet
+- ✅ **Zero-Copy Design**: Efficient state management without serialization overhead
+- ✅ **CPI Support**: Execute transactions on behalf of the wallet
 
 ---
 
-## 3. Multi-Plugin Storage (Chi tiết)
+## 1. Authority Types
 
-A Role can attach **multiple plugins**. Data is stored sequentially in the buffer.
+LazorKit v3.0.0 supports **4 authority types** based on 2 cryptographic standards:
 
-### 3.1 Cấu trúc lưu trữ
+| Type | Code | Size | Description |
+|------|------|------|-------------|
+| **Ed25519** | 1 | 32 bytes | Standard Solana keypair |
+| **Ed25519Session** | 2 | 80 bytes | Ed25519 with session key support |
+| **Secp256r1** | 5 | 40 bytes | Passkey/WebAuthn compatible (compressed) |
+| **Secp256r1Session** | 6 | 88 bytes | Secp256r1 with session key support |
 
+### 1.1 Ed25519 Authority
+
+**Size**: 32 bytes  
+**Layout**:
 ```
-Role Data in Buffer:
-┌────────────────────────────────────────┐
-│ Position Header (16 bytes)             │
-│   authority_type: u16                  │
-│   authority_length: u16                │
-│   num_actions: u16  ← SỐ LƯỢNG PLUGINS │
-│   padding: u16                         │
-│   id: u32                              │
-│   boundary: u32                        │
-├────────────────────────────────────────┤
-│ Authority Data (variable)              │
-│   (Ed25519: 32 bytes, Session: 80 bytes) │
-├────────────────────────────────────────┤
-│ Plugin 1:                              │
-│   program_id: [u8; 32]                 │
-│   data_length: u16                     │
-│   boundary: u32                        │
-│   state_blob: [u8; data_length]        │
-├────────────────────────────────────────┤
-│ Plugin 2:                              │
-│   program_id: [u8; 32]                 │
-│   data_length: u16                     │
-│   boundary: u32                        │
-│   state_blob: [u8; data_length]        │
-├────────────────────────────────────────┤
-│ Plugin 3...                            │
-└────────────────────────────────────────┘
+[0..32]  public_key: [u8; 32]
 ```
 
-### 3.2 Plugin Header Layout (40 bytes per plugin - Aligned)
+**Authentication**: Standard Ed25519 signature verification using Solana's native `ed25519_program`.
 
-| Offset | Field | Size | Description |
-|--------|-------|------|-------------|
-| 0 | `program_id` | 32 | Plugin Program ID |
-| 32 | `data_length` | 2 | Size of state_blob |
-| 34 | `_padding` | 2 | Explicit padding for 8-byte alignment |
-| 36 | `boundary` | 4 | Offset to next plugin |
-| 40 | `state_blob` | var | Plugin Data (Opaque) |
+---
 
-### 3.3 Iterate qua plugins
+### 1.2 Ed25519Session Authority
 
+**Size**: 80 bytes  
+**Layout**:
+```
+[0..32]   master_key: [u8; 32]
+[32..64]  session_key: [u8; 32]
+[64..72]  max_session_length: u64 (slots)
+[72..80]  current_session_expiration: u64 (slot number)
+```
+
+**Authentication Flow**:
+1. Check if current slot < `current_session_expiration`
+2. If session active: verify signature with `session_key`
+3. If session expired: verify signature with `master_key`
+
+**Creating Session**:
+- Requires master key signature
+- Sets `current_session_expiration = current_slot + duration`
+- Duration must be ≤ `max_session_length`
+
+---
+
+### 1.3 Secp256r1 Authority  
+
+**Size**: 40 bytes (compressed public key + metadata)  
+**Layout**:
+```
+[0..33]   compressed_pubkey: [u8; 33]
+[33..40]  last_signature_slot: u64
+```
+
+**Authentication**: WebAuthn-style signature verification
+- Prevents signature replay via `last_signature_slot` tracking
+- Signature must be more recent than last known slot
+- Max signature age: 150 slots (~1 minute)
+
+---
+
+### 1.4 Secp256r1Session Authority
+
+**Size**: 88 bytes  
+**Layout**:
+```
+[0..33]   master_compressed_pubkey: [u8; 33]
+[33..65]  session_key: [u8; 32]
+[65..73]  max_session_length: u64
+[73..81]  current_session_expiration: u64
+[81..88]  last_signature_slot: u64
+```
+
+**Authentication**: Same as Secp256r1, with session key support
+
+---
+
+## 2. Role Storage Structure
+
+Roles are stored in a **dynamic buffer** following the wallet header. Each role consists of:
+
+```
+┌─────────────────┬──────────────────┐
+│ Position Header │ Authority Data   │
+│    (16 bytes)   │  (variable size) │
+└─────────────────┴──────────────────┘
+```
+
+### 2.1 Position Header
+
+**Size**: 16 bytes (8-byte aligned)  
+**Layout**:
 ```rust
-fn iterate_plugins(role_data: &[u8], num_actions: u16) {
-    let mut cursor = 0; // Start sau Authority Data
-    
-    for _ in 0..num_actions {
-        let program_id = &role_data[cursor..cursor+32];
-        let data_len = u16::from_le_bytes(role_data[cursor+32..cursor+34]);
-        let boundary = u32::from_le_bytes(role_data[cursor+34..cursor+38]);
-        let blob = &role_data[cursor+38..cursor+38+data_len];
-        
-        // Process plugin...
-        
-        cursor = boundary as usize; // Jump to next
-    }
+pub struct Position {
+    authority_type: u16,     // Type code (1, 2, 5, or 6)
+    authority_length: u16,   // Authority data size in bytes  
+    _padding: u32,           // For alignment
+    id: u32,                 // Role ID (0=Owner, 1=Admin, 2+=Spender)
+    boundary: u32,           // Absolute offset to next role
 }
 ```
 
----
+### 2.2 Complete Account Layout
 
-## 4. Session Key Mechanism
-
-### 4.1 Tạo Session (CreateSession)
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Core
-    
-    User->>Core: CreateSession(role_id, session_key, duration)
-    Core->>Core: Authenticate với Master Key
-    Core->>Core: Check duration <= max_session_length
-    Core->>Core: Update authority data:
-    Note over Core: session_key = new_key<br/>current_expiration = slot + duration
-    Core-->>User: Session created
+```
+┌──────────────────────┬────────────────────┬─────────────┬─────────────┐
+│ LazorKitWallet (48)  │ Role 0 (Owner)     │ Role 1 (...)│  Role N     │
+├──────────────────────┼────────────────────┼─────────────┼─────────────┤
+│ - discriminator (1)  │ Position (16)      │ ...         │ ...         │
+│ - role_count (4)     │ Authority (varies) │             │             │
+│ - role_counter (4)   │                    │             │             │
+│ - vault_bump (1)     │                    │             │             │
+│ - padding (38)       │                    │             │             │
+└──────────────────────┴────────────────────┴─────────────┴─────────────┘
 ```
 
-### 4.2 Sử dụng Session
+---
 
-```mermaid
-flowchart TD
-    A[Execute with Session Key] --> B{Check authority_type}
-    B -->|Ed25519Session| C[Get current_expiration]
-    C --> D{slot < expiration?}
-    D -->|No| E[Error: SessionExpired]
-    D -->|Yes| F[Verify session_key signature]
-    F --> G{Valid?}
-    G -->|No| H[Error: InvalidSignature]
-    G -->|Yes| I[Continue to Plugin Loop]
-```
+## 3. RBAC (Role-Based Access Control)
 
-### 4.3 Session Authority Sizes
+LazorKit uses a **3-tier permission hierarchy** based on role IDs:
 
-| Type | Size | Fields |
-|------|------|--------|
-| Ed25519Session | 80 bytes | pubkey(32) + session_key(32) + max_len(8) + expiry(8) |
-| Secp256k1Session | 88 bytes | pubkey(33)+pad(3)+odo(4) + session_key(32) + max_len(8) + expiry(8) |
-| Secp256r1Session | 88 bytes | pubkey(33)+pad(3)+odo(4) + session_key(32) + max_len(8) + expiry(8) |
-| ProgramExecSession | 128 bytes | ProgramExec(80) + session fields(48) |
+| Role ID | Name | Permissions |
+|---------|------|-------------|
+| **0** | Owner | Full control + Transfer ownership |
+| **1** | Admin | Add/remove authorities, create sessions |
+| **2+** | Spender | Execute transactions, create sessions |
+
+### 3.1 Permission Matrix
+
+| Operation | Owner (0) | Admin (1) | Spender (2+) |
+|-----------|-----------|-----------|--------------|
+| Execute transactions | ✅ | ✅ | ✅ |
+| Create session | ✅ | ✅ | ✅ |
+| Add authority | ✅ | ✅ | ❌ |
+| Remove authority | ✅ | ✅ | ❌ |
+| Update authority | ✅ | ✅ | ❌ |
+| Transfer ownership | ✅ | ❌ | ❌ |
+
+### 3.2 Anti-Lockout Protection
+
+**Cannot remove last admin**: If removing a role with `id == 1`, the contract checks that at least one other admin (`id == 1`) exists.
 
 ---
 
-## 5. Role Types (Recommended Hierarchy)
+## 4. Instructions
 
-### 5.1 Owner (Role ID = 0) - "Super Admin"
-- **Authority:** Cold Wallet (Ledger/Trezor) or Multisig.
-- **Plugins:** None (Full Power).
-- **Permissions:**
-  - Full access to all instructions.
-  - Exclusive right to `TransferOwnership` (changing Role 0).
-  - Can Add/Remove/Update any role.
+LazorKit v3.0.0 implements **7 instructions**:
 
-### 5.2 Admin (Role ID = 1) - "Manager"
-- **Authority:** Hot Wallet (Laptop/Desktop).
-- **Plugins:** `AuditLogPlugin` (optional).
-- **Permissions:**
-  - **Can:** `AddAuthority`, `RemoveAuthority`, `UpdateAuthority` for lower roles (Spender/Operator).
-  - **Cannot:** Change Owner (Role 0) or delete themselves (anti-lockout).
-  - **Cannot:** `Execute` funds directly (unless explicitly authorized).
+| Discriminator | Instruction | Description |
+|---------------|-------------|-------------|
+| 0 | CreateWallet | Initialize new wallet with Owner |
+| 1 | AddAuthority | Add new role (Owner/Admin only) |
+| 2 | RemoveAuthority | Remove existing role (Owner/Admin only) |
+| 3 | UpdateAuthority | Update authority data for existing role |
+| 4 | CreateSession | Create temporary session key |
+| 5 | Execute | Execute CPI on behalf of wallet |
+| 6 | TransferOwnership | Transfer Owner role to new authority |
 
-### 5.3 Spender (Role ID = 2...99) - "User/Mobile"
-- **Authority:** Mobile Key or Session Key.
-- **Plugins:**
-  - `SolLimitPlugin`: Daily spending limits.
-  - `WhitelistPlugin`: Approved destination addresses.
-- **Permissions:**
-  - `Execute`: Subject to plugin validation.
-  - `CreateSession`: Can create session keys for themselves.
+### 4.1 CreateWallet
 
-### 5.4 Operator (Role ID >= 100) - "Automation/Bot"
-- **Authority:** `Ed25519Session` or `ProgramExecSession` (Hot Wallet on Server).
-- **Plugins:**
-  - `ProgramWhitelist`: Restricted to specific DeFi protocols.
-- **Permissions:**
-  - `Execute`: Strictly limited automated tasks.
+**Discriminator**: 0  
+**Accounts**:
+- `[writable, signer]` Config - PDA to initialize
+- `[signer]` Payer - Fee payer
+- `[]` System Program
 
----
-## 6. Plugin Registry System ("App Store" for Plugins)
-
-LazorKit enforces security by requiring plugins to be verified before they can be added to a wallet. This prevents users from accidentally installing malicious or unverified code.
-
-### 6.1 Registry Entry PDA
-Each verified plugin has a corresponding `PluginRegistryEntry` PDA controlled by the LazorKit Protocol (Factory).
-
-- **Seeds**: `["plugin-registry", plugin_program_id]`
-- **Authority**: Protocol Admin / DAO.
-
-### 6.2 Data Structure
+**Args**:
 ```rust
-struct PluginRegistryEntry {
-    pub program_id: Pubkey,    // 32
-    pub is_active: bool,       // 1 (Can be deactivated to ban malicious plugins)
-    pub added_at: i64,         // 8
-    pub bump: u8,              // 1
+{
+    authority_type: u16,
+    authority_data: Vec<u8>,
+    id: Vec<u8>, // Unique identifier for wallet PDA
 }
 ```
 
-### 6.3 Enforcement Flow
-When `AddAuthority` or `UpdateAuthority` is called to add a plugin:
-1.  Contract derives the `PluginRegistryEntry` PDA for that plugin's Program ID.
-2.  Checks if the account exists and `is_active == true`.
-3.  If valid -> Allow addition.
-4.  If invalid -> Revert with `UnverifiedPlugin`.
-
-*(Future: Wallets can have a `developer_mode` flag to bypass this for testing purposes, but default is Secure).*
-
-## 6. Instruction Set
-
-### 6.1 CreateWallet
-- **Discriminator:** 0
-- **Accounts:** Config(W), Payer(W,S), WalletAddress(W), System
-- **Args:** `{id: [u8;32], bump: u8, wallet_bump: u8, owner_auth: [u8], owner_type: u16}`
-
-### 6.2 AddAuthority
-- **Discriminator:** 1
-- **Accounts:** Config(W,S), Payer(W,S), System
-- **Args:** `{auth_type: u16, auth_data: [u8], plugins_config: [u8]}`
-
-### 6.3 RemoveAuthority
-- **Discriminator:** 2
-- **Accounts:** Config(W,S), Payer(W,S), System
-- **Args:** `{role_id: u32}`
-
-### 6.4 UpdateAuthority
-- **Discriminator:** 3
-- **Accounts:** Config(W,S), Payer(W,S), System
-- **Args:** `{target_role_id: u32, operation: u8, payload: [u8]}`
-- **Operations:** 0=ReplaceAll, 1=AddPlugins, 2=RemoveByType, 3=RemoveByIndex
-
-### 6.5 CreateSession
-- **Discriminator:** 4
-- **Accounts:** Config(W,S), Payer(W,S), System
-- **Args:** `{role_id: u32, session_key: [u8;32], duration: u64}`
-
-### 6.6 Execute
-- **Discriminator:** 5
-- **Accounts:** Config(W), WalletAddress(W,S), System, TargetProgram, ...TargetAccounts
-- **Args:** `{role_id: u32, instruction_payload: [u8]}`
-- **Payload Format:**
-  ```
-  [0]: signer_index (u8) - Index of the signer account in the transaction
-  [1..]: target_instruction_data (Variable)
-  ```
-
-### 6.7 TransferOwnership
-- **Discriminator:** 6
-- **Accounts:** Config(W,S), Payer(S)
-- **Args:** `{new_owner_auth: [u8], new_owner_type: u16}`
+**Description**: Creates a new wallet with the first authority as Owner (role ID 0).
 
 ---
 
-## 7. Execute Flow (Bounce Pattern)
+### 4.2 AddAuthority
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Core as LazorKit Core
-    participant P1 as SolLimitPlugin
-    participant P2 as WhitelistPlugin
-    participant Target as Target Program
-    
-    User->>Core: Execute(role_id=3, payload=[idx, data])
-    
-    Note over Core: 1. Authentication
-    Core->>Core: Load Role 3
-    Core->>Core: Verify accounts[idx] matches Authority
-    Core->>Core: Check session expiry (if session)
-    
-    Note over Core: 2. Plugin Bounce Loop
-    Core->>Core: Load num_actions=2
-    
-    Core->>P1: CPI Verify(ctx, blob1)
-    Note over P1: spent=2, limit=10<br/>2+5=7 <= 10 ✓
-    P1-->>Core: new_blob1 (spent=7)
-    Core->>Core: Update blob1 in buffer
-    
-    Core->>P2: CPI Verify(ctx, blob2)
-    Note over P2: Check recipient<br/>in whitelist ✓
-    P2-->>Core: new_blob2 (unchanged)
-    Core->>Core: Update blob2 in buffer
-    
-    Note over Core: 3. Execute Payload
-    Core->>Target: CPI invoke_signed(data)
-    Target-->>Core: Success
-    Core-->>User: Transaction complete
+**Discriminator**: 1  
+**Accounts**:
+- `[writable, signer]` Config
+- `[signer]` Payer
+- `[]` System Program
+
+**Args**:
+```rust
+{
+    acting_role_id: u32,
+    new_authority_type: u16,
+    new_authority_data: Vec<u8>,
+    authorization_data: Vec<u8>,
+}
+```
+
+**Permission**: Owner (0) or Admin (1) only
+
+---
+
+### 4.3 RemoveAuthority
+
+**Discriminator**: 2  
+**Accounts**: Same as AddAuthority
+
+**Args**:
+```rust
+{
+    acting_role_id: u32,
+    target_role_id: u32,
+    authorization_data: Vec<u8>,
+}
+```
+
+**Permission**: Owner (0) or Admin (1) only  
+**Restrictions**:
+- Cannot remove Owner (role 0)
+- Cannot remove last Admin (if target has id==1)
+
+---
+
+### 4.4 UpdateAuthority
+
+**Discriminator**: 3  
+**Accounts**: Same as AddAuthority
+
+**Args**:
+```rust
+{
+    acting_role_id: u32,
+    target_role_id: u32,
+    new_authority_data: Vec<u8>,
+    authorization_data: Vec<u8>,
+}
+```
+
+**Permission**: Owner (0) or Admin (1) only  
+**Use Case**: Rotate keys, update session limits without removing/re-adding role
+
+---
+
+### 4.5 CreateSession
+
+**Discriminator**: 4  
+**Accounts**:
+- `[writable, signer]` Config
+- `[signer]` Payer
+- `[]` System Program
+
+**Args**:
+```rust
+{
+    role_id: u32,
+    session_key: [u8; 32],
+    duration: u64, // in slots
+    authorization_data: Vec<u8>,
+}
+```
+
+**Permission**: Any role (must authenticate with master key)  
+**Requirement**: Authority type must support sessions (Ed25519Session or Secp256r1Session)
+
+---
+
+### 4.6 Execute
+
+**Discriminator**: 5  
+**Accounts**:
+- `[writable, signer]` Config
+- `[]` Vault (wallet PDA)
+- `[...]` Remaining accounts passed to target program
+
+**Args**:
+```rust
+{
+    role_id: u32,
+    target_program: Pubkey,
+    data: Vec<u8>,          // Instruction data for target
+    account_metas: Vec<u8>, // Serialized AccountMeta list
+    authorization_data: Vec<u8>,
+}
+```
+
+**Permission**: All roles  
+**Description**: Executes Cross-Program Invocation (CPI) with Vault as signer
+
+---
+
+### 4.7 TransferOwnership
+
+**Discriminator**: 6  
+**Accounts**:
+- `[writable, signer]` Config
+- `[signer]` Owner (current role 0)
+
+**Args**:
+```rust
+{
+    new_owner_authority_type: u16,
+    new_owner_authority_data: Vec<u8>,
+    auth_payload: Vec<u8>,
+}
+```
+
+**Permission**: Owner (0) only  
+**Restriction**: New authority size must match current Owner size (no data migration)
+
+---
+
+## 5. PDA Derivation
+
+### 5.1 Config Account
+
+**Seeds**: `["lazorkit", id]`
+
+```rust
+let (config_pda, bump) = Pubkey::find_program_address(
+    &[b"lazorkit", id.as_bytes()],
+    &program_id
+);
+```
+
+### 5.2 Vault Account (Wallet Address)
+
+**Seeds**: `["lazorkit-wallet-address", config_pubkey]`
+
+```rust
+let (vault_pda, vault_bump) = Pubkey::find_program_address(
+    &[b"lazorkit-wallet-address", config_pda.as_ref()],
+    &program_id
+);
+```
+
+The `vault_bump` is stored in `LazorKitWallet.vault_bump` for efficient re-derivation.
+
+---
+
+## 6. Error Codes
+
+### Authentication Errors (3000+)
+
+| Code | Error | Description |
+|------|-------|-------------|
+| 3000 | InvalidAuthority | Invalid or missing authority |
+| 3001 | InvalidAuthorityPayload | Malformed signature data |
+| 3014 | PermissionDeniedSessionExpired | Session key expired |
+| 3034 | InvalidSessionDuration | Duration exceeds max_session_length |
+
+### State Errors (1000+)
+
+| Code | Error | Description |
+|------|-------|-------------|
+| 1000 | InvalidAccountData | Corrupted account data |
+| 1002 | InvalidAuthorityData | Malformed authority structure |
+| 1004 | RoleNotFound | Role ID does not exist |
+
+---
+
+## 7. Zero-Copy Design
+
+LazorKit uses **zero-copy** techniques for performance:
+
+- No Borsh serialization/deserialization after initialization
+- Direct byte manipulation via `load_unchecked()` and `load_mut_unchecked()`
+- In-place updates to account data
+- Fixed-size headers with variable-length authority sections
+
+**Example**:
+```rust
+// Load authority data directly from account slice
+let auth = unsafe { 
+    Ed25519Authority::load_mut_unchecked(&mut data[offset..offset+32])? 
+};
+auth.authenticate(accounts, signature, payload, slot)?;
 ```
 
 ---
 
-## 8. Plugin Interface
+## 8. Security Considerations
 
-### Input (CPI Data)
+### 8.1 Signature Replay Protection
+
+**Secp256r1/Secp256r1Session**:
+- Tracks `last_signature_slot` to prevent reuse
+- Enforces max signature age (150 slots)
+
+**Ed25519/Ed25519Session**:
+- Uses Solana's native Ed25519 program with SigVerify checks
+- Implicit replay protection via instruction sysvar
+
+### 8.2 Session Security
+
+- Sessions require master key signature to create
+- Automatic expiration via slot number comparison
+- Falls back to master key when session expires
+- Cannot extend session without master key
+
+### 8.3 Permission Isolation
+
+- Role-based checks in every operation
+- Cannot escalate privileges (Spender → Admin)
+- Owner transfer requires explicit signature
+- Anti-lockout via last-admin protection
+
+---
+
+## 9. Upgrade from v2.x
+
+Version 3.0.0 is a **breaking change** from v2.x. Key differences:
+
+| Feature | v2.x | v3.0.0 |
+|---------|------|--------|
+| Authority types | 8 types | 4 types (Ed25519, Secp256r1 + sessions) |
+| RBAC | Plugin/policy-based | Simple role ID hierarchy |
+| Permissions | Action-based | Role-based |
+| Plugin system | ✅ | ❌ (Removed) |
+| Multisig | ✅ | ❌ (Use multiple admins instead) |
+
+**Migration**: Not supported. Deploy new wallet and transfer assets.
+
+---
+
+## 10. Examples
+
+### Creating Wallet with Ed25519
+
 ```rust
-[0]: Discriminator = 0 (Verify)
-[1..]: VerificationContext (Borsh)
-       wallet_pubkey: Pubkey
-       authority_pubkey: Pubkey
-       role_id: u32
-       slot: u64
-       instruction_data: Vec<u8>
-[...]: current_state_blob
+let authority_data = owner_keypair.pubkey().to_bytes();
+let id = b"my-wallet".to_vec();
+
+let ix = LazorKitInstruction::CreateWallet {
+    authority_type: 1, // Ed25519
+    authority_data: authority_data.to_vec(),
+    id,
+};
 ```
 
-### Output
+### Adding Admin Role
+
 ```rust
-sol_set_return_data(&new_state_blob);
+let ix = LazorKitInstruction::AddAuthority {
+    acting_role_id: 0, // Owner
+    new_authority_type: 2, // Ed25519Session
+    new_authority_data: admin_data,
+    authorization_data: owner_signature,
+};
 ```
 
-### Error Handling
-- Plugin returns `Err(...)` → Whole transaction reverts
-- Plugin returns `Ok(())` + return_data → Continue to next plugin
+### Executing Transaction
+
+```rust
+let ix = LazorKitInstruction::Execute {
+    role_id: 2, // Spender
+    target_program: spl_token::id(),
+    data: transfer_instruction_data,
+    account_metas: serialized_accounts,
+    authorization_data: spender_signature,
+};
+```
+
+---
+
+## Appendix A: Authority Data Formats
+
+### Ed25519 Creation Data
+```
+[32 bytes] public_key
+```
+
+### Ed25519Session Creation Data
+```
+[32 bytes] master_public_key
+[32 bytes] initial_session_key
+[8 bytes]  max_session_length (u64)
+```
+
+### Secp256r1 Creation Data
+```
+[33 bytes] compressed_public_key
+```
+
+### Secp256r1Session Creation Data
+```
+[33 bytes] master_compressed_public_key
+[32 bytes] initial_session_key
+[8 bytes]  max_session_length (u64)
+```
+
+---
+
+**End of Architecture Document**

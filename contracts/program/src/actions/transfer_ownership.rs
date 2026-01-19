@@ -1,11 +1,21 @@
 //! TransferOwnership instruction handler
 
 use lazorkit_state::{
-    authority::authority_type_to_length, read_position, AuthorityType, LazorKitWallet, Position,
-    Transmutable, TransmutableMut,
+    authority::{
+        authority_type_to_length,
+        ed25519::{Ed25519Authority, Ed25519SessionAuthority},
+        secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority},
+        AuthorityInfo, AuthorityType,
+    },
+    read_position, LazorKitWallet, Position, Transmutable, TransmutableMut,
 };
 use pinocchio::{
-    account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+    account_info::AccountInfo,
+    msg,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    sysvars::{clock::Clock, Sysvar},
+    ProgramResult,
 };
 
 use crate::error::LazorKitError;
@@ -15,6 +25,7 @@ pub fn process_transfer_ownership(
     accounts: &[AccountInfo],
     new_owner_authority_type: u16,
     new_owner_authority_data: Vec<u8>,
+    auth_payload: Vec<u8>,
 ) -> ProgramResult {
     let mut account_info_iter = accounts.iter();
     let config_account = account_info_iter
@@ -46,61 +57,87 @@ pub fn process_transfer_ownership(
     // Find Role 0 (Owner)
     let role_buffer = &mut config_data[LazorKitWallet::LEN..];
 
-    // Read current owner position using Zero-Copy helper (assuming read_position is efficient/zero-copy safe)
-    // read_position should be updated to use load_unchecked if it's not already.
-    // Assuming read_position takes slice and returns Position.
+    // Read current owner position
     let current_pos = read_position(role_buffer)?;
     if current_pos.id != 0 {
         msg!("First role is not Owner");
         return Err(LazorKitError::InvalidWalletAccount.into());
     }
 
-    // Check if size changes
+    // Copy values from current_pos to avoid borrow checker conflicts
     let current_auth_len = current_pos.authority_length as usize;
-
-    // Verify signer matches current owner authority
     let current_auth_type = AuthorityType::try_from(current_pos.authority_type)?;
-    let current_auth_data = &role_buffer[Position::LEN..Position::LEN + current_auth_len];
+    let current_boundary = current_pos.boundary;
 
-    match current_auth_type {
-        AuthorityType::Ed25519 | AuthorityType::Ed25519Session => {
-            // First 32 bytes are the public key
-            let expected_pubkey = &current_auth_data[..32];
-            if owner_account.key().as_ref() != expected_pubkey {
-                msg!("Signer does not match current owner");
-                return Err(ProgramError::MissingRequiredSignature);
-            }
-        },
-        _ => {
-            // TransferOwnership currently only supports Ed25519 authorities
-            // Other types (Secp256k1/r1/ProgramExec) require signature payload
-            // which is not included in the current instruction format
-            msg!(
-                "TransferOwnership only supports Ed25519 authorities (current type: {:?})",
-                current_auth_type
-            );
-            return Err(LazorKitError::InvalidInstruction.into());
-        },
+    // Get current slot for session expiration checks
+    // Get current slot for session expiration checks
+    let slot = Clock::get()?.slot;
+
+    // Authenticate using the same pattern as Execute
+    // IMPORTANT: Scope this block to drop the mutable borrow before accessing role_buffer again
+    {
+        let authority_data_slice =
+            &mut role_buffer[Position::LEN..Position::LEN + current_auth_len];
+
+        // Define auth payloads based on type
+        // Ed25519: authority_payload = [index], data_payload = [ignored]
+        // Secp256r1: authority_payload = [sig_struct], data_payload = [new_owner_data]
+        let (auth_p1, auth_p2) = match current_auth_type {
+            AuthorityType::Ed25519 | AuthorityType::Ed25519Session => {
+                if !auth_payload.is_empty() {
+                    auth_payload.split_at(1)
+                } else {
+                    (&[] as &[u8], &[] as &[u8])
+                }
+            },
+            AuthorityType::Secp256r1 | AuthorityType::Secp256r1Session => {
+                (auth_payload.as_slice(), new_owner_authority_data.as_slice())
+            },
+            _ => {
+                if !auth_payload.is_empty() {
+                    auth_payload.split_at(1)
+                } else {
+                    (&[] as &[u8], &[] as &[u8])
+                }
+            },
+        };
+
+        // Macro to simplify auth calls (reused from execute.rs)
+        macro_rules! authenticate_auth {
+            ($auth_type:ty) => {{
+                let mut auth = unsafe { <$auth_type>::load_mut_unchecked(authority_data_slice) }
+                    .map_err(|_| ProgramError::InvalidAccountData)?;
+                if auth.session_based() {
+                    auth.authenticate_session(accounts, auth_p1, auth_p2, slot)?;
+                } else {
+                    auth.authenticate(accounts, auth_p1, auth_p2, slot)?;
+                }
+            }};
+        }
+
+        match current_auth_type {
+            AuthorityType::Ed25519 => authenticate_auth!(Ed25519Authority),
+            AuthorityType::Ed25519Session => authenticate_auth!(Ed25519SessionAuthority),
+            AuthorityType::Secp256r1 => authenticate_auth!(Secp256r1Authority),
+            AuthorityType::Secp256r1Session => authenticate_auth!(Secp256r1SessionAuthority),
+            _ => return Err(ProgramError::InvalidInstructionData),
+        }
     }
+    // Mutable borrow of authority_data_slice has been dropped here
 
     if new_auth_len != current_auth_len {
         msg!(
             "Authority size change not supported yet (old={}, new={})",
             current_auth_len,
-            new_auth_len
+            new_auth_len,
         );
         return Err(LazorKitError::InvalidInstruction.into());
     }
 
-    // Update Position header (Zero-Copy)
-    let new_pos = Position {
-        authority_type: new_owner_authority_type,
-        authority_length: new_auth_len as u16,
-        num_policies: current_pos.num_policies,
-        padding: 0,
-        id: 0,
-        boundary: current_pos.boundary,
-    };
+    // Create new position with updated authority type
+    // Note: We can't change size here since that requires data migration
+    let mut new_pos = Position::new(new_auth_type, new_auth_len as u16, 0);
+    new_pos.boundary = current_boundary;
 
     // Unsafe cast to mutable reference to write
     let pos_ref = unsafe { Position::load_mut_unchecked(&mut role_buffer[..Position::LEN])? };

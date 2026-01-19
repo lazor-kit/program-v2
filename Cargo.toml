@@ -3,14 +3,9 @@ resolver = "2"
 members = [
     "contracts/program",
     "contracts/state",
-    "contracts/interface",
     "contracts/no-padding",
     "contracts/assertions",
     "sdk/lazorkit-sdk",
-    "contracts/policies/sol-limit",
-    "contracts/policies/whitelist",
-    "sdk/policies/sol-limit",
-    "sdk/policies/whitelist",
 ]
 exclude = ["tests"]
 
