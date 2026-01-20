@@ -326,20 +326,23 @@ impl<'a> ExecuteBuilder<'a> {
         // Config(0), Vault(1), System(2) are prepended.
         // If auth_payload is provided, it replaces the Proxy index.
         let final_auth_idx = if !self.auth_payload.is_empty() {
-            self.auth_payload[0]
+            // Should be full payload for Secp256r1, or index for Ed25519
+            // But builder here seems focused on Ed25519/Simple cases where auth_payload IS the payload.
+            // If self.auth_payload is set, use it.
+            // NOTE: If using Secp256r1 builder, caller should have provided full formatted payload.
+            // For simple Signer, we usually just need index.
+            self.auth_payload.clone()
         } else {
-            3 + proxy_auth_idx
+            vec![3 + proxy_auth_idx]
         };
-
-        let mut full_payload = vec![final_auth_idx];
-        full_payload.extend(target_data);
 
         let ix = instructions::execute(
             &self.wallet.program_id,
             &self.wallet.config_pda,
             &self.wallet.address,
             self.acting_role,
-            full_payload,
+            target_data,
+            final_auth_idx,
             accounts,
         );
 
@@ -590,6 +593,7 @@ pub struct TransferOwnershipBuilder<'a> {
     current_owner: Option<Pubkey>,
     new_owner_type: AuthorityType,
     new_owner_data: Option<Vec<u8>>,
+    authorization_data: Vec<u8>,
 }
 
 impl<'a> TransferOwnershipBuilder<'a> {
@@ -599,6 +603,7 @@ impl<'a> TransferOwnershipBuilder<'a> {
             current_owner: None,
             new_owner_type: AuthorityType::Ed25519,
             new_owner_data: None,
+            authorization_data: Vec::new(),
         }
     }
 
@@ -613,9 +618,15 @@ impl<'a> TransferOwnershipBuilder<'a> {
         self
     }
 
+    pub fn with_authorization_data(mut self, data: Vec<u8>) -> Self {
+        self.authorization_data = data;
+        self
+    }
+
     pub async fn build_transaction(
         &self,
         connection: &impl SolConnection,
+        payer: Pubkey,
     ) -> Result<Transaction, String> {
         let current_owner = self.current_owner.ok_or("Current owner required")?;
         let new_owner_data = self
@@ -629,6 +640,7 @@ impl<'a> TransferOwnershipBuilder<'a> {
             &current_owner,
             self.new_owner_type as u16,
             new_owner_data,
+            self.authorization_data.clone(),
         );
 
         let _recent_blockhash = connection
@@ -636,7 +648,7 @@ impl<'a> TransferOwnershipBuilder<'a> {
             .await
             .map_err(|e| e.to_string())?;
         Ok(Transaction::new_unsigned(
-            solana_sdk::message::Message::new(&[ix], Some(&current_owner)),
+            solana_sdk::message::Message::new(&[ix], Some(&payer)),
         ))
     }
 }

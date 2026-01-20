@@ -1,7 +1,7 @@
 //! Ed25519 authority implementation.
 //!
 //! This module provides implementations for Ed25519-based authority types in
-//! the Swig wallet system. It includes both standard Ed25519 authority and
+//! the LazorKit wallet system. It includes both standard Ed25519 authority and
 //! session-based Ed25519 authority with expiration support.
 
 use core::any::Any;

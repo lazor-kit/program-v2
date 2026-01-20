@@ -96,8 +96,15 @@ pub fn process_instruction(
 
         LazorKitInstruction::Execute {
             role_id,
-            instruction_payload,
-        } => actions::process_execute(program_id, accounts, role_id, &instruction_payload),
+            instruction_payload_len,
+            payload,
+        } => actions::process_execute(
+            program_id,
+            accounts,
+            role_id,
+            instruction_payload_len,
+            &payload,
+        ),
 
         LazorKitInstruction::TransferOwnership {
             new_owner_authority_type,

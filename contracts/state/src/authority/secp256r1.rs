@@ -1,7 +1,7 @@
 //! Secp256r1 authority implementation for passkey support.
 //!
 //! This module provides implementations for Secp256r1-based authority types in
-//! the Swig wallet system, designed to work with passkeys. It
+//! the LazorKit wallet system, designed to work with passkeys. It
 //! includes both standard Secp256r1 authority and session-based Secp256r1
 //! authority with expiration support. The implementation relies on the Solana
 //! secp256r1 precompile program for signature verification.
@@ -134,14 +134,33 @@ impl IntoBytes for CreateSecp256r1SessionAuthority {
 ///
 /// This struct represents a Secp256r1 authority with a compressed public key
 /// for signature verification using the Solana secp256r1 precompile program.
+///
+/// # Replay Protection
+///
+/// Uses **dual-layer** replay protection following LazorKit security model:
+///
+/// 1. **Counter-based sequencing** (`signature_odometer`):
+///    - Each signature must increment the counter by exactly 1
+///    - Prevents replay attacks even within the same slot
+///    - Enables safe transaction batching
+///    - More robust than slot-only tracking
+///
+/// 2. **Slot age validation**:
+///    - Signature must be within 60 slots (~30 seconds) of current slot
+///    - Prevents use of very old signatures
+///    - Guards against long-term replay attacks
+///
+/// This combination provides defense-in-depth: counter prevents immediate replay,
+/// while slot age check prevents old signature reuse.
 #[derive(Debug, no_padding::NoPadding)]
 #[repr(C, align(8))]
 pub struct Secp256r1Authority {
     /// The compressed Secp256r1 public key (33 bytes)
     pub public_key: [u8; 33],
-    /// Padding for u32 alignment
+    /// Padding for 8-byte alignment
     _padding: [u8; 3],
-    /// Signature counter to prevent signature replay attacks
+    /// Signature counter for replay protection. Must increment by 1 with each signature.
+    /// Provides 4.2 billion signatures before wrapping (u32::MAX).
     pub signature_odometer: u32,
 }
 

@@ -75,12 +75,18 @@ pub fn execute(
     config: &Pubkey,
     vault: &Pubkey,
     acting_role_id: u32,
-    payload: Vec<u8>,
+    instruction_payload: Vec<u8>,
+    auth_payload: Vec<u8>,
     account_metas: Vec<AccountMeta>,
 ) -> Instruction {
+    let instruction_payload_len = instruction_payload.len() as u16;
+    let mut payload = instruction_payload;
+    payload.extend(auth_payload);
+
     let instruction = LazorKitInstruction::Execute {
         role_id: acting_role_id,
-        instruction_payload: payload,
+        instruction_payload_len,
+        payload,
     };
 
     let mut accounts = vec![
@@ -192,28 +198,28 @@ pub fn create_session(
 /// Creates a transfer ownership instruction
 ///
 /// NOTE: This helper currently only supports Ed25519 authorities where the signer
-/// is provided directly in accounts. For Secp256k1/r1/ProgramExec, you'll need to
-/// construct the auth_payload manually with proper signatures.
+/// is provided directly in accounts. For Secp256r1 authorities, you'll need to
+/// construct the auth_payload manually with proper signatures and counter.
 ///
 /// # Arguments
 /// * `program_id` - LazorKit program ID
 /// * `config` - Config account pubkey
 /// * `current_owner` - Current owner (signer)
-/// * `new_owner_type` - Type ID (1-8) for new authority
-/// * `new_owner_data` - Authority data bytes
+/// * `new_owner_type` - Authority type code (1=Ed25519, 2=Ed25519Session, 5=Secp256r1, 6=Secp256r1Session)
+/// * `new_owner_data` - Authority data bytes (size must match current owner's authority size)
+/// * `auth_payload` - Authorization payload (empty for Ed25519 signer, or formatted for Secp256r1)
 pub fn transfer_ownership(
     program_id: &Pubkey,
     config: &Pubkey,
     current_owner: &Pubkey,
     new_owner_type: u16,
     new_owner_data: Vec<u8>,
+    auth_payload: Vec<u8>,
 ) -> Instruction {
     let instruction = LazorKitInstruction::TransferOwnership {
         new_owner_authority_type: new_owner_type,
         new_owner_authority_data: new_owner_data,
-        // For Ed25519, auth_payload can be empty as signer is verified via is_signer()
-        // For other auth types, caller needs to provide proper signature payload
-        auth_payload: vec![],
+        auth_payload,
     };
 
     let accounts = vec![

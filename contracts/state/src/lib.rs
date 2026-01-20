@@ -1,7 +1,6 @@
 //! LazorKit State Module
 //!
 //! This module defines the core state structures for the LazorKit smart wallet.
-//! Implements the Swig-compatible architecture with Plugin-based permissions.
 
 pub mod authority;
 pub mod builder;
@@ -98,7 +97,6 @@ impl IntoBytes for LazorKitWallet {
 }
 
 /// Position header for a Role in the dynamic buffer.
-/// This matches Swig's Position structure.
 ///
 /// Memory layout (16 bytes):
 /// - authority_type: u16 (2 bytes)
