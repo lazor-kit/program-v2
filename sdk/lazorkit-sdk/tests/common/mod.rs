@@ -19,7 +19,7 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new() -> Self {
-        let mut program_test = ProgramTest::new(
+        let program_test = ProgramTest::new(
             "lazorkit_program",
             lazorkit_program::id().into(),
             None, // processor is None because we're loading the .so or using BPF loader
@@ -78,7 +78,7 @@ impl SolConnection for TestContext {
         &self,
         pubkey: &Pubkey,
     ) -> Result<Option<Account>, Box<dyn std::error::Error + Send + Sync>> {
-        let mut client = self.get_client().await;
+        let client = self.get_client().await;
         client
             .get_account(*pubkey)
             .await

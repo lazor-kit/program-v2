@@ -116,8 +116,12 @@ pub enum LazorKitInstruction {
     Execute {
         /// Role ID executing this operation
         role_id: u32,
-        /// Serialized instruction payload to execute
-        instruction_payload: Vec<u8>,
+        /// Length of the instruction payload (u16)
+        /// Distinguishes between instruction data and authority payload
+        instruction_payload_len: u16,
+        /// Serialized instruction payload to execute + Authority Payload
+        /// Format: [Instruction Payload (len bytes)] + [Authority Payload (remainder)]
+        payload: Vec<u8>,
     },
 
     /// Transfer ownership to a new owner

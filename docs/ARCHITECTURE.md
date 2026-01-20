@@ -68,18 +68,17 @@ LazorKit v3.0.0 supports **4 authority types** based on 2 cryptographic standard
 
 ### 1.3 Secp256r1 Authority  
 
-**Size**: 40 bytes (compressed public key + metadata)  
+**Size**: 40 bytes (compressed public key + padding + counter)  
 **Layout**:
 ```
 [0..33]   compressed_pubkey: [u8; 33]
-[33..40]  last_signature_slot: u64
+[33..36]  _padding: [u8; 3]           // 8-byte alignment
+[36..40]  signature_odometer: u32     // Replay protection counter
 ```
 
-**Authentication**: WebAuthn-style signature verification
-- Prevents signature replay via `last_signature_slot` tracking
-- Signature must be more recent than last known slot
-- Max signature age: 150 slots (~1 minute)
-
+**Authentication**: WebAuthn-style signature verification with dual-layer replay protection
+- **Counter-based**: Each signature must increment `signature_odometer` by exactly 1
+- **Slot age validation**: Signature must be within 60 slots (~30 seconds) of current slot
 ---
 
 ### 1.4 Secp256r1Session Authority
@@ -88,13 +87,17 @@ LazorKit v3.0.0 supports **4 authority types** based on 2 cryptographic standard
 **Layout**:
 ```
 [0..33]   master_compressed_pubkey: [u8; 33]
-[33..65]  session_key: [u8; 32]
-[65..73]  max_session_length: u64
-[73..81]  current_session_expiration: u64
-[81..88]  last_signature_slot: u64
+[33..36]  _padding: [u8; 3]           // 8-byte alignment
+[36..40]  signature_odometer: u32     // Replay protection counter
+[40..72]  session_key: [u8; 32]
+[72..80]  max_session_age: u64        // Maximum allowed session duration
+[80..88]  current_session_expiration: u64  // Slot when session expires
 ```
 
-**Authentication**: Same as Secp256r1, with session key support
+**Authentication**: Dual-mode authentication with session support
+- **Master key mode**: Uses `master_compressed_pubkey` with Secp256r1 verification (counter + slot age)
+- **Session mode**: Uses `session_key` with Ed25519 verification (when session active)
+- Session automatically expires when `current_slot > current_session_expiration`
 
 ---
 
@@ -510,6 +513,71 @@ let ix = LazorKitInstruction::Execute {
 [32 bytes] initial_session_key
 [8 bytes]  max_session_length (u64)
 ```
+
+---
+
+## Appendix B: Replay Protection Mechanisms
+
+LazorKit implements multiple layers of replay protection depending on the authority type.
+
+### Ed25519 and Ed25519Session
+
+**Native Solana Protection**:
+- Ed25519 signatures leverage Solana's native signature verification
+- Implicit replay protection via the Instructions sysvar
+- Transaction signatures are automatically validated by the runtime
+- No additional counters or slot tracking needed
+
+**Session Key**: When a session is active, the temporary Ed25519 session key is used instead of the master key, with automatic expiration based on slot numbers.
+
+### Secp256r1 and Secp256r1Session
+
+**Dual-Layer Protection**:
+
+1. **Counter-Based Sequencing** (`signature_odometer: u32`)
+   - Each signature must increment the counter by exactly 1
+   - Prevents replay attacks even within the same slot
+   - Enables safe transaction batching
+   - Provides 4.2 billion signatures before wrapping
+   - Client can predict the next required counter value
+
+2. **Slot Age Validation**
+   - Signature must be created within 60 slots of current slot
+   - Provides ~30 second window (at 400ms per slot)
+   - Prevents use of very old signatures
+   - Guards against long-term replay attacks
+
+**Why Counter-Based?**
+
+Counter-based replay protection is superior to slot-only tracking:
+
+✅ **Prevents intra-slot replays**: Multiple transactions in the same slot are safe  
+✅ **Predictable behavior**: Client knows exact next counter value  
+✅ **Works with batching**: Can safely batch multiple operations  
+✅ **No clock skew**: Not affected by validator clock differences  
+
+**Slot-only tracking issues**:
+- ❌ Vulnerable to replay within same slot
+- ❌ Clock synchronization problems across validators
+- ❌ Harder to implement safe transaction batching
+- ❌ Race conditions in multi-signature scenarios
+
+**Combined Approach**: Using both counter AND slot age provides:
+- Short-term protection: Counter prevents immediate replay
+- Long-term protection: Slot age prevents old signature reuse
+- Defense in depth: Two independent verification layers
+
+### Security Properties
+
+| Property | Ed25519 | Secp256r1 |
+|----------|---------|-----------|
+| Replay protection | Native runtime | Counter + Slot |
+| Batching support | ✅ | ✅ |
+| Clock independent | ✅ | Partial* |
+| Signature limit | Unlimited | 4.2B per authority |
+| Verification cost | Low (native) | Medium (precompile) |
+
+\* Slot age check requires synchronized clocks, but counter ensures safety even with skew
 
 ---
 

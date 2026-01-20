@@ -111,51 +111,106 @@ fn parse_role_info(position: Position, auth_data: &[u8]) -> Result<RoleInfo> {
         ed25519_pubkey,
         secp256r1_pubkey,
         has_session_support,
+        session_key,
         max_session_length,
+        max_session_age,
         current_session_expiration,
+        signature_odometer,
     ) = match auth_type {
         AuthorityType::Ed25519 => {
+            // Layout: [0..32] public_key
             if auth_data.len() >= 32 {
                 let mut pubkey = [0u8; 32];
                 pubkey.copy_from_slice(&auth_data[..32]);
-                (Some(pubkey), None, false, None, None)
+                (Some(pubkey), None, false, None, None, None, None, None)
             } else {
-                (None, None, false, None, None)
+                (None, None, false, None, None, None, None, None)
             }
         },
         AuthorityType::Ed25519Session => {
+            // Layout: [0..32] master_key, [32..64] session_key,
+            //         [64..72] max_session_length, [72..80] current_session_expiration
             if auth_data.len() >= 80 {
                 let mut master_key = [0u8; 32];
                 master_key.copy_from_slice(&auth_data[..32]);
 
+                let mut sess_key = [0u8; 32];
+                sess_key.copy_from_slice(&auth_data[32..64]);
+
                 let max_len = u64::from_le_bytes(auth_data[64..72].try_into().unwrap());
                 let exp = u64::from_le_bytes(auth_data[72..80].try_into().unwrap());
 
-                (Some(master_key), None, true, Some(max_len), Some(exp))
+                (
+                    Some(master_key),
+                    None,
+                    true,
+                    Some(sess_key),
+                    Some(max_len),
+                    None,
+                    Some(exp),
+                    None,
+                )
             } else {
-                (None, None, true, None, None)
+                (None, None, true, None, None, None, None, None)
             }
         },
         AuthorityType::Secp256r1 => {
-            if auth_data.len() >= 33 {
+            // Layout: [0..33] compressed_pubkey, [33..36] _padding, [36..40] signature_odometer
+            if auth_data.len() >= 40 {
                 let mut pubkey = [0u8; 33];
                 pubkey.copy_from_slice(&auth_data[..33]);
-                (None, Some(pubkey), false, None, None)
+
+                // Parse signature_odometer at [36..40] (skip padding [33..36])
+                let odometer = u32::from_le_bytes(auth_data[36..40].try_into().unwrap());
+
+                (
+                    None,
+                    Some(pubkey),
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(odometer),
+                )
             } else {
-                (None, None, false, None, None)
+                (None, None, false, None, None, None, None, None)
             }
         },
         AuthorityType::Secp256r1Session => {
-            if auth_data.len() >= 73 {
+            // Layout: [0..33] master_compressed_pubkey, [33..36] _padding,
+            //         [36..40] signature_odometer, [40..72] session_key,
+            //         [72..80] max_session_age, [80..88] current_session_expiration
+            if auth_data.len() >= 88 {
+                // Parse master key [0..33]
                 let mut master_key = [0u8; 33];
                 master_key.copy_from_slice(&auth_data[..33]);
 
-                let max_len = u64::from_le_bytes(auth_data[65..73].try_into().unwrap());
-                let exp = u64::from_le_bytes(auth_data[73..81].try_into().unwrap());
+                // Parse signature_odometer [36..40] (skip padding [33..36])
+                let odometer = u32::from_le_bytes(auth_data[36..40].try_into().unwrap());
 
-                (None, Some(master_key), true, Some(max_len), Some(exp))
+                // Parse session_key [40..72]
+                let mut sess_key = [0u8; 32];
+                sess_key.copy_from_slice(&auth_data[40..72]);
+
+                // Parse max_session_age [72..80]
+                let max_age = u64::from_le_bytes(auth_data[72..80].try_into().unwrap());
+
+                // Parse expiration [80..88]
+                let exp = u64::from_le_bytes(auth_data[80..88].try_into().unwrap());
+
+                (
+                    None,
+                    Some(master_key),
+                    true,
+                    Some(sess_key),
+                    None,
+                    Some(max_age),
+                    Some(exp),
+                    Some(odometer),
+                )
             } else {
-                (None, None, true, None, None)
+                (None, None, true, None, None, None, None, None)
             }
         },
         _ => {
@@ -172,8 +227,11 @@ fn parse_role_info(position: Position, auth_data: &[u8]) -> Result<RoleInfo> {
         ed25519_pubkey,
         secp256r1_pubkey,
         has_session_support,
+        session_key,
         max_session_length,
+        max_session_age,
         current_session_expiration,
+        signature_odometer,
     })
 }
 
@@ -197,4 +255,51 @@ pub async fn fetch_wallet_info(
 /// Find a specific role by ID
 pub fn find_role(roles: &[RoleInfo], role_id: u32) -> Option<&RoleInfo> {
     roles.iter().find(|r| r.id == role_id)
+}
+
+//=============================================================================
+// Secp256r1 Signature Helpers
+//=============================================================================
+
+/// Build Secp256r1 authorization payload for standard authentication
+///
+/// # Arguments
+/// * `authority_slot` - Slot number when signature was created
+/// * `counter` - Signature counter (must be current odometer + 1)
+/// * `instruction_account_index` - Index of Instructions sysvar in accounts
+/// * `webauthn_data` - Optional WebAuthn-specific data
+///
+/// # Returns
+/// Properly formatted authorization payload for Secp256r1 authentication
+///
+/// # Layout
+/// ```
+/// [0..8]   authority_slot: u64
+/// [8..12]  counter: u32
+/// [12]     instruction_account_index: u8
+/// [13..17] reserved: [u8; 4]
+/// [17..]   optional WebAuthn data
+/// ```
+pub fn build_secp256r1_auth_payload(
+    authority_slot: u64,
+    counter: u32,
+    instruction_account_index: u8,
+    webauthn_data: Option<&[u8]>,
+) -> Vec<u8> {
+    let mut payload = Vec::new();
+
+    // Core fields
+    payload.extend_from_slice(&authority_slot.to_le_bytes());
+    payload.extend_from_slice(&counter.to_le_bytes());
+    payload.push(instruction_account_index);
+
+    // Reserved bytes
+    payload.extend_from_slice(&[0u8; 4]);
+
+    // Optional WebAuthn data
+    if let Some(data) = webauthn_data {
+        payload.extend_from_slice(data);
+    }
+
+    payload
 }

@@ -121,7 +121,7 @@ pub fn process_update_authority(
         AuthorityType::Ed25519 => new_authority_data.len() == 32,
         AuthorityType::Ed25519Session => new_authority_data.len() == 72, // 32+32+8
         AuthorityType::Secp256r1 => new_authority_data.len() == 33,
-        AuthorityType::Secp256r1Session => new_authority_data.len() == 73, // 33+32+8
+        AuthorityType::Secp256r1Session => new_authority_data.len() == 80, // 33+7(padding)+32+8
         _ => false,
     };
 

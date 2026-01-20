@@ -1,7 +1,7 @@
 //! Authority module for the state crate.
 //!
 //! This module provides functionality for managing different types of
-//! authorities in the Swig wallet system. It includes support for various
+//! authorities in the LazorKit wallet system. It includes support for various
 //! authentication methods like Ed25519 and Secp256k1,//! Defines authorities (Ed25519, Secp256r1) and
 //! session-based variants.
 

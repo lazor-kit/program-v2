@@ -67,10 +67,23 @@ pub fn authenticate_role(
             let auth = unsafe { lazorkit_state::Ed25519Authority::load_mut_unchecked(roles_data)? };
             auth.authenticate(accounts, authorization_data, data_payload, 0)?;
         },
+        lazorkit_state::AuthorityType::Ed25519Session => {
+            let clock = pinocchio::sysvars::clock::Clock::get()?;
+            let auth =
+                unsafe { lazorkit_state::Ed25519SessionAuthority::load_mut_unchecked(roles_data)? };
+            auth.authenticate(accounts, authorization_data, data_payload, clock.slot)?;
+        },
         lazorkit_state::AuthorityType::Secp256r1 => {
             let clock = pinocchio::sysvars::clock::Clock::get()?;
             let auth =
                 unsafe { lazorkit_state::Secp256r1Authority::load_mut_unchecked(roles_data)? };
+            auth.authenticate(accounts, authorization_data, data_payload, clock.slot)?;
+        },
+        lazorkit_state::AuthorityType::Secp256r1Session => {
+            let clock = pinocchio::sysvars::clock::Clock::get()?;
+            let auth = unsafe {
+                lazorkit_state::Secp256r1SessionAuthority::load_mut_unchecked(roles_data)?
+            };
             auth.authenticate(accounts, authorization_data, data_payload, clock.slot)?;
         },
         _ => {
@@ -83,4 +96,48 @@ pub fn authenticate_role(
     }
 
     Ok(())
+}
+
+/// Checks if a role ID has administrative privileges (Owner or Admin).
+///
+/// # Arguments
+/// * `role_id` - The role ID to check
+///
+/// # Returns
+/// * `true` if role is Owner (0) or Admin (1)
+/// * `false` otherwise
+///
+/// # RBAC Context
+/// Per architecture v3.0.0:
+/// - Owner (ID 0): Full control including ownership transfer
+/// - Admin (ID 1): Authority management permissions
+/// - Spender (ID 2+): Execute-only permissions
+#[inline]
+pub fn is_admin_or_owner(role_id: u32) -> bool {
+    role_id == 0 || role_id == 1
+}
+
+/// Verifies that the acting role has administrative privileges.
+///
+/// # Arguments
+/// * `role_id` - The role ID to verify
+///
+/// # Returns
+/// * `Ok(())` if authorized (Owner or Admin)
+/// * `Err(LazorKitError::Unauthorized)` if not authorized
+///
+/// # Use Cases
+/// - AddAuthority: Only Owner/Admin can add new roles
+/// - RemoveAuthority: Only Owner/Admin can remove roles
+/// - UpdateAuthority: Only Owner/Admin can update role data
+pub fn require_admin_or_owner(role_id: u32) -> ProgramResult {
+    if is_admin_or_owner(role_id) {
+        Ok(())
+    } else {
+        msg!(
+            "Permission denied: Only Owner (0) or Admin (1) can perform this operation. Acting role: {}",
+            role_id
+        );
+        Err(LazorKitError::Unauthorized.into())
+    }
 }

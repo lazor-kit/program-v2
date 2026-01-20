@@ -16,7 +16,7 @@ use pinocchio::{
 };
 use pinocchio_system::instructions::Transfer;
 
-use crate::actions::{authenticate_role, find_role};
+use crate::actions::{authenticate_role, find_role, require_admin_or_owner};
 use crate::error::LazorKitError;
 
 pub fn process_add_authority(
@@ -73,12 +73,7 @@ pub fn process_add_authority(
     }
 
     // Permission check: Only Owner (0) or Admin (1) can add authorities
-    let is_acting_admin = acting_role_id == 0 || acting_role_id == 1;
-
-    if !is_acting_admin {
-        msg!("Only Owner or Admin can add authorities");
-        return Err(LazorKitError::Unauthorized.into());
-    }
+    require_admin_or_owner(acting_role_id)?;
 
     // 2. Validate New Role Params
     let auth_type = lazorkit_state::AuthorityType::try_from(authority_type)?;

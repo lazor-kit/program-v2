@@ -60,7 +60,7 @@ pub fn process_create_session(
                 let auth_type = AuthorityType::try_from(pos.authority_type)?;
                 match auth_type {
                     AuthorityType::Ed25519Session => {
-                        // Verify that the master key (first 32 bytes) signed this transaction
+                        // Ed25519Session: Verify master key signature via simple signer check
                         if auth_data.len() < 32 {
                             return Err(ProgramError::InvalidAccountData);
                         }
@@ -73,9 +73,15 @@ pub fn process_create_session(
                             }
                         }
                         if !is_authorized {
-                            msg!("Missing signature from role master key");
+                            msg!("Missing signature from Ed25519 master key");
                             return Err(ProgramError::MissingRequiredSignature);
                         }
+                        found_internal = true;
+                    },
+                    AuthorityType::Secp256r1Session => {
+                        // Secp256r1Session: Will authenticate via full Secp256r1 flow later
+                        // This includes counter-based replay protection + precompile verification
+                        // See lines 147-156 for the actual authentication
                         found_internal = true;
                     },
                     _ => {

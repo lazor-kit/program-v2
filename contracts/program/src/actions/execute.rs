@@ -72,7 +72,8 @@ pub fn process_execute(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     role_id: u32,
-    instruction_payload: &[u8],
+    instruction_payload_len: u16,
+    unified_payload: &[u8],
 ) -> ProgramResult {
     let mut account_info_iter = accounts.iter();
     let config_account = account_info_iter
@@ -118,13 +119,13 @@ pub fn process_execute(
     };
     let slot = Clock::get()?.slot;
 
-    if instruction_payload.is_empty() {
+    if unified_payload.len() < instruction_payload_len as usize {
         return Err(ProgramError::InvalidInstructionData);
     }
-    let (auth_payload, execution_data) = instruction_payload.split_at(1);
-
     // --- Phase 2: Mutable Process ---
     let mut config_data = config_account.try_borrow_mut_data()?;
+
+    let (execution_data, auth_payload) = unified_payload.split_at(instruction_payload_len as usize);
 
     let auth_start = role_abs_offset + Position::LEN;
     let auth_end = auth_start + pos.authority_length as usize;

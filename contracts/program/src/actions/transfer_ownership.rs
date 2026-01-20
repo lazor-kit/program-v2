@@ -125,9 +125,31 @@ pub fn process_transfer_ownership(
     }
     // Mutable borrow of authority_data_slice has been dropped here
 
+    // IMPORTANT: Authority Size Change Restriction
+    //
+    // We do not support changing authority sizes during ownership transfer because it would require:
+    // 1. Shifting all subsequent role data in the account buffer (expensive compute)
+    // 2. Potential account reallocation if the new authority is larger
+    // 3. Complex error recovery if reallocation fails mid-transfer
+    // 4. Risk of wallet corruption if the operation is interrupted
+    //
+    // Supported transfers (same-size, safe in-place replacement):
+    // - Ed25519 (32) → Ed25519 (32) ✅
+    // - Secp256r1 (40) → Secp256r1 (40) ✅
+    //
+    // NOT supported (different sizes, requires data migration):
+    // - Ed25519 (32) → Ed25519Session (80) ❌
+    // - Ed25519 (32) → Secp256r1 (40) ❌
+    // - Secp256r1 (40) → Secp256r1Session (88) ❌
+    //
+    // Workaround for different authority types:
+    // 1. Create a new wallet with the desired owner authority type
+    // 2. Transfer all assets from old wallet to new wallet
+    // 3. Deprecate the old wallet
     if new_auth_len != current_auth_len {
         msg!(
-            "Authority size change not supported yet (old={}, new={})",
+            "Authority size change not supported during ownership transfer (old={} bytes, new={} bytes). \
+             Create a new wallet with the desired authority type instead.",
             current_auth_len,
             new_auth_len,
         );

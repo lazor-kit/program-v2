@@ -3,10 +3,15 @@
 use lazorkit_state::{read_position, LazorKitWallet, Position, Transmutable, TransmutableMut};
 
 use pinocchio::{
-    account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+    account_info::AccountInfo,
+    msg,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    sysvars::{rent::Rent, Sysvar},
+    ProgramResult,
 };
 
-use crate::actions::{authenticate_role, find_role};
+use crate::actions::{authenticate_role, find_role, require_admin_or_owner};
 use crate::error::LazorKitError;
 
 pub fn process_remove_authority(
@@ -64,13 +69,12 @@ pub fn process_remove_authority(
         )?;
     }
 
-    // Permission check
-    // Only Owner (0) or Admin (1) can remove authorities
-    if acting_role_id != 0 && acting_role_id != 1 {
-        return Err(LazorKitError::Unauthorized.into());
-    }
+    // Permission check: Only Owner (0) or Admin (1) can remove authorities
+    require_admin_or_owner(acting_role_id)?;
 
+    // Prevent self-removal to avoid accidental lockout
     if acting_role_id == target_role_id {
+        msg!("Cannot remove yourself - use a different admin/owner account");
         return Err(LazorKitError::Unauthorized.into());
     }
 
@@ -96,25 +100,19 @@ pub fn process_remove_authority(
 
         let pos = read_position(&config_data[cursor..])?;
 
-        // All non-owner roles are admins in simplified architecture
-        if pos.id != 0 {
+        // Count only Role ID 1 as Admin
+        if pos.id == 1 {
             admin_count += 1;
         }
 
         if pos.id == target_role_id {
             target_start = Some(cursor);
             target_end = Some(pos.boundary as usize);
-            target_is_admin = pos.id != 0; // All non-owner roles are admins
+            target_is_admin = pos.id == 1; // Only Role ID 1 is Admin
         }
 
         total_data_end = pos.boundary as usize;
         cursor = pos.boundary as usize;
-    }
-
-    // Permission check: Only Owner (0) or Admin (1) can remove authorities
-    let is_acting_admin = acting_role_id == 0 || acting_role_id == 1;
-    if !is_acting_admin {
-        return Err(LazorKitError::Unauthorized.into());
     }
 
     // Last Admin Protection:
@@ -166,10 +164,40 @@ pub fn process_remove_authority(
     }
 
     // Update header
-    // Update header
     let wallet =
         unsafe { LazorKitWallet::load_mut_unchecked(&mut config_data[..LazorKitWallet::LEN])? };
     wallet.role_count -= 1;
+
+    // Resize account and reimburse rent
+    // Calculate new size
+    let current_len = config_data.len();
+    let new_len = current_len - shift_size;
+    drop(config_data); // Release mutable borrow to allow realloc
+
+    let rent = pinocchio::sysvars::rent::Rent::get()?;
+    let current_minimum_balance = rent.minimum_balance(current_len);
+    let new_minimum_balance = rent.minimum_balance(new_len);
+
+    let lamports_diff = current_minimum_balance.saturating_sub(new_minimum_balance);
+
+    if lamports_diff > 0 {
+        // Reimburse rent to payer
+        // We need to decrease account lamports and increase payer lamports
+        let current_lamports = config_account.lamports();
+        // Ensure we don't drain the account below new rent exemption (though our diff calc relies on min balance)
+        // More safely, we take the diff from the "extra" rent.
+
+        let new_lamports = current_lamports.saturating_sub(lamports_diff);
+
+        // Update lamports manually (since we are the owner of config_account)
+        unsafe {
+            *config_account.borrow_mut_lamports_unchecked() = new_lamports;
+            *payer_account.borrow_mut_lamports_unchecked() =
+                payer_account.lamports() + lamports_diff;
+        }
+    }
+
+    config_account.resize(new_len)?;
 
     msg!("Removed authority with role ID {}", target_role_id);
 

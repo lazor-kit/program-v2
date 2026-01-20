@@ -10,8 +10,8 @@ pub use crate::core::signer::LazorSigner;
 pub use crate::error::{LazorSdkError, Result};
 pub use crate::types::{RoleInfo, WalletInfo};
 pub use crate::utils::{
-    derive_config_pda, derive_vault_pda, fetch_wallet_account, fetch_wallet_info,
-    find_role, parse_roles, parse_wallet_header,
+    build_secp256r1_auth_payload, derive_config_pda, derive_vault_pda, fetch_wallet_account,
+    fetch_wallet_info, find_role, parse_roles, parse_wallet_header,
 };
 
 pub mod state {
