@@ -1,32 +1,10 @@
 [workspace]
 resolver = "2"
-members = [
-    "contracts/program",
-    "contracts/state",
-    "contracts/no-padding",
-    "contracts/assertions",
-]
+members = ["program", "no-padding", "assertions"]
 
-
-[patch.crates-io]
-blake3 = { git = "https://github.com/BLAKE3-team/BLAKE3.git", tag = "1.5.5" }
-
-[profile.release]
-lto = true
-
-[workspace.package]
-version = "0.1.0"
-authors = ["Lazorkit Team"]
-edition = "2021"
-license = "AGPL-3.0"
-
-[workspace.lints.rust]
-unused_imports = "allow"
-unused_mut = "allow"
-dead_code = "allow"
-unused_macros = "allow"
-unused_variables = "allow"
-
-[workspace.lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(target_os, values("solana"))']
+[workspace.dependencies]
+pinocchio = { version = "0.9", features = ["std"] }
+pinocchio-pubkey = { version = "0.3" }
+pinocchio-system = { version = "0.3" }
+no-padding = { path = "./no-padding" }
+assertions = { path = "./assertions" }

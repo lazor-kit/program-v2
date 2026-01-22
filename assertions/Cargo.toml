@@ -1,0 +1,9 @@
+[package]
+name = "assertions"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-pubkey = { workspace = true }
+pinocchio-system = { workspace = true }
