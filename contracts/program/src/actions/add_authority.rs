@@ -73,11 +73,26 @@ pub fn process_add_authority(
     }
 
     // Permission check: Only Owner (0) or Admin (1) can add authorities
-    require_admin_or_owner(acting_role_id)?;
+    // Find the acting role's position to check permissions
+    let (acting_position, _offset) = {
+        let config_data = config_account.try_borrow_data()?;
+        find_role(&config_data, acting_role_id)?
+    };
+    require_admin_or_owner(&acting_position)?;
 
     // 2. Validate New Role Params
     let auth_type = lazorkit_state::AuthorityType::try_from(authority_type)?;
     let expected_len = authority_type_to_length(&auth_type)?;
+
+    // Validate authority data length to prevent buffer overflow/underflow
+    if authority_data.len() != expected_len {
+        msg!(
+            "Authority data length mismatch: expected {} bytes, got {} bytes",
+            expected_len,
+            authority_data.len()
+        );
+        return Err(crate::error::LazorKitError::InvalidAuthorityData.into());
+    }
 
     // 3. Resize and Append
     let required_space = Position::LEN + expected_len;
@@ -86,10 +101,31 @@ pub fn process_add_authority(
     reallocate_account(config_account, payer_account, new_len)?;
 
     let config_data = unsafe { config_account.borrow_mut_data_unchecked() };
+
+    // Determine role type: First non-owner role gets Admin (1), subsequent roles get Spender (2)
+    let role_type = {
+        let wallet = unsafe {
+            lazorkit_state::LazorKitWallet::load_unchecked(
+                &config_data[..lazorkit_state::LazorKitWallet::LEN],
+            )?
+        };
+
+        // Validate discriminator
+        if !wallet.is_valid() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        if wallet.role_count == 1 {
+            1 // First non-owner role = Admin
+        } else {
+            2 // Subsequent roles = Spender
+        }
+    };
+
     let mut builder = lazorkit_state::LazorKitBuilder::new_from_bytes(config_data)?;
 
     // add_role handles set_into_bytes and updating all metadata (bump, counters, boundaries)
-    builder.add_role(auth_type, &authority_data)?;
+    builder.add_role(auth_type, &authority_data, role_type)?;
 
     Ok(())
 }

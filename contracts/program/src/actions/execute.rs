@@ -1,6 +1,7 @@
 //! Execute instruction handler - Simplified
 
-use alloc::vec::Vec;
+use alloc::vec::Vec; // Kept for traits/macros if needed, but avoiding usage
+use core::mem::MaybeUninit;
 use lazorkit_state::authority::{
     ed25519::{Ed25519Authority, Ed25519SessionAuthority},
     secp256r1::{Secp256r1Authority, Secp256r1SessionAuthority},
@@ -38,12 +39,23 @@ fn dispatch_invoke_signed(
     accounts: &[&AccountInfo],
     signers_seeds: &[Signer],
 ) -> ProgramResult {
-    let mut account_structs = Vec::with_capacity(accounts.len());
-    for info in accounts {
-        account_structs.push(Account::from(*info));
+    const MAX_ACCOUNTS: usize = 24;
+    let count = accounts.len();
+    if count > MAX_ACCOUNTS {
+        return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    unsafe { invoke_signed_unchecked(instruction, &account_structs, signers_seeds) };
+    let mut accounts_storage: [MaybeUninit<Account>; MAX_ACCOUNTS] =
+        unsafe { MaybeUninit::uninit().assume_init() };
+
+    for (i, info) in accounts.iter().enumerate() {
+        accounts_storage[i].write(Account::from(*info));
+    }
+
+    let account_structs =
+        unsafe { core::slice::from_raw_parts(accounts_storage.as_ptr() as *const Account, count) };
+
+    unsafe { invoke_signed_unchecked(instruction, account_structs, signers_seeds) };
     Ok(())
 }
 
@@ -95,9 +107,13 @@ pub fn process_execute(
         let config_data = config_account.try_borrow_data()?;
         let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN]) }
             .map_err(|_| ProgramError::InvalidAccountData)?;
+
+        if !wallet.is_valid() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
         let vault_bump = wallet.wallet_bump;
 
-        // Verify seeds
         let seeds = &[
             b"lazorkit-wallet-address",
             config_account.key().as_ref(),
@@ -106,12 +122,11 @@ pub fn process_execute(
         let derived_vault = pinocchio::pubkey::create_program_address(seeds, program_id)
             .map_err(|_| LazorKitError::InvalidPDA)?;
         if derived_vault != *vault_account.key() {
-            msg!("Execute: Mismatched vault seeds");
-            msg!("Config Key: {:?}", config_account.key());
-            msg!("Provided Vault Key: {:?}", vault_account.key());
-            msg!("Derived Vault Key: {:?}", derived_vault);
-            msg!("Wallet Bump: {}", vault_bump);
             return Err(ProgramError::InvalidAccountData);
+        }
+
+        if vault_account.owner() != &pinocchio_system::ID {
+            return Err(ProgramError::IllegalOwner);
         }
 
         let (pos, offset) = find_role(&config_data, role_id)?;
@@ -148,7 +163,6 @@ pub fn process_execute(
             }
         }
 
-        // Macro to simplify auth calls
         macro_rules! authenticate_auth {
             ($auth_type:ty) => {{
                 let mut auth = unsafe { <$auth_type>::load_mut_unchecked(authority_data_slice) }
@@ -179,45 +193,74 @@ pub fn process_execute(
 
     // SECURITY: Verify target program is executable
     if !target_program.executable() {
-        msg!("Target program is not executable");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let target_instruction_data = execution_data.to_vec();
+    // Stack based account meta collection
+    const MAX_METAS: usize = 24;
+    let mut metas_storage: [MaybeUninit<AccountMeta>; MAX_METAS] =
+        unsafe { MaybeUninit::uninit().assume_init() };
 
-    let mut target_account_metas = Vec::new();
-    let mut invoke_accounts = Vec::with_capacity(1 + accounts.len().saturating_sub(4));
+    // We also need parallel array of references for dispatch
+    // invoke_accounts[0] is program
+    let mut invoke_accounts_storage: [MaybeUninit<&AccountInfo>; MAX_METAS + 1] =
+        unsafe { MaybeUninit::uninit().assume_init() };
 
-    // IMPORTANT: CPI requires the executable account to be in the invoke list
-    invoke_accounts.push(target_program);
+    invoke_accounts_storage[0].write(target_program);
+    let mut meta_count = 0;
 
     for (i, acc) in accounts[4..].iter().enumerate() {
-        let abs_index = 4 + i;
-        if Some(abs_index) == exclude_signer_index {
-            continue;
+        if meta_count >= MAX_METAS {
+            return Err(ProgramError::NotEnoughAccountKeys);
         }
-        let mut meta = AccountMeta {
-            pubkey: acc.key(),
-            is_signer: acc.is_signer(),
-            is_writable: acc.is_writable(),
+        let abs_index = 4 + i;
+
+        let should_be_signer = if Some(abs_index) == exclude_signer_index {
+            false
+        } else {
+            acc.is_signer()
         };
+
+        let mut meta = unsafe {
+            // Manual construction or use AccountMeta methods.
+            // pinocchio AccountMeta fields are pub.
+            AccountMeta {
+                pubkey: acc.key(),
+                is_signer: should_be_signer,
+                is_writable: acc.is_writable(),
+            }
+        };
+
         if acc.key() == vault_account.key() {
             meta.is_signer = true;
         }
-        target_account_metas.push(meta);
-        invoke_accounts.push(acc);
+
+        metas_storage[meta_count].write(meta);
+        invoke_accounts_storage[meta_count + 1].write(acc);
+        meta_count += 1;
     }
+
+    let target_account_metas = unsafe {
+        core::slice::from_raw_parts(metas_storage.as_ptr() as *const AccountMeta, meta_count)
+    };
+
+    let invoke_accounts = unsafe {
+        core::slice::from_raw_parts(
+            invoke_accounts_storage.as_ptr() as *const &AccountInfo,
+            meta_count + 1,
+        )
+    };
 
     // === 3. EXECUTE PAYLOAD ===
     let execute_instruction = Instruction {
         program_id: target_program.key(),
-        accounts: &target_account_metas,
-        data: &target_instruction_data,
+        accounts: target_account_metas,
+        data: execution_data,
     };
 
     let seeds = &[
         b"lazorkit-wallet-address",
-        config_account.key().as_ref(), // expected_config
+        config_account.key().as_ref(),
         &[wallet_bump],
     ];
     let seed_list = [
@@ -226,14 +269,9 @@ pub fn process_execute(
         Seed::from(seeds[2]),
     ];
     let signer = Signer::from(&seed_list);
-    let signers_seeds = &[signer]; // Array of Signer
+    let signers_seeds = &[signer];
 
     // === 6. DISPATCH ===
-    msg!(
-        "Dispatching target execution. Data len: {}",
-        target_instruction_data.len()
-    );
-
-    dispatch_invoke_signed(&execute_instruction, &invoke_accounts, signers_seeds)?;
+    dispatch_invoke_signed(&execute_instruction, invoke_accounts, signers_seeds)?;
     Ok(())
 }

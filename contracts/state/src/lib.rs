@@ -101,8 +101,8 @@ impl IntoBytes for LazorKitWallet {
 /// Memory layout (16 bytes):
 /// - authority_type: u16 (2 bytes)
 /// - authority_length: u16 (2 bytes)
-/// - num_policies: u16 (2 bytes)
-/// - padding: u16 (2 bytes)
+/// - role_type: u8 (1 byte) - 0=Owner, 1=Admin, 2=Spender
+/// - padding: [u8; 3] (3 bytes)
 /// - id: u32 (4 bytes)
 /// - boundary: u32 (4 bytes)
 #[repr(C, align(8))]
@@ -112,8 +112,10 @@ pub struct Position {
     pub authority_type: u16,
     /// Length of authority data in bytes
     pub authority_length: u16,
+    /// Role type: 0=Owner, 1=Admin, 2=Spender
+    pub role_type: u8,
     /// Padding for 8-byte alignment
-    _padding: u32,
+    _padding: [u8; 3],
     /// Unique role ID
     pub id: u32,
     /// Absolute offset to the next role (boundary)
@@ -124,13 +126,33 @@ impl Position {
     pub const LEN: usize = 16;
 
     pub fn new(authority_type: AuthorityType, authority_length: u16, id: u32) -> Self {
+        // Determine role type based on ID for backwards compatibility
+        let role_type = if id == 0 {
+            0 // Owner
+        } else if id == 1 {
+            1 // Admin
+        } else {
+            2 // Spender
+        };
+
         Self {
             authority_type: authority_type as u16,
             authority_length,
-            _padding: 0,
+            role_type,
+            _padding: [0; 3],
             id,
             boundary: 0, // Will be set during serialization
         }
+    }
+
+    /// Returns the role type (0=Owner, 1=Admin, 2=Spender)
+    pub fn role_type(&self) -> u8 {
+        self.role_type
+    }
+
+    /// Checks if this position has admin or owner privileges
+    pub fn is_admin_or_owner(&self) -> bool {
+        self.role_type == 0 || self.role_type == 1
     }
 }
 
@@ -192,7 +214,7 @@ impl<'a> RoleIterator<'a> {
 }
 
 impl<'a> Iterator for RoleIterator<'a> {
-    type Item = (Position, &'a [u8]); // (position_header, authority_data)
+    type Item = Result<(Position, &'a [u8]), ProgramError>; // Return Result instead of just value
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -200,16 +222,24 @@ impl<'a> Iterator for RoleIterator<'a> {
         }
 
         if self.cursor + Position::LEN > self.buffer.len() {
-            return None;
+            return Some(Err(ProgramError::InvalidAccountData)); // Error instead of None
         }
 
-        let position = *read_position(&self.buffer[self.cursor..]).ok()?;
+        let position = match read_position(&self.buffer[self.cursor..]) {
+            Ok(pos) => *pos,
+            Err(e) => return Some(Err(e)), // Propagate error
+        };
 
         let authority_start = self.cursor + Position::LEN;
         let authority_end = authority_start + position.authority_length as usize;
 
+        // Validate boundary
         if position.boundary as usize > self.buffer.len() {
-            return None;
+            return Some(Err(ProgramError::InvalidAccountData)); // Error instead of None
+        }
+
+        if authority_end > self.buffer.len() {
+            return Some(Err(ProgramError::InvalidAccountData)); // Error instead of None
         }
 
         let authority_data = &self.buffer[authority_start..authority_end];
@@ -217,6 +247,6 @@ impl<'a> Iterator for RoleIterator<'a> {
         self.cursor = position.boundary as usize;
         self.remaining -= 1;
 
-        Some((position, authority_data))
+        Some(Ok((position, authority_data)))
     }
 }

@@ -17,6 +17,9 @@ pub enum LazorKitError {
     #[error("Authority not found")]
     AuthorityNotFound,
 
+    #[error("Invalid authority data")]
+    InvalidAuthorityData,
+
     #[error("Policy verification failed")]
     PolicyVerificationFailed,
 
