@@ -6,15 +6,14 @@ use lazorkit_state::{
 };
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::Seed,
+    instruction::{Seed, Signer},
     msg,
-    program::{invoke, invoke_signed},
     program_error::ProgramError,
     pubkey::Pubkey,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
-use pinocchio_system::instructions::CreateAccount;
+use pinocchio_system::instructions::{CreateAccount, Transfer};
 
 pub fn process_create_wallet(
     program_id: &Pubkey,
@@ -43,11 +42,18 @@ pub fn process_create_wallet(
 
     // Verify Config PDA
     let bump_arr = [bump];
+    // wallet_seeds_with_bump returns [&[u8]; 3] but we need seeds for validation
     let config_seeds = wallet_seeds_with_bump(&id, &bump_arr);
+
+    // Check derivation logic
     let expected_config = pinocchio::pubkey::create_program_address(&config_seeds, program_id)
-        .map_err(|_| ProgramError::InvalidSeeds)?;
+        .map_err(|_| {
+            msg!("Error: create_program_address failed (On Curve)");
+            ProgramError::InvalidSeeds
+        })?;
 
     if config_account.key() != &expected_config {
+        msg!("Error: Config PDA mismatch!");
         return Err(ProgramError::InvalidSeeds);
     }
 
@@ -58,72 +64,91 @@ pub fn process_create_wallet(
         .map_err(|_| ProgramError::InvalidSeeds)?;
 
     if vault_account.key() != &expected_vault {
+        msg!("Error: Vault PDA mismatch!");
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // Validate authority type
+    // Validate authority
     let auth_type = AuthorityType::try_from(owner_authority_type)?;
     let auth_len = authority_type_to_length(&auth_type)?;
 
-    // Calculate exact space needed: Wallet header + Position + Authority only
-    // No plugin buffer - account will be reallocated when plugins are added later
     let initial_role_size = Position::LEN + auth_len;
     let space = LazorKitWallet::LEN + initial_role_size;
     let rent = Rent::get()?;
     let lamports = rent.minimum_balance(space);
 
-    // Create Config account using the seeds we already validated
-    let config_seed_list = [
-        Seed::from(config_seeds[0]),
-        Seed::from(config_seeds[1]),
-        Seed::from(config_seeds[2]),
+    // Create Config Account
+    msg!("Creating Config via pinocchio-system");
+
+    // Construct signer seeds
+    let config_signer_seeds = [
+        Seed::from(b"lazorkit"),
+        Seed::from(id.as_slice()),
+        Seed::from(bump_arr.as_slice()),
     ];
-    let config_signer = pinocchio::instruction::Signer::from(&config_seed_list);
 
-    CreateAccount {
-        from: payer_account,
-        to: config_account,
-        lamports,
-        space: space as u64,
-        owner: program_id,
+    // Check if account already exists/has lamports
+    let current_lamports = unsafe { *config_account.borrow_lamports_unchecked() };
+    let lamports_to_transfer = if current_lamports >= lamports {
+        0
+    } else {
+        lamports - current_lamports
+    };
+
+    if lamports_to_transfer > 0 {
+        CreateAccount {
+            from: payer_account,
+            to: config_account,
+            lamports: lamports_to_transfer,
+            space: space as u64,
+            owner: program_id,
+        }
+        .invoke_signed(&[Signer::from(&config_signer_seeds)])?;
+    } else {
+        // If it already has lamports but we want to allocate space/owner
+        // Note: CreateAccount usually handles everything. If we are just responding to "lamports > 0"
+        // we might miss allocating space if it was pre-funded but not created.
+        // Swig logic: check_zero_data enforces it's empty.
+        // Here we just proceed. CreateAccount instruction in system program fails if account exists with different owner.
+        // Assuming standard flow where it's a new PDA.
+        CreateAccount {
+            from: payer_account,
+            to: config_account,
+            lamports: 0, // No extra lamports needed
+            space: space as u64,
+            owner: program_id,
+        }
+        .invoke_signed(&[Signer::from(&config_signer_seeds)])?;
     }
-    .invoke_signed(&[config_signer])?;
 
-    // Create Vault PDA account
-    // This is a System Program-owned account (no data storage needed)
-    // Used as the wallet address for holding SOL and SPL tokens
-    // The vault is controlled by the config PDA through signature verification
+    // Create Vault (Owner = System Program)
+    // Swig uses Transfer to create system accounts
+    msg!("Creating Vault via pinocchio-system Transfer");
+    let vault_rent = rent.minimum_balance(0);
+    let vault_lamports = unsafe { *vault_account.borrow_lamports_unchecked() };
 
-    let vault_seed_list = [
-        Seed::from(vault_seeds[0]),
-        Seed::from(vault_seeds[1]),
-        Seed::from(vault_seeds[2]),
-    ];
-    let vault_signer = pinocchio::instruction::Signer::from(&vault_seed_list);
+    let vault_transfer_amount = if vault_lamports >= vault_rent {
+        0
+    } else {
+        vault_rent - vault_lamports
+    };
 
-    CreateAccount {
-        from: payer_account,
-        to: vault_account,
-        lamports: rent.minimum_balance(0),
-        space: 0,
-        owner: &pinocchio_system::ID,
+    if vault_transfer_amount > 0 {
+        Transfer {
+            from: payer_account,
+            to: vault_account,
+            lamports: vault_transfer_amount,
+        }
+        .invoke()?;
     }
-    .invoke_signed(&[vault_signer])?;
 
-    // Initialize wallet configuration using builder pattern
-    // This handles zero-copy serialization of wallet header and role data
+    // Initialize wallet
     let config_data = unsafe { config_account.borrow_mut_data_unchecked() };
     let wallet = LazorKitWallet::new(id, bump, wallet_bump);
     let mut wallet_builder = LazorKitBuilder::create(config_data, wallet)?;
 
-    msg!("LazorKit wallet created:");
-    msg!("  Config: {:?}", config_account.key());
-    msg!("  Vault: {:?}", vault_account.key());
-    msg!("  Owner Authority Type: {:?}", auth_type);
-
-    // Add initial owner role with authority data
-    // Empty actions array means no plugins are attached to this role initially
-    wallet_builder.add_role(auth_type, &owner_authority_data)?;
+    msg!("LazorKit wallet created successfully");
+    wallet_builder.add_role(auth_type, &owner_authority_data, 0)?;
 
     Ok(())
 }

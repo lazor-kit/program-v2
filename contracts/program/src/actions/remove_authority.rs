@@ -70,7 +70,11 @@ pub fn process_remove_authority(
     }
 
     // Permission check: Only Owner (0) or Admin (1) can remove authorities
-    require_admin_or_owner(acting_role_id)?;
+    let (acting_position, _offset) = {
+        let config_data = config_account.try_borrow_data()?;
+        find_role(&config_data, acting_role_id)?
+    };
+    require_admin_or_owner(&acting_position)?;
 
     // Prevent self-removal to avoid accidental lockout
     if acting_role_id == target_role_id {

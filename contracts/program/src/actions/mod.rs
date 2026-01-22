@@ -27,6 +27,12 @@ pub fn find_role(config_data: &[u8], role_id: u32) -> Result<(Position, usize), 
     let mut current_cursor = LazorKitWallet::LEN;
     let wallet = unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN]) }
         .map_err(|_| ProgramError::InvalidAccountData)?;
+
+    // Validate discriminator
+    if !wallet.is_valid() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     let mut remaining = wallet.role_count;
 
     while remaining > 0 {
@@ -51,6 +57,8 @@ pub fn authenticate_role(
     data_payload: &[u8],
 ) -> ProgramResult {
     let mut config_data = config_account.try_borrow_mut_data()?;
+
+    // find_role already validates discriminator
     let (pos, role_abs_offset) = find_role(&config_data, acting_role_id)?;
 
     let auth_start = role_abs_offset + Position::LEN;
@@ -64,8 +72,9 @@ pub fn authenticate_role(
 
     match auth_type_enum {
         lazorkit_state::AuthorityType::Ed25519 => {
+            let clock = pinocchio::sysvars::clock::Clock::get()?;
             let auth = unsafe { lazorkit_state::Ed25519Authority::load_mut_unchecked(roles_data)? };
-            auth.authenticate(accounts, authorization_data, data_payload, 0)?;
+            auth.authenticate(accounts, authorization_data, data_payload, clock.slot)?;
         },
         lazorkit_state::AuthorityType::Ed25519Session => {
             let clock = pinocchio::sysvars::clock::Clock::get()?;
@@ -98,29 +107,29 @@ pub fn authenticate_role(
     Ok(())
 }
 
-/// Checks if a role ID has administrative privileges (Owner or Admin).
+/// Checks if a Position has administrative privileges (Owner or Admin).
 ///
 /// # Arguments
-/// * `role_id` - The role ID to check
+/// * `position` - The Position to check
 ///
 /// # Returns
-/// * `true` if role is Owner (0) or Admin (1)
+/// * `true` if role type is Owner (0) or Admin (1)
 /// * `false` otherwise
 ///
 /// # RBAC Context
 /// Per architecture v3.0.0:
-/// - Owner (ID 0): Full control including ownership transfer
-/// - Admin (ID 1): Authority management permissions
-/// - Spender (ID 2+): Execute-only permissions
+/// - Owner (type 0): Full control including ownership transfer
+/// - Admin (type 1): Authority management permissions
+/// - Spender (type 2+): Execute-only permissions
 #[inline]
-pub fn is_admin_or_owner(role_id: u32) -> bool {
-    role_id == 0 || role_id == 1
+pub fn is_admin_or_owner(position: &Position) -> bool {
+    position.is_admin_or_owner()
 }
 
 /// Verifies that the acting role has administrative privileges.
 ///
 /// # Arguments
-/// * `role_id` - The role ID to verify
+/// * `position` - The Position to verify
 ///
 /// # Returns
 /// * `Ok(())` if authorized (Owner or Admin)
@@ -130,13 +139,14 @@ pub fn is_admin_or_owner(role_id: u32) -> bool {
 /// - AddAuthority: Only Owner/Admin can add new roles
 /// - RemoveAuthority: Only Owner/Admin can remove roles
 /// - UpdateAuthority: Only Owner/Admin can update role data
-pub fn require_admin_or_owner(role_id: u32) -> ProgramResult {
-    if is_admin_or_owner(role_id) {
+pub fn require_admin_or_owner(position: &Position) -> ProgramResult {
+    if is_admin_or_owner(position) {
         Ok(())
     } else {
         msg!(
-            "Permission denied: Only Owner (0) or Admin (1) can perform this operation. Acting role: {}",
-            role_id
+            "Permission denied: Only Owner (type 0) or Admin (type 1) can perform this operation. Role ID: {}, Role Type: {}",
+            position.id,
+            position.role_type
         );
         Err(LazorKitError::Unauthorized.into())
     }

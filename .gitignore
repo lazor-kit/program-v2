@@ -30,3 +30,4 @@ test-ledger
 *.so
 *.dylib
 build_error.log
+validator.log

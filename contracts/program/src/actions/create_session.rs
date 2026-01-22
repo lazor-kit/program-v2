@@ -46,17 +46,18 @@ pub fn process_create_session(
 
     // Release immutable borrow and get mutable borrow for update
     // We scope the search to avoid borrow conflicts
-    let (found, role_pos_boundary) = {
+    let found = {
         let config_data = config_account.try_borrow_data()?;
         let wallet =
             unsafe { LazorKitWallet::load_unchecked(&config_data[..LazorKitWallet::LEN])? };
-        let mut found_internal = false;
-        let mut boundary = 0;
+        let mut found = false;
 
-        for (pos, auth_data) in
-            RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN)
-        {
+        // Iterator now returns Result, so we need to handle it
+        for item in RoleIterator::new(&config_data, wallet.role_count, LazorKitWallet::LEN) {
+            let (pos, auth_data) = item?; // Unwrap Result
             if pos.id == role_id {
+                found = true;
+                // Check if it has Secp256k1 or Secp256r1 authority
                 let auth_type = AuthorityType::try_from(pos.authority_type)?;
                 match auth_type {
                     AuthorityType::Ed25519Session => {
@@ -76,13 +77,13 @@ pub fn process_create_session(
                             msg!("Missing signature from Ed25519 master key");
                             return Err(ProgramError::MissingRequiredSignature);
                         }
-                        found_internal = true;
+                        // found already set to true at line 59
                     },
                     AuthorityType::Secp256r1Session => {
                         // Secp256r1Session: Will authenticate via full Secp256r1 flow later
                         // This includes counter-based replay protection + precompile verification
                         // See lines 147-156 for the actual authentication
-                        found_internal = true;
+                        // found already set to true at line 59
                     },
                     _ => {
                         msg!("Authority type {:?} does not support sessions", auth_type);
@@ -92,7 +93,7 @@ pub fn process_create_session(
                 break;
             }
         }
-        (found_internal, 0)
+        found
     };
 
     // Explicitly do nothing here, just ensuring previous block is closed.

@@ -50,6 +50,7 @@ impl<'a> LazorKitBuilder<'a> {
     /// # Arguments
     /// * `authority_type` - The type of authority for this role
     /// * `authority_data` - Raw bytes containing the authority data
+    /// * `role_type` - Role type: 0=Owner, 1=Admin, 2=Spender
     ///
     /// # Returns
     /// * `Result<(), ProgramError>` - Success or error status
@@ -57,6 +58,7 @@ impl<'a> LazorKitBuilder<'a> {
         &mut self,
         authority_type: AuthorityType,
         authority_data: &[u8],
+        role_type: u8,
     ) -> Result<(), ProgramError> {
         // Find cursor position (end of last role or start if no roles)
         let mut cursor = 0;
@@ -107,8 +109,21 @@ impl<'a> LazorKitBuilder<'a> {
 
         // Calculate boundary: Position + Authority
         let size = authority_length;
-        let relative_boundary = cursor + Position::LEN + size;
-        let absolute_boundary = relative_boundary + LazorKitWallet::LEN;
+
+        // Use checked arithmetic to prevent overflow
+        let relative_boundary = cursor
+            .checked_add(Position::LEN)
+            .and_then(|r| r.checked_add(size))
+            .ok_or(ProgramError::InvalidAccountData)?;
+
+        let absolute_boundary = relative_boundary
+            .checked_add(LazorKitWallet::LEN)
+            .ok_or(ProgramError::InvalidAccountData)?;
+
+        // Ensure boundary fits in u32
+        if absolute_boundary > u32::MAX as usize {
+            return Err(ProgramError::InvalidAccountData);
+        }
 
         // Write Position header
         let position = unsafe {
@@ -116,6 +131,7 @@ impl<'a> LazorKitBuilder<'a> {
         };
         position.authority_type = authority_type as u16;
         position.authority_length = authority_length as u16;
+        position.role_type = role_type; // NEW: Set role type
         position.id = self.wallet.role_counter;
         position.boundary = absolute_boundary as u32;
 

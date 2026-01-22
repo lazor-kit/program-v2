@@ -20,14 +20,17 @@ use pinocchio::{
 };
 use pinocchio_pubkey::declare_id;
 
-declare_id!("LazorKit11111111111111111111111111111111111");
+declare_id!("8BkWE4RTAFmptSjg3AEsgdfbGtsg9i32ia723wqdfkaX");
+
+pinocchio::default_allocator!();
+pinocchio::default_panic_handler!();
 
 lazy_program_entrypoint!(process_instruction);
 
 fn process_instruction(mut ctx: InstructionContext) -> ProgramResult {
     // Collect accounts into a stack array
     // We assume a reasonable max accounts
-    const MAX_ACCOUNTS: usize = 64;
+    const MAX_ACCOUNTS: usize = 24;
     const AI: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
     let mut accounts_storage = [AI; MAX_ACCOUNTS];
     let mut accounts_len = 0;

@@ -5,7 +5,6 @@ members = [
     "contracts/state",
     "contracts/no-padding",
     "contracts/assertions",
-    "sdk/lazorkit-sdk",
 ]
 
 
