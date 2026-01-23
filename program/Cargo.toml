@@ -12,3 +12,7 @@ pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }
 no-padding = { workspace = true }
 assertions = { workspace = true }
+
+[dev-dependencies]
+solana-program-test = "2.1"
+solana-sdk = "2.1"
