@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["program", "no-padding", "assertions"]
+members = ["program", "no-padding", "assertions", "tests-e2e"]
 
 [workspace.dependencies]
 pinocchio = { version = "0.9", features = ["std"] }

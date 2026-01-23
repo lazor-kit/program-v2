@@ -1,11 +1,15 @@
 use crate::{
-    auth::{ed25519, secp256r1},
+    auth::{
+        ed25519::Ed25519Authenticator, secp256r1::Secp256r1Authenticator, traits::Authenticator,
+    },
     compact::parse_compact_instructions,
     error::AuthError,
-    state::{authority::AuthorityAccountHeader, AccountDiscriminator},
+    state::authority::AuthorityAccountHeader,
 };
 use pinocchio::{
     account_info::AccountInfo,
+    instruction::{Account, AccountMeta, Instruction, Seed, Signer},
+    program::invoke_signed_unchecked,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
     sysvars::{clock::Clock, Sysvar},
@@ -50,14 +54,6 @@ pub fn process(
 
     let authority_header = unsafe { &*(authority_data.as_ptr() as *const AuthorityAccountHeader) };
 
-    if authority_header.discriminator != AccountDiscriminator::Authority as u8 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
-    if authority_header.wallet != *wallet_pda.key() {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
     // Parse compact instructions
     let compact_instructions = parse_compact_instructions(instruction_data)?;
 
@@ -72,27 +68,66 @@ pub fn process(
         &[]
     };
 
-    // Get current slot for Secp256r1
-    let clock = Clock::get()?;
-    let current_slot = clock.slot;
+    // Authenticate based on discriminator
+    match authority_header.discriminator {
+        2 => {
+            // Authority
+            if authority_header.wallet != *wallet_pda.key() {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            match authority_header.authority_type {
+                0 => {
+                    // Ed25519: Verify signer
+                    Ed25519Authenticator.authenticate(accounts, &mut authority_data, &[], &[])?;
+                },
+                1 => {
+                    // Secp256r1: Full authentication
+                    Secp256r1Authenticator.authenticate(
+                        accounts,
+                        &mut authority_data,
+                        authority_payload,
+                        &compact_bytes,
+                    )?;
+                },
+                _ => return Err(AuthError::InvalidAuthenticationKind.into()),
+            }
+        },
+        3 => {
+            // Session
+            let session_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
+            if session_data.len() < std::mem::size_of::<crate::state::session::SessionAccount>() {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            let session = unsafe {
+                &*(session_data.as_ptr() as *const crate::state::session::SessionAccount)
+            };
 
-    // Authenticate based on authority type
-    match authority_header.authority_type {
-        0 => {
-            // Ed25519: Verify signer
-            ed25519::authenticate(&authority_data, accounts)?;
+            let clock = Clock::get()?;
+            let current_slot = clock.slot;
+
+            // Verify Wallet
+            if session.wallet != *wallet_pda.key() {
+                return Err(ProgramError::InvalidAccountData);
+            }
+
+            // Verify Expiry
+            if current_slot > session.expires_at {
+                return Err(AuthError::SessionExpired.into());
+            }
+
+            // Verify Signer matches Session Key
+            let mut signer_matched = false;
+            for acc in accounts {
+                if acc.is_signer() && *acc.key() == session.session_key {
+                    signer_matched = true;
+                    break;
+                }
+            }
+            if !signer_matched {
+                return Err(ProgramError::MissingRequiredSignature);
+            }
         },
-        1 => {
-            // Secp256r1: Full authentication
-            secp256r1::authenticate(
-                &mut authority_data,
-                accounts,
-                authority_payload,
-                &compact_bytes,
-                current_slot,
-            )?;
-        },
-        _ => return Err(AuthError::InvalidAuthenticationKind.into()),
+        _ => return Err(ProgramError::InvalidAccountData),
     }
 
     // Get vault bump for signing
@@ -104,67 +139,48 @@ pub fn process(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // Create seeds for vault signing
-    let vault_bump_arr = [vault_bump];
-    let signersseeds: &[&[u8]] = &[b"vault", wallet_pda.key().as_ref(), &vault_bump_arr];
-
     // Execute each compact instruction
     for compact_ix in &compact_instructions {
         let decompressed = compact_ix.decompress(inner_accounts)?;
 
         // Build AccountMeta array for instruction
-        let mut account_metas = Vec::with_capacity(decompressed.accounts.len());
-        for acc in &decompressed.accounts {
-            account_metas.push(pinocchio::instruction::AccountMeta {
+        let account_metas: Vec<AccountMeta> = decompressed
+            .accounts
+            .iter()
+            .map(|acc| AccountMeta {
                 pubkey: acc.key(),
-                is_signer: acc.is_signer(),
+                is_signer: acc.is_signer() || acc.key() == vault_pda.key(),
                 is_writable: acc.is_writable(),
-            });
-        }
+            })
+            .collect();
 
-        // Use pinocchio's raw syscall for invoke_signed with dynamic account counts
-        // This builds the instruction data manually to work around const generic requirements
+        // Create instruction
+        let ix = Instruction {
+            program_id: decompressed.program_id,
+            accounts: &account_metas,
+            data: &decompressed.data,
+        };
+
+        // Create seeds for vault signing (pinocchio style)
+        let vault_bump_arr = [vault_bump];
+        let seeds = [
+            Seed::from(b"vault"),
+            Seed::from(wallet_pda.key().as_ref()),
+            Seed::from(&vault_bump_arr),
+        ];
+        let signer: Signer = (&seeds).into();
+
+        // Convert AccountInfo to Account for invoke_signed_unchecked
+        let cpi_accounts: Vec<Account> = decompressed
+            .accounts
+            .iter()
+            .map(|acc| Account::from(*acc))
+            .collect();
+
+        // Invoke with vault as signer
+        // Use unchecked invocation to support dynamic account list (slice)
         unsafe {
-            #[cfg(target_os = "solana")]
-            {
-                // Build instruction in the format Solana expects
-                let ix_account_metas_ptr = account_metas.as_ptr() as *const u8;
-                let ix_account_metas_len = account_metas.len();
-                let ix_data_ptr = decompressed.data.as_ptr();
-                let ix_data_len = decompressed.data.len();
-                let ix_program_id = decompressed.program_id.as_ref().as_ptr();
-
-                // Account infos for CPI
-                let account_infos_ptr = decompressed.accounts.as_ptr() as *const u8;
-                let account_infos_len = decompressed.accounts.len();
-
-                // Signers seeds
-                let signers_seeds_ptr = &signersseeds as *const &[&[u8]] as *const u8;
-                let signers_seeds_len = 1;
-
-                // Call raw syscall
-                let result = pinocchio::syscalls::sol_invoke_signed_rust(
-                    ix_program_id,
-                    ix_account_metas_ptr,
-                    ix_account_metas_len as u64,
-                    ix_data_ptr,
-                    ix_data_len as u64,
-                    account_infos_ptr,
-                    account_infos_len as u64,
-                    signers_seeds_ptr,
-                    signers_seeds_len as u64,
-                );
-
-                if result != 0 {
-                    return Err(ProgramError::from(result));
-                }
-            }
-
-            #[cfg(not(target_os = "solana"))]
-            {
-                // For testing, just succeed
-                let _ = (decompressed, signersseeds);
-            }
+            invoke_signed_unchecked(&ix, &cpi_accounts, &[signer]);
         }
     }
 

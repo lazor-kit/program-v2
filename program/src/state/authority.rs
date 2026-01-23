@@ -8,7 +8,8 @@ pub struct AuthorityAccountHeader {
     pub authority_type: u8,
     pub role: u8,
     pub bump: u8,
+    pub _padding: [u8; 4],
+    pub counter: u64,
     pub wallet: Pubkey,
-    pub _padding: [u8; 4], // Align 36 -> 40
 }
-// 36 + 4 = 40. 40 is divisible by 8.
+// 4 + 4 + 8 + 32 = 48. 48 is divisible by 8.

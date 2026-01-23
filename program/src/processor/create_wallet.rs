@@ -96,7 +96,13 @@ pub fn process(
 
     // --- Init Wallet Account ---
     let wallet_space = 8;
-    let wallet_rent = 897840 + (wallet_space as u64 * 6960);
+    // 897840 + (space * 6960)
+    let rent_base = 897840u64;
+    let rent_per_byte = 6960u64;
+    let wallet_rent = (wallet_space as u64)
+        .checked_mul(rent_per_byte)
+        .and_then(|val| val.checked_add(rent_base))
+        .ok_or(ProgramError::ArithmeticOverflow)?;
 
     let mut create_wallet_ix_data = Vec::with_capacity(52);
     create_wallet_ix_data.extend_from_slice(&0u32.to_le_bytes());
@@ -112,7 +118,7 @@ pub fn process(
         },
         AccountMeta {
             pubkey: wallet_pda.key(),
-            is_signer: false,
+            is_signer: true, // Must be true even with invoke_signed
             is_writable: true,
         },
     ];
@@ -155,7 +161,12 @@ pub fn process(
     };
 
     let auth_space = header_size + variable_size;
-    let auth_rent = 897840 + (auth_space as u64 * 6960);
+
+    // Rent calculation: 897840 + (space * 6960)
+    let auth_rent = (auth_space as u64)
+        .checked_mul(6960)
+        .and_then(|val| val.checked_add(897840))
+        .ok_or(ProgramError::ArithmeticOverflow)?;
 
     let mut create_auth_ix_data = Vec::with_capacity(52);
     create_auth_ix_data.extend_from_slice(&0u32.to_le_bytes());
@@ -171,7 +182,7 @@ pub fn process(
         },
         AccountMeta {
             pubkey: auth_pda.key(),
-            is_signer: false,
+            is_signer: true, // Must be true even with invoke_signed
             is_writable: true,
         },
     ];
@@ -203,21 +214,16 @@ pub fn process(
         authority_type: args.authority_type,
         role: 0,
         bump: auth_bump,
-        wallet: *wallet_pda.key(),
         _padding: [0; 4],
+        counter: 0,
+        wallet: *wallet_pda.key(),
     };
     unsafe {
         *(auth_account_data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
     }
 
     let variable_target = &mut auth_account_data[header_size..];
-
-    if args.authority_type == 1 {
-        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
-        variable_target[4..].copy_from_slice(full_auth_data);
-    } else {
-        variable_target.copy_from_slice(full_auth_data);
-    }
+    variable_target.copy_from_slice(full_auth_data);
 
     Ok(())
 }

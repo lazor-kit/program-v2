@@ -6,12 +6,13 @@ use pinocchio::{
     program::invoke_signed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
-    sysvars::{clock::Clock, Sysvar},
     ProgramResult,
 };
 
 use crate::{
-    auth::{ed25519, secp256r1},
+    auth::{
+        ed25519::Ed25519Authenticator, secp256r1::Secp256r1Authenticator, traits::Authenticator,
+    },
     error::AuthError,
     state::{authority::AuthorityAccountHeader, AccountDiscriminator},
 };
@@ -114,24 +115,19 @@ pub fn process_add_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // Get current slot for Secp256r1
-    let clock = Clock::get()?;
-    let current_slot = clock.slot;
-
     // Unified Authentication
     match admin_header.authority_type {
         0 => {
             // Ed25519: Verify signer (authority_payload ignored)
-            ed25519::authenticate(&admin_data, accounts)?;
+            Ed25519Authenticator.authenticate(accounts, &mut admin_data, &[], &[])?;
         },
         1 => {
             // Secp256r1: Full authentication with payload
-            secp256r1::authenticate(
-                &mut admin_data,
+            Secp256r1Authenticator.authenticate(
                 accounts,
+                &mut admin_data,
                 authority_payload,
                 data_payload,
-                current_slot,
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -153,13 +149,13 @@ pub fn process_add_authority(
     check_zero_data(new_auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = if args.authority_type == 1 {
-        4 + full_auth_data.len()
-    } else {
-        full_auth_data.len()
-    };
-    let space = header_size + variable_size;
-    let rent = 897840 + (space as u64 * 6960);
+    let space = header_size + full_auth_data.len();
+    let rent = (space as u64)
+        .checked_mul(6960)
+        .and_then(|val| val.checked_add(897840))
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    // ... (create_ix logic same) ...
 
     let mut create_ix_data = Vec::with_capacity(52);
     create_ix_data.extend_from_slice(&0u32.to_le_bytes());
@@ -175,7 +171,7 @@ pub fn process_add_authority(
         },
         AccountMeta {
             pubkey: new_auth_pda.key(),
-            is_signer: false,
+            is_signer: true, // Must be true even with invoke_signed
             is_writable: true,
         },
     ];
@@ -209,20 +205,16 @@ pub fn process_add_authority(
         authority_type: args.authority_type,
         role: args.new_role,
         bump,
-        wallet: *wallet_pda.key(),
         _padding: [0; 4],
+        counter: 0,
+        wallet: *wallet_pda.key(),
     };
     unsafe {
         *(data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
     }
 
     let variable_target = &mut data[header_size..];
-    if args.authority_type == 1 {
-        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
-        variable_target[4..].copy_from_slice(full_auth_data);
-    } else {
-        variable_target.copy_from_slice(full_auth_data);
-    }
+    variable_target.copy_from_slice(full_auth_data);
 
     Ok(())
 }
@@ -270,22 +262,17 @@ pub fn process_remove_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // Get current slot
-    let clock = Clock::get()?;
-    let current_slot = clock.slot;
-
     // Authentication
     match admin_header.authority_type {
         0 => {
-            ed25519::authenticate(&admin_data, accounts)?;
+            Ed25519Authenticator.authenticate(accounts, &mut admin_data, &[], &[])?;
         },
         1 => {
-            secp256r1::authenticate(
-                &mut admin_data,
+            Secp256r1Authenticator.authenticate(
                 accounts,
+                &mut admin_data,
                 authority_payload,
                 data_payload,
-                current_slot,
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -307,7 +294,9 @@ pub fn process_remove_authority(
     let target_lamports = unsafe { *target_auth_pda.borrow_mut_lamports_unchecked() };
     let refund_lamports = unsafe { *refund_dest.borrow_mut_lamports_unchecked() };
     unsafe {
-        *refund_dest.borrow_mut_lamports_unchecked() = refund_lamports + target_lamports;
+        *refund_dest.borrow_mut_lamports_unchecked() = refund_lamports
+            .checked_add(target_lamports)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
         *target_auth_pda.borrow_mut_lamports_unchecked() = 0;
     }
     let target_data = unsafe { target_auth_pda.borrow_mut_data_unchecked() };
