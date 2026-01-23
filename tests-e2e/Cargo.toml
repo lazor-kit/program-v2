@@ -1,0 +1,22 @@
+[package]
+name = "lazorkit-tests-e2e"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+solana-client = "2.1"
+solana-sdk = "2.1"
+solana-program = "2.2"
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+rand = "0.8"
+borsh = "1.0"
+shellexpand = "3.0"
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+# Reference to common types if exported
+pinocchio = { workspace = true }
+# We might need to copy some struct definitions if not exported cleanly, 
+# but let's try to use common ones if possible or redefine lightly.

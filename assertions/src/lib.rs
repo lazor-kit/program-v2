@@ -62,30 +62,6 @@ macro_rules! sol_assert_return {
       }
   };
 }
-macro_rules! assert_combine {
-  ($op:ident, $($assertion:expr),+ $(,)?) => {
-      || -> ProgramResult {
-          let results = vec![$($assertion)?,+];
-          match stringify!($op) {
-              "and" => {
-                  for result in results {
-                      result?;
-                  }
-                  Ok(())
-              },
-              "or" => {
-                  for result in results {
-                      if result.is_ok() {
-                          return Ok(());
-                      }
-                  }
-                  Err(AssertionError::BytesMismatch.into())
-              },
-              _ => panic!("Unsupported operation"),
-          }
-      }
-  };
-}
 
 sol_assert_return!(check_any_pda, u8, seeds: &[&[u8]], target_key: &Pubkey, program_id: &Pubkey | {
   let (pda, bump) = find_program_address(seeds, program_id);

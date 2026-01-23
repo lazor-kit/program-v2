@@ -7,7 +7,6 @@ pub const SECP256R1_PROGRAM_ID: [u8; 32] = [
     0x81, 0x4d, 0x7a, 0x5a, 0xc9, 0x68, 0x89, 0xd9, 0xcb, 0x22, 0x4c, 0x8c, 0xd0, 0x1d, 0x4a, 0x4a,
 ]; // Keccak256("Secp256r1SigVerify1111111111111111111111111") is not this.
    // Use the pubkey! macro result or correct bytes.
-   // Swig used: pubkey!("Secp256r1SigVerify1111111111111111111111111")
    // I should use `pinocchio_pubkey::pubkey` if possible or hardcode.
    // "Secp256r1SigVerify1111111111111111111111111"
 

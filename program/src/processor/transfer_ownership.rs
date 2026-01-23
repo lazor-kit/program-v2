@@ -5,12 +5,13 @@ use pinocchio::{
     program::invoke_signed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
-    sysvars::{clock::Clock, Sysvar},
     ProgramResult,
 };
 
 use crate::{
-    auth::{ed25519, secp256r1},
+    auth::{
+        ed25519::Ed25519Authenticator, secp256r1::Secp256r1Authenticator, traits::Authenticator,
+    },
     error::AuthError,
     state::{authority::AuthorityAccountHeader, AccountDiscriminator},
 };
@@ -74,10 +75,6 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
-    // Get current slot
-    let clock = Clock::get()?;
-    let current_slot = clock.slot;
-
     {
         let mut data = unsafe { current_owner.borrow_mut_data_unchecked() };
         let auth = unsafe { &*(data.as_ptr() as *const AuthorityAccountHeader) };
@@ -94,15 +91,14 @@ pub fn process(
         // Authenticate Current Owner
         match auth.authority_type {
             0 => {
-                ed25519::authenticate(&data, accounts)?;
+                Ed25519Authenticator.authenticate(accounts, &mut data, &[], &[])?;
             },
             1 => {
-                secp256r1::authenticate(
-                    &mut data,
+                Secp256r1Authenticator.authenticate(
                     accounts,
+                    &mut data,
                     authority_payload,
                     data_payload,
-                    current_slot,
                 )?;
             },
             _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -125,7 +121,10 @@ pub fn process(
         full_auth_data.len()
     };
     let space = header_size + variable_size;
-    let rent = 897840 + (space as u64 * 6960);
+    let rent = (space as u64)
+        .checked_mul(6960)
+        .and_then(|val| val.checked_add(897840))
+        .ok_or(ProgramError::ArithmeticOverflow)?;
 
     let mut create_ix_data = Vec::with_capacity(52);
     create_ix_data.extend_from_slice(&0u32.to_le_bytes());
@@ -141,7 +140,7 @@ pub fn process(
         },
         AccountMeta {
             pubkey: new_owner.key(),
-            is_signer: false,
+            is_signer: true,
             is_writable: true,
         },
     ];
@@ -171,8 +170,9 @@ pub fn process(
         authority_type: auth_type,
         role: 0,
         bump,
-        wallet: *wallet_pda.key(),
         _padding: [0; 4],
+        counter: 0,
+        wallet: *wallet_pda.key(),
     };
     unsafe {
         *(data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
@@ -189,7 +189,9 @@ pub fn process(
     let current_lamports = unsafe { *current_owner.borrow_mut_lamports_unchecked() };
     let payer_lamports = unsafe { *payer.borrow_mut_lamports_unchecked() };
     unsafe {
-        *payer.borrow_mut_lamports_unchecked() = payer_lamports + current_lamports;
+        *payer.borrow_mut_lamports_unchecked() = payer_lamports
+            .checked_add(current_lamports)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
         *current_owner.borrow_mut_lamports_unchecked() = 0;
     }
     let current_data = unsafe { current_owner.borrow_mut_data_unchecked() };

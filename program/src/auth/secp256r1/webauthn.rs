@@ -1,250 +1,140 @@
+#[allow(unused_imports)]
 use crate::error::AuthError;
+#[allow(unused_imports)]
 use pinocchio::program_error::ProgramError;
 
-/// Constants from the secp256r1 program
-const WEBAUTHN_AUTHENTICATOR_DATA_MAX_SIZE: usize = 196;
-
-#[repr(u8)]
-pub enum WebAuthnField {
-    None,
-    Type,
-    Challenge,
-    Origin,
-    CrossOrigin,
+/// Packed flags for clientDataJson reconstruction
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct ClientDataJsonReconstructionParams {
+    pub type_and_flags: u8,
 }
 
-impl TryFrom<u8> for WebAuthnField {
-    type Error = AuthError;
+impl ClientDataJsonReconstructionParams {
+    #[allow(dead_code)]
+    const TYPE_CREATE: u8 = 0x00;
+    const TYPE_GET: u8 = 0x10;
+    const FLAG_CROSS_ORIGIN: u8 = 0x01;
+    const FLAG_HTTP_ORIGIN: u8 = 0x02;
+    const FLAG_GOOGLE_EXTRA: u8 = 0x04;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::None),
-            1 => Ok(Self::Type),
-            2 => Ok(Self::Challenge),
-            3 => Ok(Self::Origin),
-            4 => Ok(Self::CrossOrigin),
-            _ => Err(AuthError::InvalidMessage),
-        }
-    }
-}
-
-#[repr(u16)]
-pub enum R1AuthenticationKind {
-    WebAuthn = 1,
-}
-
-impl TryFrom<u16> for R1AuthenticationKind {
-    type Error = AuthError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(Self::WebAuthn),
-            _ => Err(AuthError::InvalidAuthenticationKind),
-        }
-    }
-}
-
-/// Process WebAuthn-specific message data
-pub fn webauthn_message<'a>(
-    auth_payload: &[u8],
-    computed_hash: [u8; 32],
-    message_buf: &'a mut [u8],
-) -> Result<&'a [u8], ProgramError> {
-    if auth_payload.len() < 6 {
-        return Err(AuthError::InvalidMessage.into());
-    }
-
-    let auth_len = u16::from_le_bytes(auth_payload[2..4].try_into().unwrap()) as usize;
-
-    if auth_len >= WEBAUTHN_AUTHENTICATOR_DATA_MAX_SIZE {
-        return Err(AuthError::InvalidMessage.into());
-    }
-
-    if auth_payload.len() < 4 + auth_len + 4 {
-        return Err(AuthError::InvalidMessage.into());
-    }
-
-    let auth_data = &auth_payload[4..4 + auth_len];
-
-    let mut offset = 4 + auth_len;
-
-    let field_order = &auth_payload[offset..offset + 4];
-
-    offset += 4;
-
-    let origin_len =
-        u16::from_le_bytes(auth_payload[offset..offset + 2].try_into().unwrap()) as usize;
-
-    offset += 2;
-
-    if auth_payload.len() < offset + 2 {
-        return Err(AuthError::InvalidMessage.into());
-    }
-    let huffman_tree_len =
-        u16::from_le_bytes(auth_payload[offset..offset + 2].try_into().unwrap()) as usize;
-    offset += 2;
-
-    if auth_payload.len() < offset + 2 {
-        return Err(AuthError::InvalidMessage.into());
-    }
-    let huffman_encoded_len =
-        u16::from_le_bytes(auth_payload[offset..offset + 2].try_into().unwrap()) as usize;
-    offset += 2;
-
-    if auth_payload.len() < offset + huffman_tree_len + huffman_encoded_len {
-        return Err(AuthError::InvalidMessage.into());
-    }
-
-    let huffman_tree = &auth_payload[offset..offset + huffman_tree_len];
-    let huffman_encoded_origin =
-        &auth_payload[offset + huffman_tree_len..offset + huffman_tree_len + huffman_encoded_len];
-
-    let decoded_origin = decode_huffman_origin(huffman_tree, huffman_encoded_origin, origin_len)?;
-
-    let client_data_json =
-        reconstruct_client_data_json(field_order, &decoded_origin, &computed_hash)?;
-
-    let mut client_data_hash = [0u8; 32];
-
-    #[cfg(target_os = "solana")]
-    unsafe {
-        let res = pinocchio::syscalls::sol_sha256(
-            [client_data_json.as_slice()].as_ptr() as *const u8,
-            1,
-            client_data_hash.as_mut_ptr(),
-        );
-        if res != 0 {
-            return Err(AuthError::InvalidMessageHash.into());
-        }
-    }
-    #[cfg(not(target_os = "solana"))]
-    {
-        // Mock hash
-        let _ = client_data_json; // suppress unused warning
-        client_data_hash = [1u8; 32]; // mutate to justify mut
-    }
-
-    message_buf[0..auth_len].copy_from_slice(auth_data);
-    message_buf[auth_len..auth_len + 32].copy_from_slice(&client_data_hash);
-
-    Ok(&message_buf[..auth_len + 32])
-}
-
-/// Decode huffman-encoded origin URL
-fn decode_huffman_origin(
-    tree_data: &[u8],
-    encoded_data: &[u8],
-    decoded_len: usize,
-) -> Result<Vec<u8>, ProgramError> {
-    const NODE_SIZE: usize = 3;
-    const LEAF_NODE: u8 = 0;
-    const BIT_MASKS: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
-
-    if tree_data.len() % NODE_SIZE != 0 || tree_data.is_empty() {
-        return Err(AuthError::InvalidMessage.into());
-    }
-
-    let node_count = tree_data.len() / NODE_SIZE;
-    let root_index = node_count - 1;
-    let mut current_node_index = root_index;
-    let mut decoded = Vec::new();
-
-    for &byte in encoded_data.iter() {
-        for bit_pos in 0..8 {
-            if decoded.len() == decoded_len {
-                return Ok(decoded);
-            }
-
-            let bit = (byte & BIT_MASKS[bit_pos]) != 0;
-
-            let node_offset = current_node_index * NODE_SIZE;
-            let node_type = tree_data[node_offset];
-
-            if node_type == LEAF_NODE {
-                return Err(AuthError::InvalidMessage.into());
-            }
-
-            let left_or_char = tree_data[node_offset + 1];
-            let right = tree_data[node_offset + 2];
-            current_node_index = if bit {
-                right as usize
-            } else {
-                left_or_char as usize
-            };
-
-            if current_node_index >= node_count {
-                return Err(AuthError::InvalidMessage.into());
-            }
-
-            let next_node_offset = current_node_index * NODE_SIZE;
-            let next_node_type = tree_data[next_node_offset];
-
-            if next_node_type == LEAF_NODE {
-                let character = tree_data[next_node_offset + 1];
-                decoded.push(character);
-                current_node_index = root_index;
-            }
-        }
-    }
-
-    Ok(decoded)
-}
-
-fn reconstruct_client_data_json(
-    field_order: &[u8],
-    origin: &[u8],
-    challenge_data: &[u8],
-) -> Result<Vec<u8>, ProgramError> {
-    let origin_str = core::str::from_utf8(origin).map_err(|_| AuthError::InvalidMessage)?;
-    let challenge_b64 = base64url_encode_no_pad(challenge_data);
-    let mut fields = Vec::with_capacity(4);
-
-    for key in field_order {
-        match WebAuthnField::try_from(*key)? {
-            WebAuthnField::None => {},
-            WebAuthnField::Challenge => fields.push(format!(r#""challenge":"{}""#, challenge_b64)),
-            WebAuthnField::Type => fields.push(r#""type":"webauthn.get""#.to_string()),
-            WebAuthnField::Origin => fields.push(format!(r#""origin":"{}""#, origin_str)),
-            WebAuthnField::CrossOrigin => fields.push(r#""crossOrigin":false"#.to_string()),
-        }
-    }
-
-    let client_data_json = format!("{{{}}}", fields.join(","));
-    Ok(client_data_json.into_bytes())
-}
-
-fn base64url_encode_no_pad(data: &[u8]) -> String {
-    const BASE64URL_CHARS: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-    let mut result = String::new();
-    let mut i = 0;
-
-    while i + 2 < data.len() {
-        let b1 = data[i];
-        let b2 = data[i + 1];
-        let b3 = data[i + 2];
-
-        result.push(BASE64URL_CHARS[(b1 >> 2) as usize] as char);
-        result.push(BASE64URL_CHARS[(((b1 & 0x03) << 4) | (b2 >> 4)) as usize] as char);
-        result.push(BASE64URL_CHARS[(((b2 & 0x0f) << 2) | (b3 >> 6)) as usize] as char);
-        result.push(BASE64URL_CHARS[(b3 & 0x3f) as usize] as char);
-
-        i += 3;
-    }
-
-    if i < data.len() {
-        let b1 = data[i];
-        result.push(BASE64URL_CHARS[(b1 >> 2) as usize] as char);
-
-        if i + 1 < data.len() {
-            let b2 = data[i + 1];
-            result.push(BASE64URL_CHARS[(((b1 & 0x03) << 4) | (b2 >> 4)) as usize] as char);
-            result.push(BASE64URL_CHARS[((b2 & 0x0f) << 2) as usize] as char);
+    pub fn auth_type(&self) -> AuthType {
+        if (self.type_and_flags & 0xF0) == Self::TYPE_GET {
+            AuthType::Get
         } else {
-            result.push(BASE64URL_CHARS[((b1 & 0x03) << 4) as usize] as char);
+            AuthType::Create
         }
     }
 
+    pub fn is_cross_origin(&self) -> bool {
+        self.type_and_flags & Self::FLAG_CROSS_ORIGIN != 0
+    }
+
+    pub fn is_http(&self) -> bool {
+        self.type_and_flags & Self::FLAG_HTTP_ORIGIN != 0
+    }
+
+    pub fn has_google_extra(&self) -> bool {
+        self.type_and_flags & Self::FLAG_GOOGLE_EXTRA != 0
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AuthType {
+    Create,
+    Get,
+}
+
+/// Simple Base64URL encoder without padding
+pub fn base64url_encode_no_pad(data: &[u8]) -> Vec<u8> {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut result = Vec::with_capacity((data.len() + 2) / 3 * 4);
+
+    for chunk in data.chunks(3) {
+        let b = match chunk.len() {
+            3 => (chunk[0] as u32) << 16 | (chunk[1] as u32) << 8 | (chunk[2] as u32),
+            2 => (chunk[0] as u32) << 16 | (chunk[1] as u32) << 8,
+            1 => (chunk[0] as u32) << 16,
+            _ => unreachable!(),
+        };
+
+        result.push(ALPHABET[((b >> 18) & 0x3f) as usize]);
+        result.push(ALPHABET[((b >> 12) & 0x3f) as usize]);
+        if chunk.len() > 1 {
+            result.push(ALPHABET[((b >> 6) & 0x3f) as usize]);
+        }
+        if chunk.len() > 2 {
+            result.push(ALPHABET[(b & 0x3f) as usize]);
+        }
+    }
     result
+}
+
+/// Reconstructs the clientDataJson
+pub fn reconstruct_client_data_json(
+    params: &ClientDataJsonReconstructionParams,
+    rp_id: &[u8],
+    challenge: &[u8],
+) -> Vec<u8> {
+    let challenge_b64url = base64url_encode_no_pad(challenge);
+    let type_str: &[u8] = match params.auth_type() {
+        AuthType::Create => b"webauthn.create",
+        AuthType::Get => b"webauthn.get",
+    };
+
+    let prefix: &[u8] = if params.is_http() {
+        b"http://"
+    } else {
+        b"https://"
+    };
+    let cross_origin: &[u8] = if params.is_cross_origin() {
+        b"true"
+    } else {
+        b"false"
+    };
+
+    let mut json = Vec::with_capacity(256);
+    json.extend_from_slice(b"{\"type\":\"");
+    json.extend_from_slice(type_str);
+    json.extend_from_slice(b"\",\"challenge\":\"");
+    json.extend_from_slice(&challenge_b64url);
+    json.extend_from_slice(b"\",\"origin\":\"");
+    json.extend_from_slice(prefix);
+    json.extend_from_slice(rp_id);
+    json.extend_from_slice(b"\",\"crossOrigin\":");
+    json.extend_from_slice(cross_origin);
+
+    if params.has_google_extra() {
+        json.extend_from_slice(b",\"other_keys_can_be_added_here\":\"do not compare clientDataJSON against a template. See https://goo.gl/yabPex\"");
+    }
+
+    json.extend_from_slice(b"}");
+    json
+}
+
+/// Parser for WebAuthn authenticator data
+pub struct AuthDataParser<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> AuthDataParser<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Self { data }
+    }
+
+    pub fn rp_id_hash(&self) -> &'a [u8] {
+        &self.data[0..32]
+    }
+
+    pub fn is_user_present(&self) -> bool {
+        self.data[32] & 0x01 != 0
+    }
+
+    pub fn is_user_verified(&self) -> bool {
+        self.data[32] & 0x04 != 0
+    }
+
+    pub fn counter(&self) -> u32 {
+        u32::from_be_bytes(self.data[33..37].try_into().unwrap())
+    }
 }
