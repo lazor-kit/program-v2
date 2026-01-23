@@ -3,7 +3,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::processor::{create_wallet, manage_authority, transfer_ownership};
+use crate::processor::{create_wallet, execute, manage_authority, transfer_ownership};
 
 entrypoint!(process_instruction);
 
@@ -23,7 +23,7 @@ pub fn process_instruction(
         1 => manage_authority::process_add_authority(program_id, accounts, data),
         2 => manage_authority::process_remove_authority(program_id, accounts, data),
         3 => transfer_ownership::process(program_id, accounts, data),
-        // 4 => Execute (Future Phase 4)
+        4 => execute::process(program_id, accounts, data),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
