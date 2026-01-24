@@ -31,16 +31,27 @@ pub struct CreateWalletArgs {
 }
 
 impl CreateWalletArgs {
-    pub fn from_bytes(data: &[u8]) -> Result<(&Self, &[u8]), ProgramError> {
+    pub fn from_bytes(data: &[u8]) -> Result<(Self, &[u8]), ProgramError> {
         if data.len() < 40 {
             return Err(ProgramError::InvalidInstructionData);
         }
         let (fixed, rest) = data.split_at(40);
-        if (fixed.as_ptr() as usize) % 8 != 0 {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        // SAFETY: Size and alignment checked.
-        let args = unsafe { &*(fixed.as_ptr() as *const CreateWalletArgs) };
+
+        // Safe copy to ensure alignment
+        let mut user_seed = [0u8; 32];
+        user_seed.copy_from_slice(&fixed[0..32]);
+
+        let authority_type = fixed[32];
+        let auth_bump = fixed[33];
+        // skip 6 padding bytes
+
+        let args = Self {
+            user_seed,
+            authority_type,
+            auth_bump,
+            _padding: [0; 6],
+        };
+
         Ok((args, rest))
     }
 }
@@ -174,7 +185,8 @@ pub fn process(
     let wallet_account = WalletAccount {
         discriminator: AccountDiscriminator::Wallet as u8,
         bump: wallet_bump,
-        _padding: [0; 6],
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 5],
     };
     unsafe {
         *(wallet_data.as_mut_ptr() as *mut WalletAccount) = wallet_account;
@@ -237,22 +249,26 @@ pub fn process(
 
     // Write Authority Data
     let auth_account_data = unsafe { auth_pda.borrow_mut_data_unchecked() };
-    if (auth_account_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
     let header = AuthorityAccountHeader {
         discriminator: AccountDiscriminator::Authority as u8,
         authority_type: args.authority_type,
         role: 0,
         bump: auth_bump,
-        _padding: [0; 4],
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 3],
         counter: 0,
         wallet: *wallet_pda.key(),
     };
-    unsafe {
-        *(auth_account_data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
-    }
+
+    // safe write
+    let header_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &header as *const AuthorityAccountHeader as *const u8,
+            std::mem::size_of::<AuthorityAccountHeader>(),
+        )
+    };
+    auth_account_data[0..std::mem::size_of::<AuthorityAccountHeader>()]
+        .copy_from_slice(header_bytes);
 
     let variable_target = &mut auth_account_data[header_size..];
     variable_target.copy_from_slice(full_auth_data);

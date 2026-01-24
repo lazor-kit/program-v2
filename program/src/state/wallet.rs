@@ -12,6 +12,8 @@ pub struct WalletAccount {
     pub discriminator: u8,
     /// Bump seed for this PDA.
     pub bump: u8,
+    /// Account Version.
+    pub version: u8,
     /// Padding for alignment.
-    pub _padding: [u8; 6],
+    pub _padding: [u8; 5],
 }

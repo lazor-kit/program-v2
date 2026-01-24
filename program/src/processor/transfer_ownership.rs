@@ -201,7 +201,8 @@ pub fn process(
         authority_type: auth_type,
         role: 0,
         bump,
-        _padding: [0; 4],
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 3],
         counter: 0,
         wallet: *wallet_pda.key(),
     };
