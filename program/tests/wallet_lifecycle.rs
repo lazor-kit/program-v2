@@ -232,8 +232,8 @@ fn test_authority_lifecycle() {
             accounts: vec![
                 AccountMeta::new(context.payer.pubkey(), true),
                 AccountMeta::new(wallet_pda, false),
-                AccountMeta::new_readonly(owner_auth_pda, false), // PDA cannot sign
-                AccountMeta::new(admin_auth_pda, false),          // New authority PDA being created
+                AccountMeta::new(owner_auth_pda, false), // PDA must be writable for auth logic
+                AccountMeta::new(admin_auth_pda, false), // New authority PDA being created
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
@@ -283,9 +283,9 @@ fn test_authority_lifecycle() {
             accounts: vec![
                 AccountMeta::new(context.payer.pubkey(), true),
                 AccountMeta::new(wallet_pda, false),
-                AccountMeta::new_readonly(owner_auth_pda, false), // PDA cannot sign
-                AccountMeta::new(admin_auth_pda, false),          // Target to remove
-                AccountMeta::new(context.payer.pubkey(), false),  // Refund destination
+                AccountMeta::new(owner_auth_pda, false), // PDA must be writable
+                AccountMeta::new(admin_auth_pda, false), // Target to remove
+                AccountMeta::new(context.payer.pubkey(), false), // Refund destination
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
@@ -359,7 +359,7 @@ fn test_execute_with_compact_instructions() {
         instruction_data.extend_from_slice(&user_seed);
         instruction_data.push(0); // Ed25519
         instruction_data.push(0); // Owner role
-        instruction_data.extend_from_slice(&[0; 6]);
+        instruction_data.extend_from_slice(&[0; 6]); // padding
         instruction_data.extend_from_slice(owner_keypair.pubkey().as_ref());
 
         let create_wallet_ix = Instruction {
@@ -436,7 +436,7 @@ fn test_execute_with_compact_instructions() {
         accounts: vec![
             AccountMeta::new(context.payer.pubkey(), true), // Payer
             AccountMeta::new(wallet_pda, false),            // Wallet
-            AccountMeta::new_readonly(owner_auth_pda, false), // Authority (PDA)
+            AccountMeta::new(owner_auth_pda, false),        // Authority (PDA) must be writable
             AccountMeta::new(vault_pda, false),             // Vault (Context)
             // Inner accounts start here:
             AccountMeta::new(vault_pda, false), // Index 0: Vault (will satisfy Signer via seeds)
