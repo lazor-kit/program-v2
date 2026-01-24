@@ -15,8 +15,10 @@ pub struct AuthorityAccountHeader {
     pub role: u8,
     /// Bump seed used to derive this PDA.
     pub bump: u8,
+    /// Account Version (for future upgrades).
+    pub version: u8,
     /// Padding for 8-byte alignment.
-    pub _padding: [u8; 4],
+    pub _padding: [u8; 3],
     /// Monotonically increasing counter to prevent replay attacks (Secp256r1 only).
     pub counter: u64,
     /// The wallet this authority belongs to.

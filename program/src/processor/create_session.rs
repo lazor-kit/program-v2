@@ -30,17 +30,23 @@ pub struct CreateSessionArgs {
 }
 
 impl CreateSessionArgs {
-    pub fn from_bytes(data: &[u8]) -> Result<&Self, ProgramError> {
+    pub fn from_bytes(data: &[u8]) -> Result<Self, ProgramError> {
         if data.len() < 40 {
             return Err(ProgramError::InvalidInstructionData);
         }
         // args are: [session_key(32)][expires_at(8)]
-        if (data.as_ptr() as usize) % 8 != 0 {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        // SAFETY: Alignment checked.
-        let args = unsafe { &*(data.as_ptr() as *const CreateSessionArgs) };
-        Ok(args)
+        let (key_bytes, rest) = data.split_at(32);
+        let (alloc_bytes, _) = rest.split_at(8);
+
+        let mut session_key = [0u8; 32];
+        session_key.copy_from_slice(key_bytes);
+
+        let expires_at = u64::from_le_bytes(alloc_bytes.try_into().unwrap());
+
+        Ok(Self {
+            session_key,
+            expires_at,
+        })
     }
 }
 
@@ -87,17 +93,15 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
-    if !authorizer_pda.is_writable() {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
     // Verify Authorizer
+    // Check removed: conditional writable check inside match
+
     let mut auth_data = unsafe { authorizer_pda.borrow_mut_data_unchecked() };
-    if (auth_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    // SAFETY: Alignment checked.
-    let auth_header = unsafe { &*(auth_data.as_ptr() as *const AuthorityAccountHeader) };
+
+    // Safe copy header
+    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+    header_bytes.copy_from_slice(&auth_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    let auth_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
 
     if auth_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -135,6 +139,9 @@ pub fn process(
             Ed25519Authenticator.authenticate(accounts, &mut auth_data, &[], &[])?;
         },
         1 => {
+            if !authorizer_pda.is_writable() {
+                return Err(ProgramError::InvalidAccountData);
+            }
             Secp256r1Authenticator.authenticate(
                 accounts,
                 &mut auth_data,
@@ -207,20 +214,24 @@ pub fn process(
 
     // Initialize Session State
     let data = unsafe { session_pda.borrow_mut_data_unchecked() };
-    if (data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
     let session = SessionAccount {
         discriminator: AccountDiscriminator::Session as u8,
         bump,
-        _padding: [0; 6],
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 5],
         wallet: *wallet_pda.key(),
         session_key: Pubkey::from(args.session_key),
         expires_at: args.expires_at,
     };
-    unsafe {
-        *(data.as_mut_ptr() as *mut SessionAccount) = session;
-    }
+
+    // Safe write
+    let session_bytes = unsafe {
+        std::slice::from_raw_parts(
+            &session as *const SessionAccount as *const u8,
+            std::mem::size_of::<SessionAccount>(),
+        )
+    };
+    data[0..std::mem::size_of::<SessionAccount>()].copy_from_slice(session_bytes);
 
     Ok(())
 }

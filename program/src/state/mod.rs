@@ -12,3 +12,8 @@ pub enum AccountDiscriminator {
     /// A Session account (Ephemeral Spender).
     Session = 3,
 }
+
+/// Helper constant for versioning.
+///
+/// Current account logic version.
+pub const CURRENT_ACCOUNT_VERSION: u8 = 1;

@@ -32,17 +32,22 @@ pub struct AddAuthorityArgs {
 }
 
 impl AddAuthorityArgs {
-    pub fn from_bytes(data: &[u8]) -> Result<(&Self, &[u8]), ProgramError> {
+    pub fn from_bytes(data: &[u8]) -> Result<(Self, &[u8]), ProgramError> {
         if data.len() < 8 {
             return Err(ProgramError::InvalidInstructionData);
         }
         let (fixed, rest) = data.split_at(8);
-        if (fixed.as_ptr() as usize) % 8 != 0 {
-            return Err(ProgramError::InvalidAccountData);
-        }
-        // SAFETY: We checked instruction data length (8 bytes) and alignment (8 bytes) above.
-        // AddAuthorityArgs is repr(C, align(8)) and NoPadding.
-        let args = unsafe { &*(fixed.as_ptr() as *const AddAuthorityArgs) };
+
+        // Manual deserialization for safety
+        let authority_type = fixed[0];
+        let new_role = fixed[1];
+
+        let args = Self {
+            authority_type,
+            new_role,
+            _padding: [0; 6],
+        };
+
         Ok((args, rest))
     }
 }
@@ -129,20 +134,20 @@ pub fn process_add_authority(
         return Err(ProgramError::IllegalOwner);
     }
 
-    if !admin_auth_pda.is_writable() {
-        return Err(ProgramError::InvalidAccountData);
-    }
+    // Check removed here, moved to type-specific logic
+    // if !admin_auth_pda.is_writable() {
+    //    return Err(ProgramError::InvalidAccountData);
+    // }
 
     let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
     if admin_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if (admin_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    // SAFETY: We verified data length and alignment above.
-    let admin_header = unsafe { &*(admin_data.as_ptr() as *const AuthorityAccountHeader) };
+    // Safe Copy of Header
+    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+    header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    let admin_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -158,6 +163,10 @@ pub fn process_add_authority(
             Ed25519Authenticator.authenticate(accounts, &mut admin_data, &[], &[])?;
         },
         1 => {
+            // Secp256r1 (WebAuthn) - Must be Writable
+            if !admin_auth_pda.is_writable() {
+                return Err(ProgramError::InvalidAccountData);
+            }
             // Secp256r1: Full authentication with payload
             Secp256r1Authenticator.authenticate(
                 accounts,
@@ -241,7 +250,8 @@ pub fn process_add_authority(
         authority_type: args.authority_type,
         role: args.new_role,
         bump,
-        _padding: [0; 4],
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 3],
         counter: 0,
         wallet: *wallet_pda.key(),
     };

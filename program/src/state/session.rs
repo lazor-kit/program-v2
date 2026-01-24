@@ -13,8 +13,10 @@ pub struct SessionAccount {
     pub discriminator: u8, // 1
     /// Bump seed for this PDA.
     pub bump: u8, // 1
+    /// Account Version.
+    pub version: u8, // 1
     /// Padding for alignment.
-    pub _padding: [u8; 6], // 6
+    pub _padding: [u8; 5], // 5
     /// The wallet this session belongs to.
     pub wallet: Pubkey, // 32
     /// The ephemeral public key authorized to sign.
