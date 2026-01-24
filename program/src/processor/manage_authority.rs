@@ -320,12 +320,12 @@ pub fn process_remove_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
+    // Safe copy header
     let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
-    if (admin_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    // SAFETY: Verified alignment and data length (via AuthorityAccountHeader size implicitly).
-    let admin_header = unsafe { &*(admin_data.as_ptr() as *const AuthorityAccountHeader) };
+    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+    header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    let admin_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
+
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -352,7 +352,12 @@ pub fn process_remove_authority(
     // Authorization
     if admin_header.role != 0 {
         let target_data = unsafe { target_auth_pda.borrow_data_unchecked() };
-        let target_header = unsafe { &*(target_data.as_ptr() as *const AuthorityAccountHeader) };
+        // Safe copy target header
+        let mut target_h_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+        target_h_bytes
+            .copy_from_slice(&target_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+        let target_header =
+            unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&target_h_bytes) };
         if target_header.discriminator != AccountDiscriminator::Authority as u8 {
             return Err(ProgramError::InvalidAccountData);
         }

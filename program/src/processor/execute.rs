@@ -67,16 +67,12 @@ pub fn process(
     }
 
     // Read authority header
+    // Safe copy header
     let mut authority_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
-    if authority_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
-        return Err(ProgramError::InvalidAccountData);
-    }
-
-    if (authority_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    // SAFETY: Alignment and size checked.
-    let authority_header = unsafe { &*(authority_data.as_ptr() as *const AuthorityAccountHeader) };
+    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+    header_bytes.copy_from_slice(&authority_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    let authority_header =
+        unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
 
     // Parse compact instructions
     let compact_instructions = parse_compact_instructions(instruction_data)?;
