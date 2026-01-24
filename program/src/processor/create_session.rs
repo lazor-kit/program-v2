@@ -17,6 +17,11 @@ use crate::{
     state::{authority::AuthorityAccountHeader, session::SessionAccount, AccountDiscriminator},
 };
 
+/// Arguments for the `CreateSession` instruction.
+///
+/// Layout:
+/// - `session_key`: The public key of the ephemeral session signer.
+/// - `expires_at`: The absolute slot height when this session expires.
 #[repr(C, align(8))]
 #[derive(NoPadding)]
 pub struct CreateSessionArgs {
@@ -30,11 +35,30 @@ impl CreateSessionArgs {
             return Err(ProgramError::InvalidInstructionData);
         }
         // args are: [session_key(32)][expires_at(8)]
+        if (data.as_ptr() as usize) % 8 != 0 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        // SAFETY: Alignment checked.
         let args = unsafe { &*(data.as_ptr() as *const CreateSessionArgs) };
         Ok(args)
     }
 }
 
+/// Processes the `CreateSession` instruction.
+///
+/// Creates a temporary `Session` account that facilitates limited-scope execution (Spender role).
+///
+/// # Logic:
+/// 1. Verifies the authorizing authority (must be Owner or Admin).
+/// 2. Derives a fresh Session PDA from `["session", wallet, session_key]`.
+/// 3. Allocates and initializes the Session account with expiry.
+///
+/// # Accounts:
+/// 1. `[signer, writable]` Payer: Pays for rent.
+/// 2. `[]` Wallet PDA.
+/// 3. `[signer, writable]` Authorizer: Authority approving this session creation.
+/// 4. `[writable]` Session PDA: The new session account.
+/// 5. `[]` System Program.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -63,8 +87,16 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
+    if !authorizer_pda.is_writable() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     // Verify Authorizer
     let mut auth_data = unsafe { authorizer_pda.borrow_mut_data_unchecked() };
+    if (auth_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    // SAFETY: Alignment checked.
     let auth_header = unsafe { &*(auth_data.as_ptr() as *const AuthorityAccountHeader) };
 
     if auth_header.discriminator != AccountDiscriminator::Authority as u8 {
@@ -175,6 +207,9 @@ pub fn process(
 
     // Initialize Session State
     let data = unsafe { session_pda.borrow_mut_data_unchecked() };
+    if (data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
     let session = SessionAccount {
         discriminator: AccountDiscriminator::Session as u8,
         bump,

@@ -17,6 +17,12 @@ use crate::{
     state::{authority::AuthorityAccountHeader, AccountDiscriminator},
 };
 
+/// Arguments for the `AddAuthority` instruction.
+///
+/// Layout:
+/// - `authority_type`: 0 for Ed25519, 1 for Secp256r1.
+/// - `new_role`: Role to assign (0=Owner, 1=Admin, 2=Spender).
+/// - `_padding`: Reserved to align to 8-byte boundary.
 #[repr(C, align(8))]
 #[derive(NoPadding)]
 pub struct AddAuthorityArgs {
@@ -31,11 +37,33 @@ impl AddAuthorityArgs {
             return Err(ProgramError::InvalidInstructionData);
         }
         let (fixed, rest) = data.split_at(8);
+        if (fixed.as_ptr() as usize) % 8 != 0 {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        // SAFETY: We checked instruction data length (8 bytes) and alignment (8 bytes) above.
+        // AddAuthorityArgs is repr(C, align(8)) and NoPadding.
         let args = unsafe { &*(fixed.as_ptr() as *const AddAuthorityArgs) };
         Ok((args, rest))
     }
 }
 
+/// Processes the `AddAuthority` instruction.
+///
+/// Adds a new authority to the wallet.
+///
+/// # Logic:
+/// 1. **Authentication**: Verifies the `admin_authority` (must be Admin or Owner).
+/// 2. **Authorization**: Checks permission levels:
+///    - `Owner` (0) can add any role.
+///    - `Admin` (1) can only add `Spender` (2).
+/// 3. **Execution**: Creates a new PDA `["authority", wallet, id_hash]` and initializes it.
+///
+/// # Accounts:
+/// 1. `[signer, writable]` Payer.
+/// 2. `[]` Wallet PDA.
+/// 3. `[signer]` Admin Authority: Existing authority authorizing this action.
+/// 4. `[writable]` New Authority: The PDA to create.
+/// 5. `[]` System Program.
 pub fn process_add_authority(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -101,11 +129,19 @@ pub fn process_add_authority(
         return Err(ProgramError::IllegalOwner);
     }
 
+    if !admin_auth_pda.is_writable() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
     if admin_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
         return Err(ProgramError::InvalidAccountData);
     }
 
+    if (admin_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    // SAFETY: We verified data length and alignment above.
     let admin_header = unsafe { &*(admin_data.as_ptr() as *const AuthorityAccountHeader) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
@@ -219,6 +255,23 @@ pub fn process_add_authority(
     Ok(())
 }
 
+/// Processes the `RemoveAuthority` instruction.
+///
+/// Removes an existing authority and refunds rent to the destination.
+///
+/// # Logic:
+/// 1. **Authentication**: Verifies the `admin_authority`.
+/// 2. **Authorization**:
+///    - `Owner` can remove anyone (except potentially the last owner, though not explicitly enforced here).
+///    - `Admin` can only remove `Spender`.
+/// 3. **Execution**: Securely closes the account by zeroing data and transferring lamports.
+///
+/// # Accounts:
+/// 1. `[signer]` Payer.
+/// 2. `[]` Wallet PDA.
+/// 3. `[signer]` Admin Authority.
+/// 4. `[writable]` Target Authority: PDA to verify and close.
+/// 5. `[writable]` Refund Destination.
 pub fn process_remove_authority(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -253,7 +306,15 @@ pub fn process_remove_authority(
         return Err(ProgramError::IllegalOwner);
     }
 
+    if !admin_auth_pda.is_writable() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
+    if (admin_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    // SAFETY: Verified alignment and data length (via AuthorityAccountHeader size implicitly).
     let admin_header = unsafe { &*(admin_data.as_ptr() as *const AuthorityAccountHeader) };
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -300,9 +361,7 @@ pub fn process_remove_authority(
         *target_auth_pda.borrow_mut_lamports_unchecked() = 0;
     }
     let target_data = unsafe { target_auth_pda.borrow_mut_data_unchecked() };
-    for i in 0..target_data.len() {
-        target_data[i] = 0;
-    }
+    target_data.fill(0);
 
     Ok(())
 }
