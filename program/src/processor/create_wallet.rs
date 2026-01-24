@@ -14,6 +14,13 @@ use crate::{
     state::{authority::AuthorityAccountHeader, wallet::WalletAccount, AccountDiscriminator},
 };
 
+/// Arguments for the `CreateWallet` instruction.
+///
+/// Layout:
+/// - `user_seed`: 32-byte seed for deterministic wallet derivation.
+/// - `authority_type`: 0 for Ed25519, 1 for Secp256r1.
+/// - `auth_bump`: Bump seed for the authority PDA (optional/informational).
+/// - `_padding`: Reserved for alignment (ensure total size is multiple of 8).
 #[repr(C, align(8))]
 #[derive(NoPadding)]
 pub struct CreateWalletArgs {
@@ -29,11 +36,28 @@ impl CreateWalletArgs {
             return Err(ProgramError::InvalidInstructionData);
         }
         let (fixed, rest) = data.split_at(40);
+        if (fixed.as_ptr() as usize) % 8 != 0 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        // SAFETY: Size and alignment checked.
         let args = unsafe { &*(fixed.as_ptr() as *const CreateWalletArgs) };
         Ok((args, rest))
     }
 }
 
+/// Processes the `CreateWallet` instruction.
+///
+/// This instruction initializes:
+/// 1. A `Wallet` PDA: The central identity.
+/// 2. A `Vault` PDA: To hold assets (signer).
+/// 3. An `Authority` PDA: The initial owner (Admin/Owner role).
+///
+/// # Accounts:
+/// 1. `[signer, writable]` Payer: Pays for account creation.
+/// 2. `[writable]` Wallet PDA: Derived from `["wallet", user_seed]`.
+/// 3. `[writable]` Vault PDA: Derived from `["vault", wallet_pubkey]`.
+/// 4. `[writable]` Authority PDA: Derived from `["authority", wallet_pubkey, id_seed]`.
+/// 5. `[]` System Program.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -94,7 +118,8 @@ pub fn process(
     }
     check_zero_data(auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
-    // --- Init Wallet Account ---
+    // --- 1. Initialize Wallet Account ---
+    // Calculate rent-exempt balance for fixed 8-byte wallet account layout.
     let wallet_space = 8;
     // 897840 + (space * 6960)
     let rent_base = 897840u64;
@@ -143,6 +168,9 @@ pub fn process(
 
     // Write Wallet Data
     let wallet_data = unsafe { wallet_pda.borrow_mut_data_unchecked() };
+    if (wallet_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
     let wallet_account = WalletAccount {
         discriminator: AccountDiscriminator::Wallet as u8,
         bump: wallet_bump,
@@ -152,7 +180,8 @@ pub fn process(
         *(wallet_data.as_mut_ptr() as *mut WalletAccount) = wallet_account;
     }
 
-    // --- Init Authority Account ---
+    // --- 2. Initialize Authority Account ---
+    // Authority accounts have a variable size depending on the authority type (e.g., Secp256r1 keys are larger).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
     let variable_size = if args.authority_type == 1 {
         4 + full_auth_data.len()
@@ -208,6 +237,9 @@ pub fn process(
 
     // Write Authority Data
     let auth_account_data = unsafe { auth_pda.borrow_mut_data_unchecked() };
+    if (auth_account_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     let header = AuthorityAccountHeader {
         discriminator: AccountDiscriminator::Authority as u8,

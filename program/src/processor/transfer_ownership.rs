@@ -9,6 +9,7 @@ use pinocchio::{
 };
 
 use crate::{
+    // Unified authentication helpers.
     auth::{
         ed25519::Ed25519Authenticator, secp256r1::Secp256r1Authenticator, traits::Authenticator,
     },
@@ -16,6 +17,24 @@ use crate::{
     state::{authority::AuthorityAccountHeader, AccountDiscriminator},
 };
 
+/// Processes the `TransferOwnership` instruction.
+///
+/// atomically transfers the "Owner" role from the current authority to a new one.
+/// The old owner is closed/removed, and the new one is created with `Role::Owner`.
+///
+/// # Logic:
+/// 1. **Authentication**: Verifies the `current_owner` matches the request logic.
+/// 2. **Authorization**: strictly enforced to only work if `current_owner` has `Role::Owner` (0).
+/// 3. **Atomic Swap**:
+///    - Creates the `new_owner` account.
+///    - Closes the `current_owner` account and refunds rent to payer.
+///
+/// # Accounts:
+/// 1. `[signer, writable]` Payer.
+/// 2. `[]` Wallet PDA.
+/// 3. `[signer, writable]` Current Owner Authority.
+/// 4. `[writable]` New Owner Authority.
+/// 5. `[]` System Program.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -75,8 +94,17 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
+    if !current_owner.is_writable() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    // Scope to borrow current owner data
     {
         let mut data = unsafe { current_owner.borrow_mut_data_unchecked() };
+        if (data.as_ptr() as usize) % 8 != 0 {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        // SAFETY: Alignment checked.
         let auth = unsafe { &*(data.as_ptr() as *const AuthorityAccountHeader) };
         if auth.discriminator != AccountDiscriminator::Authority as u8 {
             return Err(ProgramError::InvalidAccountData);
@@ -165,6 +193,9 @@ pub fn process(
     )?;
 
     let data = unsafe { new_owner.borrow_mut_data_unchecked() };
+    if (data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
     let header = AuthorityAccountHeader {
         discriminator: AccountDiscriminator::Authority as u8,
         authority_type: auth_type,
@@ -195,9 +226,7 @@ pub fn process(
         *current_owner.borrow_mut_lamports_unchecked() = 0;
     }
     let current_data = unsafe { current_owner.borrow_mut_data_unchecked() };
-    for i in 0..current_data.len() {
-        current_data[i] = 0;
-    }
+    current_data.fill(0);
 
     Ok(())
 }

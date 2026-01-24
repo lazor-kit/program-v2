@@ -23,6 +23,13 @@ use crate::auth::traits::Authenticator;
 pub struct Secp256r1Authenticator;
 
 impl Authenticator for Secp256r1Authenticator {
+    /// Authenticates a Secp256r1 signature (WebAuthn/Passkeys).
+    ///
+    /// # Arguments
+    /// * `accounts`: Slice of accounts, expecting Sysvar Lookups if needed.
+    /// * `auth_data`: Mutable reference to the Authority account data (to update counter).
+    /// * `auth_payload`: Auxiliary data (e.g., signature, authenticator data, client JSON parts).
+    /// * `signed_payload`: The actual message/data that was signed (e.g. instruction args).
     fn authenticate(
         &self,
         accounts: &[AccountInfo],
@@ -56,6 +63,10 @@ impl Authenticator for Secp256r1Authenticator {
         let _slot_hash = validate_nonce(slothashes_account, &truncated_slot)?;
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
+        if (auth_data.as_ptr() as usize) % 8 != 0 {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
+        // SAFETY: Pointer alignment checked above. size_of correct.
         let header = unsafe { &mut *(auth_data.as_mut_ptr() as *mut AuthorityAccountHeader) };
 
         #[allow(unused_assignments)]

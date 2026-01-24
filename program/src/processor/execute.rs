@@ -17,6 +17,22 @@ use pinocchio::{
 };
 
 /// Process the Execute instruction  
+/// Processes the `Execute` instruction.
+///
+/// Executes a batch of condensed "Compact Instructions" on behalf of the wallet.
+///
+/// # Logic:
+/// 1. **Authentication**: Verifies that the signer is a valid `Authority` or `Session` for this wallet.
+/// 2. **Session Checks**: If authenticated via Session, enforces slot expiry.
+/// 3. **Decompression**: Expands `CompactInstructions` (index-based references) into full Solana instructions.
+/// 4. **Execution**: Invokes the Instructions via CPI, signing with the Vault PDA.
+///
+/// # Accounts:
+/// 1. `[signer]` Payer.
+/// 2. `[]` Wallet PDA.
+/// 3. `[signer]` Authority or Session PDA.
+/// 4. `[signer]` Vault PDA (Signer for CPI).
+/// 5. `...` Inner accounts referenced by instructions.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -46,12 +62,20 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
+    if !authority_pda.is_writable() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     // Read authority header
     let mut authority_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
     if authority_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
         return Err(ProgramError::InvalidAccountData);
     }
 
+    if (authority_data.as_ptr() as usize) % 8 != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    // SAFETY: Alignment and size checked.
     let authority_header = unsafe { &*(authority_data.as_ptr() as *const AuthorityAccountHeader) };
 
     // Parse compact instructions
@@ -98,6 +122,10 @@ pub fn process(
             if session_data.len() < std::mem::size_of::<crate::state::session::SessionAccount>() {
                 return Err(ProgramError::InvalidAccountData);
             }
+            if (session_data.as_ptr() as usize) % 8 != 0 {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            // SAFETY: Alignment and size checked.
             let session = unsafe {
                 &*(session_data.as_ptr() as *const crate::state::session::SessionAccount)
             };
@@ -134,7 +162,8 @@ pub fn process(
     let (vault_key, vault_bump) =
         find_program_address(&[b"vault", wallet_pda.key().as_ref()], program_id);
 
-    // Verify vault PDA
+    // Verify vault PDA.
+    // CRITICAL: Ensure we are signing with the correct Vault derived from this Wallet.
     if vault_pda.key() != &vault_key {
         return Err(ProgramError::InvalidSeeds);
     }
