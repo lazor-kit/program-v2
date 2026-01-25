@@ -23,10 +23,9 @@ impl Authenticator for Ed25519Authenticator {
         let pubkey_bytes = &authority_data[header_size..header_size + 32];
 
         for account in accounts {
-            if account.is_signer() {
-                if sol_assert_bytes_eq(account.key().as_ref(), pubkey_bytes, 32) {
-                    return Ok(());
-                }
+            if account.is_signer() && sol_assert_bytes_eq(account.key().as_ref(), pubkey_bytes, 32)
+            {
+                return Ok(());
             }
         }
 

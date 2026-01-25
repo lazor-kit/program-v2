@@ -1,10 +1,7 @@
 use no_padding::NoPadding;
 
-#[repr(C, align(8))]
-#[derive(NoPadding)]
-/// Main Wallet Account.
-///
-/// Acts as the trust anchor. Assets are stored in the separate Vault PDA.
+// Main Wallet Account.
+// Acts as the trust anchor. Assets are stored in the separate Vault PDA.
 #[repr(C, align(8))]
 #[derive(NoPadding)]
 pub struct WalletAccount {

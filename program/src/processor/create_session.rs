@@ -96,12 +96,13 @@ pub fn process(
     // Verify Authorizer
     // Check removed: conditional writable check inside match
 
-    let mut auth_data = unsafe { authorizer_pda.borrow_mut_data_unchecked() };
+    let auth_data = unsafe { authorizer_pda.borrow_mut_data_unchecked() };
 
     // Safe copy header
     let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
     header_bytes.copy_from_slice(&auth_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
-    let auth_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
+    let auth_header =
+        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
 
     if auth_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -136,7 +137,7 @@ pub fn process(
 
     match auth_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, &mut auth_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &[])?;
         },
         1 => {
             if !authorizer_pda.is_writable() {
@@ -144,7 +145,7 @@ pub fn process(
             }
             Secp256r1Authenticator.authenticate(
                 accounts,
-                &mut auth_data,
+                auth_data,
                 authority_payload,
                 &instruction_data[..payload_offset], // Sign over args part?
             )?;
@@ -234,4 +235,29 @@ pub fn process(
     data[0..std::mem::size_of::<SessionAccount>()].copy_from_slice(session_bytes);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_session_args_from_bytes() {
+        let mut data = Vec::new();
+        // session_key(32) + expires_at(8)
+        let session_key = [7u8; 32];
+        let expires_at = 12345678u64;
+        data.extend_from_slice(&session_key);
+        data.extend_from_slice(&expires_at.to_le_bytes());
+
+        let args = CreateSessionArgs::from_bytes(&data).unwrap();
+        assert_eq!(args.session_key, session_key);
+        assert_eq!(args.expires_at, expires_at);
+    }
+
+    #[test]
+    fn test_create_session_args_too_short() {
+        let data = vec![0u8; 39]; // Need 40
+        assert!(CreateSessionArgs::from_bytes(&data).is_err());
+    }
 }

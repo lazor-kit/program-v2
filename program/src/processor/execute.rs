@@ -68,11 +68,11 @@ pub fn process(
 
     // Read authority header
     // Safe copy header
-    let mut authority_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
+    let authority_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
     let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
     header_bytes.copy_from_slice(&authority_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
     let authority_header =
-        unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
+        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
 
     // Parse compact instructions
     let compact_instructions = parse_compact_instructions(instruction_data)?;
@@ -98,13 +98,13 @@ pub fn process(
             match authority_header.authority_type {
                 0 => {
                     // Ed25519: Verify signer
-                    Ed25519Authenticator.authenticate(accounts, &mut authority_data, &[], &[])?;
+                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[])?;
                 },
                 1 => {
                     // Secp256r1: Full authentication
                     Secp256r1Authenticator.authenticate(
                         accounts,
-                        &mut authority_data,
+                        authority_data,
                         authority_payload,
                         &compact_bytes,
                     )?;

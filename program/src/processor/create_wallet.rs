@@ -271,7 +271,67 @@ pub fn process(
         .copy_from_slice(header_bytes);
 
     let variable_target = &mut auth_account_data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    if args.authority_type == 1 {
+        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
+        variable_target[4..].copy_from_slice(full_auth_data);
+    } else {
+        variable_target.copy_from_slice(full_auth_data);
+    }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_wallet_args_from_bytes_ed25519() {
+        let mut data = Vec::new();
+        // Args: user_seed(32) + type(1) + bump(1) + padding(6) = 40
+        let user_seed = [1u8; 32];
+        data.extend_from_slice(&user_seed);
+        data.push(0); // Ed25519
+        data.push(255); // bump
+        data.extend_from_slice(&[0; 6]); // padding
+
+        // Payload for Ed25519: pubkey(32)
+        let pubkey = [2u8; 32];
+        data.extend_from_slice(&pubkey);
+
+        let (args, rest) = CreateWalletArgs::from_bytes(&data).unwrap();
+        assert_eq!(args.user_seed, user_seed);
+        assert_eq!(args.authority_type, 0);
+        assert_eq!(args.auth_bump, 255);
+        assert_eq!(rest, &pubkey);
+    }
+
+    #[test]
+    fn test_create_wallet_args_from_bytes_secp256r1() {
+        let mut data = Vec::new();
+        let user_seed = [3u8; 32];
+        data.extend_from_slice(&user_seed);
+        data.push(1); // Secp256r1
+        data.push(254);
+        data.extend_from_slice(&[0; 6]);
+
+        // Payload for Secp256r1: hash(32) + key(variable)
+        let hash = [4u8; 32];
+        let key = [5u8; 33];
+        data.extend_from_slice(&hash);
+        data.extend_from_slice(&key);
+
+        let (args, rest) = CreateWalletArgs::from_bytes(&data).unwrap();
+        assert_eq!(args.user_seed, user_seed);
+        assert_eq!(args.authority_type, 1);
+        assert_eq!(rest.len(), 65);
+        assert_eq!(&rest[0..32], &hash);
+        assert_eq!(&rest[32..], &key);
+    }
+
+    #[test]
+    fn test_create_wallet_args_too_short() {
+        let data = vec![0u8; 39]; // Need 40
+        assert!(CreateWalletArgs::from_bytes(&data).is_err());
+    }
 }
