@@ -38,7 +38,7 @@ fn generate_idl() -> Result<(), Box<dyn std::error::Error>> {
 
     // write to json file
     let out_dir = crate_root;
-    let out_filename = format!("idl.json");
+    let out_filename = "idl.json".to_string();
     let idl_json_path = out_dir.join(out_filename);
     fs::write(&idl_json_path, idl_json)?;
 

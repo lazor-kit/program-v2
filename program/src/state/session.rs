@@ -6,7 +6,7 @@ use pinocchio::pubkey::Pubkey;
 /// Ephemeral Session Account.
 ///
 /// Represents a temporary delegated authority with an expiration time.
-#[repr(C, align(8))]
+// Removed duplicate attribute
 #[derive(NoPadding)]
 pub struct SessionAccount {
     /// Account discriminator (must be `3` for Session).

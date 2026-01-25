@@ -128,7 +128,7 @@ impl Authenticator for Secp256r1Authenticator {
         let sysvar_instructions = accounts
             .get(sysvar_ix_index)
             .ok_or(AuthError::InvalidAuthorityPayload)?;
-        if sysvar_instructions.key().as_ref() != &INSTRUCTIONS_ID {
+        if sysvar_instructions.key().as_ref() != INSTRUCTIONS_ID.as_ref() {
             return Err(AuthError::InvalidInstruction.into());
         }
 

@@ -139,7 +139,7 @@ pub fn process_add_authority(
     //    return Err(ProgramError::InvalidAccountData);
     // }
 
-    let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
+    let admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
     if admin_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -147,7 +147,8 @@ pub fn process_add_authority(
     // Safe Copy of Header
     let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
     header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
-    let admin_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
+    let admin_header =
+        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -160,7 +161,7 @@ pub fn process_add_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Verify signer (authority_payload ignored)
-            Ed25519Authenticator.authenticate(accounts, &mut admin_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[])?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
@@ -170,7 +171,7 @@ pub fn process_add_authority(
             // Secp256r1: Full authentication with payload
             Secp256r1Authenticator.authenticate(
                 accounts,
-                &mut admin_data,
+                admin_data,
                 authority_payload,
                 data_payload,
             )?;
@@ -260,7 +261,12 @@ pub fn process_add_authority(
     }
 
     let variable_target = &mut data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    if args.authority_type == 1 {
+        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
+        variable_target[4..].copy_from_slice(full_auth_data);
+    } else {
+        variable_target.copy_from_slice(full_auth_data);
+    }
 
     Ok(())
 }
@@ -321,10 +327,11 @@ pub fn process_remove_authority(
     }
 
     // Safe copy header
-    let mut admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
+    let admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
     let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
     header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
-    let admin_header = unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&header_bytes) };
+    let admin_header =
+        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -336,12 +343,12 @@ pub fn process_remove_authority(
     // Authentication
     match admin_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, &mut admin_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[])?;
         },
         1 => {
             Secp256r1Authenticator.authenticate(
                 accounts,
-                &mut admin_data,
+                admin_data,
                 authority_payload,
                 data_payload,
             )?;
@@ -357,7 +364,7 @@ pub fn process_remove_authority(
         target_h_bytes
             .copy_from_slice(&target_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
         let target_header =
-            unsafe { std::mem::transmute::<_, &AuthorityAccountHeader>(&target_h_bytes) };
+            unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&target_h_bytes) };
         if target_header.discriminator != AccountDiscriminator::Authority as u8 {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -379,4 +386,32 @@ pub fn process_remove_authority(
     target_data.fill(0);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_authority_args_from_bytes() {
+        // [type(1)][role(1)][padding(6)]
+        let mut data = Vec::new();
+        data.push(0); // Ed25519
+        data.push(2); // Spender
+        data.extend_from_slice(&[0; 6]); // padding
+
+        let extra_data = [1u8; 32];
+        data.extend_from_slice(&extra_data);
+
+        let (args, rest) = AddAuthorityArgs::from_bytes(&data).unwrap();
+        assert_eq!(args.authority_type, 0);
+        assert_eq!(args.new_role, 2);
+        assert_eq!(rest, &extra_data);
+    }
+
+    #[test]
+    fn test_add_authority_args_too_short() {
+        let data = vec![0u8; 7]; // Need 8
+        assert!(AddAuthorityArgs::from_bytes(&data).is_err());
+    }
 }

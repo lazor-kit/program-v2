@@ -224,7 +224,7 @@ pub enum LazorKitInstruction {
     /// 3. `[]` Authority PDA
     /// 4. `[signer]` Vault PDA
     /// 5. `[]` Sysvar Instructions (if Secp256r1)
-    /// ... Inner accounts
+    ///    ... Inner accounts
     Execute {
         instructions: Vec<u8>, // CompactInstructions bytes, we'll parse later
     },

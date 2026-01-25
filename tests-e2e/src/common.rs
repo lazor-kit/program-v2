@@ -1,8 +1,8 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    instruction::{AccountMeta, Instruction},
+    instruction::Instruction,
     pubkey::Pubkey,
     signature::{read_keypair_file, Keypair, Signer},
     system_instruction,

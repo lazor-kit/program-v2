@@ -26,13 +26,15 @@ where
     data: T,
 }
 
-impl<'a, T> SlotHashes<T>
+impl<T> SlotHashes<T>
 where
     T: Deref<Target = [u8]>,
 {
     /// Creates a new `SlotHashes` struct.
     /// `data` is the slot hashes sysvar account data.
     #[inline(always)]
+    /// # Safety
+    /// Caller must ensure data is valid.
     pub unsafe fn new_unchecked(data: T) -> Self {
         SlotHashes { data }
     }
@@ -40,12 +42,14 @@ where
     /// Returns the number of slot hashes in the SlotHashes sysvar.
     #[inline(always)]
     pub fn get_slothashes_len(&self) -> u64 {
-        let raw_ptr = self.data.as_ptr() as *const u8;
+        let raw_ptr = self.data.as_ptr();
         unsafe { u64::from_le(*(raw_ptr as *const u64)) }
     }
 
     /// Returns the slot hash at the specified index.
     #[inline(always)]
+    /// # Safety
+    /// Index must be within bounds.
     pub unsafe fn get_slot_hash_unchecked(&self, index: usize) -> &SlotHash {
         let offset = self
             .data

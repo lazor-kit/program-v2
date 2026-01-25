@@ -35,18 +35,37 @@ use crate::{
 /// 3. `[signer, writable]` Current Owner Authority.
 /// 4. `[writable]` New Owner Authority.
 /// 5. `[]` System Program.
+///
+/// Arguments for the `TransferOwnership` instruction.
+///
+/// Layout:
+/// - `new_type`: Authority Type (0=Ed25519, 1=Secp256r1).
+/// - `pubkey`/`hash`: The identifier for the new authority.
+#[derive(Debug)]
+pub struct TransferOwnershipArgs {
+    pub auth_type: u8,
+}
+
+impl TransferOwnershipArgs {
+    pub fn from_bytes(data: &[u8]) -> Result<(Self, &[u8]), ProgramError> {
+        if data.is_empty() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        let auth_type = data[0];
+        let rest = &data[1..];
+
+        Ok((Self { auth_type }, rest))
+    }
+}
+
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    if instruction_data.len() < 1 {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    let auth_type = instruction_data[0];
-    let rest = &instruction_data[1..];
+    let (args, rest) = TransferOwnershipArgs::from_bytes(instruction_data)?;
 
-    let (id_seed, full_auth_data) = match auth_type {
+    let (id_seed, full_auth_data) = match args.auth_type {
         0 => {
             if rest.len() < 32 {
                 return Err(ProgramError::InvalidInstructionData);
@@ -100,7 +119,7 @@ pub fn process(
 
     // Scope to borrow current owner data
     {
-        let mut data = unsafe { current_owner.borrow_mut_data_unchecked() };
+        let data = unsafe { current_owner.borrow_mut_data_unchecked() };
         if (data.as_ptr() as usize) % 8 != 0 {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -119,12 +138,12 @@ pub fn process(
         // Authenticate Current Owner
         match auth.authority_type {
             0 => {
-                Ed25519Authenticator.authenticate(accounts, &mut data, &[], &[])?;
+                Ed25519Authenticator.authenticate(accounts, data, &[], &[])?;
             },
             1 => {
                 Secp256r1Authenticator.authenticate(
                     accounts,
-                    &mut data,
+                    data,
                     authority_payload,
                     data_payload,
                 )?;
@@ -143,7 +162,7 @@ pub fn process(
     check_zero_data(new_owner, ProgramError::AccountAlreadyInitialized)?;
 
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = if auth_type == 1 {
+    let variable_size = if args.auth_type == 1 {
         4 + full_auth_data.len()
     } else {
         full_auth_data.len()
@@ -198,7 +217,7 @@ pub fn process(
     }
     let header = AuthorityAccountHeader {
         discriminator: AccountDiscriminator::Authority as u8,
-        authority_type: auth_type,
+        authority_type: args.auth_type,
         role: 0,
         bump,
         version: crate::state::CURRENT_ACCOUNT_VERSION,
@@ -211,7 +230,7 @@ pub fn process(
     }
 
     let variable_target = &mut data[header_size..];
-    if auth_type == 1 {
+    if args.auth_type == 1 {
         variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
         variable_target[4..].copy_from_slice(full_auth_data);
     } else {
@@ -230,4 +249,28 @@ pub fn process(
     current_data.fill(0);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transfer_ownership_args_from_bytes() {
+        // [type(1)][rest...]
+        let mut data = Vec::new();
+        data.push(1); // Secp256r1
+        let payload = [5u8; 65];
+        data.extend_from_slice(&payload);
+
+        let (args, rest) = TransferOwnershipArgs::from_bytes(&data).unwrap();
+        assert_eq!(args.auth_type, 1);
+        assert_eq!(rest, &payload);
+    }
+
+    #[test]
+    fn test_transfer_ownership_args_too_short() {
+        let data = vec![];
+        assert!(TransferOwnershipArgs::from_bytes(&data).is_err());
+    }
 }
