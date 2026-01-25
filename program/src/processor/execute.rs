@@ -166,7 +166,7 @@ pub fn process(
 
     // Execute each compact instruction
     for compact_ix in &compact_instructions {
-        let decompressed = compact_ix.decompress(inner_accounts)?;
+        let decompressed = compact_ix.decompress(accounts)?;
 
         // Build AccountMeta array for instruction
         let account_metas: Vec<AccountMeta> = decompressed
