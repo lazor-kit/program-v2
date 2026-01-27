@@ -10,9 +10,6 @@ import ECDSA from "ecdsa-secp256r1";
 import * as dotenv from "dotenv";
 import bs58 from "bs58";
 
-import { getAddressEncoder } from "@solana/addresses";
-import { getU64Encoder } from "@solana/codecs";
-
 // Helper to pack instructions for Execute
 // See program/src/compact.rs
 // byte format: [num_ixs(1)] [ [prog_idx(1)][num_accs(1)][acc_idxs...][data_len(2)][data...] ] ...
