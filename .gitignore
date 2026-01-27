@@ -1,11 +1,33 @@
-.anchor
-.DS_Store
+# Build outputs
+ts-sdk/dist
 target
-**/*.rs.bk
+dist
+
+# Dependencies
 node_modules
-test-ledger
-.yarn
+Cargo.lock
 yarn.lock
+
+# Environment and secrets
 .env
-.surfpool
+.keypair
 *-wallet.json
+*.key
+
+# OS files
+.DS_Store
+
+# Rust backup files
+**/*.rs.bk
+
+# Test artifacts
+test-ledger
+.anchor
+
+# Misc
+.surfpool
+.yarn.idea/
+*.so
+*.dylib
+build_error.log
+validator.log
