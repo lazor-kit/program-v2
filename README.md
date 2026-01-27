@@ -1,4 +1,4 @@
-# ⚡ LazorKit Smart Wallet (V1)
+# ⚡ LazorKit Smart Wallet (V2)
 
 **LazorKit** is a high-performance, security-focused Smart Wallet contract on Solana. It enables advanced account abstraction features like multi-signature support, session keys, and role-based access control (RBAC) with minimal on-chain overhead.
 
