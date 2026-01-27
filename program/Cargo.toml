@@ -1,0 +1,31 @@
+[package]
+name = "lazorkit-program"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-pubkey = { workspace = true }
+pinocchio-system = { workspace = true }
+no-padding = { workspace = true }
+assertions = { workspace = true }
+shank = { version = "0.4.2", git = "https://github.com/anagrambuild/shank.git" }
+
+[dev-dependencies]
+solana-sdk = "2.1"
+litesvm = "0.6"
+rand = "0.8"
+anyhow = "1.0"
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+ecdsa = "0.16"
+base64ct = "=1.6.0"
+blake3 = "=1.5.5"
+getrandom = "=0.2.17"
+
+[build-dependencies]
+shank_idl = { version = "0.4.2", git = "https://github.com/anagrambuild/shank.git" }
+anyhow = "1.0"
