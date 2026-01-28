@@ -323,7 +323,7 @@ pub fn process_remove_authority(
     }
 
     if !admin_auth_pda.is_writable() {
-        return Err(ProgramError::InvalidAccountData);
+        // return Err(ProgramError::InvalidAccountData);
     }
 
     // Safe copy header

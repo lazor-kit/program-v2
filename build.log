@@ -1,0 +1,1993 @@
+warning: Patch `getrandom v0.2.15 (https://github.com/rust-random/getrandom.git?tag=v0.2.15#cf65e83f)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling getrandom v0.3.4
+   Compiling digest v0.10.7
+   Compiling borsh-derive v0.10.4
+   Compiling getrandom v0.1.16
+   Compiling sha2 v0.9.9
+   Compiling ring v0.17.14
+   Compiling zerovec v0.11.5
+   Compiling socket2 v0.6.2
+   Compiling bv v0.11.1
+   Compiling serde-big-array v0.5.1
+   Compiling solana-msg v2.2.1
+error[E0583]: file not found for module `sys`
+   --> src/lib.rs:181:1
+    |
+181 | mod sys;
+    | ^^^^^^^^
+    |
+    = help: to create the module `sys`, create file "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.6.2/src/sys.rs" or "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/socket2-0.6.2/src/sys/mod.rs"
+    = note: if there is a `mod sys` elsewhere in the crate already, import it with `use crate::...` instead
+
+error: target is not supported. You may need to define a custom backend see: https://docs.rs/getrandom/0.3.4/#custom-backend
+   --> src/backends.rs:204:9
+    |
+204 | /         compile_error!(concat!(
+205 | |             "target is not supported. You may need to define a custom backend see: \
+206 | |             https://docs.rs/getrandom/", env!("CARGO_PKG_VERSION"), "/#custom-backend"
+207 | |         ));
+    | |__________^
+
+error: target is not supported, for more information see: https://docs.rs/getrandom/#unsupported-targets
+   --> src/lib.rs:267:9
+    |
+267 | /         compile_error!("\
+268 | |             target is not supported, for more information see: \
+269 | |             https://docs.rs/getrandom/#unsupported-targets\
+270 | |         ");
+    | |__________^
+
+error: Socket2 doesn't support the compile target
+   --> src/lib.rs:184:1
+    |
+184 | compile_error!("Socket2 doesn't support the compile target");
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0425]: cannot find function `fill_inner` in module `backends`
+  --> src/lib.rs:99:19
+   |
+99 |         backends::fill_inner(dest)?;
+   |                   ^^^^^^^^^^ not found in `backends`
+
+error[E0425]: cannot find function `inner_u32` in module `backends`
+   --> src/lib.rs:123:15
+    |
+123 |     backends::inner_u32()
+    |               ^^^^^^^^^ not found in `backends`
+    |
+help: consider importing this function
+    |
+33  + use crate::util::inner_u32;
+    |
+help: if you import `inner_u32`, refer to it directly
+    |
+123 -     backends::inner_u32()
+123 +     inner_u32()
+    |
+
+error[E0425]: cannot find function `inner_u64` in module `backends`
+   --> src/lib.rs:137:15
+    |
+137 |     backends::inner_u64()
+    |               ^^^^^^^^^ not found in `backends`
+    |
+help: consider importing this function
+    |
+33  + use crate::util::inner_u64;
+    |
+help: if you import `inner_u64`, refer to it directly
+    |
+137 -     backends::inner_u64()
+137 +     inner_u64()
+    |
+
+error[E0432]: unresolved imports `crate::sys::c_int`, `crate::sys::sockaddr_in`, `crate::sys::sockaddr_in6`, `crate::sys::sockaddr_storage`, `crate::sys::AF_INET`, `crate::sys::AF_INET6`, `crate::sys::AF_UNIX`
+  --> src/sockaddr.rs:10:18
+   |
+10 | use crate::sys::{c_int, sockaddr_in, sockaddr_in6, sockaddr_storage, AF_INET, AF_INET6, AF_UNIX};
+   |                  ^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^  ^^^^^^^^  ^^^^^^^ no `AF_UNIX` in `sys`
+   |                  |      |            |             |                 |        |
+   |                  |      |            |             |                 |        no `AF_INET6` in `sys`
+   |                  |      |            |             |                 no `AF_INET` in `sys`
+   |                  |      |            |             no `sockaddr_storage` in `sys`
+   |                  |      |            no `sockaddr_in6` in `sys`
+   |                  |      no `sockaddr_in` in `sys`
+   |                  no `c_int` in `sys`
+   |
+   = help: consider importing one of these type aliases instead:
+           std::ffi::c_int
+           std::os::raw::c_int
+           core::ffi::c_int
+
+error[E0432]: unresolved imports `crate::sys::c_int`, `crate::sys::getsockopt`, `crate::sys::setsockopt`, `crate::sys::Bool`
+  --> src/socket.rs:23:24
+   |
+23 | use crate::sys::{self, c_int, getsockopt, setsockopt, Bool};
+   |                        ^^^^^  ^^^^^^^^^^  ^^^^^^^^^^  ^^^^ no `Bool` in `sys`
+   |                        |      |           |
+   |                        |      |           no `setsockopt` in `sys`
+   |                        |      no `getsockopt` in `sys`
+   |                        no `c_int` in `sys`
+   |
+   = help: consider importing one of these type aliases instead:
+           std::ffi::c_int
+           std::os::raw::c_int
+           core::ffi::c_int
+
+error[E0432]: unresolved import `sys::c_int`
+   --> src/lib.rs:186:5
+    |
+186 | use sys::c_int;
+    |     ^^^^^^^^^^ no `c_int` in `sys`
+    |
+help: consider importing one of these type aliases instead
+    |
+186 | use std::ffi::c_int;
+    |     ~~~~~~~~~~~~~~~
+186 | use std::os::raw::c_int;
+    |     ~~~~~~~~~~~~~~~~~~~
+186 | use core::ffi::c_int;
+    |     ~~~~~~~~~~~~~~~~
+
+error[E0433]: failed to resolve: use of undeclared crate or module `imp`
+   --> src/lib.rs:291:5
+    |
+291 |     imp::getrandom_inner(dest)
+    |     ^^^ use of undeclared crate or module `imp`
+
+For more information about this error, try `rustc --explain E0425`.
+For more information about this error, try `rustc --explain E0433`.
+error[E0433]: failed to resolve: could not find `MaybeUninitSlice` in `sys`
+   --> src/lib.rs:402:31
+    |
+402 |         MaybeUninitSlice(sys::MaybeUninitSlice::new(buf))
+    |                               ^^^^^^^^^^^^^^^^ could not find `MaybeUninitSlice` in `sys`
+
+error: could not compile `getrandom` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `getrandom` (lib) due to 4 previous errors
+error[E0412]: cannot find type `socklen_t` in module `crate::sys`
+  --> src/sockaddr.rs:15:34
+   |
+15 | pub type socklen_t = crate::sys::socklen_t;
+   |                                  ^^^^^^^^^ not found in `crate::sys`
+   |
+help: consider importing this type alias through its public re-export
+   |
+1  + use crate::socklen_t;
+   |
+help: if you import `socklen_t`, refer to it directly
+   |
+15 - pub type socklen_t = crate::sys::socklen_t;
+15 + pub type socklen_t = socklen_t;
+   |
+
+error[E0412]: cannot find type `sa_family_t` in module `crate::sys`
+  --> src/sockaddr.rs:19:36
+   |
+19 | pub type sa_family_t = crate::sys::sa_family_t;
+   |                                    ^^^^^^^^^^^ not found in `crate::sys`
+   |
+help: consider importing this type alias through its public re-export
+   |
+1  + use crate::sa_family_t;
+   |
+help: if you import `sa_family_t`, refer to it directly
+   |
+19 - pub type sa_family_t = crate::sys::sa_family_t;
+19 + pub type sa_family_t = sa_family_t;
+   |
+
+error[E0425]: cannot find function `unix_sockaddr` in module `crate::sys`
+   --> src/sockaddr.rs:219:21
+    |
+219 |         crate::sys::unix_sockaddr(path.as_ref())
+    |                     ^^^^^^^^^^^^^ not found in `crate::sys`
+
+error[E0425]: cannot find function `from_in_addr` in module `crate::sys`
+   --> src/sockaddr.rs:283:34
+    |
+283 |             let ip = crate::sys::from_in_addr(addr.sin_addr);
+    |                                  ^^^^^^^^^^^^ not found in `crate::sys`
+
+error[E0425]: cannot find function `from_in6_addr` in module `crate::sys`
+   --> src/sockaddr.rs:290:34
+    |
+290 |             let ip = crate::sys::from_in6_addr(addr.sin6_addr);
+    |                                  ^^^^^^^^^^^^^ not found in `crate::sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `crate::sys`
+   --> src/sockaddr.rs:352:44
+    |
+352 |             storage.sin_addr = crate::sys::to_in_addr(addr.ip());
+    |                                            ^^^^^^^^^^ not found in `crate::sys`
+
+error[E0425]: cannot find function `to_in6_addr` in module `crate::sys`
+   --> src/sockaddr.rs:386:45
+    |
+386 |             storage.sin6_addr = crate::sys::to_in6_addr(addr.ip());
+    |                                             ^^^^^^^^^^^ not found in `crate::sys`
+
+error[E0412]: cannot find type `Socket` in module `sys`
+  --> src/socket.rs:76:17
+   |
+76 |     inner: sys::Socket,
+   |                 ^^^^^^ not found in `sys`
+   |
+help: consider importing this struct through its public re-export
+   |
+9  + use crate::Socket;
+   |
+help: if you import `Socket`, refer to it directly
+   |
+76 -     inner: sys::Socket,
+76 +     inner: Socket,
+   |
+
+error[E0412]: cannot find type `RawSocket` in module `sys`
+  --> src/socket.rs:86:38
+   |
+86 |     pub(crate) fn from_raw(raw: sys::RawSocket) -> Socket {
+   |                                      ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `socket_from_raw` in module `sys`
+  --> src/socket.rs:92:34
+   |
+92 |             inner: unsafe { sys::socket_from_raw(raw) },
+   |                                  ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `RawSocket` in module `sys`
+  --> src/socket.rs:96:41
+   |
+96 |     pub(crate) fn as_raw(&self) -> sys::RawSocket {
+   |                                         ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `socket_as_raw` in module `sys`
+  --> src/socket.rs:97:14
+   |
+97 |         sys::socket_as_raw(&self.inner)
+   |              ^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `RawSocket` in module `sys`
+   --> src/socket.rs:100:42
+    |
+100 |     pub(crate) fn into_raw(self) -> sys::RawSocket {
+    |                                          ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `socket_into_raw` in module `sys`
+   --> src/socket.rs:101:14
+    |
+101 |         sys::socket_into_raw(self.inner)
+    |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `socket` in module `sys`
+   --> src/socket.rs:126:14
+    |
+126 |         sys::socket(domain.0, ty.0, protocol).map(Socket::from_raw)
+    |              ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `bind` in module `sys`
+   --> src/socket.rs:169:14
+    |
+169 |         sys::bind(self.as_raw(), address)
+    |              ^^^^ not found in `sys`
+
+error[E0425]: cannot find function `connect` in module `sys`
+   --> src/socket.rs:193:14
+    |
+193 |         sys::connect(self.as_raw(), address)
+    |              ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `poll_connect` in module `sys`
+   --> src/socket.rs:228:14
+    |
+228 |         sys::poll_connect(self, timeout)
+    |              ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `listen` in module `sys`
+   --> src/socket.rs:241:14
+    |
+241 |         sys::listen(self.as_raw(), backlog)
+    |              ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `accept` in module `sys`
+   --> src/socket.rs:302:14
+    |
+302 |         sys::accept(self.as_raw()).map(|(inner, addr)| (Socket::from_raw(inner), addr))
+    |              ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `getsockname` in module `sys`
+   --> src/socket.rs:318:14
+    |
+318 |         sys::getsockname(self.as_raw())
+    |              ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `getpeername` in module `sys`
+   --> src/socket.rs:333:14
+    |
+333 |         sys::getpeername(self.as_raw())
+    |              ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:339:58
+    |
+339 |         unsafe { getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_TYPE).map(Type) }
+    |                                                          ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_TYPE` in module `sys`
+   --> src/socket.rs:339:75
+    |
+339 |         unsafe { getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_TYPE).map(Type) }
+    |                                                                           ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `try_clone` in module `sys`
+   --> src/socket.rs:356:14
+    |
+356 |         sys::try_clone(self.as_raw()).map(Socket::from_raw)
+    |              ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_nonblocking` in module `sys`
+   --> src/socket.rs:381:14
+    |
+381 |         sys::set_nonblocking(self.as_raw(), nonblocking)
+    |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `shutdown` in module `sys`
+   --> src/socket.rs:390:14
+    |
+390 |         sys::shutdown(self.as_raw(), how)
+    |              ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `MSG_OOB` in module `sys`
+   --> src/socket.rs:427:40
+    |
+427 |         self.recv_with_flags(buf, sys::MSG_OOB)
+    |                                        ^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `c_int` in module `sys`
+   --> src/socket.rs:437:21
+    |
+437 |         flags: sys::c_int,
+    |                     ^^^^^ not found in `sys`
+    |
+help: consider importing one of these type aliases
+    |
+9   + use std::ffi::c_int;
+    |
+9   + use std::os::raw::c_int;
+    |
+9   + use core::ffi::c_int;
+    |
+help: if you import `c_int`, refer to it directly
+    |
+437 -         flags: sys::c_int,
+437 +         flags: c_int,
+    |
+
+error[E0425]: cannot find function `recv` in module `sys`
+   --> src/socket.rs:439:14
+    |
+439 |         sys::recv(self.as_raw(), buf, flags)
+    |              ^^^^ not found in `sys`
+
+error[E0425]: cannot find function `recv_vectored` in module `sys`
+   --> src/socket.rs:493:14
+    |
+493 |         sys::recv_vectored(self.as_raw(), bufs, flags)
+    |              ^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `MSG_PEEK` in module `sys`
+   --> src/socket.rs:510:40
+    |
+510 |         self.recv_with_flags(buf, sys::MSG_PEEK)
+    |                                        ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `recv_from` in module `sys`
+   --> src/socket.rs:536:14
+    |
+536 |         sys::recv_from(self.as_raw(), buf, flags)
+    |              ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `recv_from_vectored` in module `sys`
+   --> src/socket.rs:577:14
+    |
+577 |         sys::recv_from_vectored(self.as_raw(), bufs, flags)
+    |              ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `MSG_PEEK` in module `sys`
+   --> src/socket.rs:610:45
+    |
+610 |         self.recv_from_with_flags(buf, sys::MSG_PEEK)
+    |                                             ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `peek_sender` in module `sys`
+   --> src/socket.rs:620:14
+    |
+620 |         sys::peek_sender(self.as_raw())
+    |              ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `send` in module `sys`
+   --> src/socket.rs:651:14
+    |
+651 |         sys::send(self.as_raw(), buf, flags)
+    |              ^^^^ not found in `sys`
+
+error[E0425]: cannot find function `send_vectored` in module `sys`
+   --> src/socket.rs:671:14
+    |
+671 |         sys::send_vectored(self.as_raw(), bufs, flags)
+    |              ^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `MSG_OOB` in module `sys`
+   --> src/socket.rs:683:40
+    |
+683 |         self.send_with_flags(buf, sys::MSG_OOB)
+    |                                        ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `send_to` in module `sys`
+   --> src/socket.rs:705:14
+    |
+705 |         sys::send_to(self.as_raw(), buf, addr, flags)
+    |              ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `send_to_vectored` in module `sys`
+   --> src/socket.rs:727:14
+    |
+727 |         sys::send_to_vectored(self.as_raw(), bufs, addr, flags)
+    |              ^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `c_int` in module `sys`
+   --> src/socket.rs:733:65
+    |
+733 |     pub fn sendmsg(&self, msg: &MsgHdr<'_, '_, '_>, flags: sys::c_int) -> io::Result<usize> {
+    |                                                                 ^^^^^ not found in `sys`
+    |
+help: consider importing one of these type aliases
+    |
+9   + use std::ffi::c_int;
+    |
+9   + use std::os::raw::c_int;
+    |
+9   + use core::ffi::c_int;
+    |
+help: if you import `c_int`, refer to it directly
+    |
+733 -     pub fn sendmsg(&self, msg: &MsgHdr<'_, '_, '_>, flags: sys::c_int) -> io::Result<usize> {
+733 +     pub fn sendmsg(&self, msg: &MsgHdr<'_, '_, '_>, flags: c_int) -> io::Result<usize> {
+    |
+
+error[E0425]: cannot find function `sendmsg` in module `sys`
+   --> src/socket.rs:734:14
+    |
+734 |         sys::sendmsg(self.as_raw(), msg, flags)
+    |              ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:873:53
+    |
+873 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_BROADCAST)
+    |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_BROADCAST` in module `sys`
+   --> src/socket.rs:873:70
+    |
+873 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_BROADCAST)
+    |                                                                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:886:22
+    |
+886 |                 sys::SOL_SOCKET,
+    |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_BROADCAST` in module `sys`
+   --> src/socket.rs:887:22
+    |
+887 |                 sys::SO_BROADCAST,
+    |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:899:64
+    |
+899 |         match unsafe { getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_ERROR) } {
+    |                                                                ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_ERROR` in module `sys`
+   --> src/socket.rs:899:81
+    |
+899 |         match unsafe { getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_ERROR) } {
+    |                                                                                 ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:913:52
+    |
+913 |             getsockopt::<Bool>(self.as_raw(), sys::SOL_SOCKET, sys::SO_KEEPALIVE)
+    |                                                    ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_KEEPALIVE` in module `sys`
+   --> src/socket.rs:913:69
+    |
+913 |             getsockopt::<Bool>(self.as_raw(), sys::SOL_SOCKET, sys::SO_KEEPALIVE)
+    |                                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:925:22
+    |
+925 |                 sys::SOL_SOCKET,
+    |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_KEEPALIVE` in module `sys`
+   --> src/socket.rs:926:22
+    |
+926 |                 sys::SO_KEEPALIVE,
+    |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `linger` in module `sys`
+   --> src/socket.rs:939:31
+    |
+939 |             getsockopt::<sys::linger>(self.as_raw(), sys::SOL_SOCKET, sys::SO_LINGER)
+    |                               ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:939:59
+    |
+939 |             getsockopt::<sys::linger>(self.as_raw(), sys::SOL_SOCKET, sys::SO_LINGER)
+    |                                                           ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_LINGER` in module `sys`
+   --> src/socket.rs:939:76
+    |
+939 |             getsockopt::<sys::linger>(self.as_raw(), sys::SOL_SOCKET, sys::SO_LINGER)
+    |                                                                            ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:960:49
+    |
+960 |         unsafe { setsockopt(self.as_raw(), sys::SOL_SOCKET, sys::SO_LINGER, linger) }
+    |                                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_LINGER` in module `sys`
+   --> src/socket.rs:960:66
+    |
+960 |         unsafe { setsockopt(self.as_raw(), sys::SOL_SOCKET, sys::SO_LINGER, linger) }
+    |                                                                  ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:971:53
+    |
+971 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_OOBINLINE)
+    |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_OOBINLINE` in module `sys`
+   --> src/socket.rs:971:70
+    |
+971 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_OOBINLINE)
+    |                                                                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+   --> src/socket.rs:987:22
+    |
+987 |                 sys::SOL_SOCKET,
+    |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_OOBINLINE` in module `sys`
+   --> src/socket.rs:988:22
+    |
+988 |                 sys::SO_OOBINLINE,
+    |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1065:53
+     |
+1065 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVBUF)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_RCVBUF` in module `sys`
+    --> src/socket.rs:1065:70
+     |
+1065 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVBUF)
+     |                                                                      ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1078:22
+     |
+1078 |                 sys::SOL_SOCKET,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_RCVBUF` in module `sys`
+    --> src/socket.rs:1079:22
+     |
+1079 |                 sys::SO_RCVBUF,
+     |                      ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `timeout_opt` in module `sys`
+    --> src/socket.rs:1090:14
+     |
+1090 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO)
+     |              ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1090:46
+     |
+1090 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO)
+     |                                              ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_RCVTIMEO` in module `sys`
+    --> src/socket.rs:1090:63
+     |
+1090 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO)
+     |                                                               ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_timeout_opt` in module `sys`
+    --> src/socket.rs:1098:14
+     |
+1098 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO, duration)
+     |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1098:50
+     |
+1098 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO, duration)
+     |                                                  ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_RCVTIMEO` in module `sys`
+    --> src/socket.rs:1098:67
+     |
+1098 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_RCVTIMEO, duration)
+     |                                                                   ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1108:53
+     |
+1108 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_REUSEADDR)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_REUSEADDR` in module `sys`
+    --> src/socket.rs:1108:70
+     |
+1108 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_REUSEADDR)
+     |                                                                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1122:22
+     |
+1122 |                 sys::SOL_SOCKET,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_REUSEADDR` in module `sys`
+    --> src/socket.rs:1123:22
+     |
+1123 |                 sys::SO_REUSEADDR,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1136:53
+     |
+1136 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDBUF)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_SNDBUF` in module `sys`
+    --> src/socket.rs:1136:70
+     |
+1136 |             getsockopt::<c_int>(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDBUF)
+     |                                                                      ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1149:22
+     |
+1149 |                 sys::SOL_SOCKET,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_SNDBUF` in module `sys`
+    --> src/socket.rs:1150:22
+     |
+1150 |                 sys::SO_SNDBUF,
+     |                      ^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `timeout_opt` in module `sys`
+    --> src/socket.rs:1161:14
+     |
+1161 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO)
+     |              ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1161:46
+     |
+1161 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO)
+     |                                              ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_SNDTIMEO` in module `sys`
+    --> src/socket.rs:1161:63
+     |
+1161 |         sys::timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO)
+     |                                                               ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_timeout_opt` in module `sys`
+    --> src/socket.rs:1169:14
+     |
+1169 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO, duration)
+     |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOL_SOCKET` in module `sys`
+    --> src/socket.rs:1169:50
+     |
+1169 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO, duration)
+     |                                                  ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SO_SNDTIMEO` in module `sys`
+    --> src/socket.rs:1169:67
+     |
+1169 |         sys::set_timeout_opt(self.as_raw(), sys::SOL_SOCKET, sys::SO_SNDTIMEO, duration)
+     |                                                                   ^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `linger` in module `sys`
+    --> src/socket.rs:1173:35
+     |
+1173 | const fn from_linger(linger: sys::linger) -> Option<Duration> {
+     |                                   ^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `linger` in module `sys`
+    --> src/socket.rs:1181:58
+     |
+1181 | const fn into_linger(duration: Option<Duration>) -> sys::linger {
+     |                                                          ^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `linger` in module `sys`
+    --> src/socket.rs:1183:32
+     |
+1183 |         Some(duration) => sys::linger {
+     |                                ^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `linger` in module `sys`
+    --> src/socket.rs:1187:22
+     |
+1187 |         None => sys::linger {
+     |                      ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1208:53
+     |
+1208 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_HDRINCL)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_HDRINCL` in module `sys`
+    --> src/socket.rs:1208:70
+     |
+1208 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_HDRINCL)
+     |                                                                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1233:22
+     |
+1233 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_HDRINCL` in module `sys`
+    --> src/socket.rs:1234:22
+     |
+1234 |                 sys::IP_HDRINCL,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `IpMreq` in module `sys`
+    --> src/socket.rs:1288:25
+     |
+1288 |         let mreq = sys::IpMreq {
+     |                         ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1289:33
+     |
+1289 |             imr_multiaddr: sys::to_in_addr(multiaddr),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1290:33
+     |
+1290 |             imr_interface: sys::to_in_addr(interface),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1292:49
+     |
+1292 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_ADD_MEMBERSHIP, mreq) }
+     |                                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_ADD_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1292:66
+     |
+1292 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_ADD_MEMBERSHIP, mreq) }
+     |                                                                  ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `IpMreq` in module `sys`
+    --> src/socket.rs:1301:25
+     |
+1301 |         let mreq = sys::IpMreq {
+     |                         ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1302:33
+     |
+1302 |             imr_multiaddr: sys::to_in_addr(multiaddr),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1303:33
+     |
+1303 |             imr_interface: sys::to_in_addr(interface),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1308:22
+     |
+1308 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_DROP_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1309:22
+     |
+1309 |                 sys::IP_DROP_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_mreqn` in module `sys`
+    --> src/socket.rs:1339:26
+     |
+1339 |         let mreqn = sys::to_mreqn(multiaddr, interface);
+     |                          ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1343:22
+     |
+1343 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_ADD_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1344:22
+     |
+1344 |                 sys::IP_ADD_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_mreqn` in module `sys`
+    --> src/socket.rs:1373:26
+     |
+1373 |         let mreqn = sys::to_mreqn(multiaddr, interface);
+     |                          ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1377:22
+     |
+1377 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_DROP_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1378:22
+     |
+1378 |                 sys::IP_DROP_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `IpMreqSource` in module `sys`
+    --> src/socket.rs:1409:26
+     |
+1409 |         let mreqs = sys::IpMreqSource {
+     |                          ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1410:33
+     |
+1410 |             imr_multiaddr: sys::to_in_addr(group),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1411:33
+     |
+1411 |             imr_interface: sys::to_in_addr(interface),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1412:34
+     |
+1412 |             imr_sourceaddr: sys::to_in_addr(source),
+     |                                  ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1417:22
+     |
+1417 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_ADD_SOURCE_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1418:22
+     |
+1418 |                 sys::IP_ADD_SOURCE_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `IpMreqSource` in module `sys`
+    --> src/socket.rs:1447:26
+     |
+1447 |         let mreqs = sys::IpMreqSource {
+     |                          ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1448:33
+     |
+1448 |             imr_multiaddr: sys::to_in_addr(group),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1449:33
+     |
+1449 |             imr_interface: sys::to_in_addr(interface),
+     |                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1450:34
+     |
+1450 |             imr_sourceaddr: sys::to_in_addr(source),
+     |                                  ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1455:22
+     |
+1455 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_DROP_SOURCE_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1456:22
+     |
+1456 |                 sys::IP_DROP_SOURCE_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1504:44
+     |
+1504 |             getsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_IF).map(sys::from_in_addr)
+     |                                            ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_IF` in module `sys`
+    --> src/socket.rs:1504:61
+     |
+1504 |             getsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_IF).map(sys::from_in_addr)
+     |                                                             ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `from_in_addr` in module `sys`
+    --> src/socket.rs:1504:87
+     |
+1504 |             getsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_IF).map(sys::from_in_addr)
+     |                                                                                       ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in_addr` in module `sys`
+    --> src/socket.rs:1512:30
+     |
+1512 |         let interface = sys::to_in_addr(interface);
+     |                              ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1516:22
+     |
+1516 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_IF` in module `sys`
+    --> src/socket.rs:1517:22
+     |
+1517 |                 sys::IP_MULTICAST_IF,
+     |                      ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1530:53
+     |
+1530 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_LOOP)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_LOOP` in module `sys`
+    --> src/socket.rs:1530:70
+     |
+1530 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_LOOP)
+     |                                                                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1543:22
+     |
+1543 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_LOOP` in module `sys`
+    --> src/socket.rs:1544:22
+     |
+1544 |                 sys::IP_MULTICAST_LOOP,
+     |                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1557:53
+     |
+1557 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_TTL)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_TTL` in module `sys`
+    --> src/socket.rs:1557:70
+     |
+1557 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_MULTICAST_TTL)
+     |                                                                      ^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1573:22
+     |
+1573 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_MULTICAST_TTL` in module `sys`
+    --> src/socket.rs:1574:22
+     |
+1574 |                 sys::IP_MULTICAST_TTL,
+     |                      ^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1587:53
+     |
+1587 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_TTL).map(|ttl| ttl as u32)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_TTL` in module `sys`
+    --> src/socket.rs:1587:70
+     |
+1587 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_TTL).map(|ttl| ttl as u32)
+     |                                                                      ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1596:49
+     |
+1596 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_TTL, ttl as c_int) }
+     |                                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_TTL` in module `sys`
+    --> src/socket.rs:1596:66
+     |
+1596 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_TTL, ttl as c_int) }
+     |                                                                  ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1614:49
+     |
+1614 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_TOS, tos as c_int) }
+     |                                                 ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_TOS` in module `sys`
+    --> src/socket.rs:1614:66
+     |
+1614 |         unsafe { setsockopt(self.as_raw(), sys::IPPROTO_IP, sys::IP_TOS, tos as c_int) }
+     |                                                                  ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1634:53
+     |
+1634 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_TOS).map(|tos| tos as u32)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_TOS` in module `sys`
+    --> src/socket.rs:1634:70
+     |
+1634 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_TOS).map(|tos| tos as u32)
+     |                                                                      ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1663:22
+     |
+1663 |                 sys::IPPROTO_IP,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_RECVTOS` in module `sys`
+    --> src/socket.rs:1664:22
+     |
+1664 |                 sys::IP_RECVTOS,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IP` in module `sys`
+    --> src/socket.rs:1693:53
+     |
+1693 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_RECVTOS)
+     |                                                     ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_RECVTOS` in module `sys`
+    --> src/socket.rs:1693:70
+     |
+1693 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IP, sys::IP_RECVTOS)
+     |                                                                      ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1737:53
+     |
+1737 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IP_HDRINCL)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_HDRINCL` in module `sys`
+    --> src/socket.rs:1737:72
+     |
+1737 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IP_HDRINCL)
+     |                                                                        ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1769:22
+     |
+1769 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IP_HDRINCL` in module `sys`
+    --> src/socket.rs:1773:22
+     |
+1773 |                 sys::IP_HDRINCL,
+     |                      ^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `Ipv6Mreq` in module `sys`
+    --> src/socket.rs:1788:25
+     |
+1788 |         let mreq = sys::Ipv6Mreq {
+     |                         ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in6_addr` in module `sys`
+    --> src/socket.rs:1789:36
+     |
+1789 |             ipv6mr_multiaddr: sys::to_in6_addr(multiaddr),
+     |                                    ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1796:22
+     |
+1796 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_ADD_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1797:22
+     |
+1797 |                 sys::IPV6_ADD_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0422]: cannot find struct, variant or union type `Ipv6Mreq` in module `sys`
+    --> src/socket.rs:1812:25
+     |
+1812 |         let mreq = sys::Ipv6Mreq {
+     |                         ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `to_in6_addr` in module `sys`
+    --> src/socket.rs:1813:36
+     |
+1813 |             ipv6mr_multiaddr: sys::to_in6_addr(multiaddr),
+     |                                    ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1820:22
+     |
+1820 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_DROP_MEMBERSHIP` in module `sys`
+    --> src/socket.rs:1821:22
+     |
+1821 |                 sys::IPV6_DROP_MEMBERSHIP,
+     |                      ^^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1834:53
+     |
+1834 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_HOPS)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_HOPS` in module `sys`
+    --> src/socket.rs:1834:72
+     |
+1834 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_HOPS)
+     |                                                                        ^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1848:22
+     |
+1848 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_HOPS` in module `sys`
+    --> src/socket.rs:1849:22
+     |
+1849 |                 sys::IPV6_MULTICAST_HOPS,
+     |                      ^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1897:53
+     |
+1897 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_IF)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_IF` in module `sys`
+    --> src/socket.rs:1897:72
+     |
+1897 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_IF)
+     |                                                                        ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1911:22
+     |
+1911 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_IF` in module `sys`
+    --> src/socket.rs:1912:22
+     |
+1912 |                 sys::IPV6_MULTICAST_IF,
+     |                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1925:53
+     |
+1925 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_LOOP)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_LOOP` in module `sys`
+    --> src/socket.rs:1925:72
+     |
+1925 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_MULTICAST_LOOP)
+     |                                                                        ^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1938:22
+     |
+1938 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_MULTICAST_LOOP` in module `sys`
+    --> src/socket.rs:1939:22
+     |
+1939 |                 sys::IPV6_MULTICAST_LOOP,
+     |                      ^^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1950:53
+     |
+1950 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_UNICAST_HOPS)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_UNICAST_HOPS` in module `sys`
+    --> src/socket.rs:1950:72
+     |
+1950 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_UNICAST_HOPS)
+     |                                                                        ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1962:22
+     |
+1962 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_UNICAST_HOPS` in module `sys`
+    --> src/socket.rs:1963:22
+     |
+1963 |                 sys::IPV6_UNICAST_HOPS,
+     |                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1976:53
+     |
+1976 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_V6ONLY)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_V6ONLY` in module `sys`
+    --> src/socket.rs:1976:72
+     |
+1976 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_V6ONLY)
+     |                                                                        ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:1993:22
+     |
+1993 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_V6ONLY` in module `sys`
+    --> src/socket.rs:1994:22
+     |
+1994 |                 sys::IPV6_V6ONLY,
+     |                      ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:2020:53
+     |
+2020 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_RECVTCLASS)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_RECVTCLASS` in module `sys`
+    --> src/socket.rs:2020:72
+     |
+2020 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_RECVTCLASS)
+     |                                                                        ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:2047:22
+     |
+2047 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_RECVTCLASS` in module `sys`
+    --> src/socket.rs:2048:22
+     |
+2048 |                 sys::IPV6_RECVTCLASS,
+     |                      ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:2079:53
+     |
+2079 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_RECVHOPLIMIT)
+     |                                                     ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_RECVHOPLIMIT` in module `sys`
+    --> src/socket.rs:2079:72
+     |
+2079 |             getsockopt::<c_int>(self.as_raw(), sys::IPPROTO_IPV6, sys::IPV6_RECVHOPLIMIT)
+     |                                                                        ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_IPV6` in module `sys`
+    --> src/socket.rs:2110:22
+     |
+2110 |                 sys::IPPROTO_IPV6,
+     |                      ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPV6_RECVHOPLIMIT` in module `sys`
+    --> src/socket.rs:2111:22
+     |
+2111 |                 sys::IPV6_RECVHOPLIMIT,
+     |                      ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `tcp_keepalive_time` in module `sys`
+    --> src/socket.rs:2147:14
+     |
+2147 |         sys::tcp_keepalive_time(self.as_raw())
+     |              ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_tcp_keepalive` in module `sys`
+    --> src/socket.rs:2251:14
+     |
+2251 |         sys::set_tcp_keepalive(self.as_raw(), params)
+     |              ^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_TCP` in module `sys`
+    --> src/socket.rs:2261:52
+     |
+2261 |             getsockopt::<Bool>(self.as_raw(), sys::IPPROTO_TCP, sys::TCP_NODELAY)
+     |                                                    ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `TCP_NODELAY` in module `sys`
+    --> src/socket.rs:2261:70
+     |
+2261 |             getsockopt::<Bool>(self.as_raw(), sys::IPPROTO_TCP, sys::TCP_NODELAY)
+     |                                                                      ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_TCP` in module `sys`
+    --> src/socket.rs:2277:22
+     |
+2277 |                 sys::IPPROTO_TCP,
+     |                      ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `TCP_NODELAY` in module `sys`
+    --> src/socket.rs:2278:22
+     |
+2278 |                 sys::TCP_NODELAY,
+     |                      ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `AF_INET` in module `sys`
+   --> src/lib.rs:218:42
+    |
+218 |     pub const IPV4: Domain = Domain(sys::AF_INET);
+    |                                          ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `AF_INET6` in module `sys`
+   --> src/lib.rs:221:42
+    |
+221 |     pub const IPV6: Domain = Domain(sys::AF_INET6);
+    |                                          ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `AF_UNIX` in module `sys`
+   --> src/lib.rs:224:42
+    |
+224 |     pub const UNIX: Domain = Domain(sys::AF_UNIX);
+    |                                          ^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOCK_STREAM` in module `sys`
+   --> src/lib.rs:263:40
+    |
+263 |     pub const STREAM: Type = Type(sys::SOCK_STREAM);
+    |                                        ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOCK_DGRAM` in module `sys`
+   --> src/lib.rs:268:39
+    |
+268 |     pub const DGRAM: Type = Type(sys::SOCK_DGRAM);
+    |                                       ^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOCK_SEQPACKET` in module `sys`
+   --> src/lib.rs:278:43
+    |
+278 |     pub const SEQPACKET: Type = Type(sys::SOCK_SEQPACKET);
+    |                                           ^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `SOCK_RAW` in module `sys`
+   --> src/lib.rs:282:37
+    |
+282 |     pub const RAW: Type = Type(sys::SOCK_RAW);
+    |                                     ^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_ICMP` in module `sys`
+   --> src/lib.rs:309:48
+    |
+309 |     pub const ICMPV4: Protocol = Protocol(sys::IPPROTO_ICMP);
+    |                                                ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_ICMPV6` in module `sys`
+   --> src/lib.rs:312:48
+    |
+312 |     pub const ICMPV6: Protocol = Protocol(sys::IPPROTO_ICMPV6);
+    |                                                ^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_TCP` in module `sys`
+   --> src/lib.rs:315:45
+    |
+315 |     pub const TCP: Protocol = Protocol(sys::IPPROTO_TCP);
+    |                                             ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `IPPROTO_UDP` in module `sys`
+   --> src/lib.rs:318:45
+    |
+318 |     pub const UDP: Protocol = Protocol(sys::IPPROTO_UDP);
+    |                                             ^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find value `MSG_TRUNC` in module `sys`
+   --> src/lib.rs:379:23
+    |
+379 |         self.0 & sys::MSG_TRUNC != 0
+    |                       ^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `MaybeUninitSlice` in module `sys`
+   --> src/lib.rs:387:38
+    |
+387 | pub struct MaybeUninitSlice<'a>(sys::MaybeUninitSlice<'a>);
+    |                                      ^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `msghdr` in module `sys`
+   --> src/lib.rs:567:17
+    |
+567 |     inner: sys::msghdr,
+    |                 ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_name` in module `sys`
+   --> src/lib.rs:589:14
+    |
+589 |         sys::set_msghdr_name(&mut self.inner, addr);
+    |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_iov` in module `sys`
+   --> src/lib.rs:599:14
+    |
+599 |         sys::set_msghdr_iov(&mut self.inner, ptr, bufs.len());
+    |              ^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_control` in module `sys`
+   --> src/lib.rs:609:14
+    |
+609 |         sys::set_msghdr_control(&mut self.inner, ptr, buf.len());
+    |              ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `c_int` in module `sys`
+   --> src/lib.rs:616:45
+    |
+616 |     pub fn with_flags(mut self, flags: sys::c_int) -> Self {
+    |                                             ^^^^^ not found in `sys`
+    |
+help: consider importing one of these type aliases
+    |
+63  + use std::ffi::c_int;
+    |
+63  + use std::os::raw::c_int;
+    |
+63  + use core::ffi::c_int;
+    |
+help: if you import `c_int`, refer to it directly
+    |
+616 -     pub fn with_flags(mut self, flags: sys::c_int) -> Self {
+616 +     pub fn with_flags(mut self, flags: c_int) -> Self {
+    |
+
+error[E0425]: cannot find function `set_msghdr_flags` in module `sys`
+   --> src/lib.rs:617:14
+    |
+617 |         sys::set_msghdr_flags(&mut self.inner, flags);
+    |              ^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0412]: cannot find type `msghdr` in module `sys`
+   --> src/lib.rs:636:17
+    |
+636 |     inner: sys::msghdr,
+    |                 ^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_name` in module `sys`
+   --> src/lib.rs:663:14
+    |
+663 |         sys::set_msghdr_name(&mut self.inner, addr);
+    |              ^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_iov` in module `sys`
+   --> src/lib.rs:672:14
+    |
+672 |         sys::set_msghdr_iov(&mut self.inner, bufs.as_mut_ptr().cast(), bufs.len());
+    |              ^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `set_msghdr_control` in module `sys`
+   --> src/lib.rs:681:14
+    |
+681 |         sys::set_msghdr_control(&mut self.inner, buf.as_mut_ptr().cast(), buf.len());
+    |              ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `msghdr_flags` in module `sys`
+   --> src/lib.rs:687:14
+    |
+687 |         sys::msghdr_flags(&self.inner)
+    |              ^^^^^^^^^^^^ not found in `sys`
+
+error[E0425]: cannot find function `msghdr_control_len` in module `sys`
+   --> src/lib.rs:696:14
+    |
+696 |         sys::msghdr_control_len(&self.inner)
+    |              ^^^^^^^^^^^^^^^^^^ not found in `sys`
+
+error[E0061]: this function takes 4 arguments but 3 arguments were supplied
+   --> src/sockaddr.rs:292:33
+    |
+292 |               Some(SocketAddr::V6(SocketAddrV6::new(
+    |  _________________________________^^^^^^^^^^^^^^^^^-
+293 | |                 ip,
+294 | |                 port,
+295 | |                 addr.sin6_flowinfo,
+...   |
+301 | |                 },
+302 | |             )))
+    | |_____________- argument #4 of type `u32` is missing
+    |
+note: associated function defined here
+   --> /Users/runner/work/platform-tools/platform-tools/out/rust/library/core/src/net/socket_addr.rs:416:18
+help: provide the argument
+    |
+292 |             Some(SocketAddr::V6(SocketAddrV6::new(ip, port, addr.sin6_flowinfo, /* u32 */)))
+    |                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+error[E0599]: the method `and_then` exists for enum `Result<Socket, Error>`, but its trait bounds were not satisfied
+   --> src/socket.rs:117:47
+    |
+75  | pub struct Socket {
+    | ----------------- doesn't satisfy `Socket: Sized`
+...
+117 |         Socket::new_raw(domain, ty, protocol).and_then(set_common_flags)
+    |                                               ^^^^^^^^ method cannot be called on `Result<Socket, Error>` due to unsatisfied trait bounds
+    |
+    = note: the following trait bounds were not satisfied:
+            `{type error}: Sized`
+            which is required by `Socket: Sized`
+
+error[E0599]: the method `map_or` exists for enum `Option<Protocol>`, but its trait bounds were not satisfied
+   --> src/socket.rs:125:33
+    |
+125 |         let protocol = protocol.map_or(0, |p| p.0);
+    |                                 ^^^^^^ method cannot be called on `Option<Protocol>` due to unsatisfied trait bounds
+    |
+   ::: src/lib.rs:305:1
+    |
+305 | pub struct Protocol(c_int);
+    | ------------------- doesn't satisfy `Protocol: Sized`
+    |
+    = note: the following trait bounds were not satisfied:
+            `{type error}: Sized`
+            which is required by `Protocol: Sized`
+
+error[E0599]: the method `map` exists for enum `Result<(usize, RecvFlags), Error>`, but its trait bounds were not satisfied
+    --> src/socket.rs:2300:34
+     |
+2300 |         self.recv_vectored(bufs).map(|(n, _)| n)
+     |                                  ^^^ method cannot be called on `Result<(usize, RecvFlags), Error>` due to unsatisfied trait bounds
+     |
+     = note: the following trait bounds were not satisfied:
+             `{type error}: Sized`
+             which is required by `(usize, RecvFlags): Sized`
+             `Result<(usize, RecvFlags), std::io::Error>: Iterator`
+             which is required by `&mut Result<(usize, RecvFlags), std::io::Error>: Iterator`
+
+error[E0599]: the method `map` exists for enum `Result<(usize, RecvFlags), Error>`, but its trait bounds were not satisfied
+    --> src/socket.rs:2315:34
+     |
+2315 |         self.recv_vectored(bufs).map(|(n, _)| n)
+     |                                  ^^^ method cannot be called on `Result<(usize, RecvFlags), Error>` due to unsatisfied trait bounds
+     |
+     = note: the following trait bounds were not satisfied:
+             `{type error}: Sized`
+             which is required by `(usize, RecvFlags): Sized`
+             `Result<(usize, RecvFlags), std::io::Error>: Iterator`
+             which is required by `&mut Result<(usize, RecvFlags), std::io::Error>: Iterator`
+
+error[E0599]: the method `ok` exists for enum `Result<SockAddr, Error>`, but its trait bounds were not satisfied
+    --> src/socket.rs:2353:53
+     |
+2353 |             .field("local_addr", &self.local_addr().ok())
+     |                                                     ^^ method cannot be called on `Result<SockAddr, Error>` due to unsatisfied trait bounds
+     |
+    ::: src/sockaddr.rs:91:1
+     |
+91   | pub struct SockAddr {
+     | ------------------- doesn't satisfy `SockAddr: Sized`
+     |
+     = note: the following trait bounds were not satisfied:
+             `{type error}: Sized`
+             which is required by `SockAddr: Sized`
+
+error[E0599]: the method `ok` exists for enum `Result<SockAddr, Error>`, but its trait bounds were not satisfied
+    --> src/socket.rs:2354:51
+     |
+2354 |             .field("peer_addr", &self.peer_addr().ok())
+     |                                                   ^^ method cannot be called on `Result<SockAddr, Error>` due to unsatisfied trait bounds
+     |
+    ::: src/sockaddr.rs:91:1
+     |
+91   | pub struct SockAddr {
+     | ------------------- doesn't satisfy `SockAddr: Sized`
+     |
+     = note: the following trait bounds were not satisfied:
+             `{type error}: Sized`
+             which is required by `SockAddr: Sized`
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2359:23
+     |
+2359 | from!(net::TcpStream, Socket);
+     |                       ^^^^^^ expected `Socket`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2360:25
+     |
+2360 | from!(net::TcpListener, Socket);
+     |                         ^^^^^^ expected `Socket`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2361:23
+     |
+2361 | from!(net::UdpSocket, Socket);
+     |                       ^^^^^^ expected `Socket`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2362:15
+     |
+2362 | from!(Socket, net::TcpStream);
+     |               ^^^^^^^^^^^^^^ expected `TcpStream`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2363:15
+     |
+2363 | from!(Socket, net::TcpListener);
+     |               ^^^^^^^^^^^^^^^^ expected `TcpListener`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+    --> src/socket.rs:2364:15
+     |
+2364 | from!(Socket, net::UdpSocket);
+     |               ^^^^^^^^^^^^^^ expected `UdpSocket`, found `()`
+     |
+    ::: src/lib.rs:111:16
+     |
+111  |             fn from(socket: $from) -> $for {
+     |                ---- implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0599]: the method `ok` exists for enum `Result<SockAddr, Error>`, but its trait bounds were not satisfied
+   --> src/sockref.rs:117:60
+    |
+117 |             .field("local_addr", &self.socket.local_addr().ok())
+    |                                                            ^^ method cannot be called on `Result<SockAddr, Error>` due to unsatisfied trait bounds
+    |
+   ::: src/sockaddr.rs:91:1
+    |
+91  | pub struct SockAddr {
+    | ------------------- doesn't satisfy `SockAddr: Sized`
+    |
+    = note: the following trait bounds were not satisfied:
+            `{type error}: Sized`
+            which is required by `SockAddr: Sized`
+
+error[E0599]: the method `ok` exists for enum `Result<SockAddr, Error>`, but its trait bounds were not satisfied
+   --> src/sockref.rs:118:58
+    |
+118 |             .field("peer_addr", &self.socket.peer_addr().ok())
+    |                                                          ^^ method cannot be called on `Result<SockAddr, Error>` due to unsatisfied trait bounds
+    |
+   ::: src/sockaddr.rs:91:1
+    |
+91  | pub struct SockAddr {
+    | ------------------- doesn't satisfy `SockAddr: Sized`
+    |
+    = note: the following trait bounds were not satisfied:
+            `{type error}: Sized`
+            which is required by `SockAddr: Sized`
+
+error[E0599]: the method `as_mut_ptr` exists for mutable reference `&mut [MaybeUninitSlice<'_>]`, but its trait bounds were not satisfied
+   --> src/lib.rs:672:51
+    |
+387 | pub struct MaybeUninitSlice<'a>(sys::MaybeUninitSlice<'a>);
+    | ------------------------------- doesn't satisfy `MaybeUninitSlice<'_>: Sized`
+...
+672 |         sys::set_msghdr_iov(&mut self.inner, bufs.as_mut_ptr().cast(), bufs.len());
+    |                                                   ^^^^^^^^^^ method cannot be called on `&mut [MaybeUninitSlice<'_>]` due to unsatisfied trait bounds
+    |
+    = note: the following trait bounds were not satisfied:
+            `{type error}: Sized`
+            which is required by `MaybeUninitSlice<'_>: Sized`
+
+error[E0599]: the method `len` exists for mutable reference `&mut [MaybeUninitSlice<'_>]`, but its trait bounds were not satisfied
+   --> src/lib.rs:672:77
+    |
+387 | pub struct MaybeUninitSlice<'a>(sys::MaybeUninitSlice<'a>);
+    | ------------------------------- doesn't satisfy `MaybeUninitSlice<'_>: Sized`
+...
+672 |         sys::set_msghdr_iov(&mut self.inner, bufs.as_mut_ptr().cast(), bufs.len());
+    |                                                                             ^^^ method cannot be called on `&mut [MaybeUninitSlice<'_>]` due to unsatisfied trait bounds
+    |
+    = note: the following trait bounds were not satisfied:
+            `[MaybeUninitSlice<'_>]: ExactSizeIterator`
+            which is required by `&mut [MaybeUninitSlice<'_>]: ExactSizeIterator`
+            `{type error}: Sized`
+            which is required by `MaybeUninitSlice<'_>: Sized`
+
+Some errors have detailed explanations: E0061, E0308, E0412, E0422, E0425, E0432, E0433, E0583, E0599.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `socket2` (lib) due to 242 previous errors
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/curve25519.c:24:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/internal.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/25ac62e5b3c53843-curve25519.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/curve25519.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/aes_nohw.c:17:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/../../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/0bbbd18bda93c05b-aes_nohw.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/aes_nohw.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/internal.h:28:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/../../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/00c879ee3285a50d-montgomery.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery_inv.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/internal.h:28:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/../../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/00c879ee3285a50d-montgomery_inv.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery_inv.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-ecp_nistz.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p256.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./p256_shared.h:29:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./../bn/internal.h:28:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./../bn/../../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-gfp_p256.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p256.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p384.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-gfp_p384.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p384.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/p256.c:21:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-p256.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/p256.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.c:15:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.h:20:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/aaa1ba3e455ee2e1-limbs.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/mem.c:16:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a4019cc0736b0423-mem.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/mem.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/poly1305.c:21:
+warning: ring@0.17.14: In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/../internal.h:20:
+warning: ring@0.17.14: /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+warning: ring@0.17.14:    27 | # include <assert.h>
+warning: ring@0.17.14:       |           ^~~~~~~~~~
+warning: ring@0.17.14: 1 error generated.
+warning: ring@0.17.14: ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/d5a9841f3dc6e253-poly1305.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/poly1305.c"
+error: failed to run custom build command for `ring v0.17.14`
+
+Caused by:
+  process didn't exit successfully: `/Users/mac/Documents/LazorKit/wallet-management-contract/target/release/build/ring-2371324b8be15f3f/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=CARGO_MANIFEST_DIR
+  cargo:rerun-if-env-changed=CARGO_PKG_NAME
+  cargo:rerun-if-env-changed=CARGO_PKG_VERSION_MAJOR
+  cargo:rerun-if-env-changed=CARGO_PKG_VERSION_MINOR
+  cargo:rerun-if-env-changed=CARGO_PKG_VERSION_PATCH
+  cargo:rerun-if-env-changed=CARGO_PKG_VERSION_PRE
+  cargo:rerun-if-env-changed=CARGO_MANIFEST_LINKS
+  cargo:rerun-if-env-changed=RING_PREGENERATE_ASM
+  cargo:rerun-if-env-changed=OUT_DIR
+  cargo:rerun-if-env-changed=CARGO_CFG_TARGET_ARCH
+  cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS
+  cargo:rerun-if-env-changed=CARGO_CFG_TARGET_ENV
+  cargo:rerun-if-env-changed=CARGO_CFG_TARGET_ENDIAN
+  OPT_LEVEL = Some(3)
+  OUT_DIR = Some(/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out)
+  TARGET = Some(sbpf-solana-solana)
+  CARGO_ENCODED_RUSTFLAGS = Some(-Zremap-cwd-prefix=)
+  HOST = Some(aarch64-apple-darwin)
+  cargo:rerun-if-env-changed=CC_sbpf-solana-solana
+  CC_sbpf-solana-solana = None
+  cargo:rerun-if-env-changed=CC_sbpf_solana_solana
+  CC_sbpf_solana_solana = None
+  cargo:rerun-if-env-changed=TARGET_CC
+  TARGET_CC = None
+  cargo:rerun-if-env-changed=CC
+  CC = Some(/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang)
+  RUSTC_WRAPPER = None
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  DEBUG = Some(false)
+  cargo:rerun-if-env-changed=CFLAGS
+  CFLAGS = None
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  TARGET_CFLAGS = None
+  cargo:rerun-if-env-changed=CFLAGS_sbpf_solana_solana
+  CFLAGS_sbpf_solana_solana = None
+  cargo:rerun-if-env-changed=CFLAGS_sbpf-solana-solana
+  CFLAGS_sbpf-solana-solana = None
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/curve25519.c:24:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/internal.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/25ac62e5b3c53843-curve25519.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/curve25519/curve25519.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/aes_nohw.c:17:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/../../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/0bbbd18bda93c05b-aes_nohw.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/aes/aes_nohw.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/internal.h:28:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/../../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/00c879ee3285a50d-montgomery.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery_inv.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/internal.h:28:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/../../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/00c879ee3285a50d-montgomery_inv.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/bn/montgomery_inv.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-ecp_nistz.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/ecp_nistz.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p256.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./p256_shared.h:29:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./../bn/internal.h:28:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/./../bn/../../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-gfp_p256.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p256.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p384.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-gfp_p384.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/gfp_p384.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/p256.c:21:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/limbs.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/../../limbs/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a0330e891e733f4e-p256.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/fipsmodule/ec/p256.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.c:15:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.h:20:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/aaa1ba3e455ee2e1-limbs.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/limbs/limbs.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/mem.c:16:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/a4019cc0736b0423-mem.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/mem.c"cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/poly1305.c:21:
+  cargo:warning=In file included from /Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/../internal.h:20:
+  cargo:warning=/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include/ring-core/check.h:27:11: fatal error: 'assert.h' file not found
+  cargo:warning=   27 | # include <assert.h>
+  cargo:warning=      |           ^~~~~~~~~~
+  cargo:warning=1 error generated.
+
+  exit status: 1
+  cargo:warning=ToolExecError: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/d5a9841f3dc6e253-poly1305.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/poly1305.c"
+
+  --- stderr
+
+
+  error occurred in cc-rs: command did not execute successfully (status code exit status: 1): LC_ALL="C" "/Users/mac/.local/share/solana/install/releases/stable-90098d261e2be2f898769d9ee35141597f1a2234/solana-release/bin/platform-tools-sdk/sbf/dependencies/platform-tools/llvm/bin/clang" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "--target=sbpf-solana-solana" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/include" "-I" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/pregenerated" "-Wall" "-Wextra" "-fvisibility=hidden" "-std=c1x" "-Wall" "-Wbad-function-cast" "-Wcast-align" "-Wcast-qual" "-Wconversion" "-Wmissing-field-initializers" "-Wmissing-include-dirs" "-Wnested-externs" "-Wredundant-decls" "-Wshadow" "-Wsign-compare" "-Wsign-conversion" "-Wstrict-prototypes" "-Wundef" "-Wuninitialized" "-g3" "-DNDEBUG" "-o" "/Users/mac/Documents/LazorKit/wallet-management-contract/target/sbpf-solana-solana/release/build/ring-7490c0332ce6fe51/out/d5a9841f3dc6e253-poly1305.o" "-c" "/Users/mac/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ring-0.17.14/crypto/poly1305/poly1305.c"
+
+

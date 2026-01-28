@@ -110,6 +110,7 @@ fn test_compact_instructions_basic() {
     let instructions = vec![CompactInstruction {
         program_id_index: 0,
         accounts: vec![1, 2],
+        account_roles: vec![1, 1],
         data: vec![1, 2, 3],
     }];
 
@@ -119,6 +120,7 @@ fn test_compact_instructions_basic() {
     assert_eq!(parsed.len(), 1);
     assert_eq!(parsed[0].program_id_index, 0);
     assert_eq!(parsed[0].accounts, vec![1, 2]);
+    assert_eq!(parsed[0].account_roles, vec![1, 1]);
     assert_eq!(parsed[0].data, vec![1, 2, 3]);
 
     println!("✅ CompactInstructions serialization works");
@@ -423,8 +425,9 @@ fn test_execute_with_compact_instructions() {
     transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
 
     let compact_ix = CompactInstruction {
-        program_id_index: 2,  // Index of SystemProgram in inner_accounts
-        accounts: vec![0, 1], // Vault, Payer
+        program_id_index: 2,       // Index of SystemProgram in inner_accounts
+        accounts: vec![0, 1],      // Vault, Payer
+        account_roles: vec![3, 1], // Vault: S+W, Payer: W
         data: transfer_data,
     };
 

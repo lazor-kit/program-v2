@@ -247,6 +247,55 @@ pub fn process(
         &[auth_signer],
     )?;
 
+    // --- 3. Initialize Vault Account ---
+    // Vault is just an empty account for holding SOL, owned by the program (or system).
+    // Let's make it owned by system or program?
+    // If it's owned by program, it can't be used with standard SPL tools as easily.
+    // If it's owned by System, we can still sign for it.
+    // Let's make it owned by System (0 bytes).
+    let vault_space = 0;
+    let vault_rent = (vault_space as u64)
+        .checked_mul(6960)
+        .and_then(|val| val.checked_add(897840))
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    let mut create_vault_ix_data = Vec::with_capacity(52);
+    create_vault_ix_data.extend_from_slice(&0u32.to_le_bytes()); // create_account
+    create_vault_ix_data.extend_from_slice(&vault_rent.to_le_bytes());
+    create_vault_ix_data.extend_from_slice(&(vault_space as u64).to_le_bytes());
+    create_vault_ix_data.extend_from_slice(&Pubkey::default().as_ref()); // System Program owned
+
+    let vault_accounts_meta = [
+        AccountMeta {
+            pubkey: payer.key(),
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vault_pda.key(),
+            is_signer: true,
+            is_writable: true,
+        },
+    ];
+    let create_vault_ix = Instruction {
+        program_id: system_program.key(),
+        accounts: &vault_accounts_meta,
+        data: &create_vault_ix_data,
+    };
+    let vault_bump_arr = [_vault_bump];
+    let vault_seeds = [
+        Seed::from(b"vault"),
+        Seed::from(wallet_key.as_ref()),
+        Seed::from(&vault_bump_arr),
+    ];
+    let vault_signer: Signer = (&vault_seeds).into();
+
+    invoke_signed(
+        &create_vault_ix,
+        &[&payer.clone(), &vault_pda.clone(), &system_program.clone()],
+        &[vault_signer],
+    )?;
+
     // Write Authority Data
     let auth_account_data = unsafe { auth_pda.borrow_mut_data_unchecked() };
     let header = AuthorityAccountHeader {

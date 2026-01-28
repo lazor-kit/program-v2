@@ -22,6 +22,7 @@ pub struct CompactInstructions {
 pub struct CompactInstruction {
     pub program_id_index: u8,
     pub accounts: Vec<u8>,
+    pub account_roles: Vec<u8>, // Bit-packed: bit 0 = writable, bit 1 = signer
     pub data: Vec<u8>,
 }
 
@@ -57,6 +58,7 @@ impl CompactInstructions {
             bytes.push(ix.program_id_index);
             bytes.push(ix.accounts.len() as u8);
             bytes.extend(ix.accounts.iter());
+            bytes.extend(ix.account_roles.iter());
             bytes.extend((ix.data.len() as u16).to_le_bytes());
             bytes.extend(ix.data.iter());
         }
@@ -69,19 +71,19 @@ impl CompactInstruction {
     /// Format: [program_id_index: u8][num_accounts: u8][accounts...][data_len: u16][data...]
     pub fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), ProgramError> {
         if bytes.len() < 4 {
-            // Minimum: program_id(1) + num_accounts(1) + data_len(2)
             return Err(ProgramError::InvalidInstructionData);
         }
 
         let program_id_index = bytes[0];
         let num_accounts = bytes[1] as usize;
 
-        if bytes.len() < 2 + num_accounts + 2 {
+        if bytes.len() < 2 + num_accounts * 2 + 2 {
             return Err(ProgramError::InvalidInstructionData);
         }
 
         let accounts = bytes[2..2 + num_accounts].to_vec();
-        let data_len_offset = 2 + num_accounts;
+        let account_roles = bytes[2 + num_accounts..2 + num_accounts * 2].to_vec();
+        let data_len_offset = 2 + num_accounts * 2;
         let data_len =
             u16::from_le_bytes([bytes[data_len_offset], bytes[data_len_offset + 1]]) as usize;
 
@@ -97,6 +99,7 @@ impl CompactInstruction {
             CompactInstruction {
                 program_id_index,
                 accounts,
+                account_roles,
                 data,
             },
             rest,
@@ -118,6 +121,7 @@ impl CompactInstruction {
     pub fn decompress<'a>(
         &self,
         account_infos: &'a [AccountInfo],
+        vault_pda: &Pubkey,
     ) -> Result<DecompressedInstruction<'a>, ProgramError> {
         // Validate program_id_index
         if (self.program_id_index as usize) >= account_infos.len() {
@@ -128,17 +132,32 @@ impl CompactInstruction {
 
         // Validate all account indexes
         let mut accounts = Vec::with_capacity(self.accounts.len());
-        for &index in &self.accounts {
+        let mut roles = Vec::with_capacity(self.accounts.len());
+
+        for (i, &index) in self.accounts.iter().enumerate() {
             if (index as usize) >= account_infos.len() {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            accounts.push(&account_infos[index as usize]);
+            let acc_info = &account_infos[index as usize];
+            accounts.push(acc_info);
+
+            let role_bits = self.account_roles[i];
+            let mut is_writable = (role_bits & 1) != 0;
+            let mut is_signer = (role_bits & 2) != 0;
+
+            // CRITICAL: Force signer if it's the Vault and wasn't marked as such
+            if acc_info.key() == vault_pda {
+                is_signer = true;
+            }
+
+            roles.push((is_writable, is_signer));
         }
 
         Ok(DecompressedInstruction {
             program_id,
             accounts,
-            data: self.data.clone(), // Clone data to avoid lifetime issues
+            roles,
+            data: self.data.clone(),
         })
     }
 }
@@ -147,7 +166,8 @@ impl CompactInstruction {
 pub struct DecompressedInstruction<'a> {
     pub program_id: &'a Pubkey,
     pub accounts: Vec<&'a AccountInfo>,
-    pub data: Vec<u8>, // Owned data to avoid lifetime issues
+    pub roles: Vec<(bool, bool)>, // (is_writable, is_signer)
+    pub data: Vec<u8>,
 }
 
 /// Parse multiple CompactInstructions from bytes
@@ -187,6 +207,7 @@ mod tests {
         let ix = CompactInstruction {
             program_id_index: 0,
             accounts: vec![1, 2, 3],
+            account_roles: vec![0, 0, 0],
             data: vec![0xDE, 0xAD, 0xBE, 0xEF],
         };
 
@@ -205,11 +226,13 @@ mod tests {
             CompactInstruction {
                 program_id_index: 0,
                 accounts: vec![1, 2],
+                account_roles: vec![0, 0],
                 data: vec![1, 2, 3],
             },
             CompactInstruction {
                 program_id_index: 3,
                 accounts: vec![4, 5, 6],
+                account_roles: vec![0, 0, 0],
                 data: vec![7, 8, 9, 10],
             },
         ];
@@ -231,6 +254,7 @@ mod tests {
         let ix = CompactInstruction {
             program_id_index: 0,
             accounts: vec![1],
+            account_roles: vec![0],
             data: vec![],
         };
 
@@ -246,6 +270,7 @@ mod tests {
         let ix = CompactInstruction {
             program_id_index: 0,
             accounts: vec![],
+            account_roles: vec![],
             data: vec![1, 2, 3],
         };
 
@@ -262,6 +287,7 @@ mod tests {
         let ix = CompactInstruction {
             program_id_index: 0,
             accounts,
+            account_roles: vec![0; 256],
             data: vec![1],
         };
 
@@ -280,6 +306,7 @@ mod tests {
         let ix = CompactInstruction {
             program_id_index: 0,
             accounts: vec![1],
+            account_roles: vec![0],
             data: data.clone(),
         };
 
@@ -337,6 +364,7 @@ mod tests {
             inner_instructions: vec![CompactInstruction {
                 program_id_index: 0,
                 accounts: vec![1, 2],
+                account_roles: vec![0, 0],
                 data: vec![0xAB, 0xCD],
             }],
         };

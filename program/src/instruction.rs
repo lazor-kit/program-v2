@@ -18,10 +18,11 @@ pub enum ProgramIx {
     #[account(3, writable, name = "authority", desc = "Initial owner authority PDA")]
     #[account(4, name = "system_program", desc = "System Program")]
     CreateWallet {
-        user_seed: Vec<u8>,
+        user_seed: [u8; 32],
         auth_type: u8,
-        auth_pubkey: [u8; 33],
-        credential_hash: [u8; 32],
+        auth_bump: u8,
+        padding: [u8; 6],
+        auth_pubkey: [u8; 32],
     },
 
     /// Add a new authority to the wallet
@@ -29,7 +30,6 @@ pub enum ProgramIx {
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin authority PDA authorizing this action"
     )]
@@ -48,10 +48,10 @@ pub enum ProgramIx {
         desc = "Optional signer for Ed25519 authentication"
     )]
     AddAuthority {
-        new_type: u8,
-        new_pubkey: [u8; 33],
-        new_hash: [u8; 32],
+        authority_type: u8,
         new_role: u8,
+        padding: [u8; 6],
+        new_pubkey: [u8; 32],
     },
 
     /// Remove an authority from the wallet
@@ -59,7 +59,6 @@ pub enum ProgramIx {
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin authority PDA authorizing this action"
     )]
@@ -82,7 +81,7 @@ pub enum ProgramIx {
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
-    RemoveAuthority,
+    RemoveAuthority { target_pubkey: [u8; 32] },
 
     /// Transfer ownership (atomic swap of Owner role)
     #[account(0, signer, name = "payer", desc = "Transaction payer")]
@@ -107,21 +106,18 @@ pub enum ProgramIx {
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
-    TransferOwnership {
-        new_type: u8,
-        new_pubkey: [u8; 33],
-        new_hash: [u8; 32],
-    },
+    TransferOwnership { new_type: u8, new_pubkey: [u8; 32] },
 
     /// Execute transactions
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, writable, signer, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
+        writable,
         name = "authority",
         desc = "Authority or Session PDA authorizing execution"
     )]
-    #[account(3, name = "vault", desc = "Vault PDA")]
+    #[account(3, writable, name = "vault", desc = "Vault PDA")]
     #[account(
         4,
         optional,
@@ -140,7 +136,6 @@ pub enum ProgramIx {
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin/Owner authority PDA authorizing logic"
     )]
@@ -155,7 +150,7 @@ pub enum ProgramIx {
     )]
     CreateSession {
         session_key: [u8; 32],
-        expires_at: i64,
+        expires_at: u64,
     },
 }
 

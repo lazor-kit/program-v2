@@ -157,6 +157,7 @@ fn test_session_lifecycle() {
         let compact_ix = CompactInstruction {
             program_id_index: 2,
             accounts: vec![0, 1],
+            account_roles: vec![3, 1], // Vault: Signer+Writable, Payer: Writable
             data: transfer_data,
         };
         let compact_bytes = compact::serialize_compact_instructions(&[compact_ix]);
@@ -215,6 +216,7 @@ fn test_session_lifecycle() {
         let compact_ix = CompactInstruction {
             program_id_index: 2,
             accounts: vec![0, 1],
+            account_roles: vec![3, 1],
             data: transfer_data,
         };
         let compact_bytes = compact::serialize_compact_instructions(&[compact_ix]);

@@ -8,3 +8,6 @@ pinocchio-pubkey = { version = "0.3" }
 pinocchio-system = { version = "0.3" }
 no-padding = { path = "./no-padding" }
 assertions = { path = "./assertions" }
+
+[patch.crates-io]
+getrandom = { git = "https://github.com/rust-random/getrandom.git", tag = "v0.2.15" }

@@ -52,9 +52,10 @@ pub fn process(
     let vault_pda = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let _sysvar_instructions = account_info_iter.next(); // Optional
 
     // Remaining accounts are for inner instructions
-    let inner_accounts_start = 4;
+    let inner_accounts_start = 5;
     let inner_accounts = &accounts[inner_accounts_start..];
 
     // Verify ownership
@@ -75,7 +76,12 @@ pub fn process(
         unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
 
     // Parse compact instructions
-    let compact_instructions = parse_compact_instructions(instruction_data)?;
+    // Note: The SDK (Codama) adds a 4-byte length prefix for the instructions bytes field.
+    if instruction_data.len() < 4 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let (_len_bytes, ix_data) = instruction_data.split_at(4);
+    let compact_instructions = parse_compact_instructions(ix_data)?;
 
     // Serialize compact instructions to get their byte length
     let compact_bytes = crate::compact::serialize_compact_instructions(&compact_instructions);
@@ -166,16 +172,20 @@ pub fn process(
 
     // Execute each compact instruction
     for compact_ix in &compact_instructions {
-        let decompressed = compact_ix.decompress(accounts)?;
+        let decompressed = compact_ix.decompress(accounts, vault_pda.key())?;
 
         // Build AccountMeta array for instruction
         let account_metas: Vec<AccountMeta> = decompressed
             .accounts
             .iter()
-            .map(|acc| AccountMeta {
-                pubkey: acc.key(),
-                is_signer: acc.is_signer() || acc.key() == vault_pda.key(),
-                is_writable: acc.is_writable(),
+            .enumerate()
+            .map(|(i, acc)| {
+                let (is_writable, is_signer) = decompressed.roles[i];
+                AccountMeta {
+                    pubkey: acc.key(),
+                    is_signer,
+                    is_writable,
+                }
             })
             .collect();
 

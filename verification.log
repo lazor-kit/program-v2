@@ -1,0 +1,59 @@
+[dotenv@17.2.3] injecting env (0) from ../lazorkit-sdk/.env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+No PRIVATE_KEY, generating random payer (will fail if not funded)
+Payer: 4Q55dezq64RnrHLTJWcGtvhoSSnJBeCTfkyaMCpe6ztn
+-- Config --
+Wallet PDA: GqUK3kXiP4rAezBamxwdRKtJfxrqd2yTv9syx8MTLVDf
+Vault PDA: GqznQFdivGohRqHJyUxuMSq6jLZXNQv5ofyUTqpxKD27
+Owner Auth PDA: 4dgPwrJXXNp4gu7DddZGMq8gMsUBS33aGGaKazjv1fTD
+
+[1/5] Creating Wallet...
+❌ Error: SolanaError: Transaction simulation failed
+    at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer-throw-solana-error.ts:56:23)
+    ... 7 lines matching cause stack trace ...
+    at async Object.send (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-spec/src/rpc.ts:100:20)
+    at async sendAndConfirm (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/repro-codama.ts:357:17) {
+  cause: SolanaError: Attempt to debit an account but found no record of a prior credit.
+      at Object.getSolanaErrorFromJsonRpcError (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/errors/src/json-rpc-error.ts:104:48)
+      at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer-throw-solana-error.ts:56:23)
+      at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer.ts:44:57)
+      at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/functional/src/pipe.ts:235:36)
+      at Array.reduce (<anonymous>)
+      at Object.pipe (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/functional/src/pipe.ts:235:16)
+      at Object.responseTransformer (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer.ts:42:16)
+      at Object.execute (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-spec/src/rpc-api.ts:130:39)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Object.send (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-spec/src/rpc.ts:100:20) {
+    cause: undefined,
+    context: { __code: 7050003 }
+  },
+  context: {
+    __code: -32002,
+    accounts: null,
+    fee: null,
+    innerInstructions: null,
+    loadedAccountsDataSize: 0,
+    loadedAddresses: null,
+    logs: [],
+    postBalances: null,
+    postTokenBalances: null,
+    preBalances: null,
+    preTokenBalances: null,
+    replacementBlockhash: null,
+    returnData: null,
+    unitsConsumed: 0n
+  }
+}
+Cause: SolanaError: Attempt to debit an account but found no record of a prior credit.
+    at Object.getSolanaErrorFromJsonRpcError (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/errors/src/json-rpc-error.ts:104:48)
+    at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer-throw-solana-error.ts:56:23)
+    at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer.ts:44:57)
+    at <anonymous> (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/functional/src/pipe.ts:235:36)
+    at Array.reduce (<anonymous>)
+    at Object.pipe (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/functional/src/pipe.ts:235:16)
+    at Object.responseTransformer (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-transformers/src/response-transformer.ts:42:16)
+    at Object.execute (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-spec/src/rpc-api.ts:130:39)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.send (/Users/mac/Documents/LazorKit/wallet-management-contract/sdk/codama-sdk/node_modules/@solana/rpc-spec/src/rpc.ts:100:20) {
+  cause: undefined,
+  context: { __code: 7050003 }
+}
