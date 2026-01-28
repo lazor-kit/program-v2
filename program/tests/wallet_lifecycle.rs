@@ -425,8 +425,8 @@ fn test_execute_with_compact_instructions() {
     transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
 
     let compact_ix = CompactInstruction {
-        program_id_index: 2,       // Index of SystemProgram in inner_accounts
-        accounts: vec![0, 1],      // Vault, Payer
+        program_id_index: 7,       // Index of SystemProgram (Absolute index 7)
+        accounts: vec![5, 6],      // Vault (Index 5), Payer (Index 6)
         account_roles: vec![3, 1], // Vault: S+W, Payer: W
         data: transfer_data,
     };
@@ -441,6 +441,7 @@ fn test_execute_with_compact_instructions() {
             AccountMeta::new(wallet_pda, false),            // Wallet
             AccountMeta::new(owner_auth_pda, false),        // Authority (PDA) must be writable
             AccountMeta::new(vault_pda, false),             // Vault (Context)
+            AccountMeta::new_readonly(solana_sdk::sysvar::instructions::id(), false), // SysvarInstructions Placeholder
             // Inner accounts start here:
             AccountMeta::new(vault_pda, false), // Index 0: Vault (will satisfy Signer via seeds)
             AccountMeta::new(context.payer.pubkey(), false), // Index 1: Payer (Dest)
@@ -450,6 +451,7 @@ fn test_execute_with_compact_instructions() {
         ],
         data: {
             let mut data = vec![4]; // Execute discriminator
+            data.extend_from_slice(&(compact_bytes.len() as u32).to_le_bytes());
             data.extend_from_slice(&compact_bytes);
             // Ed25519 needs no extra payload, signature is validated against owner_keypair account
             data

@@ -108,10 +108,11 @@ impl CompactInstruction {
 
     /// Serialize this CompactInstruction to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(4 + self.accounts.len() + self.data.len());
+        let mut bytes = Vec::with_capacity(4 + self.accounts.len() * 2 + self.data.len());
         bytes.push(self.program_id_index);
         bytes.push(self.accounts.len() as u8);
         bytes.extend_from_slice(&self.accounts);
+        bytes.extend_from_slice(&self.account_roles);
         bytes.extend_from_slice(&(self.data.len() as u16).to_le_bytes());
         bytes.extend_from_slice(&self.data);
         bytes
@@ -339,6 +340,7 @@ mod tests {
     fn test_invalid_data_length_mismatch() {
         // Data length field says 10 bytes but only 5 provided
         let mut bytes = vec![0, 1, 1]; // program_id, num_accounts=1, account=1
+        bytes.push(0); // role=0
         bytes.extend(&10u16.to_le_bytes()); // data_len = 10
         bytes.extend(&[1, 2, 3, 4, 5]); // only 5 bytes of data
 

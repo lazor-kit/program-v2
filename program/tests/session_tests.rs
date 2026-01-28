@@ -155,8 +155,8 @@ fn test_session_lifecycle() {
         transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
 
         let compact_ix = CompactInstruction {
-            program_id_index: 2,
-            accounts: vec![0, 1],
+            program_id_index: 7,       // SystemProgram
+            accounts: vec![5, 6],      // Vault (Inner), Payer (Inner)
             account_roles: vec![3, 1], // Vault: Signer+Writable, Payer: Writable
             data: transfer_data,
         };
@@ -169,6 +169,7 @@ fn test_session_lifecycle() {
                 AccountMeta::new(wallet_pda, false),
                 AccountMeta::new(session_pda, false), // Session PDA as Authority
                 AccountMeta::new(vault_pda, false),
+                AccountMeta::new_readonly(solana_sdk::sysvar::instructions::id(), false), // SysvarInstructions Placeholder
                 // Inner accounts
                 AccountMeta::new(vault_pda, false),
                 AccountMeta::new(context.payer.pubkey(), false),
@@ -178,6 +179,7 @@ fn test_session_lifecycle() {
             ],
             data: {
                 let mut data = vec![4]; // Execute discriminator
+                data.extend_from_slice(&(compact_bytes.len() as u32).to_le_bytes()); // Vec<u8> length prefix
                 data.extend_from_slice(&compact_bytes);
                 data
             },
@@ -214,8 +216,8 @@ fn test_session_lifecycle() {
         transfer_data.extend_from_slice(&2u32.to_le_bytes());
         transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
         let compact_ix = CompactInstruction {
-            program_id_index: 2,
-            accounts: vec![0, 1],
+            program_id_index: 7,
+            accounts: vec![5, 6],
             account_roles: vec![3, 1],
             data: transfer_data,
         };
@@ -228,6 +230,7 @@ fn test_session_lifecycle() {
                 AccountMeta::new(wallet_pda, false),
                 AccountMeta::new(session_pda, false),
                 AccountMeta::new(vault_pda, false),
+                AccountMeta::new_readonly(solana_sdk::sysvar::instructions::id(), false), // SysvarInstructions Placeholder
                 AccountMeta::new(vault_pda, false),
                 AccountMeta::new(context.payer.pubkey(), false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
@@ -235,6 +238,7 @@ fn test_session_lifecycle() {
             ],
             data: {
                 let mut data = vec![4];
+                data.extend_from_slice(&(compact_bytes.len() as u32).to_le_bytes());
                 data.extend_from_slice(&compact_bytes);
                 data
             },
@@ -259,3 +263,6 @@ fn test_session_lifecycle() {
     }
     println!("✅ Expired session rejected");
 }
+
+let seeds = &[b"vault", user.key().as_ref(), &[bump]];
+invoke_signed(..., &[seeds]);

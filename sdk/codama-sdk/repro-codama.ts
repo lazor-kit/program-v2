@@ -164,8 +164,16 @@ function packInstructions(
             payer = await generateKeyPairSigner();
             try {
                 const airdropSig = await rpc.requestAirdrop(payer.address, lamports(2_000_000_000n)).send();
-                await new Promise(r => setTimeout(r, 2000)); // Wait for airdrop
                 console.log("Airdrop requested:", airdropSig);
+                // Wait for balance
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    const bal = await rpc.getBalance(payer.address).send();
+                    if (bal.value > 0n) {
+                        console.log("Funded:", bal.value);
+                        break;
+                    }
+                }
             } catch (e) {
                 console.warn("Airdrop failed (might be rate limited):", e);
             }
