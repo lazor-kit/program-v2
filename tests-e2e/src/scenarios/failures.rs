@@ -143,14 +143,6 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         ],
         &ctx.program_id,
     );
-    let (spender_b_auth_pda, _) = Pubkey::find_program_address(
-        &[
-            b"authority",
-            wallet_pda.as_ref(),
-            Signer::pubkey(&spender_keypair).as_ref(),
-        ],
-        &ctx.program_id,
-    );
 
     // Add Spender (by Owner)
     let mut add_spender_data = vec![1]; // AddAuthority
@@ -163,14 +155,14 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let add_spender_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(wallet_pda.to_address(), false),
-            AccountMeta::new(owner_auth_pda.to_address(), false), // auth
-            AccountMeta::new(spender_b_auth_pda.to_address(), false), // target
-            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // signer
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false), // auth
+            AccountMeta::new(spender_auth_pda.to_address(), false),        // target
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true), // signer
         ],
-        data: vec![1, 2], // AddAuthority(Spender)
+        data: add_spender_data,
     };
 
     let message = Message::new(
@@ -204,14 +196,14 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let malicious_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(wallet_pda.to_address(), false),
-            AccountMeta::new(spender_b_auth_pda.to_address(), false), // Spender auth
-            AccountMeta::new(owner_auth_pda.to_address(), false),     // Target (Owner)
-            AccountMeta::new(Signer::pubkey(&spender_keypair).to_address(), true), // Signer
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(spender_auth_pda.to_address(), false), // Spender auth
+            AccountMeta::new(bad_admin_pda.to_address(), false),             // Target (Bad admin)
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&spender_keypair).to_address(), true), // Signer
         ],
-        data: vec![1, 2], // Try to add Spender (doesn't matter, auth check fails first)
+        data: malicious_add,
     };
 
     let message = Message::new(
@@ -236,40 +228,28 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         ],
         &ctx.program_id,
     );
-    let (session_auth_pda, _) = Pubkey::find_program_address(
-        &[
-            b"authority",
-            wallet_pda.as_ref(),
-            session_keypair.pubkey().as_ref(),
-        ],
-        &ctx.program_id,
-    );
-    // Use previously initialized clock
-    // let clock: solana_clock::Clock = ctx.svm.get_sysvar(); // Already initialized
-    // Re-get it to be safe if svm advanced
+    // Use slot-based expiry
     let clock: solana_clock::Clock = ctx.svm.get_sysvar();
-    let now = clock.unix_timestamp as u64;
+    let current_slot = clock.slot;
+    let expires_at = current_slot + 50; // Expires in 50 slots
 
-    let mut session_create_data = vec![5]; // CreateSession
-    session_create_data.extend_from_slice(session_keypair.pubkey().as_ref());
-    session_create_data.extend_from_slice(&0u64.to_le_bytes()); // Expires at 0 (Genesis)
+    let mut session_data = Vec::new();
+    session_data.push(5); // CreateSession
+    session_data.extend_from_slice(session_keypair.pubkey().as_ref());
+    session_data.extend_from_slice(&expires_at.to_le_bytes());
 
     let create_session_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(wallet_pda.to_address(), false),
-            AccountMeta::new(owner_auth_pda.to_address(), false),
-            AccountMeta::new(session_auth_pda.to_address(), false),
-            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true),
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
+            AccountMeta::new(session_pda.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
             AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
-        data: [
-            vec![1, 3],                         // AddAuthority(Session)
-            (now - 100).to_le_bytes().to_vec(), // Expires in past
-        ]
-        .concat(),
+        data: session_data,
     };
 
     let message = Message::new(
@@ -281,16 +261,22 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
 
     ctx.execute_tx(create_session_tx)?;
 
+    // Warp to future slot to expire session
+    ctx.warp_to_slot(current_slot + 100);
+
     // Try to Execute with Expired Session
+    let mut exec_payload = vec![4]; // Execute
+    exec_payload.push(0); // Empty compact instructions
     let exec_expired_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(wallet_pda.to_address(), false),
-            AccountMeta::new(session_auth_pda.to_address(), false),
-            AccountMeta::new(Signer::pubkey(&session_keypair).to_address(), true),
-            AccountMeta::new_readonly(solana_system_program::id().to_address(), false), // target to invoke (system)
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true), // Payer
+            AccountMeta::new(wallet_pda.to_address(), false),                // Wallet
+            AccountMeta::new(session_pda.to_address(), false), // Authority (Session PDA)
+            AccountMeta::new(vault_pda.to_address(), false),   // Vault
+            AccountMeta::new_readonly(Signer::pubkey(&session_keypair).to_address(), true), // Session Signer
         ],
-        data: vec![3, 0], // Execute payload (empty for test)
+        data: exec_payload,
     };
 
     let message = Message::new(
@@ -327,14 +313,14 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let add_admin_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(wallet_pda.to_address(), false),
-            AccountMeta::new(owner_auth_pda.to_address(), false), // auth
-            AccountMeta::new(admin_auth_pda.to_address(), false), // target
-            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // signer
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false), // auth
+            AccountMeta::new(admin_auth_pda.to_address(), false),          // target
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true), // signer
         ],
-        data: vec![1, 1], // AddAuthority(Admin)
+        data: add_admin_data,
     };
 
     let message = Message::new(
