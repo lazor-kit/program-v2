@@ -102,16 +102,23 @@ pub fn process(
             }
             match authority_header.authority_type {
                 0 => {
-                    // Ed25519: Verify signer
-                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[])?;
+                    // Ed25519: Verify signer (authority_payload ignored)
+                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[], &[4])?;
                 },
                 1 => {
-                    // Secp256r1: Full authentication
+                    // Secp256r1 (WebAuthn)
+                    // signed_payload is compact_instructions bytes for Execute
+                    // The instruction format is [discriminator][compact_instructions_bytes][payload]
+                    // instruction_data is [compact_instructions_bytes][payload]
+                    let data_payload = &instruction_data[..compact_len];
+                    let authority_payload = &instruction_data[compact_len..];
+
                     Secp256r1Authenticator.authenticate(
                         accounts,
                         authority_data,
                         authority_payload,
-                        &compact_bytes,
+                        data_payload,
+                        &[4],
                     )?;
                 },
                 _ => return Err(AuthError::InvalidAuthenticationKind.into()),
