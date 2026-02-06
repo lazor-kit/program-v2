@@ -18,7 +18,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let (wallet_a, _) = Pubkey::find_program_address(&[b"wallet", &user_seed_a], &ctx.program_id);
     let (vault_a, _) =
         Pubkey::find_program_address(&[b"vault", wallet_a.as_ref()], &ctx.program_id);
-    let (owner_a_auth, _) = Pubkey::find_program_address(
+    let (owner_a_auth, auth_bump_a) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_a.as_ref(),
@@ -32,7 +32,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let (wallet_b, _) = Pubkey::find_program_address(&[b"wallet", &user_seed_b], &ctx.program_id);
     let (vault_b, _) =
         Pubkey::find_program_address(&[b"vault", wallet_b.as_ref()], &ctx.program_id);
-    let (owner_b_auth, _) = Pubkey::find_program_address(
+    let (owner_b_auth, auth_bump_b) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_b.as_ref(),
@@ -46,7 +46,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let mut data_a = vec![0];
     data_a.extend_from_slice(&user_seed_a);
     data_a.push(0);
-    data_a.push(0);
+    data_a.push(auth_bump_a);
     data_a.extend_from_slice(&[0; 6]);
     data_a.extend_from_slice(Signer::pubkey(&owner_a).as_ref());
 
@@ -68,7 +68,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         Some(&Signer::pubkey(&ctx.payer).to_address()),
     );
     let mut create_a_tx = Transaction::new_unsigned(message_a);
-    create_a_tx.sign(&[&ctx.payer, &owner_a], ctx.svm.latest_blockhash());
+    create_a_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
 
     ctx.execute_tx(create_a_tx)?;
 
@@ -77,7 +77,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let mut data_b = vec![0];
     data_b.extend_from_slice(&user_seed_b);
     data_b.push(0);
-    data_b.push(0);
+    data_b.push(auth_bump_b);
     data_b.extend_from_slice(&[0; 6]);
     data_b.extend_from_slice(Signer::pubkey(&owner_b).as_ref());
 
@@ -99,7 +99,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         Some(&Signer::pubkey(&ctx.payer).to_address()),
     );
     let mut create_b_tx = Transaction::new_unsigned(message_b);
-    create_b_tx.sign(&[&ctx.payer, &owner_b], ctx.svm.latest_blockhash());
+    create_b_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
 
     ctx.execute_tx(create_b_tx)?;
 
@@ -130,9 +130,10 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(owner_a_auth.to_address(), false), // Auth: Owner A (WRONG WALLET)
             AccountMeta::new(attacker_auth_b.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_a).to_address(), true), // Owner A signing
         ],
-        data: vec![1, 1],
+        data: add_cross_data,
     };
 
     let message_cross = Message::new(

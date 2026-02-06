@@ -78,6 +78,10 @@ impl TestContext {
             .get_account(&addr)
             .ok_or_else(|| anyhow!("Account not found"))
     }
+
+    pub fn warp_to_slot(&mut self, slot: u64) {
+        self.svm.warp_to_slot(slot);
+    }
 }
 
 pub trait ToAddress {

@@ -22,7 +22,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let (wallet_pda, _) = Pubkey::find_program_address(&[b"wallet", &user_seed], &ctx.program_id);
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &ctx.program_id);
-    let (owner_auth_pda, _) = Pubkey::find_program_address(
+    let (owner_auth_pda, auth_bump) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_pda.as_ref(),
@@ -39,7 +39,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     data.push(0); // Discriminator: CreateWallet
     data.extend_from_slice(&user_seed);
     data.push(0); // Type: Ed25519
-    data.push(0); // Role: Owner
+    data.push(auth_bump); // auth_bump from find_program_address
     data.extend_from_slice(&[0; 6]); // Padding
     data.extend_from_slice(Signer::pubkey(&owner_keypair).as_ref());
 
@@ -91,11 +91,14 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     inner_ix_data.extend_from_slice(&2u32.to_le_bytes()); // SystemInstruction::Transfer
     inner_ix_data.extend_from_slice(&5000u64.to_le_bytes()); // Amount
 
+    // Account indices in execute accounts list:
+    // 0: payer, 1: wallet_pda, 2: authority, 3: vault
+    // 4: system_program, 5: vault (inner), 6: payer (inner), 7: owner signer
     let mut compact_bytes = Vec::new();
-    compact_bytes.push(0); // Program Index (SystemProgram)
+    compact_bytes.push(4); // Program Index = system_program (index 4)
     compact_bytes.push(2); // Num Accounts
-    compact_bytes.push(1); // Vault (Inner Index 1)
-    compact_bytes.push(2); // Payer (Inner Index 2)
+    compact_bytes.push(5); // Vault (inner) - index 5
+    compact_bytes.push(6); // Payer (inner) - index 6
     compact_bytes.extend_from_slice(&(inner_ix_data.len() as u16).to_le_bytes());
     compact_bytes.extend_from_slice(&inner_ix_data);
 
@@ -164,6 +167,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
             AccountMeta::new(secp_auth_pda.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: add_auth_data,
@@ -277,6 +281,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(owner_auth_pda.to_address(), false), // Current Owner
             AccountMeta::new(new_owner_pda.to_address(), false),  // New Owner
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: transfer_own_data,

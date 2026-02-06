@@ -112,6 +112,15 @@ pub fn process(
         return Err(ProgramError::IllegalOwner);
     }
 
+    // Validate system_program is the correct System Program (audit N2)
+    if !sol_assert_bytes_eq(
+        system_program.key().as_ref(),
+        &crate::utils::SYSTEM_PROGRAM_ID,
+        32,
+    ) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
     if !current_owner.is_writable() {
         return Err(ProgramError::InvalidAccountData);
     }
