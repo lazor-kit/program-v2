@@ -90,13 +90,24 @@ impl Authenticator for Secp256r1Authenticator {
             return Err(AuthError::InvalidPubkey.into());
         }
 
+        let payer = accounts.first().ok_or(ProgramError::NotEnoughAccountKeys)?;
+        if !payer.is_signer() {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
         #[allow(unused_assignments)]
         let mut hasher = [0u8; 32];
         #[cfg(target_os = "solana")]
         unsafe {
             let _res = pinocchio::syscalls::sol_sha256(
-                [discriminator, signed_payload, &slot.to_le_bytes()].as_ptr() as *const u8,
-                3,
+                [
+                    discriminator,
+                    signed_payload,
+                    &slot.to_le_bytes(),
+                    payer.key().as_ref(),
+                ]
+                .as_ptr() as *const u8,
+                4,
                 hasher.as_mut_ptr(),
             );
         }
