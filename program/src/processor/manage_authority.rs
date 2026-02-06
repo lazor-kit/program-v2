@@ -203,7 +203,13 @@ pub fn process_add_authority(
     check_zero_data(new_auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let space = header_size + full_auth_data.len();
+    // Secp256r1 needs extra 4 bytes for counter prefix
+    let variable_size = if args.authority_type == 1 {
+        4 + full_auth_data.len()
+    } else {
+        full_auth_data.len()
+    };
+    let space = header_size + variable_size;
     let rent = (space as u64)
         .checked_mul(6960)
         .and_then(|val| val.checked_add(897840))
