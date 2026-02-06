@@ -356,19 +356,27 @@ pub fn process_remove_authority(
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
     }
 
-    // Authorization
-    if admin_header.role != 0 {
-        let target_data = unsafe { target_auth_pda.borrow_data_unchecked() };
-        // Safe copy target header
-        let mut target_h_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-        target_h_bytes
-            .copy_from_slice(&target_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
-        let target_header =
-            unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&target_h_bytes) };
-        if target_header.discriminator != AccountDiscriminator::Authority as u8 {
-            return Err(ProgramError::InvalidAccountData);
-        }
+    // Authorization - ALWAYS validate target authority
+    let target_data = unsafe { target_auth_pda.borrow_data_unchecked() };
+    // Safe copy target header
+    let mut target_h_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
+    target_h_bytes.copy_from_slice(&target_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    let target_header =
+        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&target_h_bytes) };
 
+    // ALWAYS verify discriminator
+    if target_header.discriminator != AccountDiscriminator::Authority as u8 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    // ALWAYS verify target belongs to THIS wallet (CRITICAL SECURITY CHECK)
+    if target_header.wallet != *wallet_pda.key() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    // Role-based permission check
+    if admin_header.role != 0 {
+        // Admin can only remove Spender
         if admin_header.role != 1 || target_header.role != 2 {
             return Err(AuthError::PermissionDenied.into());
         }
