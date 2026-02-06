@@ -133,6 +133,15 @@ pub fn process_add_authority(
         return Err(ProgramError::IllegalOwner);
     }
 
+    // Validate system_program is the correct System Program (audit N2)
+    if !sol_assert_bytes_eq(
+        system_program.key().as_ref(),
+        &crate::utils::SYSTEM_PROGRAM_ID,
+        32,
+    ) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
     // Check removed here, moved to type-specific logic
     // if !admin_auth_pda.is_writable() {
     //    return Err(ProgramError::InvalidAccountData);

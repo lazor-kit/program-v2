@@ -97,6 +97,15 @@ pub fn process(
     // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
     let rent = Rent::from_account_info(rent_sysvar)?;
 
+    // Validate system_program is the correct System Program (audit N2)
+    if !assertions::sol_assert_bytes_eq(
+        system_program.key().as_ref(),
+        &crate::utils::SYSTEM_PROGRAM_ID,
+        32,
+    ) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
     if wallet_pda.owner() != program_id || authorizer_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
     }
