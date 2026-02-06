@@ -36,6 +36,7 @@ impl Authenticator for Secp256r1Authenticator {
         auth_data: &mut [u8],
         auth_payload: &[u8],
         signed_payload: &[u8], // The message payload (e.g. compact instructions or args) that is signed
+        discriminator: &[u8],
     ) -> Result<(), ProgramError> {
         if auth_payload.len() < 12 {
             return Err(AuthError::InvalidAuthorityPayload.into());
@@ -94,8 +95,8 @@ impl Authenticator for Secp256r1Authenticator {
         #[cfg(target_os = "solana")]
         unsafe {
             let _res = pinocchio::syscalls::sol_sha256(
-                [signed_payload, &slot.to_le_bytes()].as_ptr() as *const u8,
-                2,
+                [discriminator, signed_payload, &slot.to_le_bytes()].as_ptr() as *const u8,
+                3,
                 hasher.as_mut_ptr(),
             );
         }
