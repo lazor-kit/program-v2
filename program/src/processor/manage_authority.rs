@@ -5,6 +5,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -133,6 +134,19 @@ pub fn process_add_authority(
         return Err(ProgramError::IllegalOwner);
     }
 
+    // Validate system_program is the correct System Program (audit N2)
+    if !sol_assert_bytes_eq(
+        system_program.key().as_ref(),
+        &crate::utils::SYSTEM_PROGRAM_ID,
+        32,
+    ) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let rent_sysvar_info = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent = Rent::from_account_info(rent_sysvar_info)?;
+
     // Check removed here, moved to type-specific logic
     // if !admin_auth_pda.is_writable() {
     //    return Err(ProgramError::InvalidAccountData);
@@ -194,11 +208,14 @@ pub fn process_add_authority(
     check_zero_data(new_auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let space = header_size + full_auth_data.len();
-    let rent = (space as u64)
-        .checked_mul(6960)
-        .and_then(|val| val.checked_add(897840))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    // Secp256r1 needs extra 4 bytes for counter prefix
+    let variable_size = if args.authority_type == 1 {
+        4 + full_auth_data.len()
+    } else {
+        full_auth_data.len()
+    };
+    let space = header_size + variable_size;
+    let rent_lamports = rent.minimum_balance(space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let bump_arr = [bump];
@@ -214,7 +231,7 @@ pub fn process_add_authority(
         new_auth_pda,
         system_program,
         space,
-        rent,
+        rent_lamports,
         program_id,
         &seeds,
     )?;

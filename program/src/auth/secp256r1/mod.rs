@@ -69,6 +69,26 @@ impl Authenticator for Secp256r1Authenticator {
         // SAFETY: Pointer alignment checked above. size_of correct.
         let header = unsafe { &mut *(auth_data.as_mut_ptr() as *mut AuthorityAccountHeader) };
 
+        // Compute hash of user-provided RP ID and verify against stored hash (audit N3)
+        let stored_rp_id_hash = &auth_data[header_size..header_size + 32];
+        #[allow(unused_assignments)]
+        let mut computed_rp_id_hash = [0u8; 32];
+        #[cfg(target_os = "solana")]
+        unsafe {
+            let _res = pinocchio::syscalls::sol_sha256(
+                [rp_id].as_ptr() as *const u8,
+                1,
+                computed_rp_id_hash.as_mut_ptr(),
+            );
+        }
+        #[cfg(not(target_os = "solana"))]
+        {
+            computed_rp_id_hash = [0u8; 32];
+        }
+        if computed_rp_id_hash != stored_rp_id_hash {
+            return Err(AuthError::InvalidPubkey.into());
+        }
+
         #[allow(unused_assignments)]
         let mut hasher = [0u8; 32];
         #[cfg(target_os = "solana")]

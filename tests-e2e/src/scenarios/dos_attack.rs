@@ -17,11 +17,11 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let owner_keypair = Keypair::new();
 
     // 1. Calculate PDA addresses
-    let (wallet_pda, bump) =
+    let (wallet_pda, _wallet_bump) =
         Pubkey::find_program_address(&[b"wallet", &user_seed], &ctx.program_id);
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &ctx.program_id);
-    let (auth_pda, _) = Pubkey::find_program_address(
+    let (auth_pda, auth_bump) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_pda.as_ref(),
@@ -68,7 +68,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let mut data = vec![0]; // CreateWallet discriminator
     data.extend_from_slice(&user_seed);
     data.push(0); // Ed25519
-    data.push(bump);
+    data.push(auth_bump);
     data.extend_from_slice(&[0; 6]); // Padding
     data.extend_from_slice(Signer::pubkey(&owner_keypair).as_ref());
 
