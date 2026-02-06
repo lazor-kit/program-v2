@@ -185,7 +185,7 @@ pub fn process_add_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Verify signer (authority_payload ignored)
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[], &[1])?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
@@ -198,6 +198,7 @@ pub fn process_add_authority(
                 admin_data,
                 authority_payload,
                 data_payload,
+                &[1],
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -345,7 +346,7 @@ pub fn process_remove_authority(
     // Authentication
     match admin_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[], &[2])?;
         },
         1 => {
             Secp256r1Authenticator.authenticate(
@@ -353,6 +354,7 @@ pub fn process_remove_authority(
                 admin_data,
                 authority_payload,
                 data_payload,
+                &[2],
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),

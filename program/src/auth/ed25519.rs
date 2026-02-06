@@ -12,6 +12,7 @@ impl Authenticator for Ed25519Authenticator {
         authority_data: &mut [u8],
         _auth_payload: &[u8],
         _signed_payload: &[u8],
+        _discriminator: &[u8],
     ) -> Result<(), ProgramError> {
         if authority_data.len() < std::mem::size_of::<AuthorityAccountHeader>() + 32 {
             return Err(ProgramError::InvalidAccountData);

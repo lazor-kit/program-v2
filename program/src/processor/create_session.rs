@@ -157,20 +157,25 @@ pub fn process(
     // For Secp256r1, we need to distinguish args from auth payload.
     // The instruction format is [discriminator][args][payload].
     // `instruction_data` here is [args][payload].
+    let data_payload = &instruction_data[..payload_offset];
 
     match auth_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &[])?;
+            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &[], &[5])?;
         },
         1 => {
-            if !authorizer_pda.is_writable() {
-                return Err(ProgramError::InvalidAccountData);
-            }
+            // Secp256r1 (WebAuthn) - Must be Writable
+            // Check removed: conditional writable check inside match
+            // Verified above.
+
+            // Secp256r1: Full authentication with payload
+            // signed_payload is CreateSessionArgs (contains session_key + expires_at)
             Secp256r1Authenticator.authenticate(
                 accounts,
                 auth_data,
                 authority_payload,
-                &instruction_data[..payload_offset], // Sign over args part?
+                data_payload,
+                &[5],
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),

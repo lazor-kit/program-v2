@@ -137,7 +137,7 @@ pub fn process(
             return Err(ProgramError::InvalidAccountData);
         }
         // SAFETY: Alignment checked.
-        let auth = unsafe { &*(data.as_ptr() as *const AuthorityAccountHeader) };
+        let auth = unsafe { &*(current_owner_data.as_ptr() as *const AuthorityAccountHeader) };
         if auth.discriminator != AccountDiscriminator::Authority as u8 {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -151,14 +151,21 @@ pub fn process(
         // Authenticate Current Owner
         match auth.authority_type {
             0 => {
-                Ed25519Authenticator.authenticate(accounts, data, &[], &[])?;
+                // Ed25519: Verify signer (authority_payload ignored)
+                Ed25519Authenticator.authenticate(accounts, current_owner_data, &[], &[], &[3])?;
             },
             1 => {
+                // Secp256r1 (WebAuthn) - Must be Writable
+                if !current_owner.is_writable() {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                // Secp256r1: Full authentication with payload
                 Secp256r1Authenticator.authenticate(
                     accounts,
-                    data,
+                    current_owner_data,
                     authority_payload,
                     data_payload,
+                    &[3],
                 )?;
             },
             _ => return Err(AuthError::InvalidAuthenticationKind.into()),

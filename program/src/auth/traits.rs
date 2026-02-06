@@ -16,5 +16,6 @@ pub trait Authenticator {
         authority_data: &mut [u8],
         auth_payload: &[u8],
         signed_payload: &[u8],
+        discriminator: &[u8],
     ) -> Result<(), ProgramError>;
 }
