@@ -1,15 +1,17 @@
-use crate::common::TestContext;
+use crate::common::{TestContext, ToAddress};
 use anyhow::{Context, Result};
 use p256::ecdsa::SigningKey;
 use rand::rngs::OsRng;
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    system_program,
-};
+use solana_instruction::{AccountMeta, Instruction};
+use solana_keypair::Keypair;
+use solana_message::Message;
+use solana_program::hash::hash;
+use solana_pubkey::Pubkey;
+use solana_signer::Signer;
+use solana_system_program;
+use solana_transaction::Transaction;
 
-pub async fn run(ctx: &TestContext) -> Result<()> {
+pub fn run(ctx: &mut TestContext) -> Result<()> {
     println!("\n🚀 Running Happy Path Scenario...");
 
     // 1. Setup Data
@@ -23,7 +25,7 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"authority",
             wallet_pda.as_ref(),
-            owner_keypair.pubkey().as_ref(),
+            Signer::pubkey(&owner_keypair).as_ref(),
         ],
         &ctx.program_id,
     );
@@ -38,26 +40,47 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     data.push(0); // Type: Ed25519
     data.push(0); // Role: Owner
     data.extend_from_slice(&[0; 6]); // Padding
-    data.extend_from_slice(owner_keypair.pubkey().as_ref());
+    data.extend_from_slice(Signer::pubkey(&owner_keypair).as_ref());
 
     let create_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new(owner_auth_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
         data,
     };
-    ctx.send_transaction(&[create_ix], &[&ctx.payer])
-        .context("Create Wallet Failed")?;
 
-    // 3. Fund Vault
-    println!("\n[2/3] Funding Vault...");
-    ctx.fund_account(&vault_pda, 10_000_000)
-        .context("Fund Vault Failed")?;
+    let message_create = Message::new(&[create_ix], Some(&Signer::pubkey(&ctx.payer).to_address()));
+    let mut create_tx = Transaction::new_unsigned(message_create);
+    create_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(create_tx)?;
+    println!("   ✓ Wallet created");
+
+    // 3. Fund Vault - using manual transfer instruction construction
+    println!("\n[Test] Funding Vault...");
+    let mut transfer_data = Vec::new();
+    transfer_data.extend_from_slice(&2u32.to_le_bytes()); // Transfer instruction
+    transfer_data.extend_from_slice(&1_000_000_000u64.to_le_bytes());
+
+    let fund_ix = Instruction {
+        program_id: solana_system_program::id().to_address(),
+        accounts: vec![
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(vault_pda.to_address(), false),
+        ],
+        data: transfer_data,
+    };
+
+    let message_fund = Message::new(&[fund_ix], Some(&Signer::pubkey(&ctx.payer).to_address()));
+    let mut fund_tx = Transaction::new_unsigned(message_fund);
+    fund_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(fund_tx)?;
 
     // 4. Execute Transfer (Ed25519)
     println!("\n[3/7] Executing Transfer (Ed25519)...");
@@ -83,28 +106,36 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     exec_data.extend_from_slice(&full_compact);
 
     let execute_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(owner_auth_pda, false), // Authority
-            AccountMeta::new(vault_pda, false),      // Vault (Signer)
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false), // Authority
+            AccountMeta::new(vault_pda.to_address(), false),      // Vault (Signer)
             // Inner:
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new(ctx.payer.pubkey(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), false),
             // Signer for Ed25519
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: exec_data,
     };
-    ctx.send_transaction(&[execute_ix], &[&ctx.payer, &owner_keypair])
+
+    let message_exec = Message::new(
+        &[execute_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut execute_tx = Transaction::new_unsigned(message_exec);
+    execute_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(execute_tx)
         .context("Execute Transfer Failed")?;
 
     // 5. Add Secp256r1 Authority
     println!("\n[4/7] Adding Secp256r1 Authority...");
     let rp_id = "lazorkit.vault";
-    let rp_id_hash = solana_sdk::keccak::hash(rp_id.as_bytes()).to_bytes();
+    let rp_id_hash = hash(rp_id.as_bytes()).to_bytes();
     let signing_key = SigningKey::random(&mut OsRng);
     let verifying_key = p256::ecdsa::VerifyingKey::from(&signing_key);
     let encoded_point = verifying_key.to_encoded_point(true);
@@ -124,18 +155,26 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     add_auth_data.extend_from_slice(secp_pubkey); // Pubkey
 
     let add_secp_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new_readonly(owner_auth_pda, false),
-            AccountMeta::new(secp_auth_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
+            AccountMeta::new(secp_auth_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: add_auth_data,
     };
-    ctx.send_transaction(&[add_secp_ix], &[&ctx.payer, &owner_keypair])
+
+    let message_add = Message::new(
+        &[add_secp_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut add_spender_tx = Transaction::new_unsigned(message_add);
+    add_spender_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(add_spender_tx)
         .context("Add Secp256r1 Failed")?;
 
     // 6. Create Session
@@ -145,31 +184,39 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"session",
             wallet_pda.as_ref(),
-            session_keypair.pubkey().as_ref(),
+            Signer::pubkey(&session_keypair).as_ref(),
         ],
         &ctx.program_id,
     );
-    let clock = ctx.client.get_epoch_info()?;
-    let expires_at = clock.absolute_slot + 1000;
+    let clock: solana_clock::Clock = ctx.svm.get_sysvar();
+    let expires_at = clock.slot + 1000;
 
     let mut session_data = Vec::new();
     session_data.push(5); // CreateSession
-    session_data.extend_from_slice(session_keypair.pubkey().as_ref());
+    session_data.extend_from_slice(Signer::pubkey(&session_keypair).as_ref());
     session_data.extend_from_slice(&expires_at.to_le_bytes());
 
     let session_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new_readonly(wallet_pda, false),
-            AccountMeta::new_readonly(owner_auth_pda, false),
-            AccountMeta::new(session_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(wallet_pda.to_address(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
+            AccountMeta::new(session_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: session_data,
     };
-    ctx.send_transaction(&[session_ix], &[&ctx.payer, &owner_keypair])
+
+    let message_session = Message::new(
+        &[session_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut session_tx = Transaction::new_unsigned(message_session);
+    session_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(session_tx)
         .context("Create Session Failed")?;
 
     // 7. Execute via Session
@@ -178,20 +225,28 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     session_exec_data.extend_from_slice(&full_compact); // Reuse transfer instruction
 
     let session_exec_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(session_pda, false), // Session as Authority
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new(ctx.payer.pubkey(), false),
-            AccountMeta::new_readonly(session_keypair.pubkey(), true), // Session Signer
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(session_pda.to_address(), false), // Session as Authority
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&session_keypair).to_address(), true), // Session Signer
         ],
         data: session_exec_data,
     };
-    ctx.send_transaction(&[session_exec_ix], &[&ctx.payer, &session_keypair])
+
+    let message_sess_exec = Message::new(
+        &[session_exec_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut session_exec_tx = Transaction::new_unsigned(message_sess_exec);
+    session_exec_tx.sign(&[&ctx.payer, &session_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(session_exec_tx)
         .context("Session Execute Failed")?;
 
     // 8. Transfer Ownership
@@ -201,7 +256,7 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"authority",
             wallet_pda.as_ref(),
-            new_owner.pubkey().as_ref(),
+            Signer::pubkey(&new_owner).as_ref(),
         ],
         &ctx.program_id,
     );
@@ -209,21 +264,29 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     let mut transfer_own_data = Vec::new();
     transfer_own_data.push(3); // TransferOwnership
     transfer_own_data.push(0); // Ed25519
-    transfer_own_data.extend_from_slice(new_owner.pubkey().as_ref());
+    transfer_own_data.extend_from_slice(Signer::pubkey(&new_owner).as_ref());
 
     let transfer_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(owner_auth_pda, false), // Current Owner
-            AccountMeta::new(new_owner_pda, false),  // New Owner
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false), // Current Owner
+            AccountMeta::new(new_owner_pda.to_address(), false),  // New Owner
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: transfer_own_data,
     };
-    ctx.send_transaction(&[transfer_ix], &[&ctx.payer, &owner_keypair])
+
+    let message_transfer = Message::new(
+        &[transfer_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut transfer_tx = Transaction::new_unsigned(message_transfer);
+    transfer_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(transfer_tx)
         .context("Transfer Ownership Failed")?;
 
     println!("✅ Happy Path Scenario Passed");
