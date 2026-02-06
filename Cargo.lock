@@ -1963,6 +1963,7 @@ name = "lazorkit-tests-e2e"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.7",
  "litesvm 0.9.1",
  "p256",
  "pinocchio",
