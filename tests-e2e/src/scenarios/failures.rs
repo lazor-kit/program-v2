@@ -360,5 +360,56 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     ctx.execute_tx_expect_error(remove_owner_tx)?;
     println!("✅ Admin Removing Owner Rejected.");
 
+    // Scenario 6: Wallet Discriminator Check (Issue #7)
+    // Attempt to use an Authority PDA (owned by program, but wrong discriminator) as the Wallet PDA
+    println!("\n[6/6] Testing Wallet Discriminator Validation...");
+
+    // We will try to call CreateSession using the Owner Authority PDA as the "Wallet PDA"
+    // The Owner Authority PDA is owned by the program, so it passes the owner check.
+    // However, it has Discriminator::Authority (2), not Wallet (1), so it should fail the new check.
+
+    let fake_wallet_pda = owner_auth_pda; // This is actually an Authority account
+
+    let bad_session_keypair = Keypair::new();
+    let (bad_session_pda, _) = Pubkey::find_program_address(
+        &[
+            b"session",
+            fake_wallet_pda.as_ref(), // Derived from the "fake" wallet
+            bad_session_keypair.pubkey().as_ref(),
+        ],
+        &ctx.program_id,
+    );
+
+    let mut bad_session_data = Vec::new();
+    bad_session_data.push(5); // CreateSession
+    bad_session_data.extend_from_slice(bad_session_keypair.pubkey().as_ref());
+    bad_session_data.extend_from_slice(&(current_slot + 100).to_le_bytes());
+
+    let bad_discriminator_ix = Instruction {
+        program_id: ctx.program_id.to_address(),
+        accounts: vec![
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(fake_wallet_pda.to_address(), false), // FAKE WALLET (Authority Account)
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false), // Authorizer (Using same account as auth is technically weird but valid for this test)
+            AccountMeta::new(bad_session_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
+        ],
+        data: bad_session_data,
+    };
+
+    let message = Message::new(
+        &[bad_discriminator_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut bad_disc_tx = Transaction::new_unsigned(message);
+    bad_disc_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    // Expect InvalidAccountData (which is often generic error or custom depending on implementation)
+    // Our fix returns InvalidAccountData
+    ctx.execute_tx_expect_error(bad_disc_tx)?;
+    println!("✅ Invalid Wallet Discriminator Rejected.");
+
     Ok(())
 }

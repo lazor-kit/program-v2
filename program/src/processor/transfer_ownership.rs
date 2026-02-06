@@ -111,6 +111,11 @@ pub fn process(
     if wallet_pda.owner() != program_id || current_owner.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
     }
+    // Validate Wallet Discriminator (Issue #7)
+    let wallet_data = unsafe { wallet_pda.borrow_data_unchecked() };
+    if wallet_data.is_empty() || wallet_data[0] != AccountDiscriminator::Wallet as u8 {
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     // Validate system_program is the correct System Program (audit N2)
     if !sol_assert_bytes_eq(

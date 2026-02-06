@@ -30,10 +30,15 @@
 **Status**: ✅ Fixed
 **Fix**: Replaced hardcoded rent calculations with `Rent::minimum_balance(space)` in `create_wallet.rs` and `manage_authority.rs`. Verified by tests.
 
+### Issue #8 (Validation): Wallet Discriminator Check
+**Status**: ✅ Fixed
+**Fix**: Added `wallet_data[0] == AccountDiscriminator::Wallet` check in `create_session.rs`, `manage_authority.rs`, `execute.rs`, and `transfer_ownership.rs`.
+**Verification**: Added `Scenario 6: Wallet Discriminator Check` in `failures.rs`. Tested passing Authority PDA as Wallet PDA (Rejected).
+
 ## Current Status
 All E2E scenarios are PASSING.
 - Happy Path
-- Failures (5/5)
+- Failures (6/6)
 - Cross Wallet (3/3)
 - DoS Attack
 - Audit Validations
