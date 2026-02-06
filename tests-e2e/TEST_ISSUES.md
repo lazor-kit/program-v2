@@ -1,46 +1,31 @@
 # E2E Test Issues
 
-## Issue #1: `failures.rs` Scenario 3 - Spender Privilege Escalation Test
+## Resolved Issues
 
-**Status**: 🔴 Broken  
-**Priority**: Medium  
-**File**: `tests-e2e/src/scenarios/failures.rs` (lines 225-290)
+### Issue #1: `failures.rs` Scenario 3 - Spender Privilege Escalation Test
+**Status**: ✅ Fixed
+**Fix**: Corrected account order (payer first) and used proper instruction data format.
 
-### Problem
-Test has incorrect logic - mixes CreateSession and AddAuthority concepts:
-- Creates `session_pda` and `session_auth_pda` with session keypair seeds
-- But uses AddAuthority instruction discriminator `[1, 3]`
-- Account list doesn't match either CreateSession or AddAuthority expected format
-- Error: `InvalidInstructionData` (consumed only 113 compute units)
+### Issue #2: `failures.rs` Scenario 4 - Session Expiry
+**Status**: ✅ Fixed
+**Fix**: Updated CreateSession format, switched to slot-based expiry, and used `warp_to_slot` to ensure expiry.
 
-### Root Cause
-Test was likely written during refactoring and instruction formats changed. The test:
-1. Sets up PDAs for session creation
-2. But instruction data is for AddAuthority (discriminator 1)
-3. Account order is wrong for both instructions
+### Issue #3: `failures.rs` Scenario 5 - Admin Permission Constraints
+**Status**: ✅ Fixed
+**Fix**: Corrected AddAuthority instruction data and account order.
 
-### Fix Required
-Decide what this test should actually verify:
-- **Option A**: Test that spender cannot call AddAuthority → fix instruction data and accounts
-- **Option B**: Test that expired session cannot be used → rewrite as proper CreateSession + Execute flow
+### Issue #4: `cross_wallet_attacks.rs` Malformed Data
+**Status**: ✅ Fixed
+**Fix**: Corrected malformed `vec![1,1]` data to full `add_cross_data`.
 
-### Affected Code
-```rust
-// Line 268-272 - Instruction data is mixed up
-data: [
-    vec![1, 3],                         // AddAuthority(Session) ← WRONG
-    (now - 100).to_le_bytes().to_vec(), // Expires in past
-]
-.concat(),
-```
+### Issue #5: `cross_wallet_attacks.rs` Keypair Mismatch
+**Status**: ✅ Fixed
+**Fix**: Removed unused owner keypair from transaction signing to match instruction accounts.
 
----
-
-## Issue #2: Other Skipped Tests Not Running
-
-Tests after scenario 3 failure are skipped:
-- Cross Wallet Attacks
-- DoS Attack  
+## Current Status
+All E2E scenarios are PASSING.
+- Happy Path
+- Failures (5/5)
+- Cross Wallet (3/3)
+- DoS Attack
 - Audit Validations
-
-These should run after fixing Issue #1.

@@ -68,7 +68,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         Some(&Signer::pubkey(&ctx.payer).to_address()),
     );
     let mut create_a_tx = Transaction::new_unsigned(message_a);
-    create_a_tx.sign(&[&ctx.payer, &owner_a], ctx.svm.latest_blockhash());
+    create_a_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
 
     ctx.execute_tx(create_a_tx)?;
 
@@ -99,7 +99,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         Some(&Signer::pubkey(&ctx.payer).to_address()),
     );
     let mut create_b_tx = Transaction::new_unsigned(message_b);
-    create_b_tx.sign(&[&ctx.payer, &owner_b], ctx.svm.latest_blockhash());
+    create_b_tx.sign(&[&ctx.payer], ctx.svm.latest_blockhash());
 
     ctx.execute_tx(create_b_tx)?;
 
@@ -132,7 +132,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_a).to_address(), true), // Owner A signing
         ],
-        data: vec![1, 1],
+        data: add_cross_data,
     };
 
     let message_cross = Message::new(
