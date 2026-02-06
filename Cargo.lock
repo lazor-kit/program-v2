@@ -1980,6 +1980,7 @@ dependencies = [
  "solana-pubkey 2.2.1",
  "solana-signer 3.0.0",
  "solana-system-program 3.1.8",
+ "solana-sysvar 3.1.1",
  "solana-transaction 3.0.2",
 ]
 
