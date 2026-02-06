@@ -130,6 +130,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(owner_a_auth.to_address(), false), // Auth: Owner A (WRONG WALLET)
             AccountMeta::new(attacker_auth_b.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_a).to_address(), true), // Owner A signing
         ],
         data: add_cross_data,

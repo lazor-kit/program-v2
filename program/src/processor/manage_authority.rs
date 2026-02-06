@@ -5,6 +5,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -141,6 +142,10 @@ pub fn process_add_authority(
     ) {
         return Err(ProgramError::IncorrectProgramId);
     }
+    let rent_sysvar_info = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent = Rent::from_account_info(rent_sysvar_info)?;
 
     // Check removed here, moved to type-specific logic
     // if !admin_auth_pda.is_writable() {
@@ -210,10 +215,7 @@ pub fn process_add_authority(
         full_auth_data.len()
     };
     let space = header_size + variable_size;
-    let rent = (space as u64)
-        .checked_mul(6960)
-        .and_then(|val| val.checked_add(897840))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let rent_lamports = rent.minimum_balance(space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let bump_arr = [bump];
@@ -229,7 +231,7 @@ pub fn process_add_authority(
         new_auth_pda,
         system_program,
         space,
-        rent,
+        rent_lamports,
         program_id,
         &seeds,
     )?;

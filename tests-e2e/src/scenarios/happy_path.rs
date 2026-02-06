@@ -167,6 +167,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
             AccountMeta::new(secp_auth_pda.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: add_auth_data,
@@ -280,6 +281,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(owner_auth_pda.to_address(), false), // Current Owner
             AccountMeta::new(new_owner_pda.to_address(), false),  // New Owner
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: transfer_own_data,

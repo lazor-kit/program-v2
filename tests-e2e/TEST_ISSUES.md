@@ -22,6 +22,14 @@
 **Status**: ✅ Fixed
 **Fix**: Removed unused owner keypair from transaction signing to match instruction accounts.
 
+### Issue #6 (DoS): System Program Create Account
+**Status**: ✅ Fixed
+**Fix**: Implemented Transfer-Allocate-Assign pattern in `utils.rs`. Verified by `dos_attack.rs`.
+
+### Issue #7 (Rent Calc): Hardcoded Rent
+**Status**: ✅ Fixed
+**Fix**: Replaced hardcoded rent calculations with `Rent::minimum_balance(space)` in `create_wallet.rs` and `manage_authority.rs`. Verified by tests.
+
 ## Current Status
 All E2E scenarios are PASSING.
 - Happy Path
