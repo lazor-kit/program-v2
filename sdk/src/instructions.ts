@@ -127,6 +127,7 @@ export async function createWalletInstruction(
             { address: vaultPda, role: 1 }, // writable
             { address: authorityPda, role: 1 }, // writable
             { address: address("11111111111111111111111111111111"), role: 0 }, // system program
+            { address: address("SysvarRent111111111111111111111111111111111"), role: 0 }, // rent sysvar
         ],
         data,
     };
@@ -260,6 +261,7 @@ export async function createSessionInstruction(
         { address: authorizerPda, role: 1 },
         { address: sessionPda, role: 1 },
         { address: address("11111111111111111111111111111111"), role: 0 },
+        { address: address("SysvarRent111111111111111111111111111111111"), role: 0 }, // rent sysvar
     ];
 
     if (authorizerSigner) {

@@ -6,6 +6,7 @@ use solana_message::Message;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_system_program;
+use solana_sysvar;
 use solana_transaction::Transaction;
 
 pub fn run(ctx: &mut TestContext) -> Result<()> {
@@ -79,6 +80,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(vault_pda.to_address(), false),
             AccountMeta::new(auth_pda.to_address(), false),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
         ],
         data,
     };
