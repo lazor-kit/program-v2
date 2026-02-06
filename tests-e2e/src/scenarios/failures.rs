@@ -5,6 +5,7 @@ use solana_keypair::Keypair;
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_system_program;
+use solana_sysvar;
 // use solana_transaction::Transaction; // Transaction usage needs refactor
 use solana_message::Message;
 use solana_transaction::Transaction;
@@ -46,6 +47,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // owner
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
         ],
         data,
     };
@@ -262,6 +264,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true),
             AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
         ],
         data: [
             vec![1, 3],                         // AddAuthority(Session)

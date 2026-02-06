@@ -5,6 +5,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -68,6 +69,7 @@ impl CreateWalletArgs {
 /// 3. `[writable]` Vault PDA: Derived from `["vault", wallet_pubkey]`.
 /// 4. `[writable]` Authority PDA: Derived from `["authority", wallet_pubkey, id_seed]`.
 /// 5. `[]` System Program.
+/// 6. `[]` Rent Sysvar.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -108,6 +110,12 @@ pub fn process(
     let system_program = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent_sysvar = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
+    let rent = Rent::from_account_info(rent_sysvar)?;
 
     let (wallet_key, wallet_bump) = find_program_address(&[b"wallet", &args.user_seed], program_id);
     if !sol_assert_bytes_eq(wallet_pda.key().as_ref(), wallet_key.as_ref(), 32) {
@@ -131,13 +139,7 @@ pub fn process(
     // --- 1. Initialize Wallet Account ---
     // Calculate rent-exempt balance for fixed 8-byte wallet account layout.
     let wallet_space = 8;
-    // 897840 + (space * 6960)
-    let rent_base = 897840u64;
-    let rent_per_byte = 6960u64;
-    let wallet_rent = (wallet_space as u64)
-        .checked_mul(rent_per_byte)
-        .and_then(|val| val.checked_add(rent_base))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let wallet_rent = rent.minimum_balance(wallet_space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let wallet_bump_arr = [wallet_bump];
@@ -182,12 +184,7 @@ pub fn process(
     };
 
     let auth_space = header_size + variable_size;
-
-    // Rent calculation: 897840 + (space * 6960)
-    let auth_rent = (auth_space as u64)
-        .checked_mul(6960)
-        .and_then(|val| val.checked_add(897840))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let auth_rent = rent.minimum_balance(auth_space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let auth_bump_arr = [auth_bump];

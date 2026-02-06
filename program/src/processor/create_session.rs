@@ -6,6 +6,7 @@ use pinocchio::{
     program::invoke_signed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -65,6 +66,7 @@ impl CreateSessionArgs {
 /// 3. `[signer, writable]` Authorizer: Authority approving this session creation.
 /// 4. `[writable]` Session PDA: The new session account.
 /// 5. `[]` System Program.
+/// 6. `[]` Rent Sysvar.
 pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -88,6 +90,12 @@ pub fn process(
     let system_program = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent_sysvar = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
+    let rent = Rent::from_account_info(rent_sysvar)?;
 
     if wallet_pda.owner() != program_id || authorizer_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
@@ -165,15 +173,11 @@ pub fn process(
 
     // Create Session Account
     let space = std::mem::size_of::<SessionAccount>();
-    // Rent: 897840 + (space * 6960)
-    let rent = (space as u64)
-        .checked_mul(6960)
-        .and_then(|val| val.checked_add(897840))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let session_rent = rent.minimum_balance(space);
 
     let mut create_ix_data = Vec::with_capacity(52);
     create_ix_data.extend_from_slice(&0u32.to_le_bytes());
-    create_ix_data.extend_from_slice(&rent.to_le_bytes());
+    create_ix_data.extend_from_slice(&session_rent.to_le_bytes());
     create_ix_data.extend_from_slice(&(space as u64).to_le_bytes());
     create_ix_data.extend_from_slice(program_id.as_ref());
 
