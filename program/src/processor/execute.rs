@@ -4,7 +4,7 @@ use crate::{
     },
     compact::parse_compact_instructions,
     error::AuthError,
-    state::authority::AuthorityAccountHeader,
+    state::{authority::AuthorityAccountHeader, AccountDiscriminator},
 };
 use pinocchio::{
     account_info::AccountInfo,
@@ -60,6 +60,11 @@ pub fn process(
     // Verify ownership
     if wallet_pda.owner() != program_id || authority_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
+    }
+    // Validate Wallet Discriminator (Issue #7)
+    let wallet_data = unsafe { wallet_pda.borrow_data_unchecked() };
+    if wallet_data.is_empty() || wallet_data[0] != AccountDiscriminator::Wallet as u8 {
+        return Err(ProgramError::InvalidAccountData);
     }
 
     if !authority_pda.is_writable() {
