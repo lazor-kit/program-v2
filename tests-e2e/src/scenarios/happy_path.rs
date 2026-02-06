@@ -22,7 +22,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     let (wallet_pda, _) = Pubkey::find_program_address(&[b"wallet", &user_seed], &ctx.program_id);
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &ctx.program_id);
-    let (owner_auth_pda, _) = Pubkey::find_program_address(
+    let (owner_auth_pda, auth_bump) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_pda.as_ref(),
@@ -39,7 +39,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     data.push(0); // Discriminator: CreateWallet
     data.extend_from_slice(&user_seed);
     data.push(0); // Type: Ed25519
-    data.push(0); // Role: Owner
+    data.push(auth_bump); // auth_bump from find_program_address
     data.extend_from_slice(&[0; 6]); // Padding
     data.extend_from_slice(Signer::pubkey(&owner_keypair).as_ref());
 

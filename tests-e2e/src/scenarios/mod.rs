@@ -1,3 +1,4 @@
+pub mod audit_validations;
 pub mod cross_wallet_attacks;
 pub mod dos_attack;
 pub mod failures;

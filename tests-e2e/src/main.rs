@@ -17,8 +17,9 @@ fn main() -> Result<()> {
     // 2. Run Scenarios
     scenarios::happy_path::run(&mut ctx)?;
     scenarios::failures::run(&mut ctx)?;
-    // scenarios::cross_wallet_attacks::run(&mut ctx)?; // Missing in this branch
+    scenarios::cross_wallet_attacks::run(&mut ctx)?;
     scenarios::dos_attack::run(&mut ctx)?;
+    scenarios::audit_validations::run(&mut ctx)?;
 
     println!("\n🎉 All scenarios completed successfully!");
     Ok(())

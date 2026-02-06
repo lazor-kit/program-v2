@@ -20,7 +20,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
 
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &ctx.program_id);
-    let (owner_auth_pda, _) = Pubkey::find_program_address(
+    let (owner_auth_pda, auth_bump) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_pda.as_ref(),
@@ -34,18 +34,17 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
     data.push(0);
     data.extend_from_slice(&user_seed);
     data.push(0);
-    data.push(0);
+    data.push(auth_bump);
     data.extend_from_slice(&[0; 6]);
     data.extend_from_slice(owner_keypair.pubkey().as_ref());
 
     let create_wallet_ix = Instruction {
         program_id: ctx.program_id.to_address(),
         accounts: vec![
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
             AccountMeta::new(wallet_pda.to_address(), false),
             AccountMeta::new(vault_pda.to_address(), false),
             AccountMeta::new(owner_auth_pda.to_address(), false),
-            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // owner
-            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
             AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
         ],
