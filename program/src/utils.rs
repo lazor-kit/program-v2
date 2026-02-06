@@ -7,6 +7,9 @@ use pinocchio::{
     ProgramResult,
 };
 
+/// System Program ID (11111111111111111111111111111111)
+pub const SYSTEM_PROGRAM_ID: [u8; 32] = [0u8; 32];
+
 /// Wrapper around the `sol_get_stack_height` syscall
 pub fn get_stack_height() -> u64 {
     #[cfg(target_os = "solana")]

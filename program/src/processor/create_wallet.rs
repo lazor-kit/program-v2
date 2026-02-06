@@ -4,7 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::Seed,
     program_error::ProgramError,
-    pubkey::{find_program_address, Pubkey},
+    pubkey::{create_program_address, find_program_address, Pubkey},
     sysvars::rent::Rent,
     ProgramResult,
 };
@@ -117,6 +117,15 @@ pub fn process(
     // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
     let rent = Rent::from_account_info(rent_sysvar)?;
 
+    // Validate system_program is the correct System Program (audit N2)
+    if !sol_assert_bytes_eq(
+        system_program.key().as_ref(),
+        &crate::utils::SYSTEM_PROGRAM_ID,
+        32,
+    ) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
     let (wallet_key, wallet_bump) = find_program_address(&[b"wallet", &args.user_seed], program_id);
     if !sol_assert_bytes_eq(wallet_pda.key().as_ref(), wallet_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
@@ -129,8 +138,13 @@ pub fn process(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    let (auth_key, auth_bump) =
-        find_program_address(&[b"authority", wallet_key.as_ref(), id_seed], program_id);
+    // Use client-provided auth_bump for efficiency (audit N1)
+    let auth_bump_arr = [args.auth_bump];
+    let auth_key = create_program_address(
+        &[b"authority", wallet_key.as_ref(), id_seed, &auth_bump_arr],
+        program_id,
+    )
+    .map_err(|_| ProgramError::InvalidSeeds)?;
     if !sol_assert_bytes_eq(auth_pda.key().as_ref(), auth_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
     }
@@ -187,7 +201,7 @@ pub fn process(
     let auth_rent = rent.minimum_balance(auth_space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
-    let auth_bump_arr = [auth_bump];
+    let auth_bump_arr = [args.auth_bump];
     let auth_seeds = [
         Seed::from(b"authority"),
         Seed::from(wallet_key.as_ref()),
@@ -211,7 +225,7 @@ pub fn process(
         discriminator: AccountDiscriminator::Authority as u8,
         authority_type: args.authority_type,
         role: 0,
-        bump: auth_bump,
+        bump: args.auth_bump,
         version: crate::state::CURRENT_ACCOUNT_VERSION,
         _padding: [0; 3],
         counter: 0,
