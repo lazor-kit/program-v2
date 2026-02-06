@@ -1,8 +1,7 @@
 use assertions::{check_zero_data, sol_assert_bytes_eq};
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Seed, Signer},
-    program::invoke_signed,
+    instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
     ProgramResult,
@@ -173,29 +172,7 @@ pub fn process(
         .and_then(|val| val.checked_add(897840))
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
-    let mut create_ix_data = Vec::with_capacity(52);
-    create_ix_data.extend_from_slice(&0u32.to_le_bytes());
-    create_ix_data.extend_from_slice(&rent.to_le_bytes());
-    create_ix_data.extend_from_slice(&(space as u64).to_le_bytes());
-    create_ix_data.extend_from_slice(program_id.as_ref());
-
-    let accounts_meta = [
-        AccountMeta {
-            pubkey: payer.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: new_owner.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-    ];
-    let create_ix = Instruction {
-        program_id: system_program.key(),
-        accounts: &accounts_meta,
-        data: &create_ix_data,
-    };
+    // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let bump_arr = [bump];
     let seeds = [
         Seed::from(b"authority"),
@@ -203,12 +180,15 @@ pub fn process(
         Seed::from(id_seed),
         Seed::from(&bump_arr),
     ];
-    let signer: Signer = (&seeds).into();
 
-    invoke_signed(
-        &create_ix,
-        &[&payer.clone(), &new_owner.clone(), &system_program.clone()],
-        &[signer],
+    crate::utils::initialize_pda_account(
+        payer,
+        new_owner,
+        system_program,
+        space,
+        rent,
+        program_id,
+        &seeds,
     )?;
 
     let data = unsafe { new_owner.borrow_mut_data_unchecked() };
