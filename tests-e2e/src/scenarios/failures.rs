@@ -60,7 +60,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
         Some(&Signer::pubkey(&ctx.payer).to_address()),
     );
     let mut create_wallet_tx = Transaction::new_unsigned(message);
-    create_wallet_tx.sign(&[&ctx.payer, &owner_keypair], latest_blockhash);
+    create_wallet_tx.sign(&[&ctx.payer], latest_blockhash);
 
     ctx.execute_tx(create_wallet_tx)?;
 
