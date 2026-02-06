@@ -160,6 +160,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(owner_auth_pda.to_address(), false), // auth
             AccountMeta::new(spender_auth_pda.to_address(), false),        // target
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true), // signer
         ],
         data: add_spender_data,
@@ -201,6 +202,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(spender_auth_pda.to_address(), false), // Spender auth
             AccountMeta::new(bad_admin_pda.to_address(), false),             // Target (Bad admin)
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&spender_keypair).to_address(), true), // Signer
         ],
         data: malicious_add,
@@ -318,6 +320,7 @@ pub fn run(ctx: &mut TestContext) -> Result<()> {
             AccountMeta::new_readonly(owner_auth_pda.to_address(), false), // auth
             AccountMeta::new(admin_auth_pda.to_address(), false),          // target
             AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+            AccountMeta::new_readonly(solana_sysvar::rent::ID.to_address(), false),
             AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true), // signer
         ],
         data: add_admin_data,
