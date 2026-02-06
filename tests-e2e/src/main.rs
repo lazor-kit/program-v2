@@ -3,22 +3,22 @@ mod scenarios;
 
 use anyhow::Result;
 use common::TestContext;
-use solana_sdk::signature::Signer;
+use solana_signer::Signer;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    println!("🚀 Starting LazorKit Mainnet Readiness Tests...");
+fn main() -> Result<()> {
+    println!("🚀 Starting LazorKit Tests (LiteSVM)...");
 
-    // 1. Initialize Context (Client, Payer, ProgramID)
-    let ctx = TestContext::new()?;
-    println!("Helper Context Initialized.");
-    println!("RPC URL: {}", ctx.client.url());
+    // 1. Initialize Context
+    let mut ctx = TestContext::new()?;
+    println!("Test Context Initialized.");
     println!("Payer: {}", ctx.payer.pubkey());
     println!("Program ID: {}", ctx.program_id);
 
     // 2. Run Scenarios
-    scenarios::happy_path::run(&ctx).await?;
-    scenarios::failures::run(&ctx).await?;
+    scenarios::happy_path::run(&mut ctx)?;
+    scenarios::failures::run(&mut ctx)?;
+    // scenarios::cross_wallet_attacks::run(&mut ctx)?; // Missing in this branch
+    scenarios::dos_attack::run(&mut ctx)?;
 
     println!("\n🎉 All scenarios completed successfully!");
     Ok(())

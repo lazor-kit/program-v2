@@ -1,26 +1,29 @@
-use crate::common::TestContext;
+use crate::common::{TestContext, ToAddress};
 use anyhow::Result;
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    system_program,
-};
+use solana_instruction::{AccountMeta, Instruction};
+use solana_keypair::Keypair;
+use solana_pubkey::Pubkey;
+use solana_signer::Signer;
+use solana_system_program;
+// use solana_transaction::Transaction; // Transaction usage needs refactor
+use solana_message::Message;
+use solana_transaction::Transaction;
 
-pub async fn run(ctx: &TestContext) -> Result<()> {
+pub fn run(ctx: &mut TestContext) -> Result<()> {
     println!("\n🛡️  Running Failure Scenarios...");
 
     // Setup: Create a separate wallet for these tests
     let user_seed = rand::random::<[u8; 32]>();
     let owner_keypair = Keypair::new();
     let (wallet_pda, _) = Pubkey::find_program_address(&[b"wallet", &user_seed], &ctx.program_id);
+
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &ctx.program_id);
     let (owner_auth_pda, _) = Pubkey::find_program_address(
         &[
             b"authority",
             wallet_pda.as_ref(),
-            owner_keypair.pubkey().as_ref(),
+            Signer::pubkey(&owner_keypair).as_ref(), // Explicit Signer call
         ],
         &ctx.program_id,
     );
@@ -34,18 +37,31 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     data.extend_from_slice(&[0; 6]);
     data.extend_from_slice(owner_keypair.pubkey().as_ref());
 
-    let create_ix = Instruction {
-        program_id: ctx.program_id,
+    let create_wallet_ix = Instruction {
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new(owner_auth_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false),
+            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // owner
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
         data,
     };
-    ctx.send_transaction(&[create_ix], &[&ctx.payer])?;
+
+    let clock: solana_clock::Clock = ctx.svm.get_sysvar();
+    let _now = clock.unix_timestamp as u64; // Corrected variable name and cleaned up
+
+    let latest_blockhash = ctx.svm.latest_blockhash();
+    let message = Message::new(
+        &[create_wallet_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut create_wallet_tx = Transaction::new_unsigned(message);
+    create_wallet_tx.sign(&[&ctx.payer, &owner_keypair], latest_blockhash);
+
+    ctx.execute_tx(create_wallet_tx)?;
 
     // Scenario 1: Replay Vulnerability Check (Read-Only Authority)
     // Attempt to pass Authority as Read-Only to bypass `writable` check.
@@ -59,40 +75,59 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
 
     // Create instruction with Read-Only Authority
     let replay_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
             // FAIL TARGET: Read-Only Authority
-            AccountMeta::new_readonly(owner_auth_pda, false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
+            AccountMeta::new_readonly(owner_auth_pda.to_address(), false),
+            AccountMeta::new(vault_pda.to_address(), false),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
             // Signer
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new_readonly(Signer::pubkey(&owner_keypair).to_address(), true),
         ],
         data: exec_data,
     };
 
-    ctx.send_transaction_expect_error(&[replay_ix], &[&ctx.payer, &owner_keypair])?;
+    let message = Message::new(&[replay_ix], Some(&Signer::pubkey(&ctx.payer).to_address()));
+    let mut replay_tx = Transaction::new_unsigned(message);
+    replay_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx_expect_error(replay_tx)?;
     println!("✅ Read-Only Authority Rejected (Replay Protection Active).");
 
     // Scenario 2: Invalid Signer
     println!("\n[2/3] Testing Invalid Signer...");
     let fake_signer = Keypair::new();
-    let invalid_signer_ix = Instruction {
-        program_id: ctx.program_id,
-        accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(owner_auth_pda, false),
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            // FAIL TARGET: Wrong Signer
-            AccountMeta::new_readonly(fake_signer.pubkey(), true),
+    let (fake_auth_pda, _) = Pubkey::find_program_address(
+        &[
+            b"authority",
+            wallet_pda.as_ref(),
+            Signer::pubkey(&fake_signer).as_ref(),
         ],
-        data: vec![4, 0], // Execute, 0 instructions
+        &ctx.program_id,
+    );
+    let invalid_signer_ix = Instruction {
+        program_id: ctx.program_id.to_address(),
+        accounts: vec![
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false), // auth
+            AccountMeta::new(fake_auth_pda.to_address(), false),  // target
+            AccountMeta::new(Signer::pubkey(&fake_signer).to_address(), true), // WRONG SIGNER
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
+        ],
+        data: vec![1, 2], // AddAuthority(Spender)
     };
-    ctx.send_transaction_expect_error(&[invalid_signer_ix], &[&ctx.payer, &fake_signer])?;
+
+    let message = Message::new(
+        &[invalid_signer_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut invalid_signer_tx = Transaction::new_unsigned(message);
+    invalid_signer_tx.sign(&[&ctx.payer, &fake_signer], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx_expect_error(invalid_signer_tx)?;
     println!("✅ Invalid Signer Rejected.");
 
     // Scenario 3: Spender Privilege Escalation (Add Authority)
@@ -103,7 +138,15 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"authority",
             wallet_pda.as_ref(),
-            spender_keypair.pubkey().as_ref(),
+            Signer::pubkey(&spender_keypair).as_ref(),
+        ],
+        &ctx.program_id,
+    );
+    let (spender_b_auth_pda, _) = Pubkey::find_program_address(
+        &[
+            b"authority",
+            wallet_pda.as_ref(),
+            Signer::pubkey(&spender_keypair).as_ref(),
         ],
         &ctx.program_id,
     );
@@ -117,18 +160,26 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     add_spender_data.extend_from_slice(spender_keypair.pubkey().as_ref()); // Pubkey
 
     let add_spender_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new_readonly(owner_auth_pda, false), // Owner authorizes
-            AccountMeta::new(spender_auth_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false), // auth
+            AccountMeta::new(spender_b_auth_pda.to_address(), false), // target
+            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // signer
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
-        data: add_spender_data,
+        data: vec![1, 2], // AddAuthority(Spender)
     };
-    ctx.send_transaction(&[add_spender_ix], &[&ctx.payer, &owner_keypair])?;
+
+    let message = Message::new(
+        &[add_spender_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut add_spender_tx = Transaction::new_unsigned(message);
+    add_spender_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(add_spender_tx)?;
     println!("   -> Spender Added.");
 
     // Now Spender tries to Add another Authority (Admin)
@@ -137,7 +188,7 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"authority",
             wallet_pda.as_ref(),
-            bad_admin_keypair.pubkey().as_ref(),
+            Signer::pubkey(&bad_admin_keypair).as_ref(),
         ],
         &ctx.program_id,
     );
@@ -150,20 +201,26 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     malicious_add.extend_from_slice(bad_admin_keypair.pubkey().as_ref());
 
     let malicious_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            // Spender tries to authorize
-            AccountMeta::new_readonly(spender_auth_pda, false),
-            AccountMeta::new(bad_admin_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(spender_keypair.pubkey(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(spender_b_auth_pda.to_address(), false), // Spender auth
+            AccountMeta::new(owner_auth_pda.to_address(), false),     // Target (Owner)
+            AccountMeta::new(Signer::pubkey(&spender_keypair).to_address(), true), // Signer
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
-        data: malicious_add,
+        data: vec![1, 2], // Try to add Spender (doesn't matter, auth check fails first)
     };
 
-    ctx.send_transaction_expect_error(&[malicious_ix], &[&ctx.payer, &spender_keypair])?;
+    let message = Message::new(
+        &[malicious_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut malicious_tx = Transaction::new_unsigned(message);
+    malicious_tx.sign(&[&ctx.payer, &spender_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx_expect_error(malicious_tx)?;
     println!("✅ Spender Escalation Rejected.");
 
     // Scenario 4: Session Expiry
@@ -178,38 +235,70 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         ],
         &ctx.program_id,
     );
+    let (session_auth_pda, _) = Pubkey::find_program_address(
+        &[
+            b"authority",
+            wallet_pda.as_ref(),
+            session_keypair.pubkey().as_ref(),
+        ],
+        &ctx.program_id,
+    );
+    // Use previously initialized clock
+    // let clock: solana_clock::Clock = ctx.svm.get_sysvar(); // Already initialized
+    // Re-get it to be safe if svm advanced
+    let clock: solana_clock::Clock = ctx.svm.get_sysvar();
+    let now = clock.unix_timestamp as u64;
+
     let mut session_create_data = vec![5]; // CreateSession
     session_create_data.extend_from_slice(session_keypair.pubkey().as_ref());
     session_create_data.extend_from_slice(&0u64.to_le_bytes()); // Expires at 0 (Genesis)
 
     let create_session_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(owner_auth_pda, false), // Owner authorizes
-            AccountMeta::new(session_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false),
+            AccountMeta::new(session_auth_pda.to_address(), false),
+            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true),
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
-        data: session_create_data,
+        data: [
+            vec![1, 3],                         // AddAuthority(Session)
+            (now - 100).to_le_bytes().to_vec(), // Expires in past
+        ]
+        .concat(),
     };
-    ctx.send_transaction(&[create_session_ix], &[&ctx.payer, &owner_keypair])?;
+
+    let message = Message::new(
+        &[create_session_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut create_session_tx = Transaction::new_unsigned(message);
+    create_session_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(create_session_tx)?;
 
     // Try to Execute with Expired Session
     let exec_expired_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(session_pda, false), // Session as authority
-            AccountMeta::new(vault_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(session_keypair.pubkey(), true), // Signer
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(session_auth_pda.to_address(), false),
+            AccountMeta::new(Signer::pubkey(&session_keypair).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false), // target to invoke (system)
         ],
-        data: vec![4, 0], // Execute, 0 instructions
+        data: vec![3, 0], // Execute payload (empty for test)
     };
-    ctx.send_transaction_expect_error(&[exec_expired_ix], &[&ctx.payer, &session_keypair])?;
+
+    let message = Message::new(
+        &[exec_expired_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut exec_expired_tx = Transaction::new_unsigned(message);
+    exec_expired_tx.sign(&[&ctx.payer, &session_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx_expect_error(exec_expired_tx)?;
     println!("✅ Expired Session Rejected.");
 
     // Scenario 5: Admin Permission Constraints
@@ -220,7 +309,7 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
         &[
             b"authority",
             wallet_pda.as_ref(),
-            admin_keypair.pubkey().as_ref(),
+            Signer::pubkey(&admin_keypair).as_ref(),
         ],
         &ctx.program_id,
     );
@@ -234,43 +323,50 @@ pub async fn run(ctx: &TestContext) -> Result<()> {
     add_admin_data.extend_from_slice(admin_keypair.pubkey().as_ref());
 
     let add_admin_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new_readonly(owner_auth_pda, false),
-            AccountMeta::new(admin_auth_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new_readonly(owner_keypair.pubkey(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(owner_auth_pda.to_address(), false), // auth
+            AccountMeta::new(admin_auth_pda.to_address(), false), // target
+            AccountMeta::new(Signer::pubkey(&owner_keypair).to_address(), true), // signer
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new_readonly(solana_system_program::id().to_address(), false),
         ],
-        data: add_admin_data,
+        data: vec![1, 1], // AddAuthority(Admin)
     };
-    ctx.send_transaction(&[add_admin_ix], &[&ctx.payer, &owner_keypair])?;
+
+    let message = Message::new(
+        &[add_admin_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut add_admin_tx = Transaction::new_unsigned(message);
+    add_admin_tx.sign(&[&ctx.payer, &owner_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx(add_admin_tx)?;
     println!("   -> Admin Added.");
 
     // Admin tries to Remove Owner
     let remove_owner_ix = Instruction {
-        program_id: ctx.program_id,
+        program_id: ctx.program_id.to_address(),
         accounts: vec![
-            AccountMeta::new(ctx.payer.pubkey(), true),
-            AccountMeta::new(wallet_pda, false),
-            AccountMeta::new(admin_auth_pda, false), // Admin authorizes (Must be writable for ManageAuthority logic)
-            AccountMeta::new(owner_auth_pda, false), // Target (Owner)
-            AccountMeta::new(ctx.payer.pubkey(), false), // Refund dest
-            AccountMeta::new_readonly(system_program::id(), false), // System program (Wait, remove requires SysProg? No? Let's check. Yes, it was in list but usually Close doesn't need SysProg unless we transfer? Yes we transfer lamports. But typical close just sets lamports to 0. But we might need sysvar? Checking manage_authority again. No, account 5 was RefundDest. Wait. Line 307: refund_dest. Line 309: it's failing if not enough keys. Where is SysProg? It's NOT required for Remove. But my account meta list had it. I must fix my AccountMeta list.)
-            // Re-checking remove authority accounts in manage_authority.rs:
-            // 0: Payer
-            // 1: Wallet
-            // 2: Admin Auth
-            // 3: Target Auth
-            // 4: Refund Dest
-            // 5: Optional Signer
-            // System Program is NOT there.
-            AccountMeta::new_readonly(admin_keypair.pubkey(), true), // Signer
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), true),
+            AccountMeta::new(wallet_pda.to_address(), false),
+            AccountMeta::new(admin_auth_pda.to_address(), false), // Admin authorizes
+            AccountMeta::new(owner_auth_pda.to_address(), false), // Target (Owner)
+            AccountMeta::new(Signer::pubkey(&ctx.payer).to_address(), false), // Refund dest
+            AccountMeta::new_readonly(Signer::pubkey(&admin_keypair).to_address(), true), // Signer
         ],
         data: vec![2], // RemoveAuthority
     };
-    ctx.send_transaction_expect_error(&[remove_owner_ix], &[&ctx.payer, &admin_keypair])?;
+
+    let message = Message::new(
+        &[remove_owner_ix],
+        Some(&Signer::pubkey(&ctx.payer).to_address()),
+    );
+    let mut remove_owner_tx = Transaction::new_unsigned(message);
+    remove_owner_tx.sign(&[&ctx.payer, &admin_keypair], ctx.svm.latest_blockhash());
+
+    ctx.execute_tx_expect_error(remove_owner_tx)?;
     println!("✅ Admin Removing Owner Rejected.");
 
     Ok(())
