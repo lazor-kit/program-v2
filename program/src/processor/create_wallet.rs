@@ -2,8 +2,7 @@ use assertions::{check_zero_data, sol_assert_bytes_eq};
 use no_padding::NoPadding;
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Seed, Signer},
-    program::invoke_signed,
+    instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
     ProgramResult,
@@ -140,41 +139,22 @@ pub fn process(
         .and_then(|val| val.checked_add(rent_base))
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
-    let mut create_wallet_ix_data = Vec::with_capacity(52);
-    create_wallet_ix_data.extend_from_slice(&0u32.to_le_bytes());
-    create_wallet_ix_data.extend_from_slice(&wallet_rent.to_le_bytes());
-    create_wallet_ix_data.extend_from_slice(&(wallet_space as u64).to_le_bytes());
-    create_wallet_ix_data.extend_from_slice(program_id.as_ref());
-
-    let wallet_accounts_meta = [
-        AccountMeta {
-            pubkey: payer.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: wallet_pda.key(),
-            is_signer: true, // Must be true even with invoke_signed
-            is_writable: true,
-        },
-    ];
-    let create_wallet_ix = Instruction {
-        program_id: system_program.key(),
-        accounts: &wallet_accounts_meta,
-        data: &create_wallet_ix_data,
-    };
+    // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let wallet_bump_arr = [wallet_bump];
     let wallet_seeds = [
         Seed::from(b"wallet"),
         Seed::from(&args.user_seed),
         Seed::from(&wallet_bump_arr),
     ];
-    let wallet_signer: Signer = (&wallet_seeds).into();
 
-    invoke_signed(
-        &create_wallet_ix,
-        &[&payer.clone(), &wallet_pda.clone(), &system_program.clone()],
-        &[wallet_signer],
+    crate::utils::initialize_pda_account(
+        payer,
+        wallet_pda,
+        system_program,
+        wallet_space,
+        wallet_rent,
+        program_id,
+        &wallet_seeds,
     )?;
 
     // Write Wallet Data
@@ -209,29 +189,7 @@ pub fn process(
         .and_then(|val| val.checked_add(897840))
         .ok_or(ProgramError::ArithmeticOverflow)?;
 
-    let mut create_auth_ix_data = Vec::with_capacity(52);
-    create_auth_ix_data.extend_from_slice(&0u32.to_le_bytes());
-    create_auth_ix_data.extend_from_slice(&auth_rent.to_le_bytes());
-    create_auth_ix_data.extend_from_slice(&(auth_space as u64).to_le_bytes());
-    create_auth_ix_data.extend_from_slice(program_id.as_ref());
-
-    let auth_accounts_meta = [
-        AccountMeta {
-            pubkey: payer.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: auth_pda.key(),
-            is_signer: true, // Must be true even with invoke_signed
-            is_writable: true,
-        },
-    ];
-    let create_auth_ix = Instruction {
-        program_id: system_program.key(),
-        accounts: &auth_accounts_meta,
-        data: &create_auth_ix_data,
-    };
+    // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let auth_bump_arr = [auth_bump];
     let auth_seeds = [
         Seed::from(b"authority"),
@@ -239,12 +197,15 @@ pub fn process(
         Seed::from(id_seed),
         Seed::from(&auth_bump_arr),
     ];
-    let auth_signer: Signer = (&auth_seeds).into();
 
-    invoke_signed(
-        &create_auth_ix,
-        &[&payer.clone(), &auth_pda.clone(), &system_program.clone()],
-        &[auth_signer],
+    crate::utils::initialize_pda_account(
+        payer,
+        auth_pda,
+        system_program,
+        auth_space,
+        auth_rent,
+        program_id,
+        &auth_seeds,
     )?;
 
     // Write Authority Data

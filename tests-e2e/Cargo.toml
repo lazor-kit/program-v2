@@ -3,20 +3,29 @@ name = "lazorkit-tests-e2e"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lazorkit-tests-e2e"
+path = "src/main.rs"
+
 [dependencies]
-solana-client = "2.1"
-solana-sdk = "2.1"
-solana-program = "2.2"
+litesvm = "0.9.1"
+solana-pubkey = { version = "2.1", features = [
+    "std",
+] } # Assuming 2.1 is compatible or latest
+solana-account = "3.4"
+solana-hash = "4.1"
+solana-keypair = "3.1"
+solana-instruction = "3.1"
+solana-transaction = "3.0"
+solana-message = "3.0"
+solana-system-program = "3.1"
+solana-clock = "3.0"
+solana-signer = "3.0"
+solana-address = "2.1" # Check if litesvm uses 2.1 (yes, see output)
+solana-program = "2.1" # Contract uses this, keep it for constants?
 anyhow = "1.0"
-tokio = { version = "1.0", features = ["full"] }
 rand = "0.8"
-borsh = "1.0"
-shellexpand = "3.0"
 p256 = { version = "0.13", features = ["ecdsa"] }
 sha2 = "0.10"
-hex = "0.4"
-base64 = "0.22"
-# Reference to common types if exported
 pinocchio = { workspace = true }
-# We might need to copy some struct definitions if not exported cleanly, 
-# but let's try to use common ones if possible or redefine lightly.
+serde_json = "1.0.149"
