@@ -8,7 +8,7 @@ name = "lazorkit-tests-e2e"
 path = "src/main.rs"
 
 [dependencies]
-litesvm = "0.9.1"
+litesvm = "0.8"
 solana-pubkey = { version = "2.1", features = ["std"] }
 solana-account = "3.4"
 solana-hash = "4.1"
@@ -28,3 +28,4 @@ p256 = { version = "0.13", features = ["ecdsa"] }
 sha2 = "0.10"
 pinocchio = { workspace = true }
 serde_json = "1.0.149"
+base64 = "0.21"
