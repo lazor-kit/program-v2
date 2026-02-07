@@ -181,8 +181,14 @@ pub fn process_add_authority(
     // Unified Authentication
     match admin_header.authority_type {
         0 => {
-            // Ed25519: Verify signer (authority_payload ignored)
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[], &[1])?;
+            // Ed25519: Include new_auth_pda in signed payload (Issue #13)
+            Ed25519Authenticator.authenticate(
+                accounts,
+                admin_data,
+                &[],
+                new_auth_pda.key().as_ref(),
+                &[1],
+            )?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
@@ -294,9 +300,10 @@ pub fn process_remove_authority(
     instruction_data: &[u8],
 ) -> ProgramResult {
     // For RemoveAuthority, all instruction_data is authority_payload
-    // data_payload is empty (or could be just the discriminator)
+    // Issue #13: Bind signature to specific target accounts to prevent reuse
     let authority_payload = instruction_data;
-    let data_payload = &[]; // Empty for remove
+
+    // Build data_payload with target pubkeys (computed after parsing accounts)
 
     let account_info_iter = &mut accounts.iter();
     let _payer = account_info_iter
@@ -340,17 +347,24 @@ pub fn process_remove_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
+    // Issue #13: Build data_payload with target pubkeys to prevent signature reuse
+    // Signature is now bound to specific target_auth_pda and refund_dest
+    let mut data_payload = Vec::with_capacity(64);
+    data_payload.extend_from_slice(target_auth_pda.key().as_ref());
+    data_payload.extend_from_slice(refund_dest.key().as_ref());
+
     // Authentication
     match admin_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &[], &[2])?;
+            // Ed25519: Include data_payload in signature verification
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &data_payload, &[2])?;
         },
         1 => {
             Secp256r1Authenticator.authenticate(
                 accounts,
                 admin_data,
                 authority_payload,
-                data_payload,
+                &data_payload,
                 &[2],
             )?;
         },
