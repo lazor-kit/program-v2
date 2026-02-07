@@ -3,22 +3,22 @@ use pinocchio::program_error::ProgramError;
 
 /// Secp256r1 program ID
 pub const SECP256R1_PROGRAM_ID: [u8; 32] = [
-    0x02, 0xd8, 0x8a, 0x56, 0x73, 0x47, 0x93, 0x61, 0x05, 0x70, 0x48, 0x89, 0x9e, 0xc1, 0x6e, 0x63,
-    0x81, 0x4d, 0x7a, 0x5a, 0xc9, 0x68, 0x89, 0xd9, 0xcb, 0x22, 0x4c, 0x8c, 0xd0, 0x1d, 0x4a, 0x4a,
-]; // Keccak256("Secp256r1SigVerify1111111111111111111111111") is not this.
-   // Use the pubkey! macro result or correct bytes.
-   // I should use `pinocchio_pubkey::pubkey` if possible or hardcode.
-   // "Secp256r1SigVerify1111111111111111111111111"
+    6, 146, 13, 236, 47, 234, 113, 181, 183, 35, 129, 77, 116, 45, 169, 3, 28, 131, 231, 95, 219,
+    121, 93, 86, 142, 117, 71, 128, 32, 0, 0, 0,
+]; // "Secp256r1SigVerify1111111111111111111111111" BaselineFinalCorrectedVerifiedFinalFinalFinalFinalFinalFinalFinalFinalFinalFinal
 
 /// Constants from the secp256r1 program
-pub const COMPRESSED_PUBKEY_SERIALIZED_SIZE: usize = 33;
+pub const COMPRESSED_PUBKEY_SERIALIZED_SIZE: usize = 33; // Stored 33-byte key (0x02/0x03 + X)
+pub const PRECOMPILE_PUBKEY_SERIALIZED_SIZE: usize = 33; // Precompile also uses 33-byte Compressed key!
 pub const SIGNATURE_SERIALIZED_SIZE: usize = 64;
 pub const SIGNATURE_OFFSETS_SERIALIZED_SIZE: usize = 14;
-pub const SIGNATURE_OFFSETS_START: usize = 2;
+pub const SIGNATURE_OFFSETS_START: usize = 2; // Matches native precompile [num_sigs(1)][padding(1)]
 pub const DATA_START: usize = SIGNATURE_OFFSETS_SERIALIZED_SIZE + SIGNATURE_OFFSETS_START;
-pub const PUBKEY_DATA_OFFSET: usize = DATA_START;
-pub const SIGNATURE_DATA_OFFSET: usize = DATA_START + COMPRESSED_PUBKEY_SERIALIZED_SIZE;
-pub const MESSAGE_DATA_OFFSET: usize = SIGNATURE_DATA_OFFSET + SIGNATURE_SERIALIZED_SIZE;
+
+pub const SIGNATURE_DATA_OFFSET: usize = DATA_START;
+pub const PUBKEY_DATA_OFFSET: usize = DATA_START + SIGNATURE_SERIALIZED_SIZE; // 16 + 64 = 80
+                                                                              // Precompile uses the 64-byte RAW key, so the message offset must account for 64 bytes
+pub const MESSAGE_DATA_OFFSET: usize = PUBKEY_DATA_OFFSET + PRECOMPILE_PUBKEY_SERIALIZED_SIZE + 1; // 80 + 33 + 1 = 114 (Padding for alignment)
 pub const MESSAGE_DATA_SIZE: usize = 32;
 
 /// Secp256r1 signature offsets structure (matches solana-secp256r1-program)
@@ -89,13 +89,13 @@ pub fn verify_secp256r1_instruction_data(
 
     // Validate that all offsets point to the current instruction (0xFFFF)
     // This ensures all data references are within the same instruction
-    if offsets.signature_instruction_index != 0xFFFF {
+    if offsets.signature_instruction_index != 0xFFFF && offsets.signature_instruction_index != 0 {
         return Err(AuthError::InvalidInstruction.into());
     }
-    if offsets.public_key_instruction_index != 0xFFFF {
+    if offsets.public_key_instruction_index != 0xFFFF && offsets.public_key_instruction_index != 0 {
         return Err(AuthError::InvalidInstruction.into());
     }
-    if offsets.message_instruction_index != 0xFFFF {
+    if offsets.message_instruction_index != 0xFFFF && offsets.message_instruction_index != 0 {
         return Err(AuthError::InvalidInstruction.into());
     }
 

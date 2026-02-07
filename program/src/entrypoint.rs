@@ -14,6 +14,7 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    pinocchio::msg!("LazorKit Entrypoint called!");
     if instruction_data.is_empty() {
         return Err(ProgramError::InvalidInstructionData);
     }

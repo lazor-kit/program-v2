@@ -1,0 +1,20 @@
+[package]
+name = "lazorkit-tests-rpc"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+solana-client = "2.1"
+solana-sdk = "2.1"
+solana-program = "2.1"
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+base64 = "0.21"
+rand = "0.8"
+openssl = "0.10"
+solana-secp256r1-program = "2.1"
+serde_json = "1.0"

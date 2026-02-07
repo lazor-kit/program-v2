@@ -89,10 +89,7 @@ pub fn process_add_authority(
                 return Err(ProgramError::InvalidInstructionData);
             }
             let (hash, rest_after_hash) = rest.split_at(32);
-            // For Secp256r1: need hash + pubkey for full_auth_data
-            // Pubkey is variable but typically 33 bytes (compressed)
-            // We need to determine where auth_data ends and authority_payload begins
-            // Assuming fixed 33 bytes for pubkey
+            // Expecting 33-byte COMPRESSED pubkey for storage (efficient state)
             if rest_after_hash.len() < 33 {
                 return Err(ProgramError::InvalidInstructionData);
             }

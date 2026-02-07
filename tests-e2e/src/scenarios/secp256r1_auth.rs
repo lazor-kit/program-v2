@@ -160,7 +160,46 @@ fn test_secp256r1_signature_binding(ctx: &mut TestContext) -> Result<()> {
     // Discriminator for RemoveAuthority signed_payload is &[2].
     let discriminator = [2u8];
     let payload = Vec::new(); // empty for remove
-    let slot = ctx.svm.get_sysvar::<solana_clock::Clock>().slot;
+                              // Issue #9 & Nonce Validation:
+                              // LiteSVM doesn't auto-populate SlotHashes on warp. We must inject it manually.
+                              // We want to sign for slot 100. So SlotHashes should contain 100 (if block is done? no, prev block).
+                              // Let's say we sign for slot 100.
+                              // The contract nonce check: diff = most_recent - submitted.
+                              // If we want success, diff must be small (e.g. 0).
+                              // So most_recent in SlotHashes should be 100.
+                              // SlotHashes layout: struct SlotHash { slot: u64, hash: [u8;32] } entries...
+
+    let target_slot = 100;
+    ctx.svm.warp_to_slot(target_slot + 1); // Current slot 101
+
+    // Construct SlotHashes data: [len (u64) + (slot, hash) + (slot, hash)...]
+    // We only need the latest one to work for diff=0.
+    let mut slot_hashes_data = Vec::new();
+    slot_hashes_data.extend_from_slice(&2u64.to_le_bytes()); // Length of Vec = 2
+                                                             // Entry 0: Slot 100
+    slot_hashes_data.extend_from_slice(&(target_slot).to_le_bytes()); // slot
+    slot_hashes_data.extend_from_slice(&[0xAA; 32]); // arbitrary hash
+                                                     // Entry 1: Slot 99
+    slot_hashes_data.extend_from_slice(&(target_slot - 1).to_le_bytes());
+    slot_hashes_data.extend_from_slice(&[0xBB; 32]);
+
+    // Inject into LiteSVM
+    let slot_hashes_acc = solana_account::Account {
+        lamports: 1, // minimal
+        data: slot_hashes_data,
+        owner: solana_program::sysvar::id().to_address(),
+        executable: false,
+        rent_epoch: 0,
+    };
+    ctx.svm
+        .set_account(solana_sysvar::slot_hashes::ID.to_address(), slot_hashes_acc)
+        .unwrap();
+
+    let slot = target_slot;
+    println!(
+        "   -> Injected SlotHashes for slot: {}, using it for signature",
+        slot
+    );
 
     // Issue #9: Include Payer in Challenge
     let payer_pubkey = Signer::pubkey(&ctx.payer);
