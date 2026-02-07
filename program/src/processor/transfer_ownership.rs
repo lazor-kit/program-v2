@@ -151,8 +151,14 @@ pub fn process(
         // Authenticate Current Owner
         match auth.authority_type {
             0 => {
-                // Ed25519: Verify signer (authority_payload ignored)
-                Ed25519Authenticator.authenticate(accounts, data, &[], &[], &[3])?;
+                // Ed25519: Include new_owner in signed payload (Issue #13)
+                Ed25519Authenticator.authenticate(
+                    accounts,
+                    data,
+                    &[],
+                    new_owner.key().as_ref(),
+                    &[3],
+                )?;
             },
             1 => {
                 // Secp256r1 (WebAuthn) - Must be Writable
