@@ -55,7 +55,7 @@ pub fn process(
 
     // Remaining accounts are for inner instructions
     let inner_accounts_start = 4;
-    let inner_accounts = &accounts[inner_accounts_start..];
+    let _inner_accounts = &accounts[inner_accounts_start..];
 
     // Verify ownership
     if wallet_pda.owner() != program_id || authority_pda.owner() != program_id {
@@ -85,13 +85,6 @@ pub fn process(
     // Serialize compact instructions to get their byte length
     let compact_bytes = crate::compact::serialize_compact_instructions(&compact_instructions);
     let compact_len = compact_bytes.len();
-
-    // Everything after compact instructions is authority payload
-    let authority_payload = if instruction_data.len() > compact_len {
-        &instruction_data[compact_len..]
-    } else {
-        &[]
-    };
 
     // Authenticate based on discriminator
     match authority_header.discriminator {
@@ -190,6 +183,12 @@ pub fn process(
                 is_writable: acc.is_writable(),
             })
             .collect();
+
+        // Prevent self-reentrancy (Issue #10)
+        // Reject CPI calls back into this program to avoid unexpected state mutations
+        if decompressed.program_id.as_ref() == program_id.as_ref() {
+            return Err(AuthError::SelfReentrancyNotAllowed.into());
+        }
 
         // Create instruction
         let ix = Instruction {
