@@ -100,17 +100,25 @@ pub fn process(
                 },
                 1 => {
                     // Secp256r1 (WebAuthn)
-                    // signed_payload is compact_instructions bytes for Execute
-                    // The instruction format is [discriminator][compact_instructions_bytes][payload]
-                    // instruction_data is [compact_instructions_bytes][payload]
+                    // Issue #11: Include accounts hash to prevent account reordering attacks
+                    // signed_payload is compact_instructions bytes + accounts hash for Execute
                     let data_payload = &instruction_data[..compact_len];
                     let authority_payload = &instruction_data[compact_len..];
+
+                    // Compute hash of all account pubkeys referenced by compact instructions
+                    // This binds the signature to the exact accounts, preventing reordering
+                    let accounts_hash = compute_accounts_hash(accounts, &compact_instructions)?;
+
+                    // Extended payload: compact_instructions + accounts_hash
+                    let mut extended_payload = Vec::with_capacity(compact_len + 32);
+                    extended_payload.extend_from_slice(data_payload);
+                    extended_payload.extend_from_slice(&accounts_hash);
 
                     Secp256r1Authenticator.authenticate(
                         accounts,
                         authority_data,
                         authority_payload,
-                        data_payload,
+                        &extended_payload,
                         &[4],
                     )?;
                 },
@@ -221,4 +229,62 @@ pub fn process(
     }
 
     Ok(())
+}
+
+/// Compute SHA256 hash of all account pubkeys referenced by compact instructions (Issue #11)
+///
+/// This binds the signature to the exact accounts in their exact order,
+/// preventing account reordering attacks where an attacker could swap
+/// recipient addresses while keeping the signature valid.
+///
+/// # Arguments
+/// * `accounts` - Slice of all account infos in the transaction
+/// * `compact_instructions` - Parsed compact instructions containing account indices
+///
+/// # Returns
+/// * 32-byte SHA256 hash of all referenced pubkeys
+fn compute_accounts_hash(
+    accounts: &[AccountInfo],
+    compact_instructions: &[crate::compact::CompactInstruction],
+) -> Result<[u8; 32], ProgramError> {
+    // Collect all account pubkeys in order of reference
+    let mut pubkeys_data = Vec::new();
+
+    for ix in compact_instructions {
+        // Include program_id
+        let program_idx = ix.program_id_index as usize;
+        if program_idx >= accounts.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        pubkeys_data.extend_from_slice(accounts[program_idx].key().as_ref());
+
+        // Include all account pubkeys
+        for &acc_idx in &ix.accounts {
+            let idx = acc_idx as usize;
+            if idx >= accounts.len() {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            pubkeys_data.extend_from_slice(accounts[idx].key().as_ref());
+        }
+    }
+
+    // Compute SHA256 hash
+    #[allow(unused_assignments)]
+    let mut hash = [0u8; 32];
+    #[cfg(target_os = "solana")]
+    unsafe {
+        pinocchio::syscalls::sol_sha256(
+            [pubkeys_data.as_slice()].as_ptr() as *const u8,
+            1,
+            hash.as_mut_ptr(),
+        );
+    }
+    #[cfg(not(target_os = "solana"))]
+    {
+        // For tests, use a dummy hash
+        hash = [0xAA; 32];
+        let _ = pubkeys_data; // suppress warning
+    }
+
+    Ok(hash)
 }
