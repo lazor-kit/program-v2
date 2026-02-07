@@ -60,6 +60,11 @@ pub fn initialize_pda_account(
     owner: &Pubkey,
     pda_seeds: &[Seed],
 ) -> ProgramResult {
+    // Validate System Program ID
+    if system_program.key() != &SYSTEM_PROGRAM_ID {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
     let current_balance = target_pda.lamports();
 
     // Step 1: Transfer lamports if needed to reach rent-exemption
@@ -87,7 +92,7 @@ pub fn initialize_pda_account(
         ];
 
         let transfer_ix = Instruction {
-            program_id: system_program.key(),
+            program_id: &Pubkey::from(SYSTEM_PROGRAM_ID),
             accounts: &transfer_accounts,
             data: &transfer_data,
         };
@@ -108,7 +113,7 @@ pub fn initialize_pda_account(
     }];
 
     let allocate_ix = Instruction {
-        program_id: system_program.key(),
+        program_id: &Pubkey::from(SYSTEM_PROGRAM_ID),
         accounts: &allocate_accounts,
         data: &allocate_data,
     };
@@ -129,7 +134,7 @@ pub fn initialize_pda_account(
     }];
 
     let assign_ix = Instruction {
-        program_id: system_program.key(),
+        program_id: &Pubkey::from(SYSTEM_PROGRAM_ID),
         accounts: &assign_accounts,
         data: &assign_data,
     };
