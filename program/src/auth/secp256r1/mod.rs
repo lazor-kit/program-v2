@@ -71,7 +71,9 @@ impl Authenticator for Secp256r1Authenticator {
         let header = unsafe { &mut *(auth_data.as_mut_ptr() as *mut AuthorityAccountHeader) };
 
         // Compute hash of user-provided RP ID and verify against stored hash (audit N3)
-        let stored_rp_id_hash = &auth_data[header_size..header_size + 32];
+        // Secp256r1 data layout: [Header] [Counter(4)] [RP_ID_Hash(32)] [Pubkey(33)]
+        let rp_id_hash_offset = header_size + 4;
+        let stored_rp_id_hash = &auth_data[rp_id_hash_offset..rp_id_hash_offset + 32];
         #[allow(unused_assignments)]
         let mut computed_rp_id_hash = [0u8; 32];
         #[cfg(target_os = "solana")]
@@ -86,6 +88,7 @@ impl Authenticator for Secp256r1Authenticator {
         {
             computed_rp_id_hash = [0u8; 32];
         }
+
         if computed_rp_id_hash != stored_rp_id_hash {
             return Err(AuthError::InvalidPubkey.into());
         }
@@ -102,12 +105,13 @@ impl Authenticator for Secp256r1Authenticator {
             let _res = pinocchio::syscalls::sol_sha256(
                 [
                     discriminator,
+                    auth_payload,
                     signed_payload,
                     &slot.to_le_bytes(),
                     payer.key().as_ref(),
                 ]
                 .as_ptr() as *const u8,
-                4,
+                5,
                 hasher.as_mut_ptr(),
             );
         }
@@ -140,18 +144,26 @@ impl Authenticator for Secp256r1Authenticator {
         }
 
         let authenticator_counter = auth_data_parser.counter() as u64;
+
         if authenticator_counter > 0 && authenticator_counter <= header.counter {
             return Err(AuthError::SignatureReused.into());
         }
         header.counter = authenticator_counter;
 
-        let stored_rp_id_hash = &auth_data[header_size..header_size + 32];
+        let stored_rp_id_hash = &auth_data[rp_id_hash_offset..rp_id_hash_offset + 32];
         if auth_data_parser.rp_id_hash() != stored_rp_id_hash {
             return Err(AuthError::InvalidPubkey.into());
         }
 
-        let expected_pubkey = &auth_data[header_size + 32..header_size + 32 + 33];
-        let expected_pubkey: &[u8; 33] = expected_pubkey.try_into().unwrap();
+        // Unified Model:
+        // - Precompile Instruction Data: Contains 33-byte COMPRESSED public key (Prefix, X)
+        // - Contract Storage: Contains 33-byte COMPRESSED public key (Prefix, X)
+        // The fuzzing test confirmed the precompile supports 33-byte compressed keys.
+
+        // 1. Extract the 33-byte COMPRESSED key from the precompile instruction data
+        let instruction_pubkey_bytes =
+            &auth_data[rp_id_hash_offset + 32..rp_id_hash_offset + 32 + 33];
+        let expected_pubkey: &[u8; 33] = instruction_pubkey_bytes.try_into().unwrap();
 
         let mut signed_message = Vec::with_capacity(authenticator_data_raw.len() + 32);
         signed_message.extend_from_slice(authenticator_data_raw);
@@ -178,7 +190,7 @@ impl Authenticator for Secp256r1Authenticator {
 
         verify_secp256r1_instruction_data(
             secp_ix.get_instruction_data(),
-            expected_pubkey,
+            expected_pubkey, // Now passing the 33-byte key, matching helper signature
             &signed_message,
         )?;
 

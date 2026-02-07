@@ -8,7 +8,7 @@ name = "lazorkit-tests-e2e"
 path = "src/main.rs"
 
 [dependencies]
-litesvm = "0.9.1"
+litesvm = "0.8"
 solana-pubkey = { version = "2.1", features = ["std"] }
 solana-account = "3.4"
 solana-hash = "4.1"
