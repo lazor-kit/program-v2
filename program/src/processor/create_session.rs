@@ -161,7 +161,8 @@ pub fn process(
 
     match auth_header.authority_type {
         0 => {
-            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &[], &[5])?;
+            // Ed25519: Include session_key in signed payload (Issue #13)
+            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &args.session_key, &[5])?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
