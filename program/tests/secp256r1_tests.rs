@@ -31,7 +31,7 @@ fn test_create_wallet_secp256r1_repro() {
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &context.program_id);
     // Authority seed for Secp256r1 is the credential hash
-    let (auth_pda, _) = Pubkey::find_program_address(
+    let (auth_pda, auth_bump) = Pubkey::find_program_address(
         &[b"authority", wallet_pda.as_ref(), &credential_hash],
         &context.program_id,
     );
@@ -41,7 +41,7 @@ fn test_create_wallet_secp256r1_repro() {
     let mut instruction_data = Vec::new();
     instruction_data.extend_from_slice(&user_seed);
     instruction_data.push(1); // Secp256r1
-    instruction_data.push(0); // bump placeholder (not verified in args parsing, just stored or ignored)
+    instruction_data.push(auth_bump); // Use correct bump
     instruction_data.extend_from_slice(&[0; 6]); // padding
 
     // "rest" part for Secp256r1: hash + pubkey
@@ -56,6 +56,7 @@ fn test_create_wallet_secp256r1_repro() {
             AccountMeta::new(vault_pda, false),
             AccountMeta::new(auth_pda, false),
             AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
+            AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
         ],
         data: {
             let mut data = vec![0]; // Discriminator
