@@ -15,6 +15,7 @@ pub enum AuthError {
     AuthorityDoesNotSupportSession = 3010,
     InvalidAuthenticationKind = 3011,
     InvalidMessage = 3012,
+    SelfReentrancyNotAllowed = 3013,
 }
 
 impl From<AuthError> for ProgramError {
