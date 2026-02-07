@@ -12,7 +12,7 @@ pub mod slothashes;
 pub mod webauthn;
 
 use self::introspection::verify_secp256r1_instruction_data;
-use self::nonce::{validate_nonce, TruncatedSlot};
+use self::nonce::validate_nonce;
 use self::webauthn::{
     reconstruct_client_data_json, AuthDataParser, ClientDataJsonReconstructionParams,
 };
@@ -60,8 +60,8 @@ impl Authenticator for Secp256r1Authenticator {
         let slothashes_account = accounts
             .get(sysvar_slothashes_index)
             .ok_or(AuthError::InvalidAuthorityPayload)?;
-        let truncated_slot = TruncatedSlot::new(slot);
-        let _slot_hash = validate_nonce(slothashes_account, &truncated_slot)?;
+        // TruncatedSlot removed (Issue #16), passing u64 slot directly
+        let _slot_hash = validate_nonce(slothashes_account, slot)?;
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
         if (auth_data.as_ptr() as usize) % 8 != 0 {
