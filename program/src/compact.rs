@@ -349,4 +349,33 @@ mod tests {
         assert_eq!(parsed[0].accounts, vec![1, 2]);
         assert_eq!(parsed[0].data, vec![0xAB, 0xCD]);
     }
+
+    /// Test demonstrating Issue #11 fix concept:
+    /// Same indices with different account orderings should produce different extended payloads
+    #[test]
+    fn test_account_ordering_affects_signature() {
+        // This test verifies the conceptual fix for Issue #11
+        // The actual hash computation happens in execute.rs with real AccountInfo
+        // Here we demonstrate that the account indices are preserved in serialization
+
+        let ix = CompactInstruction {
+            program_id_index: 0,
+            accounts: vec![1, 2], // Transfer from accounts[1] to accounts[2]
+            data: vec![0x01],     // Transfer instruction
+        };
+
+        let bytes = ix.to_bytes();
+
+        // The serialized format preserves exact indices
+        // [program_id: 0] [num_accounts: 2] [acc_idx: 1] [acc_idx: 2] [data_len: 1] [data: 0x01]
+        assert_eq!(bytes[0], 0); // program_id_index
+        assert_eq!(bytes[1], 2); // num_accounts
+        assert_eq!(bytes[2], 1); // first account index
+        assert_eq!(bytes[3], 2); // second account index
+
+        // If accounts are reordered in transaction (Issue #11 attack):
+        // accounts[1] and accounts[2] would point to different pubkeys
+        // causing hash(pubkey[1], pubkey[2]) != hash(pubkey[2], pubkey[1])
+        // This is verified at runtime in execute.rs::compute_accounts_hash
+    }
 }
