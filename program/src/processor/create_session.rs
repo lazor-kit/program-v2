@@ -159,23 +159,27 @@ pub fn process(
     // `instruction_data` here is [args][payload].
     let data_payload = &instruction_data[..payload_offset];
 
+    // Include payer in signed payload to prevent payer swap
+    let mut ed25519_payload = Vec::with_capacity(64);
+    ed25519_payload.extend_from_slice(payer.key().as_ref());
+    ed25519_payload.extend_from_slice(&args.session_key);
+
     match auth_header.authority_type {
         0 => {
-            // Ed25519: Include session_key in signed payload (Issue #13)
-            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &args.session_key, &[5])?;
+            // Ed25519: Include payer + session_key in signed payload
+            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &ed25519_payload, &[5])?;
         },
         1 => {
-            // Secp256r1 (WebAuthn) - Must be Writable
-            // Check removed: conditional writable check inside match
-            // Verified above.
+            // Secp256r1: Include payer in data_payload
+            let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 32);
+            extended_data_payload.extend_from_slice(data_payload);
+            extended_data_payload.extend_from_slice(payer.key().as_ref());
 
-            // Secp256r1: Full authentication with payload
-            // signed_payload is CreateSessionArgs (contains session_key + expires_at)
             Secp256r1Authenticator.authenticate(
                 accounts,
                 auth_data,
                 authority_payload,
-                data_payload,
+                &extended_data_payload,
                 &[5],
             )?;
         },

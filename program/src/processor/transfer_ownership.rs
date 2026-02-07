@@ -149,28 +149,31 @@ pub fn process(
         }
 
         // Authenticate Current Owner
+        // Issue: Include payer + new_owner to prevent rent theft via payer swap
+        let mut ed25519_payload = Vec::with_capacity(64);
+        ed25519_payload.extend_from_slice(payer.key().as_ref());
+        ed25519_payload.extend_from_slice(new_owner.key().as_ref());
+
         match auth.authority_type {
             0 => {
-                // Ed25519: Include new_owner in signed payload (Issue #13)
-                Ed25519Authenticator.authenticate(
-                    accounts,
-                    data,
-                    &[],
-                    new_owner.key().as_ref(),
-                    &[3],
-                )?;
+                // Ed25519: Include payer + new_owner in signed payload
+                Ed25519Authenticator.authenticate(accounts, data, &[], &ed25519_payload, &[3])?;
             },
             1 => {
                 // Secp256r1 (WebAuthn) - Must be Writable
                 if !current_owner.is_writable() {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                // Secp256r1: Full authentication with payload
+                // Secp256r1: Include payer in signed payload to prevent rent theft
+                let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 32);
+                extended_data_payload.extend_from_slice(data_payload);
+                extended_data_payload.extend_from_slice(payer.key().as_ref());
+
                 Secp256r1Authenticator.authenticate(
                     accounts,
                     data,
                     authority_payload,
-                    data_payload,
+                    &extended_data_payload,
                     &[3],
                 )?;
             },
