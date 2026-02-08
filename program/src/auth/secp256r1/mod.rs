@@ -118,6 +118,7 @@ impl Authenticator for Secp256r1Authenticator {
         #[cfg(not(target_os = "solana"))]
         {
             let _ = signed_payload; // suppress unused warning for non-solana
+            let _ = discriminator;
             hasher = [0u8; 32];
         }
 
