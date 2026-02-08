@@ -117,15 +117,6 @@ pub fn process(
     // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
     let rent = Rent::from_account_info(rent_sysvar)?;
 
-    // Validate system_program is the correct System Program (audit N2)
-    if !sol_assert_bytes_eq(
-        system_program.key().as_ref(),
-        &crate::utils::SYSTEM_PROGRAM_ID,
-        32,
-    ) {
-        return Err(ProgramError::IncorrectProgramId);
-    }
-
     let (wallet_key, wallet_bump) = find_program_address(&[b"wallet", &args.user_seed], program_id);
     if !sol_assert_bytes_eq(wallet_pda.key().as_ref(), wallet_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
