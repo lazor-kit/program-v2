@@ -4,6 +4,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::rent::Rent,
     ProgramResult,
 };
 
@@ -84,6 +85,11 @@ pub fn process(
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
     };
 
+    // Issue #15: Prevent transferring ownership to zero address / SystemProgram
+    if id_seed.iter().all(|&x| x == 0) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     // Split data_payload and authority_payload
     let data_payload_len = 1 + full_auth_data.len(); // auth_type + full_auth_data
     if instruction_data.len() < data_payload_len {
@@ -107,6 +113,10 @@ pub fn process(
     let system_program = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent_sysvar = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let rent_obj = Rent::from_account_info(rent_sysvar)?;
 
     if wallet_pda.owner() != program_id || current_owner.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
@@ -188,10 +198,7 @@ pub fn process(
         full_auth_data.len()
     };
     let space = header_size + variable_size;
-    let rent = (space as u64)
-        .checked_mul(6960)
-        .and_then(|val| val.checked_add(897840))
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let rent = rent_obj.minimum_balance(space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let bump_arr = [bump];
