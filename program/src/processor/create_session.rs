@@ -2,8 +2,7 @@ use assertions::{check_zero_data, sol_assert_bytes_eq};
 use no_padding::NoPadding;
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Instruction, Seed, Signer},
-    program::invoke_signed,
+    instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
     sysvars::rent::Rent,
@@ -200,29 +199,6 @@ pub fn process(
     let space = std::mem::size_of::<SessionAccount>();
     let session_rent = rent.minimum_balance(space);
 
-    let mut create_ix_data = Vec::with_capacity(52);
-    create_ix_data.extend_from_slice(&0u32.to_le_bytes());
-    create_ix_data.extend_from_slice(&session_rent.to_le_bytes());
-    create_ix_data.extend_from_slice(&(space as u64).to_le_bytes());
-    create_ix_data.extend_from_slice(program_id.as_ref());
-
-    let accounts_meta = [
-        AccountMeta {
-            pubkey: payer.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: session_pda.key(),
-            is_signer: true,
-            is_writable: true,
-        },
-    ];
-    let create_ix = Instruction {
-        program_id: system_program.key(),
-        accounts: &accounts_meta,
-        data: &create_ix_data,
-    };
     let bump_arr = [bump];
     let seeds = [
         Seed::from(b"session"),
@@ -230,16 +206,15 @@ pub fn process(
         Seed::from(&args.session_key),
         Seed::from(&bump_arr),
     ];
-    let signer: Signer = (&seeds).into();
 
-    invoke_signed(
-        &create_ix,
-        &[
-            &payer.clone(),
-            &session_pda.clone(),
-            &system_program.clone(),
-        ],
-        &[signer],
+    crate::utils::initialize_pda_account(
+        payer,
+        session_pda,
+        system_program,
+        space,
+        session_rent,
+        program_id,
+        &seeds,
     )?;
 
     // Initialize Session State
