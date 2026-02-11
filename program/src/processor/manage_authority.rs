@@ -157,11 +157,9 @@ pub fn process_add_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // Safe Copy of Header
-    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-    header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    // Safe Copy of Header using read_unaligned
     let admin_header =
-        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
+        unsafe { std::ptr::read_unaligned(admin_data.as_ptr() as *const AuthorityAccountHeader) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -328,12 +326,13 @@ pub fn process_remove_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // Safe copy header
+    // Safe copy header using read_unaligned
     let admin_data = unsafe { admin_auth_pda.borrow_mut_data_unchecked() };
-    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-    header_bytes.copy_from_slice(&admin_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    if admin_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
+        return Err(ProgramError::InvalidAccountData);
+    }
     let admin_header =
-        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
+        unsafe { std::ptr::read_unaligned(admin_data.as_ptr() as *const AuthorityAccountHeader) };
 
     if admin_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
@@ -368,11 +367,12 @@ pub fn process_remove_authority(
 
     // Authorization - ALWAYS validate target authority
     let target_data = unsafe { target_auth_pda.borrow_data_unchecked() };
-    // Safe copy target header
-    let mut target_h_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-    target_h_bytes.copy_from_slice(&target_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    if target_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    // Safe copy target header using read_unaligned
     let target_header =
-        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&target_h_bytes) };
+        unsafe { std::ptr::read_unaligned(target_data.as_ptr() as *const AuthorityAccountHeader) };
 
     // ALWAYS verify discriminator
     if target_header.discriminator != AccountDiscriminator::Authority as u8 {

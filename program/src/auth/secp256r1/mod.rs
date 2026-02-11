@@ -64,11 +64,15 @@ impl Authenticator for Secp256r1Authenticator {
         let _slot_hash = validate_nonce(slothashes_account, slot)?;
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-        if (auth_data.as_ptr() as usize) % 8 != 0 {
+        // Check size
+        if auth_data.len() < header_size {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
-        // SAFETY: Pointer alignment checked above. size_of correct.
-        let header = unsafe { &mut *(auth_data.as_mut_ptr() as *mut AuthorityAccountHeader) };
+
+        // Safe read
+        let mut header = unsafe {
+            std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader)
+        };
 
         // Compute hash of user-provided RP ID and verify against stored hash (audit N3)
         // Secp256r1 data layout: [Header] [Counter(4)] [RP_ID_Hash(32)] [Pubkey(33)]
@@ -150,6 +154,12 @@ impl Authenticator for Secp256r1Authenticator {
             return Err(AuthError::SignatureReused.into());
         }
         header.counter = authenticator_counter;
+        unsafe {
+            std::ptr::write_unaligned(
+                auth_data.as_mut_ptr() as *mut AuthorityAccountHeader,
+                header,
+            );
+        }
 
         let stored_rp_id_hash = &auth_data[rp_id_hash_offset..rp_id_hash_offset + 32];
         if auth_data_parser.rp_id_hash() != stored_rp_id_hash {

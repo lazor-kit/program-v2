@@ -73,11 +73,15 @@ pub fn process(
 
     // Read authority header
     // Safe copy header
+    // Read authority data
     let authority_data = unsafe { authority_pda.borrow_mut_data_unchecked() };
-    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-    header_bytes.copy_from_slice(&authority_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
-    let authority_header =
-        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
+
+    // Authenticate based on discriminator
+    let discriminator = if !authority_data.is_empty() {
+        authority_data[0]
+    } else {
+        return Err(ProgramError::InvalidAccountData);
+    };
 
     // Parse compact instructions
     let compact_instructions = parse_compact_instructions(instruction_data)?;
@@ -86,10 +90,21 @@ pub fn process(
     let compact_bytes = crate::compact::serialize_compact_instructions(&compact_instructions);
     let compact_len = compact_bytes.len();
 
-    // Authenticate based on discriminator
-    match authority_header.discriminator {
+    match discriminator {
         2 => {
             // Authority
+            if authority_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            // Use read_unaligned to safely copy potentially unaligned data into a local struct
+            let authority_header = unsafe {
+                std::ptr::read_unaligned(authority_data.as_ptr() as *const AuthorityAccountHeader)
+            };
+
+            if authority_header.discriminator != AccountDiscriminator::Authority as u8 {
+                return Err(ProgramError::InvalidAccountData);
+            }
+
             if authority_header.wallet != *wallet_pda.key() {
                 return Err(ProgramError::InvalidAccountData);
             }
@@ -131,12 +146,12 @@ pub fn process(
             if session_data.len() < std::mem::size_of::<crate::state::session::SessionAccount>() {
                 return Err(ProgramError::InvalidAccountData);
             }
-            if (session_data.as_ptr() as usize) % 8 != 0 {
-                return Err(ProgramError::InvalidAccountData);
-            }
-            // SAFETY: Alignment and size checked.
+
+            // Use read_unaligned to safely load SessionAccount
             let session = unsafe {
-                &*(session_data.as_ptr() as *const crate::state::session::SessionAccount)
+                std::ptr::read_unaligned(
+                    session_data.as_ptr() as *const crate::state::session::SessionAccount
+                )
             };
 
             let clock = Clock::get()?;
