@@ -176,7 +176,10 @@ pub fn process(
         _padding: [0; 5],
     };
     unsafe {
-        *(wallet_data.as_mut_ptr() as *mut WalletAccount) = wallet_account;
+        std::ptr::write_unaligned(
+            wallet_data.as_mut_ptr() as *mut WalletAccount,
+            wallet_account,
+        );
     }
 
     // --- 2. Initialize Authority Account ---

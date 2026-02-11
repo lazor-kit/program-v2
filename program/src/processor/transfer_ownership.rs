@@ -137,8 +137,9 @@ pub fn process(
         if (data.as_ptr() as usize) % 8 != 0 {
             return Err(ProgramError::InvalidAccountData);
         }
-        // SAFETY: Alignment checked.
-        let auth = unsafe { &*(data.as_ptr() as *const AuthorityAccountHeader) };
+        // SAFETY: Use read_unaligned for safety
+        let auth =
+            unsafe { std::ptr::read_unaligned(data.as_ptr() as *const AuthorityAccountHeader) };
         if auth.discriminator != AccountDiscriminator::Authority as u8 {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -220,7 +221,7 @@ pub fn process(
     )?;
 
     let data = unsafe { new_owner.borrow_mut_data_unchecked() };
-    if (data.as_ptr() as usize) % 8 != 0 {
+    if data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
         return Err(ProgramError::InvalidAccountData);
     }
     let header = AuthorityAccountHeader {
@@ -234,7 +235,7 @@ pub fn process(
         wallet: *wallet_pda.key(),
     };
     unsafe {
-        *(data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
+        std::ptr::write_unaligned(data.as_mut_ptr() as *mut AuthorityAccountHeader, header);
     }
 
     let variable_target = &mut data[header_size..];
