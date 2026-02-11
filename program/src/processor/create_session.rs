@@ -120,11 +120,12 @@ pub fn process(
 
     let auth_data = unsafe { authorizer_pda.borrow_mut_data_unchecked() };
 
-    // Safe copy header
-    let mut header_bytes = [0u8; std::mem::size_of::<AuthorityAccountHeader>()];
-    header_bytes.copy_from_slice(&auth_data[..std::mem::size_of::<AuthorityAccountHeader>()]);
+    // Safe Copy of Header using read_unaligned
+    if auth_data.len() < std::mem::size_of::<AuthorityAccountHeader>() {
+        return Err(ProgramError::InvalidAccountData);
+    }
     let auth_header =
-        unsafe { std::mem::transmute::<&[u8; 48], &AuthorityAccountHeader>(&header_bytes) };
+        unsafe { std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader) };
 
     if auth_header.discriminator != AccountDiscriminator::Authority as u8 {
         return Err(ProgramError::InvalidAccountData);
