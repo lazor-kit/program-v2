@@ -102,6 +102,7 @@ pub fn initialize_pda_account(
 
     // Step 2: Allocate space
     // System Program Allocate instruction (discriminator: 8)
+    pinocchio::msg!("Allocating space for PDA...");
     let mut allocate_data = Vec::with_capacity(12);
     allocate_data.extend_from_slice(&8u32.to_le_bytes());
     allocate_data.extend_from_slice(&(space as u64).to_le_bytes());
@@ -123,6 +124,7 @@ pub fn initialize_pda_account(
 
     // Step 3: Assign ownership to target program
     // System Program Assign instruction (discriminator: 1)
+    pinocchio::msg!("Assigning PDA to owner...");
     let mut assign_data = Vec::with_capacity(36);
     assign_data.extend_from_slice(&1u32.to_le_bytes());
     assign_data.extend_from_slice(owner.as_ref());
