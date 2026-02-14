@@ -1,0 +1,25 @@
+{
+  "name": "lazorkit-ts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "@types/node": "^25.2.3",
+    "codama": "^1.5.0",
+    "solana-bankrun": "^0.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@solana/kit": "^6.0.1"
+  }
+}
