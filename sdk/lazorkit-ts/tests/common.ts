@@ -26,7 +26,7 @@ class BankrunRpcAdapter {
     }
 }
 
-export async function setupTest() {
+export async function setupTest(): Promise<{ context: any, client: LazorClient }> {
     const context = await start(
         [{ name: "lazorkit_program", programId: PROGRAM_ID }],
         []

@@ -51,7 +51,7 @@ describe("Instruction: CreateSession", () => {
 
         const sessionAcc = await client.getSession(sessionPda);
         expect(sessionAcc.discriminator).toBe(3); // Session
-        expect(sessionAcc.sessionKey).toEqual(sessionKey.publicKey.toBytes());
+        expect(sessionAcc.sessionKey).toEqual(sessionKey.publicKey.toBase58());
     });
 
     it("Failure: Spender cannot create a session key", async () => {
