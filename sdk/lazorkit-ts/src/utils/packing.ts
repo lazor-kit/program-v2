@@ -1,4 +1,3 @@
-
 /**
  * Utility to pack instructions into the compact format expected by LazorKit's Execute instruction.
  * 
@@ -19,7 +18,8 @@ export interface CompactInstruction {
 }
 
 /**
- * Packs a list of compact instructions into a buffer.
+ * Packs a list of compact instructions into a single buffer.
+ * Used by the Execute instruction to encode inner instructions.
  */
 export function packCompactInstructions(instructions: CompactInstruction[]): Uint8Array {
     if (instructions.length > 255) {
@@ -29,35 +29,26 @@ export function packCompactInstructions(instructions: CompactInstruction[]): Uin
     const buffers: Uint8Array[] = [];
 
     // 1. Number of instructions
-    const header = new Uint8Array([instructions.length]);
-    buffers.push(header);
+    buffers.push(new Uint8Array([instructions.length]));
 
     for (const ix of instructions) {
-        // 2. Program ID index
-        const ixHeader = new Uint8Array(2);
-        ixHeader[0] = ix.programIdIndex;
-
-        // 3. Number of accounts
+        // 2. Program ID index + number of accounts
         if (ix.accountIndexes.length > 255) {
             throw new Error("Too many accounts in an instruction (max 255)");
         }
-        ixHeader[1] = ix.accountIndexes.length;
-        buffers.push(ixHeader);
+        buffers.push(new Uint8Array([ix.programIdIndex, ix.accountIndexes.length]));
 
-        // 4. Account indexes
+        // 3. Account indexes
         buffers.push(new Uint8Array(ix.accountIndexes));
 
-        // 5. Data length (u16 LE)
+        // 4. Data length (u16 LE)
         const dataLen = ix.data.length;
         if (dataLen > 65535) {
             throw new Error("Instruction data too large (max 65535 bytes)");
         }
-        const lenBuffer = new Uint8Array(2);
-        lenBuffer[0] = dataLen & 0xff;
-        lenBuffer[1] = (dataLen >> 8) & 0xff;
-        buffers.push(lenBuffer);
+        buffers.push(new Uint8Array([dataLen & 0xff, (dataLen >> 8) & 0xff]));
 
-        // 6. Data
+        // 5. Data
         buffers.push(ix.data);
     }
 

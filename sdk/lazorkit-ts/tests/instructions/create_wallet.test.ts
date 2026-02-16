@@ -4,10 +4,12 @@ import { PublicKey, Keypair } from "@solana/web3.js";
 import { Address } from "@solana/kit";
 import { setupTest, processInstruction, tryProcessInstruction } from "../common";
 import { findWalletPda, findVaultPda, findAuthorityPda } from "../../src";
+import { LazorClient } from "../../src";
+import { ProgramTestContext } from "solana-bankrun";
 
 describe("Instruction: CreateWallet", () => {
-    let context: any;
-    let client: any;
+    let context: ProgramTestContext;
+    let client: LazorClient;
 
     beforeAll(async () => {
         ({ context, client } = await setupTest());

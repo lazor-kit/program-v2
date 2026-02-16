@@ -1,11 +1,17 @@
+/**
+ * PDA derivation helpers for LazorKit accounts.
+ * 
+ * These are not auto-generated because the Shank IDL
+ * doesn't include PDA seed definitions.
+ */
 
 import {
     getAddressEncoder,
     getProgramDerivedAddress,
-    Address,
-    ProgramDerivedAddress
+    type Address,
+    type ProgramDerivedAddress,
 } from "@solana/kit";
-import { LAZOR_KIT_PROGRAM_ID } from "./constants";
+import { LAZORKIT_PROGRAM_PROGRAM_ADDRESS } from "../generated";
 
 const encoder = getAddressEncoder();
 
@@ -17,11 +23,8 @@ export async function findWalletPda(
     userSeed: Uint8Array
 ): Promise<ProgramDerivedAddress> {
     return await getProgramDerivedAddress({
-        programAddress: LAZOR_KIT_PROGRAM_ID,
-        seeds: [
-            "wallet",
-            userSeed
-        ],
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["wallet", userSeed],
     });
 }
 
@@ -33,11 +36,8 @@ export async function findVaultPda(
     wallet: Address
 ): Promise<ProgramDerivedAddress> {
     return await getProgramDerivedAddress({
-        programAddress: LAZOR_KIT_PROGRAM_ID,
-        seeds: [
-            "vault",
-            encoder.encode(wallet)
-        ],
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["vault", encoder.encode(wallet)],
     });
 }
 
@@ -50,12 +50,8 @@ export async function findAuthorityPda(
     idHash: Uint8Array
 ): Promise<ProgramDerivedAddress> {
     return await getProgramDerivedAddress({
-        programAddress: LAZOR_KIT_PROGRAM_ID,
-        seeds: [
-            "authority",
-            encoder.encode(wallet),
-            idHash
-        ],
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["authority", encoder.encode(wallet), idHash],
     });
 }
 
@@ -68,11 +64,7 @@ export async function findSessionPda(
     sessionKey: Address
 ): Promise<ProgramDerivedAddress> {
     return await getProgramDerivedAddress({
-        programAddress: LAZOR_KIT_PROGRAM_ID,
-        seeds: [
-            "session",
-            encoder.encode(wallet),
-            encoder.encode(sessionKey)
-        ],
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["session", encoder.encode(wallet), encoder.encode(sessionKey)],
     });
 }
