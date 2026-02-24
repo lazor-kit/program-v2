@@ -75,10 +75,10 @@ impl Authenticator for Secp256r1Authenticator {
         };
 
         // Secp256r1 on-chain data layout:
-        //   [Header] [Counter(4)] [credential_id_hash(32)] [Pubkey(33)]
+        //   [Header] [credential_id_hash(32)] [Pubkey(33)]
         // Note: credential_id_hash is stored for off-chain wallet discovery
         //       via getProgramAccounts + memcmp filter. It is not used in authentication.
-        let pubkey_offset = header_size + 4 + 32; // skip counter + credential_id_hash
+        let pubkey_offset = header_size + 32; // skip credential_id_hash
 
         #[allow(unused_assignments)]
         let mut computed_rp_id_hash = [0u8; 32];
