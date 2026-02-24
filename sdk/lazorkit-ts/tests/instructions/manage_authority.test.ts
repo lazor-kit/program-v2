@@ -210,4 +210,103 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         expect(result.result).toContain("custom program error: 0xbba");
     });
+
+    // --- Category 2: SDK Encoding Correctness ---
+
+    it("Encoding: AddAuthority Secp256r1 data matches expected binary layout", async () => {
+        const credentialIdHash = Buffer.alloc(32, 0xCC);
+        const p256Pubkey = Buffer.alloc(33, 0xDD);
+        p256Pubkey[0] = 0x03;
+
+        const [newAuthPda] = await findAuthorityPda(walletPda, credentialIdHash);
+
+        const ix = client.addAuthority({
+            payer: { address: context.payer.publicKey.toBase58() as Address } as any,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: newAuthPda,
+            authType: 1, // Secp256r1
+            newRole: 2,  // Spender
+            authPubkey: p256Pubkey,
+            credentialHash: credentialIdHash,
+            authorizerSigner: { address: owner.publicKey.toBase58() as Address } as any,
+        });
+
+        const data = Buffer.from(ix.data);
+        // Layout: [disc(1)][authType(1)][newRole(1)][padding(6)][credIdHash(32)][pubkey(33)]
+        // Total: 1 + 1 + 1 + 6 + 32 + 33 = 74
+        expect(data[0]).toBe(1);                                                 // discriminator = AddAuthority
+        expect(data[1]).toBe(1);                                                 // authType = Secp256r1
+        expect(data[2]).toBe(2);                                                 // newRole = Spender
+        expect(Buffer.from(data.subarray(9, 41))).toEqual(credentialIdHash);     // credential_id_hash
+        expect(Buffer.from(data.subarray(41, 74))).toEqual(p256Pubkey);          // pubkey
+    });
+
+    // --- Category 4: RBAC Edge Cases ---
+
+    it("Failure: Spender cannot add any authority", async () => {
+        const spender = Keypair.generate();
+        const [spenderPda] = await findAuthorityPda(walletPda, spender.publicKey.toBytes());
+
+        // Owner adds a Spender
+        await processInstruction(context, client.addAuthority({
+            payer: { address: context.payer.publicKey.toBase58() as Address } as any,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: spenderPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: spender.publicKey.toBytes(),
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: { address: owner.publicKey.toBase58() as Address } as any,
+        }), [owner]);
+
+        // Spender tries to add another Spender → should fail
+        const victim = Keypair.generate();
+        const [victimPda] = await findAuthorityPda(walletPda, victim.publicKey.toBytes());
+
+        const result = await tryProcessInstruction(context, client.addAuthority({
+            payer: { address: context.payer.publicKey.toBase58() as Address } as any,
+            wallet: walletPda,
+            adminAuthority: spenderPda,
+            newAuthority: victimPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: victim.publicKey.toBytes(),
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: { address: spender.publicKey.toBase58() as Address } as any,
+        }), [spender]);
+
+        expect(result.result).toContain("custom program error: 0xbba"); // PermissionDenied
+    });
+
+    it("Failure: Admin cannot remove Owner", async () => {
+        const admin = Keypair.generate();
+        const [adminPda] = await findAuthorityPda(walletPda, admin.publicKey.toBytes());
+
+        // Owner adds an Admin
+        await processInstruction(context, client.addAuthority({
+            payer: { address: context.payer.publicKey.toBase58() as Address } as any,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: adminPda,
+            authType: 0,
+            newRole: 1,
+            authPubkey: admin.publicKey.toBytes(),
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: { address: owner.publicKey.toBase58() as Address } as any,
+        }), [owner]);
+
+        // Admin tries to remove Owner → should fail
+        const result = await tryProcessInstruction(context, client.removeAuthority({
+            payer: { address: context.payer.publicKey.toBase58() as Address } as any,
+            wallet: walletPda,
+            adminAuthority: adminPda,
+            targetAuthority: ownerAuthPda,
+            refundDestination: context.payer.publicKey.toBase58() as Address,
+            authorizerSigner: { address: admin.publicKey.toBase58() as Address } as any,
+        }), [admin]);
+
+        expect(result.result).toContain("custom program error"); // PermissionDenied
+    });
 });

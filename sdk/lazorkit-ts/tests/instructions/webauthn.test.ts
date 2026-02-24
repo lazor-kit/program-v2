@@ -20,10 +20,10 @@ describe("WebAuthn (Secp256r1) Support", () => {
         const [vaultPda] = await findVaultPda(walletPda);
 
         // Mock WebAuthn values
-        const rpIdHash = Buffer.from(crypto.randomBytes(32));
+        const credentialIdHash = Buffer.from(crypto.randomBytes(32));
         const p256Pubkey = Buffer.from(crypto.randomBytes(33)); // Compressed P-256 key
 
-        const [authPda, authBump] = await findAuthorityPda(walletPda, rpIdHash);
+        const [authPda, authBump] = await findAuthorityPda(walletPda, credentialIdHash);
 
         await processInstruction(context, client.createWallet({
             payer: { address: context.payer.publicKey.toBase58() as Address } as any,
@@ -34,7 +34,7 @@ describe("WebAuthn (Secp256r1) Support", () => {
             authType: 1, // Secp256r1
             authBump,
             authPubkey: p256Pubkey,
-            credentialHash: rpIdHash,
+            credentialHash: credentialIdHash,
         }));
 
         // Verify state
@@ -65,9 +65,9 @@ describe("WebAuthn (Secp256r1) Support", () => {
         }));
 
         // Add Secp256r1 Admin
-        const rpIdHash = Buffer.from(crypto.randomBytes(32));
+        const credentialIdHash = Buffer.from(crypto.randomBytes(32));
         const p256Pubkey = Buffer.from(crypto.randomBytes(33));
-        const [newAdminPda] = await findAuthorityPda(walletPda, rpIdHash);
+        const [newAdminPda] = await findAuthorityPda(walletPda, credentialIdHash);
 
         await processInstruction(context, client.addAuthority({
             payer: { address: context.payer.publicKey.toBase58() as Address } as any,
@@ -77,7 +77,7 @@ describe("WebAuthn (Secp256r1) Support", () => {
             authType: 1, // Secp256r1
             newRole: 1, // Admin
             authPubkey: p256Pubkey,
-            credentialHash: rpIdHash,
+            credentialHash: credentialIdHash,
             authorizerSigner: { address: owner.publicKey.toBase58() as Address } as any,
         }), [owner]);
 
@@ -90,9 +90,9 @@ describe("WebAuthn (Secp256r1) Support", () => {
         const userSeed = Buffer.from(crypto.randomBytes(32));
         const [walletPda] = await findWalletPda(userSeed);
         const [vaultPda] = await findVaultPda(walletPda);
-        const rpIdHash = Buffer.from(crypto.randomBytes(32));
+        const credentialIdHash = Buffer.from(crypto.randomBytes(32));
         const p256Pubkey = Buffer.from(crypto.randomBytes(33));
-        const [authPda, authBump] = await findAuthorityPda(walletPda, rpIdHash);
+        const [authPda, authBump] = await findAuthorityPda(walletPda, credentialIdHash);
 
         // Create wallet with Secp256r1 owner
         await processInstruction(context, client.createWallet({
@@ -104,7 +104,7 @@ describe("WebAuthn (Secp256r1) Support", () => {
             authType: 1,
             authBump,
             authPubkey: p256Pubkey,
-            credentialHash: rpIdHash,
+            credentialHash: credentialIdHash,
         }));
 
         // Try to execute with dummy signature/payload
