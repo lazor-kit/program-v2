@@ -43,15 +43,16 @@ export async function findVaultPda(
 
 /**
  * Derives an Authority PDA.
- * Seeds: ["authority", wallet_pubkey, id_hash]
+ * Seeds: ["authority", wallet_pubkey, id_seed]
+ * @param idSeed - For Ed25519 this is the 32-byte public key. For Secp256r1 this is the 32-byte SHA256 Hash of the `credential_id` (rawId).
  */
 export async function findAuthorityPda(
     wallet: Address,
-    idHash: Uint8Array
+    idSeed: Uint8Array
 ): Promise<ProgramDerivedAddress> {
     return await getProgramDerivedAddress({
         programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
-        seeds: ["authority", encoder.encode(wallet), idHash],
+        seeds: ["authority", encoder.encode(wallet), idSeed],
     });
 }
 
