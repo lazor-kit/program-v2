@@ -13,15 +13,13 @@ import * as crypto from "crypto";
  *
  * After header:
  *   Ed25519:    [pubkey(32)]
- *   Secp256r1:  [counter(4)] [credential_id_hash(32)] [pubkey(33)]
+ *   Secp256r1:  [credential_id_hash(32)] [pubkey(33)]
  *
- * Note: Secp256r1 has a 4-byte u32 nonce counter before the credential data.
+ * Both authority types start variable data at offset 48.
  */
 const HEADER_SIZE = 48;
-const ED25519_DATA_OFFSET = HEADER_SIZE;           // pubkey starts right after header
-const SECP256R1_COUNTER_SIZE = 4;                  // u32 nonce counter
-const SECP256R1_CRED_OFFSET = HEADER_SIZE + SECP256R1_COUNTER_SIZE;  // offset 52
-const SECP256R1_PUBKEY_OFFSET = SECP256R1_CRED_OFFSET + 32;         // offset 84
+const DATA_OFFSET = HEADER_SIZE;                   // offset 48 for both types
+const SECP256R1_PUBKEY_OFFSET = DATA_OFFSET + 32;  // offset 80
 
 describe("Contract Data Integrity", () => {
     let context: any;
@@ -67,8 +65,8 @@ describe("Contract Data Integrity", () => {
         const storedWallet = data.subarray(16, 48);
         expect(Buffer.from(storedWallet)).toEqual(Buffer.from(new PublicKey(walletPda).toBytes()));
 
-        // Ed25519 pubkey at ED25519_DATA_OFFSET (no counter prefix)
-        const storedPubkey = data.subarray(ED25519_DATA_OFFSET, ED25519_DATA_OFFSET + 32);
+        // Ed25519 pubkey at DATA_OFFSET
+        const storedPubkey = data.subarray(DATA_OFFSET, DATA_OFFSET + 32);
         expect(Buffer.from(storedPubkey)).toEqual(Buffer.from(ownerPubkeyBytes));
     });
 
@@ -103,8 +101,8 @@ describe("Contract Data Integrity", () => {
         expect(data[1]).toBe(1);  // authority_type = Secp256r1
         expect(data[2]).toBe(0);  // role = Owner
 
-        // credential_id_hash at SECP256R1_CRED_OFFSET (skip 4-byte counter)
-        const storedCredHash = data.subarray(SECP256R1_CRED_OFFSET, SECP256R1_CRED_OFFSET + 32);
+        // credential_id_hash at DATA_OFFSET
+        const storedCredHash = data.subarray(DATA_OFFSET, DATA_OFFSET + 32);
         expect(Buffer.from(storedCredHash)).toEqual(credentialIdHash);
 
         // pubkey at SECP256R1_PUBKEY_OFFSET (33 bytes compressed)
@@ -174,14 +172,14 @@ describe("Contract Data Integrity", () => {
         const data1 = await getRawAccountData(authPda1);
         expect(data1[1]).toBe(1); // Secp256r1
         expect(data1[2]).toBe(1); // Admin
-        expect(Buffer.from(data1.subarray(SECP256R1_CRED_OFFSET, SECP256R1_CRED_OFFSET + 32))).toEqual(credHash1);
+        expect(Buffer.from(data1.subarray(DATA_OFFSET, DATA_OFFSET + 32))).toEqual(credHash1);
         expect(Buffer.from(data1.subarray(SECP256R1_PUBKEY_OFFSET, SECP256R1_PUBKEY_OFFSET + 33))).toEqual(pubkey1);
 
         // Verify Passkey 2 data
         const data2 = await getRawAccountData(authPda2);
         expect(data2[1]).toBe(1); // Secp256r1
         expect(data2[2]).toBe(2); // Spender
-        expect(Buffer.from(data2.subarray(SECP256R1_CRED_OFFSET, SECP256R1_CRED_OFFSET + 32))).toEqual(credHash2);
+        expect(Buffer.from(data2.subarray(DATA_OFFSET, DATA_OFFSET + 32))).toEqual(credHash2);
         expect(Buffer.from(data2.subarray(SECP256R1_PUBKEY_OFFSET, SECP256R1_PUBKEY_OFFSET + 33))).toEqual(pubkey2);
     });
 });

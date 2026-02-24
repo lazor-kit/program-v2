@@ -186,11 +186,7 @@ pub fn process(
     // --- 2. Initialize Authority Account ---
     // Authority accounts have a variable size depending on the authority type (e.g., Secp256r1 keys are larger).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = if args.authority_type == 1 {
-        4 + full_auth_data.len()
-    } else {
-        full_auth_data.len()
-    };
+    let variable_size = full_auth_data.len();
 
     let auth_space = header_size + variable_size;
     let auth_rent = rent.minimum_balance(auth_space);
@@ -238,12 +234,7 @@ pub fn process(
         .copy_from_slice(header_bytes);
 
     let variable_target = &mut auth_account_data[header_size..];
-    if args.authority_type == 1 {
-        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
-        variable_target[4..].copy_from_slice(full_auth_data);
-    } else {
-        variable_target.copy_from_slice(full_auth_data);
-    }
+    variable_target.copy_from_slice(full_auth_data);
 
     Ok(())
 }

@@ -26,7 +26,7 @@ import * as crypto from "crypto";
  */
 
 const HEADER_WALLET_OFFSET = 16;  // wallet pubkey in header
-const SECP256R1_CRED_OFFSET = 52; // after header(48) + counter(4)
+const DATA_OFFSET = 48;           // after header(48) — same for both authority types
 const ED25519_DATA_OFFSET = 48;   // after header(48)
 
 describe("Wallet Discovery", () => {
@@ -87,7 +87,7 @@ describe("Wallet Discovery", () => {
         expect(data![1]).toBe(1);  // authority_type = Secp256r1
 
         // Step 5: Extract credential_id_hash and verify it matches
-        const storedCredHash = data!.subarray(SECP256R1_CRED_OFFSET, SECP256R1_CRED_OFFSET + 32);
+        const storedCredHash = data!.subarray(DATA_OFFSET, DATA_OFFSET + 32);
         expect(Buffer.from(storedCredHash)).toEqual(discoveryHash);
 
         // Step 6: Extract wallet pubkey from header
