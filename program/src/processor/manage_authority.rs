@@ -85,16 +85,14 @@ pub fn process_add_authority(
             (pubkey, pubkey)
         },
         1 => {
-            if rest.len() < 32 {
+            // [credential_id_hash(32)] [pubkey(33)] = 65 bytes total
+            if rest.len() < 65 {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            let (hash, rest_after_hash) = rest.split_at(32);
-            // Expecting 33-byte COMPRESSED pubkey for storage (efficient state)
-            if rest_after_hash.len() < 33 {
-                return Err(ProgramError::InvalidInstructionData);
-            }
-            let full_data = &rest[..32 + 33]; // hash + pubkey
-            (hash, full_data)
+            let (credential_id_hash, _rest_after_cred) = rest.split_at(32);
+            // We store credential_id_hash + pubkey for on-chain wallet discovery
+            let full_auth_data = &rest[..65];
+            (credential_id_hash, full_auth_data)
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
     };
