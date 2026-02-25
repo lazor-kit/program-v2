@@ -1,0 +1,20 @@
+{
+  "name": "lazorkit-tests-real-rpc",
+  "version": "1.0.0",
+  "description": "Real RPC End-to-End Tests for LazorKit",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:local": "./scripts/test-local.sh",
+    "test:devnet": "vitest run"
+  },
+  "dependencies": {
+    "@solana/kit": "^3.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.9.3",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

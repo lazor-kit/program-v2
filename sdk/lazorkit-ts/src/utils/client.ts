@@ -60,7 +60,7 @@ function meta(
     role: "r" | "w" | "rs" | "ws" | "s",
 ): AccountMeta | AccountSignerMeta {
     const addr = resolveAddress(address);
-    const isSignerObj = typeof address === 'object' && 'signTransaction' in address && !Array.isArray(address);
+    const isSignerObj = typeof address === 'object' && ('signTransaction' in address || 'signTransactions' in address) && !Array.isArray(address);
 
     // Determine base role (Readonly or Writable)
     let accountRole = role.includes('w') ? AccountRole.WRITABLE : AccountRole.READONLY;
@@ -75,8 +75,8 @@ function meta(
     return {
         address: addr,
         role: accountRole,
-        signer: (role.includes('s') && isSignerObj) ? (address as TransactionSigner) : undefined,
-    };
+        ...(role.includes('s') && isSignerObj ? { signer: address as TransactionSigner } : {}),
+    } as any;
 }
 
 export class LazorClient {
