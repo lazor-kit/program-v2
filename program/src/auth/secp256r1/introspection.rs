@@ -5,7 +5,7 @@ use pinocchio::program_error::ProgramError;
 pub const SECP256R1_PROGRAM_ID: [u8; 32] = [
     6, 146, 13, 236, 47, 234, 113, 181, 183, 35, 129, 77, 116, 45, 169, 3, 28, 131, 231, 95, 219,
     121, 93, 86, 142, 117, 71, 128, 32, 0, 0, 0,
-]; // "Secp256r1SigVerify1111111111111111111111111" BaselineFinalCorrectedVerifiedFinalFinalFinalFinalFinalFinalFinalFinalFinalFinal
+]; // "Secp256r1SigVerify1111111111111111111111111"
 
 /// Constants from the secp256r1 program
 pub const COMPRESSED_PUBKEY_SERIALIZED_SIZE: usize = 33; // Stored 33-byte key (0x02/0x03 + X)

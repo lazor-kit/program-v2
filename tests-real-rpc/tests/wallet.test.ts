@@ -380,4 +380,104 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
 
         expect(result.result).toMatch(/simulation failed|IllegalOwner|InvalidAccountData/i);
     });
+
+    it("Success: Secp256r1 Owner transfers ownership to Ed25519", async () => {
+        const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
+        const crypto = await import("crypto");
+
+        const userSeed = getRandomSeed();
+        const [walletPda] = await findWalletPda(userSeed);
+        const [vaultPda] = await findVaultPda(walletPda);
+
+        // 1. Create Wallet with Secp256r1 Owner
+        const secpOwner = await generateMockSecp256r1Signer();
+        const [secpOwnerPda, ownerBump] = await findAuthorityPda(walletPda, secpOwner.credentialIdHash);
+
+        await processInstruction(context, client.createWallet({
+            payer: context.payer,
+            wallet: walletPda,
+            vault: vaultPda,
+            authority: secpOwnerPda,
+            userSeed,
+            authType: 1, // Secp256r1
+            authBump: ownerBump,
+            authPubkey: secpOwner.publicKeyBytes,
+            credentialHash: secpOwner.credentialIdHash,
+        }));
+
+        // 2. Prepare new Ed25519 Owner
+        const newOwner = await generateKeyPairSigner();
+        const newOwnerBytes = Uint8Array.from(getAddressEncoder().encode(newOwner.address));
+        const [newAuthPda] = await findAuthorityPda(walletPda, newOwnerBytes);
+
+        // 3. Perform Transfer
+        const transferIx = client.transferOwnership({
+            payer: context.payer,
+            wallet: walletPda,
+            currentOwnerAuthority: secpOwnerPda,
+            newOwnerAuthority: newAuthPda,
+            authType: 0, // Transfer to Ed25519
+            authPubkey: newOwnerBytes,
+            credentialHash: new Uint8Array(32),
+            // No authorizerSigner for Secp256r1
+        });
+
+        // SDK accounts array is typically frozen, we MUST reassign a new array!
+        transferIx.accounts = [
+            ...(transferIx.accounts || []),
+            { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
+            { address: "SysvarRent111111111111111111111111111111111" as any, role: 0 }
+        ];
+
+        // Fetch current slot and slotHash from SysvarS1otHashes
+        const slotHashesAddress = "SysvarS1otHashes111111111111111111111111111" as Address;
+        const accountInfo = await context.rpc.getAccountInfo(slotHashesAddress, { encoding: 'base64' }).send();
+        const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
+        const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+
+        const sysvarIxIndex = transferIx.accounts.length - 3; // instructions
+        const sysvarSlotIndex = transferIx.accounts.length - 2; // slothashes
+
+        const authenticatorDataRaw = generateAuthenticatorData("example.com");
+        const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
+
+        // The signed payload for TransferOwnership is `auth_type(1)` + `full_auth_data(32 for Ed25519)` + `payer(32)`
+        const signedPayload = new Uint8Array(1 + 32 + 32);
+        signedPayload[0] = 0; // New type Ed25519
+        signedPayload.set(newOwnerBytes, 1);
+        signedPayload.set(new Uint8Array(getAddressEncoder().encode(context.payer.address)), 33);
+
+        const currentSlotBytes = new Uint8Array(8);
+        new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
+
+        const discriminator = new Uint8Array([3]); // TransferOwnership is 3
+        const msgToSign = getSecp256r1MessageToSign(
+            discriminator,
+            authPayload,
+            signedPayload,
+            new Uint8Array(getAddressEncoder().encode(context.payer.address)),
+            authenticatorDataRaw,
+            currentSlotBytes
+        );
+
+        const sysvarIx = await createSecp256r1Instruction(secpOwner, msgToSign);
+
+        // Pack the payload into transferIx.data
+        const originalData = transferIx.data;
+        const finalTransferData = new Uint8Array(originalData.length + authPayload.length);
+        finalTransferData.set(originalData, 0);
+        finalTransferData.set(authPayload, originalData.length);
+        transferIx.data = finalTransferData;
+
+        const { tryProcessInstructions } = await import("./common");
+        const result = await tryProcessInstructions(context, [sysvarIx, transferIx]);
+
+        expect(result.result).toBe("ok");
+
+        const acc = await client.getAuthority(newAuthPda);
+        expect(acc.role).toBe(0); // Owner
+        expect(acc.authorityType).toBe(0); // Ed25519
+    });
 });
+

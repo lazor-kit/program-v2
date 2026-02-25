@@ -254,4 +254,96 @@ describe("Instruction: CreateSession", () => {
 
         expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
     });
+
+    it("Success: Secp256r1 Admin creates a session", async () => {
+        // Create Secp256r1 Admin
+        const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
+        const crypto = await import("crypto");
+        const secpAdmin = await generateMockSecp256r1Signer();
+        const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: secpAdminPda,
+            authType: 1, // Secp256r1
+            newRole: 1,  // Admin
+            authPubkey: secpAdmin.publicKeyBytes,
+            credentialHash: secpAdmin.credentialIdHash,
+            authorizerSigner: owner,
+        }), [owner]);
+
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+
+        const expiresAt = 999999999n;
+
+        const createSessionIx = client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: secpAdminPda,
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt,
+            // Since we're using Secp256r1, we don't pass an authorizerSigner.
+        });
+
+        // SDK accounts array is typically frozen, we MUST reassign a new array!
+        createSessionIx.accounts = [
+            ...(createSessionIx.accounts || []),
+            { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 }
+        ];
+
+        // Fetch current slot and slotHash from SysvarS1otHashes
+        const slotHashesAddress = "SysvarS1otHashes111111111111111111111111111" as Address;
+        const accountInfo = await context.rpc.getAccountInfo(slotHashesAddress, { encoding: 'base64' }).send();
+        const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
+        const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+
+        const sysvarIxIndex = createSessionIx.accounts.length - 2;
+        const sysvarSlotIndex = createSessionIx.accounts.length - 1;
+
+        const authenticatorDataRaw = generateAuthenticatorData("example.com");
+        const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
+
+        // The signed payload for CreateSession is `session_key` + `expires_at` + `payer`
+        const signedPayload = new Uint8Array(32 + 8 + 32);
+        signedPayload.set(sessionKeyBytes, 0);
+        new DataView(signedPayload.buffer, signedPayload.byteOffset + 32).setBigUint64(0, expiresAt, true);
+        signedPayload.set(new Uint8Array(getAddressEncoder().encode(context.payer.address)), 40);
+
+        const currentSlotBytes = new Uint8Array(8);
+        new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
+
+        const discriminator = new Uint8Array([5]); // CreateSession is 5
+        const msgToSign = getSecp256r1MessageToSign(
+            discriminator,
+            authPayload,
+            signedPayload,
+            new Uint8Array(getAddressEncoder().encode(context.payer.address)),
+            authenticatorDataRaw,
+            currentSlotBytes
+        );
+
+        const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+
+        // Pack the payload into createSessionIx.data
+        const originalData = createSessionIx.data;
+        const finalCreateSessionData = new Uint8Array(originalData.length + authPayload.length);
+        finalCreateSessionData.set(originalData, 0);
+        finalCreateSessionData.set(authPayload, originalData.length);
+        createSessionIx.data = finalCreateSessionData;
+
+        const { tryProcessInstructions } = await import("./common");
+        const result = await tryProcessInstructions(context, [sysvarIx, createSessionIx]);
+
+        expect(result.result).toBe("ok");
+
+        const sessionAcc = await client.getSession(sessionPda);
+        expect(sessionAcc.discriminator).toBe(3); // Session
+        expect(sessionAcc.sessionKey).toEqual(sessionKey.address);
+    });
 });
