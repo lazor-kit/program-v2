@@ -442,7 +442,7 @@ export class LazorClient {
         const accounts: (AccountMeta | AccountSignerMeta)[] = allAccounts.map(a => ({
             address: a.address,
             role: a.role,
-            signer: a.signer
+            ...(a.signer ? { signer: a.signer } : {})
         }));
 
         return {
