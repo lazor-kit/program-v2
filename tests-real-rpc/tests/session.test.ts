@@ -1,0 +1,257 @@
+
+import { describe, it, expect, beforeAll } from "vitest";
+import {
+    type Address,
+    generateKeyPairSigner,
+    getAddressEncoder,
+    type TransactionSigner
+} from "@solana/kit";
+import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx } from "./common";
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "../../sdk/lazorkit-ts/src";
+
+function getRandomSeed() {
+    return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));
+}
+
+describe("Instruction: CreateSession", () => {
+    let context: TestContext;
+    let client: any;
+    let walletPda: Address;
+    let owner: TransactionSigner;
+    let ownerAuthPda: Address;
+
+    beforeAll(async () => {
+        ({ context, client } = await setupTest());
+
+        const userSeed = getRandomSeed();
+        [walletPda] = await findWalletPda(userSeed);
+        const [vaultPda] = await findVaultPda(walletPda);
+        owner = await generateKeyPairSigner();
+        const ownerBytes = Uint8Array.from(getAddressEncoder().encode(owner.address));
+        let authBump;
+        [ownerAuthPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
+
+        await processInstruction(context, client.createWallet({
+            payer: context.payer,
+            wallet: walletPda,
+            vault: vaultPda,
+            authority: ownerAuthPda,
+            userSeed,
+            authType: 0,
+            authBump,
+            authPubkey: ownerBytes,
+            credentialHash: new Uint8Array(32),
+        }));
+
+        // Fund vault
+        await processInstruction(context, getSystemTransferIx(context.payer, vaultPda, 500_000_000n));
+    });
+
+    it("Success: Owner creates a session key", async () => {
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+
+        await processInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt: 999999999n,
+            authorizerSigner: owner,
+        }), [owner]);
+
+        const sessionAcc = await client.getSession(sessionPda);
+        expect(sessionAcc.discriminator).toBe(3); // Session
+        expect(sessionAcc.sessionKey).toEqual(sessionKey.address);
+    });
+
+    it("Success: Execution using session key", async () => {
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+        const [vaultPda] = await findVaultPda(walletPda);
+
+        await processInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        const recipient = (await generateKeyPairSigner()).address;
+        const executeIx = client.buildExecute({
+            payer: context.payer,
+            wallet: walletPda,
+            authority: sessionPda,
+            vault: vaultPda,
+            innerInstructions: [
+                getSystemTransferIx(vaultPda, recipient, 1_000_000n)
+            ],
+            authorizerSigner: sessionKey,
+        });
+
+        await processInstruction(context, executeIx, [sessionKey]);
+        const balance = await context.rpc.getBalance(recipient).send();
+        expect(balance.value).toBe(1_000_000n);
+    });
+
+    // --- P2: Session Permission Boundaries ---
+
+    it("Failure: Spender cannot create session", async () => {
+        const spender = await generateKeyPairSigner();
+        const spenderBytes = Uint8Array.from(getAddressEncoder().encode(spender.address));
+        const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
+
+        // Owner adds a Spender
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: spenderPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: spenderBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Spender tries to create session → should fail
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+
+        const result = await tryProcessInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: spenderPda, // Spender, not Admin/Owner
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: spender,
+        }), [spender]);
+
+        expect(result.result).toMatch(/0xbba|3002|simulation failed/i); // PermissionDenied
+    });
+
+    it("Failure: Session PDA cannot create another session", async () => {
+        // Create a valid session first
+        const sessionKey1 = await generateKeyPairSigner();
+        const sessionKey1Bytes = Uint8Array.from(getAddressEncoder().encode(sessionKey1.address));
+        const [sessionPda1] = await findSessionPda(walletPda, sessionKey1.address);
+
+        await processInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            session: sessionPda1,
+            sessionKey: sessionKey1Bytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Now try to use the session PDA as adminAuthority to create another session
+        const sessionKey2 = await generateKeyPairSigner();
+        const sessionKey2Bytes = Uint8Array.from(getAddressEncoder().encode(sessionKey2.address));
+        const [sessionPda2] = await findSessionPda(walletPda, sessionKey2.address);
+
+        const result = await tryProcessInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: sessionPda1, // Session PDA, not Authority
+            session: sessionPda2,
+            sessionKey: sessionKey2Bytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: sessionKey1,
+        }), [sessionKey1]);
+
+        expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
+    });
+
+    // --- P4: Session Key Cannot Do Admin Actions ---
+
+    it("Failure: Session key cannot add authority", async () => {
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+
+        await processInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Try to use session PDA as adminAuthority to add authority
+        const newUser = await generateKeyPairSigner();
+        const newUserBytes = Uint8Array.from(getAddressEncoder().encode(newUser.address));
+        const [newUserPda] = await findAuthorityPda(walletPda, newUserBytes);
+
+        const result = await tryProcessInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: sessionPda, // Session PDA, not Authority
+            newAuthority: newUserPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: newUserBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: sessionKey,
+        }), [sessionKey]);
+
+        expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
+    });
+
+    it("Failure: Session key cannot remove authority", async () => {
+        // Create a spender first
+        const spender = await generateKeyPairSigner();
+        const spenderBytes = Uint8Array.from(getAddressEncoder().encode(spender.address));
+        const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: spenderPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: spenderBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Create a session
+        const sessionKey = await generateKeyPairSigner();
+        const sessionKeyBytes = Uint8Array.from(getAddressEncoder().encode(sessionKey.address));
+        const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
+
+        await processInstruction(context, client.createSession({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            session: sessionPda,
+            sessionKey: sessionKeyBytes,
+            expiresAt: BigInt(2 ** 62),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Try to use session PDA as adminAuthority to remove spender
+        const result = await tryProcessInstruction(context, client.removeAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: sessionPda,
+            targetAuthority: spenderPda,
+            refundDestination: context.payer.address,
+            authorizerSigner: sessionKey,
+        }), [sessionKey]);
+
+        expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
+    });
+});

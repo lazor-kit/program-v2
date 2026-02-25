@@ -6,8 +6,8 @@ import {
     getAddressEncoder,
     type TransactionSigner
 } from "@solana/kit";
-import { setupTest, processInstruction, tryProcessInstruction, type TestContext } from "../common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "../../../sdk/lazorkit-ts/src";
+import { setupTest, processInstruction, tryProcessInstruction, type TestContext } from "./common";
+import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
 
 function getRandomSeed() {
     return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));
@@ -67,23 +67,7 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
     });
 
     it("Success: Admin adds a Spender", async () => {
-        // Setup an Admin first
-        const admin = await generateKeyPairSigner();
-        const adminBytes = Uint8Array.from(getAddressEncoder().encode(admin.address));
-        const [adminPda] = await findAuthorityPda(walletPda, adminBytes);
-        await processInstruction(context, client.addAuthority({
-            payer: context.payer,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            newAuthority: adminPda,
-            authType: 0,
-            newRole: 1,
-            authPubkey: adminBytes,
-            credentialHash: new Uint8Array(32),
-            authorizerSigner: owner,
-        }), [owner]);
-
-        // Admin adds Spender
+        // ... (existing Spender test)
         const spender = await generateKeyPairSigner();
         const spenderBytes = Uint8Array.from(getAddressEncoder().encode(spender.address));
         const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
@@ -91,17 +75,40 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         await processInstruction(context, client.addAuthority({
             payer: context.payer,
             wallet: walletPda,
-            adminAuthority: adminPda,
+            adminAuthority: ownerAuthPda, // Using owner to add admin for next step
             newAuthority: spenderPda,
             authType: 0,
             newRole: 2,
             authPubkey: spenderBytes,
             credentialHash: new Uint8Array(32),
-            authorizerSigner: admin,
-        }), [admin]);
+            authorizerSigner: owner,
+        }), [owner]);
 
         const acc = await client.getAuthority(spenderPda);
         expect(acc.role).toBe(2);
+    });
+
+    it("Success: Owner adds a Secp256r1 Admin", async () => {
+        const credentialIdHash = getRandomSeed();
+        const p256Pubkey = new Uint8Array(33).map(() => Math.floor(Math.random() * 256));
+        p256Pubkey[0] = 0x02;
+        const [newAdminPda] = await findAuthorityPda(walletPda, credentialIdHash);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: newAdminPda,
+            authType: 1, // Secp256r1
+            newRole: 1, // Admin
+            authPubkey: p256Pubkey,
+            credentialHash: credentialIdHash,
+            authorizerSigner: owner,
+        }), [owner]);
+
+        const acc = await client.getAuthority(newAdminPda);
+        expect(acc.authorityType).toBe(1);
+        expect(acc.role).toBe(1);
     });
 
     it("Failure: Admin tries to add an Admin", async () => {
@@ -329,5 +336,168 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         }), [admin]);
 
         expect(result.result).toMatch(/simulation failed|3002|0xbba/i); // PermissionDenied
+    });
+
+    // --- P1: Cross-Wallet Attack Tests ---
+
+    it("Failure: Authority from Wallet A cannot add authority to Wallet B", async () => {
+        // Create Wallet B with its own owner
+        const userSeedB = getRandomSeed();
+        const [walletPdaB] = await findWalletPda(userSeedB);
+        const [vaultPdaB] = await findVaultPda(walletPdaB);
+        const ownerB = await generateKeyPairSigner();
+        const ownerBBytes = Uint8Array.from(getAddressEncoder().encode(ownerB.address));
+        const [ownerBAuthPda, ownerBBump] = await findAuthorityPda(walletPdaB, ownerBBytes);
+
+        await processInstruction(context, client.createWallet({
+            payer: context.payer,
+            wallet: walletPdaB,
+            vault: vaultPdaB,
+            authority: ownerBAuthPda,
+            userSeed: userSeedB,
+            authType: 0,
+            authBump: ownerBBump,
+            authPubkey: ownerBBytes,
+            credentialHash: new Uint8Array(32),
+        }));
+
+        // Wallet A's owner tries to add authority to Wallet B
+        const victim = await generateKeyPairSigner();
+        const victimBytes = Uint8Array.from(getAddressEncoder().encode(victim.address));
+        const [victimPda] = await findAuthorityPda(walletPdaB, victimBytes);
+
+        const result = await tryProcessInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPdaB,         // Target: Wallet B
+            adminAuthority: ownerAuthPda, // Using Wallet A's owner
+            newAuthority: victimPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: victimBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,     // Wallet A's owner signer
+        }), [owner]);
+
+        expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
+    });
+
+    it("Failure: Authority from Wallet A cannot remove authority in Wallet B", async () => {
+        // Create Wallet B
+        const userSeedB = getRandomSeed();
+        const [walletPdaB] = await findWalletPda(userSeedB);
+        const [vaultPdaB] = await findVaultPda(walletPdaB);
+        const ownerB = await generateKeyPairSigner();
+        const ownerBBytes = Uint8Array.from(getAddressEncoder().encode(ownerB.address));
+        const [ownerBAuthPda, ownerBBump] = await findAuthorityPda(walletPdaB, ownerBBytes);
+
+        await processInstruction(context, client.createWallet({
+            payer: context.payer,
+            wallet: walletPdaB,
+            vault: vaultPdaB,
+            authority: ownerBAuthPda,
+            userSeed: userSeedB,
+            authType: 0,
+            authBump: ownerBBump,
+            authPubkey: ownerBBytes,
+            credentialHash: new Uint8Array(32),
+        }));
+
+        // Add a spender to Wallet B
+        const spenderB = await generateKeyPairSigner();
+        const spenderBBytes = Uint8Array.from(getAddressEncoder().encode(spenderB.address));
+        const [spenderBPda] = await findAuthorityPda(walletPdaB, spenderBBytes);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPdaB,
+            adminAuthority: ownerBAuthPda,
+            newAuthority: spenderBPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: spenderBBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: ownerB,
+        }), [ownerB]);
+
+        // Wallet A's owner tries to remove Wallet B's spender
+        const result = await tryProcessInstruction(context, client.removeAuthority({
+            payer: context.payer,
+            wallet: walletPdaB,            // Target: Wallet B
+            adminAuthority: ownerAuthPda,   // Using Wallet A's owner
+            targetAuthority: spenderBPda,
+            refundDestination: context.payer.address,
+            authorizerSigner: owner,        // Wallet A's owner signer
+        }), [owner]);
+
+        expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
+    });
+
+    // --- P1: Duplicate Authority Creation ---
+
+    it("Failure: Cannot add same authority twice", async () => {
+        const newUser = await generateKeyPairSigner();
+        const newUserBytes = Uint8Array.from(getAddressEncoder().encode(newUser.address));
+        const [newUserPda] = await findAuthorityPda(walletPda, newUserBytes);
+
+        // First add — should succeed
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: newUserPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: newUserBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Second add with same pubkey — should fail (AccountAlreadyInitialized)
+        const result = await tryProcessInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: newUserPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: newUserBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        expect(result.result).toMatch(/simulation failed|already in use|AccountAlreadyInitialized/i);
+    });
+
+    // --- P2: Owner Self-Removal Edge Case ---
+
+    it("Edge: Owner can remove itself (leaves wallet ownerless)", async () => {
+        // Create a fresh wallet for this test
+        const userSeed = getRandomSeed();
+        const [wPda] = await findWalletPda(userSeed);
+        const [vPda] = await findVaultPda(wPda);
+        const o = await generateKeyPairSigner();
+        const oBytes = Uint8Array.from(getAddressEncoder().encode(o.address));
+        const [oPda, oBump] = await findAuthorityPda(wPda, oBytes);
+
+        await processInstruction(context, client.createWallet({
+            payer: context.payer,
+            wallet: wPda, vault: vPda, authority: oPda,
+            userSeed, authType: 0, authBump: oBump,
+            authPubkey: oBytes, credentialHash: new Uint8Array(32),
+        }));
+
+        // Owner removes itself
+        await processInstruction(context, client.removeAuthority({
+            payer: context.payer,
+            wallet: wPda,
+            adminAuthority: oPda,
+            targetAuthority: oPda,
+            refundDestination: context.payer.address,
+            authorizerSigner: o,
+        }), [o]);
+
+        // Authority PDA should be closed
+        const { value: acc } = await context.rpc.getAccountInfo(oPda).send();
+        expect(acc).toBeNull();
     });
 });

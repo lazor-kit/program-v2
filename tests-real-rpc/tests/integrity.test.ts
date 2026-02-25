@@ -5,8 +5,8 @@ import {
     generateKeyPairSigner,
     getAddressEncoder,
 } from "@solana/kit";
-import { setupTest, processInstruction, type TestContext } from "../common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "../../../sdk/lazorkit-ts/src";
+import { setupTest, processInstruction, type TestContext } from "./common";
+import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
 import * as crypto from "crypto";
 
 function getRandomSeed() {

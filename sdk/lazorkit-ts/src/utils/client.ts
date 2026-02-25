@@ -19,6 +19,7 @@ import {
 } from "../generated";
 
 import {
+    getAddressEncoder,
     type Address,
     type TransactionSigner,
     type ReadonlyUint8Array,
@@ -43,6 +44,7 @@ import {
 } from "../generated/accounts";
 
 import { packCompactInstructions, type CompactInstruction } from "./packing";
+import { findAuthorityPda } from "./pdas";
 
 // Valid address input types
 type AddressLike = Address | ProgramDerivedAddress;
@@ -503,5 +505,24 @@ export class LazorClient {
     async getSession(address: AddressLike): Promise<SessionAccount> {
         const account = await fetchSessionAccount(this.rpc, resolveAddress(address));
         return account.data;
+    }
+
+    async getAuthorityByPublicKey(walletAddress: AddressLike, pubkey: Address | Uint8Array): Promise<AuthorityAccount | null> {
+        const pubkeyBytes = typeof pubkey === 'string' ? Uint8Array.from(getAddressEncoder().encode(pubkey)) : pubkey;
+        const [pda] = await findAuthorityPda(resolveAddress(walletAddress), pubkeyBytes);
+        try {
+            return await this.getAuthority(pda);
+        } catch {
+            return null;
+        }
+    }
+
+    async getAuthorityByCredentialId(walletAddress: AddressLike, credentialIdHash: Uint8Array): Promise<AuthorityAccount | null> {
+        const [pda] = await findAuthorityPda(resolveAddress(walletAddress), credentialIdHash);
+        try {
+            return await this.getAuthority(pda);
+        } catch {
+            return null;
+        }
     }
 }

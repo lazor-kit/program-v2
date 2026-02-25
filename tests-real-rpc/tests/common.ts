@@ -7,9 +7,10 @@ import {
     generateKeyPairSigner,
     pipe,
     createTransactionMessage,
-    setTransactionMessageFeePayer,
+    setTransactionMessageFeePayerSigner,
     setTransactionMessageLifetimeUsingBlockhash,
     appendTransactionMessageInstruction,
+    addSignersToTransactionMessage,
     compileTransaction,
     signTransactionMessageWithSigners,
     getBase64EncodedWireTransaction,
@@ -58,15 +59,21 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
         payer = await generateKeyPairSigner();
     }
 
-    // Airdrop to payer if not skipped
-    if (!skipAirdrop) {
-        try {
-            console.log(`Requesting airdrop for ${payer.address}...`);
-            await rpc.requestAirdrop(payer.address, lamports(2_000_000_000n)).send();
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (e) {
-            console.warn("Airdrop failed or rate limited (normal on Devnet).");
+    // Check balance and log it
+    try {
+        const balance = await rpc.getBalance(payer.address).send();
+        console.log(`Payer balance: ${Number(balance.value) / 1e9} SOL`);
+
+        // If balance is low (< 0.5 SOL), try airdrop anyway (if not on mainnet)
+        if (balance.value < 500_000_000n && !rpcUrl.includes("mainnet")) {
+            console.log("Balance low. Attempting airdrop...");
+            await rpc.requestAirdrop(payer.address, lamports(1_000_000_000n)).send();
+            await sleep(2000);
+            const newBalance = await rpc.getBalance(payer.address).send();
+            console.log(`New balance: ${Number(newBalance.value) / 1e9} SOL`);
         }
+    } catch (e) {
+        console.warn("Could not check balance or airdrop.");
     }
 
     const client = new LazorClient(rpc);
@@ -99,12 +106,13 @@ export async function processInstruction(context: TestContext, ix: any, signers:
 
             const transactionMessage = pipe(
                 createTransactionMessage({ version: 0 }),
-                m => setTransactionMessageFeePayer(payer.address, m),
+                m => setTransactionMessageFeePayerSigner(payer, m),
                 m => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
                 m => appendTransactionMessageInstruction({
                     ...ix,
                     accounts
-                } as Instruction, m)
+                } as Instruction, m),
+                m => addSignersToTransactionMessage(signers, m)
             );
 
             const signedTransaction = await signTransactionMessageWithSigners(transactionMessage);
