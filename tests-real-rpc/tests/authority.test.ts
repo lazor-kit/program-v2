@@ -236,6 +236,108 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         expect(result.result).toMatch(/0xbba|3002|simulation failed/i);
     });
 
+    it("Success: Secp256r1 Admin removes a Spender", async () => {
+        // Create Secp256r1 Admin
+        const { generateMockSecp256r1Signer, createSecp256r1Instruction } = await import("./secp256r1Utils");
+        const secpAdmin = await generateMockSecp256r1Signer();
+        const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: secpAdminPda,
+            authType: 1, // Secp256r1
+            newRole: 1,  // Admin
+            authPubkey: secpAdmin.publicKeyBytes,
+            credentialHash: secpAdmin.credentialIdHash,
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Create a disposable Spender via the Owner
+        const victim = await generateKeyPairSigner();
+        const victimBytes = Uint8Array.from(getAddressEncoder().encode(victim.address));
+        const [victimPda] = await findAuthorityPda(walletPda, victimBytes);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: victimPda,
+            authType: 0,
+            newRole: 2,
+            authPubkey: victimBytes,
+            credentialHash: new Uint8Array(32),
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Secp256r1 Admin removes the victim
+        const removeAuthIx = client.removeAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: secpAdminPda,
+            targetAuthority: victimPda,
+            refundDestination: context.payer.address,
+        });
+
+        // SDK doesn't automatically fetch Sysvar Instructions or SlotHashes for removeAuthority, we must add them for Secp256r1
+        removeAuthIx.accounts = [
+            ...(removeAuthIx.accounts || []),
+            { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 }
+        ];
+
+        // Fetch current slot and slotHash from SysvarS1otHashes
+        const slotHashesAddress = "SysvarS1otHashes111111111111111111111111111" as Address;
+        const accountInfo = await context.rpc.getAccountInfo(slotHashesAddress, { encoding: 'base64' }).send();
+        const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
+        const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+        const currentSlotHash = new Uint8Array(rawData.buffer, rawData.byteOffset + 16, 32);
+
+        // SYSVAR Indexes
+        const sysvarIxIndex = removeAuthIx.accounts.length - 2;
+        const sysvarSlotIndex = removeAuthIx.accounts.length - 1;
+
+        const { buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
+        const authenticatorDataRaw = generateAuthenticatorData("example.com");
+
+        const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
+
+        // The Secp256r1 signed payload for remove_authority is strictly `target_auth_pda` + `refund_dest`
+        const signedPayload = new Uint8Array(64);
+        signedPayload.set(getAddressEncoder().encode(victimPda), 0);
+        signedPayload.set(getAddressEncoder().encode(context.payer.address), 32); // refund dest
+
+        const currentSlotBytes = new Uint8Array(8);
+        new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
+
+        const msgToSign = getSecp256r1MessageToSign(
+            new Uint8Array([2]), // Discriminator for RemoveAuthority is 2
+            authPayload,
+            signedPayload,
+            new Uint8Array(getAddressEncoder().encode(context.payer.address)),
+            authenticatorDataRaw,
+            currentSlotBytes
+        );
+
+        // Append authPayload to removeAuthIx data (since Secp256r1Authenticator parses it from instruction_data)
+        const newIxData = new Uint8Array(removeAuthIx.data.length + authPayload.length);
+        newIxData.set(removeAuthIx.data, 0);
+        newIxData.set(authPayload, removeAuthIx.data.length);
+        removeAuthIx.data = newIxData;
+
+        const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+
+        const { tryProcessInstructions } = await import("./common");
+        const result = await tryProcessInstructions(context, [sysvarIx, removeAuthIx]);
+
+        expect(result.result).toBe("ok");
+
+        // Verify removed
+        const { value: acc } = await context.rpc.getAccountInfo(victimPda).send();
+        expect(acc).toBeNull();
+    });
+
     // --- Category 2: SDK Encoding Correctness ---
 
     it("Encoding: AddAuthority Secp256r1 data matches expected binary layout", async () => {

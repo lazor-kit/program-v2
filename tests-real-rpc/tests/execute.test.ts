@@ -4,7 +4,6 @@ import {
     type Address,
     generateKeyPairSigner,
     getAddressEncoder,
-    lamports,
     type TransactionSigner
 } from "@solana/kit";
 import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx } from "./common";
@@ -138,6 +137,118 @@ describe("Instruction: Execute", () => {
 
         const balance = await context.rpc.getBalance(recipient).send();
         expect(balance.value).toBe(1_000_000n);
+    });
+
+    it("Success: Secp256r1 Admin executes a transfer", async () => {
+        // Create Secp256r1 Admin
+        const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign } = await import("./secp256r1Utils");
+        const secpAdmin = await generateMockSecp256r1Signer();
+        const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
+
+        await processInstruction(context, client.addAuthority({
+            payer: context.payer,
+            wallet: walletPda,
+            adminAuthority: ownerAuthPda,
+            newAuthority: secpAdminPda,
+            authType: 1, // Secp256r1
+            newRole: 1,  // Admin
+            authPubkey: secpAdmin.publicKeyBytes,
+            credentialHash: secpAdmin.credentialIdHash,
+            authorizerSigner: owner,
+        }), [owner]);
+
+        // Secp256r1 Admin executes a transfer
+        const recipient = (await generateKeyPairSigner()).address;
+        const innerInstructions = [
+            getSystemTransferIx(vaultPda, recipient, 2_000_000n)
+        ];
+        const executeIx = client.buildExecute({
+            payer: context.payer,
+            wallet: walletPda,
+            authority: secpAdminPda,
+            vault: vaultPda,
+            innerInstructions,
+            // Since we're using Secp256r1, we don't pass an authorizerSigner.
+            // We'll calculate the payload manually.
+        });
+
+        // SDK accounts array is typically frozen, we MUST reassign a new array!
+        executeIx.accounts = [
+            ...(executeIx.accounts || []),
+            { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 }
+        ];
+
+        const argsDataExecute = executeIx.data.subarray(1); // after discriminator
+
+        // Fetch current slot and slotHash from SysvarS1otHashes
+        const slotHashesAddress = "SysvarS1otHashes111111111111111111111111111" as Address;
+        const accountInfo = await context.rpc.getAccountInfo(slotHashesAddress, { encoding: 'base64' }).send();
+        const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
+
+        // SlotHashes layout:
+        // u64 len
+        // SlotHash[0]: u64 slot, 32 bytes hash
+        const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+        const currentSlotHash = new Uint8Array(rawData.buffer, rawData.byteOffset + 16, 32);
+
+        // SYSVAR Indexes
+        // Execute already has: Payer(0), Wallet(1), Auth(2), Vault(3), InnerAccs...
+        const sysvarIxIndex = executeIx.accounts.length - 2;
+        const sysvarSlotIndex = executeIx.accounts.length - 1;
+
+        const { generateAuthenticatorData } = await import("./secp256r1Utils");
+        const authenticatorDataRaw = generateAuthenticatorData("example.com");
+
+        // Build mock WebAuthn metadata payload
+        const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
+
+        // Compute Accounts Hash (unique to Execute instruction binding)
+        const systemProgramId = "11111111111111111111111111111111" as Address; // Transfer invokes System
+        const accountsHashData = new Uint8Array(32 * 3);
+        accountsHashData.set(getAddressEncoder().encode(systemProgramId), 0);
+        accountsHashData.set(getAddressEncoder().encode(vaultPda), 32);
+        accountsHashData.set(getAddressEncoder().encode(recipient), 64);
+
+        const crypto = await import("crypto");
+        const accountsHashHasher = crypto.createHash('sha256');
+        accountsHashHasher.update(accountsHashData);
+        const accountsHash = new Uint8Array(accountsHashHasher.digest());
+
+        // The signed payload for Execute is `compact_instructions` (argsDataExecute) + `accounts_hash`
+        const signedPayload = new Uint8Array(argsDataExecute.length + 32);
+        signedPayload.set(argsDataExecute, 0);
+        signedPayload.set(accountsHash, argsDataExecute.length);
+
+        const currentSlotBytes = new Uint8Array(8);
+        new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
+
+        const discriminator = new Uint8Array([4]); // Execute is 4
+        const msgToSign = getSecp256r1MessageToSign(
+            discriminator,
+            authPayload,
+            signedPayload,
+            new Uint8Array(getAddressEncoder().encode(context.payer.address)),
+            authenticatorDataRaw,
+            currentSlotBytes
+        );
+
+        const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+
+        // Pack the payload into executeIx.data
+        const finalExecuteData = new Uint8Array(1 + argsDataExecute.length + authPayload.length);
+        finalExecuteData.set(discriminator, 0);
+        finalExecuteData.set(argsDataExecute, 1);
+        finalExecuteData.set(authPayload, 1 + argsDataExecute.length);
+        executeIx.data = finalExecuteData;
+
+        const { tryProcessInstructions } = await import("./common");
+        const result = await tryProcessInstructions(context, [sysvarIx, executeIx]);
+
+        expect(result.result).toBe("ok");
+
+        const balance = await context.rpc.getBalance(recipient).send();
+        expect(balance.value).toBe(2_000_000n);
     });
 
     it("Failure: Session expired", async () => {
