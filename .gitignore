@@ -31,3 +31,4 @@ test-ledger
 *.dylib
 build_error.log
 validator.log
+.test-ledger
