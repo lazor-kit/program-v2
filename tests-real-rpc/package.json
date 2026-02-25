@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:local": "./scripts/test-local.sh",
-    "test:devnet": "vitest run"
+    "test:devnet": "vitest run --fileParallelism=false --testTimeout 60000",
+    "test:devnet:file": "vitest run --fileParallelism=false --testTimeout 60000"
   },
   "dependencies": {
     "@solana/kit": "^6.0.1",

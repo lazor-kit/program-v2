@@ -31,7 +31,7 @@ import {
 } from "../instructions";
 
 export const LAZORKIT_PROGRAM_PROGRAM_ADDRESS =
-  "Btg4mLUdMd3ov8PBtmuuFMAimLAdXyew9XmsGtuY9VcP" as Address<"Btg4mLUdMd3ov8PBtmuuFMAimLAdXyew9XmsGtuY9VcP">;
+  "2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT" as Address<"2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT">;
 
 export enum LazorkitProgramAccount {
   WalletAccount,
@@ -76,7 +76,7 @@ export function identifyLazorkitProgramInstruction(
 }
 
 export type ParsedLazorkitProgramInstruction<
-  TProgram extends string = "Btg4mLUdMd3ov8PBtmuuFMAimLAdXyew9XmsGtuY9VcP",
+  TProgram extends string = "2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT",
 > =
   | ({
       instructionType: LazorkitProgramInstruction.CreateWallet;
