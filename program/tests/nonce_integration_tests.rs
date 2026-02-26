@@ -30,6 +30,7 @@ fn test_nonce_slot_truncation_fix() {
     let rp_id_hash = hasher.finalize();
     let credential_hash: [u8; 32] = rp_id_hash.into();
 
+    let credential_id_hash = [5u8; 32];
     let user_seed = rand::random::<[u8; 32]>();
 
     // Derive PDAs
@@ -38,7 +39,7 @@ fn test_nonce_slot_truncation_fix() {
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &context.program_id);
     let (auth_pda, auth_bump) = Pubkey::find_program_address(
-        &[b"authority", wallet_pda.as_ref(), &credential_hash],
+        &[b"authority", wallet_pda.as_ref(), &credential_id_hash],
         &context.program_id,
     );
 
@@ -49,7 +50,7 @@ fn test_nonce_slot_truncation_fix() {
         instruction_data.push(1); // Secp256r1
         instruction_data.push(auth_bump);
         instruction_data.extend_from_slice(&[0; 6]); // padding
-        instruction_data.extend_from_slice(&credential_hash);
+        instruction_data.extend_from_slice(&credential_id_hash);
         instruction_data.extend_from_slice(&pubkey_bytes);
 
         let ix = Instruction {

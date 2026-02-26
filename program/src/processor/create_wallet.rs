@@ -4,7 +4,7 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::Seed,
     program_error::ProgramError,
-    pubkey::{create_program_address, find_program_address, Pubkey},
+    pubkey::{find_program_address, Pubkey},
     sysvars::rent::Rent,
     ProgramResult,
 };
@@ -85,11 +85,14 @@ pub fn process(
             (rest, rest)
         },
         1 => {
-            if rest.len() < 32 {
+            // [credential_id_hash(32)] [pubkey(33)] = 65 bytes total
+            if rest.len() < 65 {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            let (hash, _key) = rest.split_at(32);
-            (hash, rest)
+            let (credential_id_hash, _rest_after_cred) = rest.split_at(32);
+            // We store credential_id_hash + pubkey for on-chain wallet discovery
+            let full_auth_data = &rest[..65];
+            (credential_id_hash, full_auth_data)
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
     };
@@ -129,13 +132,11 @@ pub fn process(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // Use client-provided auth_bump for efficiency (audit N1)
-    let auth_bump_arr = [args.auth_bump];
-    let auth_key = create_program_address(
-        &[b"authority", wallet_key.as_ref(), id_seed, &auth_bump_arr],
-        program_id,
-    )
-    .map_err(|_| ProgramError::InvalidSeeds)?;
+    // Derive canonical authority PDA and verify user-provided bump matches (audit N1)
+    // Must use find_program_address to ensure canonical bump - user-supplied bump
+    // could create a valid but non-canonical PDA
+    let (auth_key, auth_bump) =
+        find_program_address(&[b"authority", wallet_key.as_ref(), id_seed], program_id);
     if !sol_assert_bytes_eq(auth_pda.key().as_ref(), auth_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
     }
@@ -185,17 +186,13 @@ pub fn process(
     // --- 2. Initialize Authority Account ---
     // Authority accounts have a variable size depending on the authority type (e.g., Secp256r1 keys are larger).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = if args.authority_type == 1 {
-        4 + full_auth_data.len()
-    } else {
-        full_auth_data.len()
-    };
+    let variable_size = full_auth_data.len();
 
     let auth_space = header_size + variable_size;
     let auth_rent = rent.minimum_balance(auth_space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
-    let auth_bump_arr = [args.auth_bump];
+    let auth_bump_arr = [auth_bump];
     let auth_seeds = [
         Seed::from(b"authority"),
         Seed::from(wallet_key.as_ref()),
@@ -219,7 +216,7 @@ pub fn process(
         discriminator: AccountDiscriminator::Authority as u8,
         authority_type: args.authority_type,
         role: 0,
-        bump: args.auth_bump,
+        bump: auth_bump,
         version: crate::state::CURRENT_ACCOUNT_VERSION,
         _padding: [0; 3],
         counter: 0,
@@ -237,12 +234,7 @@ pub fn process(
         .copy_from_slice(header_bytes);
 
     let variable_target = &mut auth_account_data[header_size..];
-    if args.authority_type == 1 {
-        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
-        variable_target[4..].copy_from_slice(full_auth_data);
-    } else {
-        variable_target.copy_from_slice(full_auth_data);
-    }
+    variable_target.copy_from_slice(full_auth_data);
 
     Ok(())
 }
@@ -277,22 +269,23 @@ mod tests {
         let mut data = Vec::new();
         let user_seed = [3u8; 32];
         data.extend_from_slice(&user_seed);
-        data.push(1); // Secp256r1
-        data.push(254);
-        data.extend_from_slice(&[0; 6]);
+        data.push(1); // authority_type = Secp256r1
+        data.push(123); // bump
+        data.extend_from_slice(&[0; 6]); // padding
 
-        // Payload for Secp256r1: hash(32) + key(variable)
-        let hash = [4u8; 32];
-        let key = [5u8; 33];
-        data.extend_from_slice(&hash);
-        data.extend_from_slice(&key);
+        // Payload for Secp256r1: credential_id_hash(32) + pubkey(33)
+        let cred_id_hash = [4u8; 32];
+        let pubkey = [6u8; 33];
+        data.extend_from_slice(&cred_id_hash);
+        data.extend_from_slice(&pubkey);
 
         let (args, rest) = CreateWalletArgs::from_bytes(&data).unwrap();
         assert_eq!(args.user_seed, user_seed);
         assert_eq!(args.authority_type, 1);
-        assert_eq!(rest.len(), 65);
-        assert_eq!(&rest[0..32], &hash);
-        assert_eq!(&rest[32..], &key);
+        assert_eq!(args.auth_bump, 123);
+        assert_eq!(rest.len(), 65); // from_bytes returns the raw remaining data
+        assert_eq!(&rest[0..32], &cred_id_hash);
+        assert_eq!(&rest[32..65], &pubkey);
     }
 
     #[test]
