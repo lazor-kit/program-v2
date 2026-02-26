@@ -74,10 +74,12 @@ impl Authenticator for Secp256r1Authenticator {
             std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader)
         };
 
-        // Compute hash of user-provided RP ID and verify against stored hash (audit N3)
-        // Secp256r1 data layout: [Header] [Counter(4)] [RP_ID_Hash(32)] [Pubkey(33)]
-        let rp_id_hash_offset = header_size + 4;
-        let stored_rp_id_hash = &auth_data[rp_id_hash_offset..rp_id_hash_offset + 32];
+        // Secp256r1 on-chain data layout:
+        //   [Header] [credential_id_hash(32)] [Pubkey(33)]
+        // Note: credential_id_hash is stored for off-chain wallet discovery
+        //       via getProgramAccounts + memcmp filter. It is not used in authentication.
+        let pubkey_offset = header_size + 32; // skip credential_id_hash
+
         #[allow(unused_assignments)]
         let mut computed_rp_id_hash = [0u8; 32];
         #[cfg(target_os = "solana")]
@@ -91,10 +93,6 @@ impl Authenticator for Secp256r1Authenticator {
         #[cfg(not(target_os = "solana"))]
         {
             computed_rp_id_hash = [0u8; 32];
-        }
-
-        if computed_rp_id_hash != stored_rp_id_hash {
-            return Err(AuthError::InvalidPubkey.into());
         }
 
         let payer = accounts.first().ok_or(ProgramError::NotEnoughAccountKeys)?;
@@ -161,8 +159,11 @@ impl Authenticator for Secp256r1Authenticator {
             );
         }
 
-        let stored_rp_id_hash = &auth_data[rp_id_hash_offset..rp_id_hash_offset + 32];
-        if auth_data_parser.rp_id_hash() != stored_rp_id_hash {
+        // Security Validation (Replaces on-chain storage check):
+        // Ensure the domain (rp_id_hash) the user provided in the instruction payload actually matches
+        // the rpIdHash that the authenticator (Hardware/FaceID) signed over inside authenticatorData.
+        // This validates the origin domain mathematically without wasting 32 bytes on-chain.
+        if auth_data_parser.rp_id_hash() != computed_rp_id_hash {
             return Err(AuthError::InvalidPubkey.into());
         }
 
@@ -172,8 +173,7 @@ impl Authenticator for Secp256r1Authenticator {
         // The fuzzing test confirmed the precompile supports 33-byte compressed keys.
 
         // 1. Extract the 33-byte COMPRESSED key from the precompile instruction data
-        let instruction_pubkey_bytes =
-            &auth_data[rp_id_hash_offset + 32..rp_id_hash_offset + 32 + 33];
+        let instruction_pubkey_bytes = &auth_data[pubkey_offset..pubkey_offset + 33];
         let expected_pubkey: &[u8; 33] = instruction_pubkey_bytes.try_into().unwrap();
 
         let mut signed_message = Vec::with_capacity(authenticator_data_raw.len() + 32);

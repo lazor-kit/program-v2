@@ -193,11 +193,7 @@ pub fn process(
     check_zero_data(new_owner, ProgramError::AccountAlreadyInitialized)?;
 
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = if args.auth_type == 1 {
-        4 + full_auth_data.len()
-    } else {
-        full_auth_data.len()
-    };
+    let variable_size = full_auth_data.len();
     let space = header_size + variable_size;
     let rent = rent_obj.minimum_balance(space);
 
@@ -239,12 +235,7 @@ pub fn process(
     }
 
     let variable_target = &mut data[header_size..];
-    if args.auth_type == 1 {
-        variable_target[0..4].copy_from_slice(&0u32.to_le_bytes());
-        variable_target[4..].copy_from_slice(full_auth_data);
-    } else {
-        variable_target.copy_from_slice(full_auth_data);
-    }
+    variable_target.copy_from_slice(full_auth_data);
 
     let current_lamports = unsafe { *current_owner.borrow_mut_lamports_unchecked() };
     let payer_lamports = unsafe { *payer.borrow_mut_lamports_unchecked() };
