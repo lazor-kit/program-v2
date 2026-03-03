@@ -7,8 +7,8 @@ LazorKit is a high-performance, secure smart wallet on Solana designed for disti
 *   **Zero-Copy Executions**: We strictly use `pinocchio` to cast raw bytes into Rust structs. This bypasses Borsh serialization overhead for maximum performance.
     *   *Requirement*: All state structs must implement `NoPadding` (via `#[derive(NoPadding)]`) to ensure memory safety and perfect packing.
 *   **Separated Storage (PDAs)**: Uses a deterministic PDA for *each* Authority.
-    *   *Benefit*: Unlimited distinct authorities per wallet without resizing costs.
-*   **Strict RBAC**: Hardcoded Permission Roles (Owner, Admin, Spender) for predictability.
+    *   *Benefit*: Unlimited distinct authorities per wallet without resizing costs or hitting `10KiB` limits limits inside a single account.
+*   **Strict RBAC**: Hardcoded Permission Roles (Owner, Admin, Spender) for predictability and secure delegation.
 *   **Transaction Compression**: Uses `CompactInstructions` (Index-based referencing) to fit complex multi-call payloads into standard Solana transaction limits (~1232 bytes).
 
 ## 3. Security Mechanisms
@@ -16,19 +16,20 @@ LazorKit is a high-performance, secure smart wallet on Solana designed for disti
 ### Replay Protection
 *   **Ed25519**: Relies on standard Solana runtime signature verification.
 *   **Secp256r1 (WebAuthn)**:
-    *   **SlotHashes Nonce**: Uses the `SlotHashes` sysvar to verify that the signed payload references a recent slot (within 150 slots). This acts as a "Proof of Liveness" without requiring on-chain nonces.
-    *   **CPI Protection**: Explicit `stack_height` check prevents the authentication instruction from being called via CPI, defending against cross-program replay attacks.
+    *   **SlotHashes Nonce**: Uses the `SlotHashes` sysvar to verify that the signed payload references a recent slot (within 150 slots). This acts as a highly efficient "Proof of Liveness" without requiring stateful on-chain nonces or counters.
+    *   **CPI Protection**: Explicit `stack_height` check prevents the authentication instruction from being called maliciously via CPI (`invoke`), defending against cross-program attack vectors.
+    *   **Signature Binding**: The `auth_payload` ensures signatures are tightly bound to the specific target account and instruction data, mitigating cross-wallet and cross-instruction replays.
 *   **Session Keys**:
-    *   **Slot-Based Expiry**: Sessions are valid until a specific absolute slot height `expires_at` (u64).
+    *   **Absolute Expiry**: Sessions are valid until a strict absolute slot height `expires_at` (u64).
 
 ### WebAuthn "Passkey" Support
 *   **Modules**: `program/src/auth/secp256r1`
 *   **Mechanism**:
-    *   Reconstructs `clientDataJson` on-chain from `challenge` (nonce) and `origin`.
+    *   Reconstructs `clientDataJson` on-chain dynamically based on the current context (`challenge` and `origin`).
     *   Verifies `authenticatorData` flags (User Presence/User Verification).
-    *   Uses `Secp256r1SigVerify` precompile via Sysvar Introspection.
-    *   Uses `Secp256r1SigVerify` precompile via Sysvar Introspection.
-    *   *Abstraction*: Implements the `Authority` trait for unified verification logic.
+    *   Uses `Secp256r1SigVerify` precompile via Sysvar Introspection (`load_current_index_param`).
+    *   *Abstraction*: Implements the `Authority` trait for unified verification logic across both key types.
+
 ## 4. Account Structure (PDAs)
 
 ### Discriminators
@@ -41,8 +42,12 @@ pub enum AccountDiscriminator {
 }
 ```
 
-### A. Authority Account
-Represents a single authorized user.
+### A. Wallet Account
+Anchor for the identity.
+*   **Seeds**: `[b"wallet", user_seed]`
+
+### B. Authority Account
+Represents a single authorized user (Owner, Admin, or Spender). Multi-signature schemas allow deploying multiple Authority PDAs per Wallet.
 *   **Seeds**: `[b"authority", wallet_pubkey, id_hash]`
 *   **Data Structure**:
     ```rust
@@ -56,10 +61,10 @@ Represents a single authorized user.
         pub wallet: Pubkey,
     }
     ```
-    *   **Type 1 (Secp256r1)** adds: `[ u32 padding ] + [ credential_id_hash (32) ] + [ pubkey (64) ]`.
+    *   **Type 1 (Secp256r1)** adds padding to reach 8-byte alignment: `[ u32 padding ] + [ credential_id_hash (32) ] + [ pubkey (64) ]`.
 
-### B. Session Account (Ephemeral)
-Temporary sub-key for automated agents.
+### C. Session Account (Ephemeral)
+Temporary sub-key for automated agents (like a session token).
 *   **Seeds**: `[b"session", wallet_pubkey, session_key]`
 *   **Data Structure**:
     ```rust
@@ -79,37 +84,37 @@ Temporary sub-key for automated agents.
 
 ### `CreateWallet`
 *   Initializes `WalletAccount`, `Vault`, and the first `Authority` (Owner).
-*   Derives `AuthorityPDA` using `role=0`.
+*   Follows the Transfer-Allocate-Assign pattern to prevent pre-funding DoS attacks.
 
 ### `Execute`
 *   **Authentication**:
-    *   **Ed25519**: Runtime signer check.
+    *   **Ed25519**: Standard Instruction Introspection.
     *   **Secp256r1**:
-        1.  Reconstruct `clientDataJson` using `current_slot` (must match signed challenge).
-        2.  Verify `SlotHashes` history to ensure `current_slot` is within 150 blocks of now.
+        1.  Verify `SlotHashes` history to ensure the signed `current_slot` is within 150 blocks of the exact current network slot.
+        2.  Reconstruct `clientDataJson` using that `current_slot`.
         3.  Verify Signature against `sha256(clientDataJson + authData)`.
     *   **Session**:
         1.  Verify `session.wallet == wallet`.
         2.  Verify `current_slot <= session.expires_at`.
-        3.  Verify `session_key` is a signer.
-*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed` with Vault seeds.
+        3.  Verify `session_key` is a valid Ed25519 signer on the transaction.
+*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed` with Vault seeds across all requested target programs.
 
 ### `CreateSession`
 *   **Auth**: Requires `Role::Admin` or `Role::Owner`.
-*   **Expiry**: Sets `expires_at` to a future slot height (u64).
+*   **Action**: Derives the correct Session PDA and sets `expires_at` to a future slot height (u64).
 
 ## 6. Project Structure
-```
+```text
 program/src/
 ├── auth/
-│   ├── ed25519.rs       # Native signer checks
+│   ├── ed25519.rs       # Native signer verification
 │   ├── secp256r1/
-│   │   ├── mod.rs       # Main logic
-│   │   ├── nonce.rs     # SlotHashes validation
-│   │   ├── slothashes.rs# Sysvar parser
-│   │   └── webauthn.rs  # ClientDataJSON utils
-├── processor/           # Instruction handlers
-├── state/               # Account definitions (NoPadding)
-├── utils.rs             # Helper functions (stack_height)
-└── lib.rs               # Entrypoint
+│   │   ├── mod.rs       # Passkey entrypoint
+│   │   ├── nonce.rs     # SlotHashes verification logic
+│   │   ├── slothashes.rs# Sysvar memory-parsing
+│   │   └── webauthn.rs  # ClientDataJSON reconstruction
+├── processor/           # Handlers: create_wallet, manage_authority, etc.
+├── state/               # NoPadding definitions (Wallet, Authority, Session)
+├── utils.rs             # Protections (stack_height, dos_prevention)
+└── lib.rs               # Entrypoint & routing
 ```
