@@ -50,6 +50,8 @@ describe("Contract Data Integrity", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, ownerPubkeyBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -90,6 +92,8 @@ describe("Contract Data Integrity", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, credentialIdHash);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -128,6 +132,8 @@ describe("Contract Data Integrity", () => {
         const [ownerPda, ownerBump] = await findAuthorityPda(walletPda, ownerPubkeyBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -145,6 +151,8 @@ describe("Contract Data Integrity", () => {
         const [authPda1] = await findAuthorityPda(walletPda, credHash1);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerPda,
@@ -162,6 +170,8 @@ describe("Contract Data Integrity", () => {
         const [authPda2] = await findAuthorityPda(walletPda, credHash2);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerPda,

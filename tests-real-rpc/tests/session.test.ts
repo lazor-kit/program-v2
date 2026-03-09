@@ -32,6 +32,8 @@ describe("Instruction: CreateSession", () => {
         [ownerAuthPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -53,6 +55,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
 
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -74,6 +78,8 @@ describe("Instruction: CreateSession", () => {
         const [vaultPda] = await findVaultPda(walletPda);
 
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -85,6 +91,8 @@ describe("Instruction: CreateSession", () => {
 
         const recipient = (await generateKeyPairSigner()).address;
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: sessionPda,
@@ -109,6 +117,8 @@ describe("Instruction: CreateSession", () => {
 
         // Owner adds a Spender
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -126,6 +136,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
 
         const result = await tryProcessInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: spenderPda, // Spender, not Admin/Owner
@@ -145,6 +157,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda1] = await findSessionPda(walletPda, sessionKey1.address);
 
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -160,6 +174,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda2] = await findSessionPda(walletPda, sessionKey2.address);
 
         const result = await tryProcessInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: sessionPda1, // Session PDA, not Authority
@@ -180,6 +196,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
 
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -195,6 +213,8 @@ describe("Instruction: CreateSession", () => {
         const [newUserPda] = await findAuthorityPda(walletPda, newUserBytes);
 
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: sessionPda, // Session PDA, not Authority
@@ -216,6 +236,8 @@ describe("Instruction: CreateSession", () => {
         const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -233,6 +255,8 @@ describe("Instruction: CreateSession", () => {
         const [sessionPda] = await findSessionPda(walletPda, sessionKey.address);
 
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -244,6 +268,8 @@ describe("Instruction: CreateSession", () => {
 
         // Try to use session PDA as adminAuthority to remove spender
         const result = await tryProcessInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: sessionPda,
@@ -263,6 +289,8 @@ describe("Instruction: CreateSession", () => {
         const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -281,6 +309,8 @@ describe("Instruction: CreateSession", () => {
         const expiresAt = 999999999n;
 
         const createSessionIx = client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: secpAdminPda,
@@ -291,10 +321,15 @@ describe("Instruction: CreateSession", () => {
         });
 
         // SDK accounts array is typically frozen, we MUST reassign a new array!
+        // Insert sysvars BEFORE Config/TreasuryShard (last 2 accounts)
+        // because Rust reads Config from accounts[len-2] and TreasuryShard from accounts[len-1]
+        const baseAccounts = (createSessionIx.accounts || []).slice(0, -2);
+        const configAndTreasury = (createSessionIx.accounts || []).slice(-2);
         createSessionIx.accounts = [
-            ...(createSessionIx.accounts || []),
+            ...baseAccounts,
             { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
-            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 }
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
+            ...configAndTreasury,
         ];
 
         // Fetch current slot and slotHash from SysvarS1otHashes
@@ -303,8 +338,8 @@ describe("Instruction: CreateSession", () => {
         const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
         const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
 
-        const sysvarIxIndex = createSessionIx.accounts.length - 2;
-        const sysvarSlotIndex = createSessionIx.accounts.length - 1;
+        const sysvarIxIndex = baseAccounts.length;      // Sysvar1nstructions position
+        const sysvarSlotIndex = baseAccounts.length + 1; // SysvarSlotHashes position
 
         const authenticatorDataRaw = generateAuthenticatorData("example.com");
         const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);

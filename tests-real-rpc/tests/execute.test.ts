@@ -34,6 +34,8 @@ describe("Instruction: Execute", () => {
         [ownerAuthPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -53,6 +55,8 @@ describe("Instruction: Execute", () => {
         const recipient = (await generateKeyPairSigner()).address;
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
@@ -75,6 +79,8 @@ describe("Instruction: Execute", () => {
         const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -89,6 +95,8 @@ describe("Instruction: Execute", () => {
         const recipient = (await generateKeyPairSigner()).address;
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: spenderPda,
@@ -112,6 +120,8 @@ describe("Instruction: Execute", () => {
 
         // Create a valid session (expires in the far future)
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -123,6 +133,8 @@ describe("Instruction: Execute", () => {
 
         const recipient = (await generateKeyPairSigner()).address;
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: sessionPda,
@@ -146,6 +158,8 @@ describe("Instruction: Execute", () => {
         const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -163,6 +177,8 @@ describe("Instruction: Execute", () => {
             getSystemTransferIx(vaultPda, recipient, 2_000_000n)
         ];
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: secpAdminPda,
@@ -257,6 +273,8 @@ describe("Instruction: Execute", () => {
 
         // Create a session that is already expired (expires at slot 0)
         await processInstruction(context, client.createSession({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -268,6 +286,8 @@ describe("Instruction: Execute", () => {
 
         const recipient = (await generateKeyPairSigner()).address;
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: sessionPda,
@@ -288,6 +308,8 @@ describe("Instruction: Execute", () => {
         const recipient = (await generateKeyPairSigner()).address;
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
@@ -315,6 +337,8 @@ describe("Instruction: Execute", () => {
         const [ownerBAuthPda, ownerBBump] = await findAuthorityPda(walletPdaB, ownerBBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,
             vault: vaultPdaB,
@@ -333,6 +357,8 @@ describe("Instruction: Execute", () => {
 
         // Wallet A's owner tries to execute on Wallet B
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,         // Target: Wallet B
             authority: ownerAuthPda,     // Using Wallet A's owner auth
@@ -363,6 +389,8 @@ describe("Instruction: Execute", () => {
         };
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
@@ -384,6 +412,8 @@ describe("Instruction: Execute", () => {
         const recipient3 = (await generateKeyPairSigner()).address;
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
@@ -409,6 +439,8 @@ describe("Instruction: Execute", () => {
 
     it("Success: Execute with empty inner instructions", async () => {
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
@@ -427,6 +459,8 @@ describe("Instruction: Execute", () => {
         const recipient = (await generateKeyPairSigner()).address;
 
         const executeIx = client.buildExecute({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             authority: ownerAuthPda,
