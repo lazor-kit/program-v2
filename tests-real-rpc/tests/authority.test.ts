@@ -33,6 +33,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         [ownerAuthPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -51,6 +53,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [newAdminPda] = await findAuthorityPda(walletPda, newAdminBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -73,6 +77,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda, // Using owner to add admin for next step
@@ -95,6 +101,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [newAdminPda] = await findAuthorityPda(walletPda, credentialIdHash);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -116,6 +124,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const adminBytes = Uint8Array.from(getAddressEncoder().encode(admin.address));
         const [adminPda] = await findAuthorityPda(walletPda, adminBytes);
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -132,6 +142,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [anotherAdminPda] = await findAuthorityPda(walletPda, anotherAdminBytes);
 
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: adminPda,
@@ -151,6 +163,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const adminBytes = Uint8Array.from(getAddressEncoder().encode(admin.address));
         const [adminPda] = await findAuthorityPda(walletPda, adminBytes);
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -166,6 +180,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const spenderBytes = Uint8Array.from(getAddressEncoder().encode(spender.address));
         const [spenderPda] = await findAuthorityPda(walletPda, spenderBytes);
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -179,6 +195,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Admin removes Spender
         await processInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: adminPda,
@@ -201,6 +219,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [s2Pda] = await findAuthorityPda(walletPda, s2Bytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -213,6 +233,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         }), [owner]);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -225,6 +247,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         }), [owner]);
 
         const result = await tryProcessInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: s1Pda,
@@ -243,6 +267,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [secpAdminPda] = await findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -260,6 +286,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [victimPda] = await findAuthorityPda(walletPda, victimBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -273,6 +301,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Secp256r1 Admin removes the victim
         const removeAuthIx = client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: secpAdminPda,
@@ -281,10 +311,15 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         });
 
         // SDK doesn't automatically fetch Sysvar Instructions or SlotHashes for removeAuthority, we must add them for Secp256r1
+        // Insert sysvars BEFORE Config/TreasuryShard (last 2 accounts)
+        // because Rust reads Config from accounts[len-2] and TreasuryShard from accounts[len-1]
+        const baseAccounts = (removeAuthIx.accounts || []).slice(0, -2);
+        const configAndTreasury = (removeAuthIx.accounts || []).slice(-2);
         removeAuthIx.accounts = [
-            ...(removeAuthIx.accounts || []),
+            ...baseAccounts,
             { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
-            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 }
+            { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
+            ...configAndTreasury,
         ];
 
         // Fetch current slot and slotHash from SysvarS1otHashes
@@ -295,8 +330,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const currentSlotHash = new Uint8Array(rawData.buffer, rawData.byteOffset + 16, 32);
 
         // SYSVAR Indexes
-        const sysvarIxIndex = removeAuthIx.accounts.length - 2;
-        const sysvarSlotIndex = removeAuthIx.accounts.length - 1;
+        const sysvarIxIndex = baseAccounts.length;      // Sysvar1nstructions position
+        const sysvarSlotIndex = baseAccounts.length + 1; // SysvarSlotHashes position
 
         const { buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
         const authenticatorDataRaw = generateAuthenticatorData("example.com");
@@ -348,6 +383,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [newAuthPda] = await findAuthorityPda(walletPda, credentialIdHash);
 
         const ix = client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -378,6 +415,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Owner adds a Spender
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -395,6 +434,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [victimPda] = await findAuthorityPda(walletPda, victimBytes);
 
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: spenderPda,
@@ -416,6 +457,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Owner adds an Admin
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -429,6 +472,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Admin tries to remove Owner → should fail
         const result = await tryProcessInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: adminPda,
@@ -452,6 +497,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [ownerBAuthPda, ownerBBump] = await findAuthorityPda(walletPdaB, ownerBBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,
             vault: vaultPdaB,
@@ -469,6 +516,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [victimPda] = await findAuthorityPda(walletPdaB, victimBytes);
 
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,         // Target: Wallet B
             adminAuthority: ownerAuthPda, // Using Wallet A's owner
@@ -493,6 +542,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [ownerBAuthPda, ownerBBump] = await findAuthorityPda(walletPdaB, ownerBBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,
             vault: vaultPdaB,
@@ -510,6 +561,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [spenderBPda] = await findAuthorityPda(walletPdaB, spenderBBytes);
 
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,
             adminAuthority: ownerBAuthPda,
@@ -523,6 +576,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Wallet A's owner tries to remove Wallet B's spender
         const result = await tryProcessInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPdaB,            // Target: Wallet B
             adminAuthority: ownerAuthPda,   // Using Wallet A's owner
@@ -543,6 +598,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // First add — should succeed
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -556,6 +613,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Second add with same pubkey — should fail (AccountAlreadyInitialized)
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -582,6 +641,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const [oPda, oBump] = await findAuthorityPda(wPda, oBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: oPda,
             userSeed, authType: 0, authBump: oBump,
@@ -590,6 +651,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
 
         // Owner removes itself
         await processInstruction(context, client.removeAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda,
             adminAuthority: oPda,

@@ -34,6 +34,8 @@ export interface TestContext {
     rpc: any;
     rpcSubscriptions: any;
     payer: TransactionSigner;
+    configPda: Address;
+    treasuryShard: Address;
 }
 
 export async function setupTest(): Promise<{ context: TestContext, client: LazorClient }> {
@@ -78,8 +80,68 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
 
     const client = new LazorClient(rpc);
 
+    // Compute Config and Treasury Shard PDAs
+    const { findConfigPda, findTreasuryShardPda } = await import("../../sdk/lazorkit-ts/src/utils/pdas");
+    const { getAddressEncoder } = await import("@solana/kit");
+
+    const [configPda] = await findConfigPda();
+    const pubkeyBytes = getAddressEncoder().encode(payer.address);
+    const sum = pubkeyBytes.reduce((a, b) => a + b, 0);
+    const shardId = sum % 16;
+    const [treasuryShard] = await findTreasuryShardPda(shardId);
+
+    // Initialize Config if not exists
+    try {
+        await rpc.getAccountInfo(configPda, { commitment: "confirmed" }).send();
+        // If it throws or returns null (Solana.js might return null), it means not initialized
+        const accInfo = await rpc.getAccountInfo(configPda, { commitment: "confirmed" }).send();
+        if (!accInfo || !accInfo.value) throw new Error("Not initialized");
+    } catch {
+        console.log("Initializing Global Config and Treasury Shard...");
+        const { getInitializeConfigInstruction, getInitTreasuryShardInstruction } = await import("../../sdk/lazorkit-ts/src");
+
+        const initConfigIx = getInitializeConfigInstruction({
+            admin: payer,
+            config: configPda,
+            systemProgram: "11111111111111111111111111111111" as Address,
+            rent: "SysvarRent111111111111111111111111111111111" as Address,
+            walletFee: 10000n, // 0.00001 SOL
+            actionFee: 1000n,  // 0.000001 SOL
+            numShards: 16
+        });
+
+        const initShardIx = getInitTreasuryShardInstruction({
+            payer: payer,
+            config: configPda,
+            treasuryShard: treasuryShard,
+            systemProgram: "11111111111111111111111111111111" as Address,
+            rent: "SysvarRent111111111111111111111111111111111" as Address,
+            shardId,
+        });
+
+        await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initConfigIx, initShardIx], [payer]);
+    }
+
+    // Initialize Treasury Shard if not exists (in case config existed but not this shard)
+    try {
+        const accInfo = await rpc.getAccountInfo(treasuryShard, { commitment: "confirmed" }).send();
+        if (!accInfo || !accInfo.value) throw new Error("Not initialized");
+    } catch {
+        console.log(`Initializing Treasury Shard ${shardId}...`);
+        const { getInitTreasuryShardInstruction } = await import("../../sdk/lazorkit-ts/src");
+        const initShardIx = getInitTreasuryShardInstruction({
+            payer: payer,
+            config: configPda,
+            treasuryShard: treasuryShard,
+            systemProgram: "11111111111111111111111111111111" as Address,
+            rent: "SysvarRent111111111111111111111111111111111" as Address,
+            shardId,
+        });
+        await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initShardIx], [payer]);
+    }
+
     return {
-        context: { rpc, rpcSubscriptions, payer },
+        context: { rpc, rpcSubscriptions, payer, configPda, treasuryShard },
         client
     };
 }

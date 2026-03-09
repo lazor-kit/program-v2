@@ -70,6 +70,8 @@ describe("Real RPC Integration Suite", () => {
         const authBump = (await findAuthorityPda(walletPda, credentialIdHash))[1];
 
         const ix = client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,

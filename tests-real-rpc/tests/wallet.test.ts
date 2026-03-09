@@ -34,6 +34,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -62,6 +64,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, credentialIdHash);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -89,6 +93,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -114,6 +120,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [authPda, authBump] = await findAuthorityPda(walletPda, credIdHash);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -141,6 +149,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [currentAuthPda, currentBump] = await findAuthorityPda(walletPda, currentOwnerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -157,6 +167,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [newAuthPda] = await findAuthorityPda(walletPda, newOwnerBytes);
 
         await processInstruction(context, client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             currentOwnerAuthority: currentAuthPda,
@@ -180,6 +192,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [ownerAuthPda, bump] = await findAuthorityPda(walletPda, ownerBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -196,6 +210,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const adminBytes = Uint8Array.from(getAddressEncoder().encode(admin.address));
         const [adminPda] = await findAuthorityPda(walletPda, adminBytes);
         await processInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             adminAuthority: ownerAuthPda,
@@ -209,6 +225,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
 
         // Admin tries to transfer
         const result = await tryProcessInstruction(context, client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             currentOwnerAuthority: adminPda,
@@ -234,6 +252,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
 
         // First creation — should succeed
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: aPda,
             userSeed, authType: 0, authBump: aBump,
@@ -246,6 +266,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [a2Pda, a2Bump] = await findAuthorityPda(wPda, o2Bytes);
 
         const result = await tryProcessInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: a2Pda,
             userSeed, authType: 0, authBump: a2Bump,
@@ -266,6 +288,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [aPda, aBump] = await findAuthorityPda(wPda, oBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: aPda,
             userSeed, authType: 0, authBump: aBump,
@@ -277,6 +301,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [zeroPda] = await findAuthorityPda(wPda, zeroPubkey);
 
         const result = await tryProcessInstruction(context, client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda,
             currentOwnerAuthority: aPda,
@@ -301,6 +327,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [oldPda, oldBump] = await findAuthorityPda(wPda, oldBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: oldPda,
             userSeed, authType: 0, authBump: oldBump,
@@ -312,6 +340,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [newPda] = await findAuthorityPda(wPda, newBytes);
 
         await processInstruction(context, client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda,
             currentOwnerAuthority: oldPda,
@@ -340,6 +370,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [oldPda, oldBump] = await findAuthorityPda(wPda, oldBytes);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda, vault: vPda, authority: oldPda,
             userSeed, authType: 0, authBump: oldBump,
@@ -351,6 +383,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [newPda] = await findAuthorityPda(wPda, newBytes);
 
         await processInstruction(context, client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda,
             currentOwnerAuthority: oldPda,
@@ -367,6 +401,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [victimPda] = await findAuthorityPda(wPda, victimBytes);
 
         const result = await tryProcessInstruction(context, client.addAuthority({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: wPda,
             adminAuthority: oldPda,
@@ -394,6 +430,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const [secpOwnerPda, ownerBump] = await findAuthorityPda(walletPda, secpOwner.credentialIdHash);
 
         await processInstruction(context, client.createWallet({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             vault: vaultPda,
@@ -412,6 +450,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
 
         // 3. Perform Transfer
         const transferIx = client.transferOwnership({
+            config: context.configPda,
+            treasuryShard: context.treasuryShard,
             payer: context.payer,
             wallet: walletPda,
             currentOwnerAuthority: secpOwnerPda,
@@ -423,11 +463,16 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         });
 
         // SDK accounts array is typically frozen, we MUST reassign a new array!
+        // Insert sysvars BEFORE Config/TreasuryShard (last 2 accounts)
+        // because Rust reads Config from accounts[len-2] and TreasuryShard from accounts[len-1]
+        const baseAccounts = (transferIx.accounts || []).slice(0, -2);
+        const configAndTreasury = (transferIx.accounts || []).slice(-2);
         transferIx.accounts = [
-            ...(transferIx.accounts || []),
+            ...baseAccounts,
             { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
             { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
-            { address: "SysvarRent111111111111111111111111111111111" as any, role: 0 }
+            { address: "SysvarRent111111111111111111111111111111111" as any, role: 0 },
+            ...configAndTreasury,
         ];
 
         // Fetch current slot and slotHash from SysvarS1otHashes
@@ -436,8 +481,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
         const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
 
-        const sysvarIxIndex = transferIx.accounts.length - 3; // instructions
-        const sysvarSlotIndex = transferIx.accounts.length - 2; // slothashes
+        const sysvarIxIndex = baseAccounts.length;      // Sysvar1nstructions position
+        const sysvarSlotIndex = baseAccounts.length + 1; // SysvarSlotHashes position
 
         const authenticatorDataRaw = generateAuthenticatorData("example.com");
         const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
