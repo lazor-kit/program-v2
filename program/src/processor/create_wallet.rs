@@ -117,8 +117,38 @@ pub fn process(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
+    let config_pda = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+
     // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
     let rent = Rent::from_account_info(rent_sysvar)?;
+
+    // Parse and validate Config PDA
+    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
+    if !sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let config_data = unsafe { config_pda.borrow_data_unchecked() };
+    if config_data.len() < std::mem::size_of::<crate::state::config::ConfigAccount>() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    let config_account = unsafe {
+        std::ptr::read_unaligned(config_data.as_ptr() as *const crate::state::config::ConfigAccount)
+    };
+
+    // Collect protocol fee
+    crate::utils::collect_protocol_fee(
+        program_id,
+        payer,
+        &config_account,
+        treasury_shard,
+        system_program,
+        true, // is_wallet_creation = true
+    )?;
 
     let (wallet_key, wallet_bump) = find_program_address(&[b"wallet", &args.user_seed], program_id);
     if !sol_assert_bytes_eq(wallet_pda.key().as_ref(), wallet_key.as_ref(), 32) {

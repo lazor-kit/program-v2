@@ -53,9 +53,38 @@ pub fn process(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    // Remaining accounts are for inner instructions
-    let inner_accounts_start = 4;
-    let _inner_accounts = &accounts[inner_accounts_start..];
+    let len = accounts.len();
+    if len < 7 {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+    // As per IDL, Config is at 4, Treasury at 5, SystemProgram at 6, optional Sysvar at 7
+
+    // Let's get config and treasury from fixed indices 4 and 5
+    let config_pda = accounts.get(4).ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = accounts.get(5).ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let system_program = accounts.get(6).ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    // Parse Config and Charge Fee early
+    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
+    if !assertions::sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let config_data = unsafe { config_pda.borrow_data_unchecked() };
+    if config_data.len() < std::mem::size_of::<crate::state::config::ConfigAccount>() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    let config_account = unsafe {
+        std::ptr::read_unaligned(config_data.as_ptr() as *const crate::state::config::ConfigAccount)
+    };
+
+    crate::utils::collect_protocol_fee(
+        program_id,
+        _payer,
+        &config_account,
+        treasury_shard,
+        system_program,
+        false, // is_wallet_creation = false
+    )?;
 
     // Verify ownership
     if wallet_pda.owner() != program_id || authority_pda.owner() != program_id {
@@ -134,7 +163,7 @@ pub fn process(
                         authority_data,
                         authority_payload,
                         &extended_payload,
-                        &[4],
+                        &[4], // Execute instruction discriminator
                     )?;
                 },
                 _ => return Err(AuthError::InvalidAuthenticationKind.into()),

@@ -296,6 +296,39 @@ pub fn process_remove_authority(
     let refund_dest = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let system_program = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    let len = accounts.len();
+    if len < 8 {
+        // 5 original + system_program + config + treasury_shard
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+    let config_pda = &accounts[len - 2];
+    let treasury_shard = &accounts[len - 1];
+
+    // Read config
+    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
+    if !assertions::sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let config_data = unsafe { config_pda.borrow_data_unchecked() };
+    if config_data.len() < std::mem::size_of::<crate::state::config::ConfigAccount>() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    let config = unsafe {
+        std::ptr::read_unaligned(config_data.as_ptr() as *const crate::state::config::ConfigAccount)
+    };
+
+    crate::utils::collect_protocol_fee(
+        program_id,
+        _payer,
+        &config,
+        treasury_shard,
+        system_program,
+        false, // not a wallet creation
+    )?;
 
     if wallet_pda.owner() != program_id
         || admin_auth_pda.owner() != program_id
