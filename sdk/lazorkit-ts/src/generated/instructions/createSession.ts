@@ -53,6 +53,8 @@ export type CreateSessionInstruction<
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
+  TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -78,6 +80,12 @@ export type CreateSessionInstruction<
         ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
             AccountSignerMeta<TAccountAuthorizerSigner>
         : TAccountAuthorizerSigner,
+      TAccountConfig extends string
+        ? ReadonlyAccount<TAccountConfig>
+        : TAccountConfig,
+      TAccountTreasuryShard extends string
+        ? WritableAccount<TAccountTreasuryShard>
+        : TAccountTreasuryShard,
       ...TRemainingAccounts,
     ]
   >;
@@ -129,6 +137,8 @@ export type CreateSessionInput<
   TAccountSession extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountAuthorizerSigner extends string = string,
+  TAccountConfig extends string = string,
+  TAccountTreasuryShard extends string = string,
 > = {
   /** Transaction payer and rent contributor */
   payer: TransactionSigner<TAccountPayer>;
@@ -142,6 +152,10 @@ export type CreateSessionInput<
   systemProgram?: Address<TAccountSystemProgram>;
   /** Optional signer for Ed25519 authentication */
   authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
+  /** Config PDA */
+  config: Address<TAccountConfig>;
+  /** Treasury Shard PDA */
+  treasuryShard: Address<TAccountTreasuryShard>;
   sessionKey: CreateSessionInstructionDataArgs["sessionKey"];
   expiresAt: CreateSessionInstructionDataArgs["expiresAt"];
 };
@@ -153,6 +167,8 @@ export function getCreateSessionInstruction<
   TAccountSession extends string,
   TAccountSystemProgram extends string,
   TAccountAuthorizerSigner extends string,
+  TAccountConfig extends string,
+  TAccountTreasuryShard extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: CreateSessionInput<
@@ -161,7 +177,9 @@ export function getCreateSessionInstruction<
     TAccountAdminAuthority,
     TAccountSession,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner
+    TAccountAuthorizerSigner,
+    TAccountConfig,
+    TAccountTreasuryShard
   >,
   config?: { programAddress?: TProgramAddress },
 ): CreateSessionInstruction<
@@ -171,7 +189,9 @@ export function getCreateSessionInstruction<
   TAccountAdminAuthority,
   TAccountSession,
   TAccountSystemProgram,
-  TAccountAuthorizerSigner
+  TAccountAuthorizerSigner,
+  TAccountConfig,
+  TAccountTreasuryShard
 > {
   // Program address.
   const programAddress =
@@ -188,6 +208,8 @@ export function getCreateSessionInstruction<
       value: input.authorizerSigner ?? null,
       isWritable: false,
     },
+    config: { value: input.config ?? null, isWritable: false },
+    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -212,6 +234,8 @@ export function getCreateSessionInstruction<
       getAccountMeta(accounts.session),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.authorizerSigner),
+      getAccountMeta(accounts.config),
+      getAccountMeta(accounts.treasuryShard),
     ],
     data: getCreateSessionInstructionDataEncoder().encode(
       args as CreateSessionInstructionDataArgs,
@@ -224,7 +248,9 @@ export function getCreateSessionInstruction<
     TAccountAdminAuthority,
     TAccountSession,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner
+    TAccountAuthorizerSigner,
+    TAccountConfig,
+    TAccountTreasuryShard
   >);
 }
 
@@ -246,6 +272,10 @@ export type ParsedCreateSessionInstruction<
     systemProgram: TAccountMetas[4];
     /** Optional signer for Ed25519 authentication */
     authorizerSigner?: TAccountMetas[5] | undefined;
+    /** Config PDA */
+    config: TAccountMetas[6];
+    /** Treasury Shard PDA */
+    treasuryShard: TAccountMetas[7];
   };
   data: CreateSessionInstructionData;
 };
@@ -258,7 +288,7 @@ export function parseCreateSessionInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateSessionInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 8) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -283,6 +313,8 @@ export function parseCreateSessionInstruction<
       session: getNextAccount(),
       systemProgram: getNextAccount(),
       authorizerSigner: getNextOptionalAccount(),
+      config: getNextAccount(),
+      treasuryShard: getNextAccount(),
     },
     data: getCreateSessionInstructionDataDecoder().decode(instruction.data),
   };

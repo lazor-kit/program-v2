@@ -7,8 +7,14 @@
  */
 
 export * from "./addAuthority";
+export * from "./closeSession";
+export * from "./closeWallet";
 export * from "./createSession";
 export * from "./createWallet";
 export * from "./execute";
+export * from "./initializeConfig";
+export * from "./initTreasuryShard";
 export * from "./removeAuthority";
+export * from "./sweepTreasury";
 export * from "./transferOwnership";
+export * from "./updateConfig";

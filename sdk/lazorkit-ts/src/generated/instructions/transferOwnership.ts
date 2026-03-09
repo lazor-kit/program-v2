@@ -53,6 +53,8 @@ export type TransferOwnershipInstruction<
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
+  TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -78,6 +80,12 @@ export type TransferOwnershipInstruction<
         ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
             AccountSignerMeta<TAccountAuthorizerSigner>
         : TAccountAuthorizerSigner,
+      TAccountConfig extends string
+        ? ReadonlyAccount<TAccountConfig>
+        : TAccountConfig,
+      TAccountTreasuryShard extends string
+        ? WritableAccount<TAccountTreasuryShard>
+        : TAccountTreasuryShard,
       ...TRemainingAccounts,
     ]
   >;
@@ -129,6 +137,8 @@ export type TransferOwnershipInput<
   TAccountNewOwnerAuthority extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountAuthorizerSigner extends string = string,
+  TAccountConfig extends string = string,
+  TAccountTreasuryShard extends string = string,
 > = {
   /** Transaction payer */
   payer: TransactionSigner<TAccountPayer>;
@@ -142,6 +152,10 @@ export type TransferOwnershipInput<
   systemProgram?: Address<TAccountSystemProgram>;
   /** Optional signer for Ed25519 authentication */
   authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
+  /** Config PDA */
+  config: Address<TAccountConfig>;
+  /** Treasury Shard PDA */
+  treasuryShard: Address<TAccountTreasuryShard>;
   newType: TransferOwnershipInstructionDataArgs["newType"];
   payload: TransferOwnershipInstructionDataArgs["payload"];
 };
@@ -153,6 +167,8 @@ export function getTransferOwnershipInstruction<
   TAccountNewOwnerAuthority extends string,
   TAccountSystemProgram extends string,
   TAccountAuthorizerSigner extends string,
+  TAccountConfig extends string,
+  TAccountTreasuryShard extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: TransferOwnershipInput<
@@ -161,7 +177,9 @@ export function getTransferOwnershipInstruction<
     TAccountCurrentOwnerAuthority,
     TAccountNewOwnerAuthority,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner
+    TAccountAuthorizerSigner,
+    TAccountConfig,
+    TAccountTreasuryShard
   >,
   config?: { programAddress?: TProgramAddress },
 ): TransferOwnershipInstruction<
@@ -171,7 +189,9 @@ export function getTransferOwnershipInstruction<
   TAccountCurrentOwnerAuthority,
   TAccountNewOwnerAuthority,
   TAccountSystemProgram,
-  TAccountAuthorizerSigner
+  TAccountAuthorizerSigner,
+  TAccountConfig,
+  TAccountTreasuryShard
 > {
   // Program address.
   const programAddress =
@@ -194,6 +214,8 @@ export function getTransferOwnershipInstruction<
       value: input.authorizerSigner ?? null,
       isWritable: false,
     },
+    config: { value: input.config ?? null, isWritable: false },
+    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -218,6 +240,8 @@ export function getTransferOwnershipInstruction<
       getAccountMeta(accounts.newOwnerAuthority),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.authorizerSigner),
+      getAccountMeta(accounts.config),
+      getAccountMeta(accounts.treasuryShard),
     ],
     data: getTransferOwnershipInstructionDataEncoder().encode(
       args as TransferOwnershipInstructionDataArgs,
@@ -230,7 +254,9 @@ export function getTransferOwnershipInstruction<
     TAccountCurrentOwnerAuthority,
     TAccountNewOwnerAuthority,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner
+    TAccountAuthorizerSigner,
+    TAccountConfig,
+    TAccountTreasuryShard
   >);
 }
 
@@ -252,6 +278,10 @@ export type ParsedTransferOwnershipInstruction<
     systemProgram: TAccountMetas[4];
     /** Optional signer for Ed25519 authentication */
     authorizerSigner?: TAccountMetas[5] | undefined;
+    /** Config PDA */
+    config: TAccountMetas[6];
+    /** Treasury Shard PDA */
+    treasuryShard: TAccountMetas[7];
   };
   data: TransferOwnershipInstructionData;
 };
@@ -264,7 +294,7 @@ export function parseTransferOwnershipInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTransferOwnershipInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 8) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -289,6 +319,8 @@ export function parseTransferOwnershipInstruction<
       newOwnerAuthority: getNextAccount(),
       systemProgram: getNextAccount(),
       authorizerSigner: getNextOptionalAccount(),
+      config: getNextAccount(),
+      treasuryShard: getNextAccount(),
     },
     data: getTransferOwnershipInstructionDataDecoder().decode(instruction.data),
   };

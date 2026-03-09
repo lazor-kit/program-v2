@@ -69,3 +69,28 @@ export async function findSessionPda(
         seeds: ["session", encoder.encode(wallet), encoder.encode(sessionKey)],
     });
 }
+
+/**
+ * Derives the Config PDA.
+ * Seeds: ["config"]
+ */
+export async function findConfigPda(): Promise<ProgramDerivedAddress> {
+    return await getProgramDerivedAddress({
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["config"],
+    });
+}
+
+/**
+ * Derives a Treasury Shard PDA.
+ * Seeds: ["treasury", shard_id]
+ */
+export async function findTreasuryShardPda(
+    shardId: number
+): Promise<ProgramDerivedAddress> {
+    return await getProgramDerivedAddress({
+        programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+        seeds: ["treasury", new Uint8Array([shardId])],
+    });
+}
+

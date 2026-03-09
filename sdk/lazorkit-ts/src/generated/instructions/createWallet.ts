@@ -53,6 +53,10 @@ export type CreateWalletInstruction<
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
+  TAccountRent extends string | AccountMeta<string> =
+    "SysvarRent111111111111111111111111111111111",
+  TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -74,6 +78,15 @@ export type CreateWalletInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
+      TAccountRent extends string
+        ? ReadonlyAccount<TAccountRent>
+        : TAccountRent,
+      TAccountConfig extends string
+        ? ReadonlyAccount<TAccountConfig>
+        : TAccountConfig,
+      TAccountTreasuryShard extends string
+        ? WritableAccount<TAccountTreasuryShard>
+        : TAccountTreasuryShard,
       ...TRemainingAccounts,
     ]
   >;
@@ -136,6 +149,9 @@ export type CreateWalletInput<
   TAccountVault extends string = string,
   TAccountAuthority extends string = string,
   TAccountSystemProgram extends string = string,
+  TAccountRent extends string = string,
+  TAccountConfig extends string = string,
+  TAccountTreasuryShard extends string = string,
 > = {
   /** Payer and rent contributor */
   payer: TransactionSigner<TAccountPayer>;
@@ -147,6 +163,12 @@ export type CreateWalletInput<
   authority: Address<TAccountAuthority>;
   /** System Program */
   systemProgram?: Address<TAccountSystemProgram>;
+  /** Rent Sysvar */
+  rent?: Address<TAccountRent>;
+  /** Config PDA */
+  config: Address<TAccountConfig>;
+  /** Treasury Shard PDA */
+  treasuryShard: Address<TAccountTreasuryShard>;
   userSeed: CreateWalletInstructionDataArgs["userSeed"];
   authType: CreateWalletInstructionDataArgs["authType"];
   authBump: CreateWalletInstructionDataArgs["authBump"];
@@ -160,6 +182,9 @@ export function getCreateWalletInstruction<
   TAccountVault extends string,
   TAccountAuthority extends string,
   TAccountSystemProgram extends string,
+  TAccountRent extends string,
+  TAccountConfig extends string,
+  TAccountTreasuryShard extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: CreateWalletInput<
@@ -167,7 +192,10 @@ export function getCreateWalletInstruction<
     TAccountWallet,
     TAccountVault,
     TAccountAuthority,
-    TAccountSystemProgram
+    TAccountSystemProgram,
+    TAccountRent,
+    TAccountConfig,
+    TAccountTreasuryShard
   >,
   config?: { programAddress?: TProgramAddress },
 ): CreateWalletInstruction<
@@ -176,7 +204,10 @@ export function getCreateWalletInstruction<
   TAccountWallet,
   TAccountVault,
   TAccountAuthority,
-  TAccountSystemProgram
+  TAccountSystemProgram,
+  TAccountRent,
+  TAccountConfig,
+  TAccountTreasuryShard
 > {
   // Program address.
   const programAddress =
@@ -189,6 +220,9 @@ export function getCreateWalletInstruction<
     vault: { value: input.vault ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    rent: { value: input.rent ?? null, isWritable: false },
+    config: { value: input.config ?? null, isWritable: false },
+    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -203,6 +237,10 @@ export function getCreateWalletInstruction<
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
+  if (!accounts.rent.value) {
+    accounts.rent.value =
+      "SysvarRent111111111111111111111111111111111" as Address<"SysvarRent111111111111111111111111111111111">;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -212,6 +250,9 @@ export function getCreateWalletInstruction<
       getAccountMeta(accounts.vault),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.systemProgram),
+      getAccountMeta(accounts.rent),
+      getAccountMeta(accounts.config),
+      getAccountMeta(accounts.treasuryShard),
     ],
     data: getCreateWalletInstructionDataEncoder().encode(
       args as CreateWalletInstructionDataArgs,
@@ -223,7 +264,10 @@ export function getCreateWalletInstruction<
     TAccountWallet,
     TAccountVault,
     TAccountAuthority,
-    TAccountSystemProgram
+    TAccountSystemProgram,
+    TAccountRent,
+    TAccountConfig,
+    TAccountTreasuryShard
   >);
 }
 
@@ -243,6 +287,12 @@ export type ParsedCreateWalletInstruction<
     authority: TAccountMetas[3];
     /** System Program */
     systemProgram: TAccountMetas[4];
+    /** Rent Sysvar */
+    rent: TAccountMetas[5];
+    /** Config PDA */
+    config: TAccountMetas[6];
+    /** Treasury Shard PDA */
+    treasuryShard: TAccountMetas[7];
   };
   data: CreateWalletInstructionData;
 };
@@ -255,7 +305,7 @@ export function parseCreateWalletInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateWalletInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 8) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -273,6 +323,9 @@ export function parseCreateWalletInstruction<
       vault: getNextAccount(),
       authority: getNextAccount(),
       systemProgram: getNextAccount(),
+      rent: getNextAccount(),
+      config: getNextAccount(),
+      treasuryShard: getNextAccount(),
     },
     data: getCreateWalletInstructionDataDecoder().decode(instruction.data),
   };
