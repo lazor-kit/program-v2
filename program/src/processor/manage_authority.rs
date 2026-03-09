@@ -5,7 +5,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
-    sysvars::rent::Rent,
+    sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 
@@ -122,6 +122,34 @@ pub fn process_add_authority(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
+    let len = accounts.len();
+    if len < 7 {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+    let config_pda = &accounts[len - 2];
+    let treasury_shard = &accounts[len - 1];
+
+    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
+    if !sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let config_data = unsafe { config_pda.borrow_data_unchecked() };
+    if config_data.len() < std::mem::size_of::<crate::state::config::ConfigAccount>() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    let config = unsafe {
+        std::ptr::read_unaligned(config_data.as_ptr() as *const crate::state::config::ConfigAccount)
+    };
+
+    crate::utils::collect_protocol_fee(
+        program_id,
+        payer,
+        &config,
+        treasury_shard,
+        system_program,
+        false,
+    )?;
+
     if wallet_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
     }
@@ -134,10 +162,7 @@ pub fn process_add_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let rent_sysvar_info = account_info_iter
-        .next()
-        .ok_or(ProgramError::NotEnoughAccountKeys)?;
-    let rent = Rent::from_account_info(rent_sysvar_info)?;
+    let rent = Rent::get()?;
 
     // Check removed here, moved to type-specific logic
     // if !admin_auth_pda.is_writable() {
