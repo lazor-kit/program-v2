@@ -114,17 +114,6 @@ pub fn process(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // 2. Read Config PDA to verify contract admin
-    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
-    if !sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
-        return Err(ProgramError::InvalidSeeds);
-    }
-    let config_data = unsafe { config_pda.borrow_data_unchecked() };
-    if config_data.len() < std::mem::size_of::<ConfigAccount>() {
-        return Err(ProgramError::UninitializedAccount);
-    }
-    let config = unsafe { std::ptr::read_unaligned(config_data.as_ptr() as *const ConfigAccount) };
-
     // 3. Check expiration
     let current_slot = Clock::get()?.slot;
     let is_expired = current_slot > session.expires_at;

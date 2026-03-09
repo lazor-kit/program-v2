@@ -62,8 +62,8 @@ pub fn process(
 
     // 1. Validate Wallet PDA
     let len = accounts.len();
-    if len < 10 {
-        // 5 fixed + up to 2 optional + config + treasury + sys prog
+    if len < 8 {
+        // 5 fixed + Config + Treasury + SystemProgram = 8 minimum
         return Err(ProgramError::NotEnoughAccountKeys);
     }
     let config_pda = &accounts[len - 3];
