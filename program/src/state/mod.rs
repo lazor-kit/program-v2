@@ -1,4 +1,5 @@
 pub mod authority;
+pub mod config;
 pub mod session;
 pub mod wallet;
 
@@ -11,6 +12,8 @@ pub enum AccountDiscriminator {
     Authority = 2,
     /// A Session account (Ephemeral Spender).
     Session = 3,
+    /// The global Config account.
+    Config = 4,
 }
 
 /// Helper constant for versioning.
