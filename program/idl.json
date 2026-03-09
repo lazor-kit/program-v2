@@ -44,6 +44,30 @@
           "docs": [
             "System Program"
           ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
         }
       ],
       "args": [
@@ -130,6 +154,22 @@
           "docs": [
             "Optional signer for Ed25519 authentication"
           ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
         }
       ],
       "args": [
@@ -209,12 +249,36 @@
           ]
         },
         {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
           "name": "authorizerSigner",
           "isMut": false,
           "isSigner": true,
           "isOptional": true,
           "docs": [
             "Optional signer for Ed25519 authentication"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
           ]
         }
       ],
@@ -274,6 +338,22 @@
           "isOptional": true,
           "docs": [
             "Optional signer for Ed25519 authentication"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
           ]
         }
       ],
@@ -339,6 +419,30 @@
           "isSigner": false,
           "docs": [
             "Vault PDA"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
           ]
         },
         {
@@ -413,6 +517,22 @@
           "docs": [
             "Optional signer for Ed25519 authentication"
           ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
         }
       ],
       "args": [
@@ -433,6 +553,366 @@
       "discriminant": {
         "type": "u8",
         "value": 5
+      }
+    },
+    {
+      "name": "InitializeConfig",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Initial contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "walletFee",
+          "type": "u64"
+        },
+        {
+          "name": "actionFee",
+          "type": "u64"
+        },
+        {
+          "name": "numShards",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 6
+      }
+    },
+    {
+      "name": "UpdateConfig",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Current contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 7
+      }
+    },
+    {
+      "name": "CloseSession",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Receives rent refund"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Session's parent wallet"
+          ]
+        },
+        {
+          "name": "session",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Target session"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA for contract admin check"
+          ]
+        },
+        {
+          "name": "authorizer",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Wallet authority PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Ed25519 signer"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Secp256r1 sysvar"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 8
+      }
+    },
+    {
+      "name": "CloseWallet",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Pays tx fee"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA to close"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Vault PDA to drain"
+          ]
+        },
+        {
+          "name": "ownerAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Owner Authority PDA"
+          ]
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Receives all drained SOL"
+          ]
+        },
+        {
+          "name": "ownerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Ed25519 signer"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Secp256r1 sysvar"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 9
+      }
+    },
+    {
+      "name": "SweepTreasury",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Receives swept funds"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "shardId",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 10
+      }
+    },
+    {
+      "name": "InitTreasuryShard",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Pays for rent exemption"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "shardId",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 11
       }
     }
   ],
