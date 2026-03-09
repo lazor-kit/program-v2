@@ -17,6 +17,9 @@ pub enum ProgramIx {
     #[account(2, writable, name = "vault", desc = "Vault PDA")]
     #[account(3, writable, name = "authority", desc = "Initial owner authority PDA")]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent", desc = "Rent Sysvar")]
+    #[account(6, name = "config", desc = "Config PDA")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     CreateWallet {
         user_seed: Vec<u8>,
         auth_type: u8,
@@ -47,6 +50,8 @@ pub enum ProgramIx {
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
+    #[account(6, name = "config", desc = "Config PDA")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     AddAuthority {
         new_type: u8,
         new_pubkey: [u8; 33],
@@ -75,13 +80,16 @@ pub enum ProgramIx {
         name = "refund_destination",
         desc = "Account to receive rent refund"
     )]
+    #[account(5, name = "system_program", desc = "System Program")]
     #[account(
-        5,
+        6,
         signer,
         optional,
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
+    #[account(7, name = "config", desc = "Config PDA")]
+    #[account(8, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     RemoveAuthority,
 
     /// Transfer ownership (atomic swap of Owner role)
@@ -107,6 +115,8 @@ pub enum ProgramIx {
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
+    #[account(6, name = "config", desc = "Config PDA")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     TransferOwnership {
         new_type: u8,
         new_pubkey: [u8; 33],
@@ -122,8 +132,11 @@ pub enum ProgramIx {
         desc = "Authority or Session PDA authorizing execution"
     )]
     #[account(3, name = "vault", desc = "Vault PDA")]
+    #[account(4, name = "config", desc = "Config PDA")]
+    #[account(5, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
+    #[account(6, name = "system_program", desc = "System Program")]
     #[account(
-        4,
+        7,
         optional,
         name = "sysvar_instructions",
         desc = "Sysvar Instructions (required for Secp256r1)"
@@ -153,10 +166,74 @@ pub enum ProgramIx {
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
+    #[account(6, name = "config", desc = "Config PDA")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     CreateSession {
         session_key: [u8; 32],
         expires_at: i64,
     },
+
+    /// Initialize global Config PDA
+    #[account(0, signer, writable, name = "admin", desc = "Initial contract admin")]
+    #[account(1, writable, name = "config", desc = "Config PDA")]
+    #[account(2, name = "system_program", desc = "System Program")]
+    #[account(3, name = "rent", desc = "Rent Sysvar")]
+    InitializeConfig {
+        wallet_fee: u64,
+        action_fee: u64,
+        num_shards: u8,
+    },
+
+    /// Update global Config PDA
+    #[account(0, signer, name = "admin", desc = "Current contract admin")]
+    #[account(1, writable, name = "config", desc = "Config PDA")]
+    UpdateConfig, // args parsed raw
+
+    /// Close an expired or active Session
+    #[account(0, signer, writable, name = "payer", desc = "Receives rent refund")]
+    #[account(1, name = "wallet", desc = "Session's parent wallet")]
+    #[account(2, writable, name = "session", desc = "Target session")]
+    #[account(3, name = "config", desc = "Config PDA for contract admin check")]
+    #[account(4, optional, name = "authorizer", desc = "Wallet authority PDA")]
+    #[account(
+        5,
+        signer,
+        optional,
+        name = "authorizer_signer",
+        desc = "Ed25519 signer"
+    )]
+    #[account(6, optional, name = "sysvar_instructions", desc = "Secp256r1 sysvar")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
+    #[account(8, name = "system_program", desc = "System Program")]
+    CloseSession,
+
+    /// Drain and close a Wallet PDA (Owner-only)
+    #[account(0, signer, name = "payer", desc = "Pays tx fee")]
+    #[account(1, writable, name = "wallet", desc = "Wallet PDA to close")]
+    #[account(2, writable, name = "vault", desc = "Vault PDA to drain")]
+    #[account(3, name = "owner_authority", desc = "Owner Authority PDA")]
+    #[account(4, writable, name = "destination", desc = "Receives all drained SOL")]
+    #[account(5, signer, optional, name = "owner_signer", desc = "Ed25519 signer")]
+    #[account(6, optional, name = "sysvar_instructions", desc = "Secp256r1 sysvar")]
+    #[account(7, name = "config", desc = "Config PDA")]
+    #[account(8, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
+    #[account(9, name = "system_program", desc = "System Program")]
+    CloseWallet,
+
+    /// Sweep funds from a treasury shard
+    #[account(0, signer, name = "admin", desc = "Contract admin")]
+    #[account(1, name = "config", desc = "Config PDA")]
+    #[account(2, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
+    #[account(3, writable, name = "destination", desc = "Receives swept funds")]
+    SweepTreasury { shard_id: u8 },
+
+    /// Initialize a new treasury shard
+    #[account(0, signer, writable, name = "payer", desc = "Pays for rent exemption")]
+    #[account(1, name = "config", desc = "Config PDA")]
+    #[account(2, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
+    #[account(3, name = "system_program", desc = "System Program")]
+    #[account(4, name = "rent", desc = "Rent Sysvar")]
+    InitTreasuryShard { shard_id: u8 },
 }
 
 #[repr(C)]
@@ -200,6 +277,7 @@ pub enum LazorKitInstruction {
     /// 3. `[signer]` Admin Authority PDA
     /// 4. `[writable]` Target Authority PDA
     /// 5. `[writable]` Refund Destination
+    /// 6. `[]` System Program
     RemoveAuthority,
 
     /// Transfer ownership (atomic swap of Owner role)
@@ -240,6 +318,21 @@ pub enum LazorKitInstruction {
     CreateSession {
         session_key: [u8; 32],
         expires_at: u64,
+    },
+
+    InitializeConfig {
+        wallet_fee: u64,
+        action_fee: u64,
+        num_shards: u8,
+    },
+    UpdateConfig,
+    CloseSession,
+    CloseWallet,
+    SweepTreasury {
+        shard_id: u8,
+    },
+    InitTreasuryShard {
+        shard_id: u8,
     },
 }
 
@@ -330,6 +423,22 @@ impl LazorKitInstruction {
                     session_key: session_key.try_into().unwrap(),
                     expires_at,
                 })
+            },
+            6 => Ok(Self::InitializeConfig {
+                wallet_fee: 0,
+                action_fee: 0,
+                num_shards: 16,
+            }), // Dummy unpack, actual args parsed in processor
+            7 => Ok(Self::UpdateConfig),
+            8 => Ok(Self::CloseSession),
+            9 => Ok(Self::CloseWallet),
+            10 => {
+                let (&shard_id, _) = rest.split_first().unwrap();
+                Ok(Self::SweepTreasury { shard_id })
+            },
+            11 => {
+                let (&shard_id, _) = rest.split_first().unwrap();
+                Ok(Self::InitTreasuryShard { shard_id })
             },
             _ => Err(ProgramError::InvalidInstructionData),
         }

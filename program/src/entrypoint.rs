@@ -4,7 +4,8 @@ use pinocchio::{
 };
 
 use crate::processor::{
-    create_session, create_wallet, execute, manage_authority, transfer_ownership,
+    close_session, close_wallet, create_session, create_wallet, execute, init_treasury_shard,
+    initialize_config, manage_authority, sweep_treasury, transfer_ownership, update_config,
 };
 
 entrypoint!(process_instruction);
@@ -27,6 +28,12 @@ pub fn process_instruction(
         3 => transfer_ownership::process(program_id, accounts, data),
         4 => execute::process(program_id, accounts, data),
         5 => create_session::process(program_id, accounts, data),
+        6 => initialize_config::process(program_id, accounts, data),
+        7 => update_config::process(program_id, accounts, data),
+        8 => close_session::process(program_id, accounts, data),
+        9 => close_wallet::process(program_id, accounts, data),
+        10 => sweep_treasury::process(program_id, accounts, data),
+        11 => init_treasury_shard::process(program_id, accounts, data),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
