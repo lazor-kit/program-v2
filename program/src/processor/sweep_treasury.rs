@@ -1,7 +1,6 @@
 use assertions::sol_assert_bytes_eq;
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
     ProgramResult,
