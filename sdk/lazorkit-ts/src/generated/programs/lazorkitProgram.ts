@@ -17,17 +17,29 @@ import {
 } from "@solana/kit";
 import {
   parseAddAuthorityInstruction,
+  parseCloseSessionInstruction,
+  parseCloseWalletInstruction,
   parseCreateSessionInstruction,
   parseCreateWalletInstruction,
   parseExecuteInstruction,
+  parseInitializeConfigInstruction,
+  parseInitTreasuryShardInstruction,
   parseRemoveAuthorityInstruction,
+  parseSweepTreasuryInstruction,
   parseTransferOwnershipInstruction,
+  parseUpdateConfigInstruction,
   type ParsedAddAuthorityInstruction,
+  type ParsedCloseSessionInstruction,
+  type ParsedCloseWalletInstruction,
   type ParsedCreateSessionInstruction,
   type ParsedCreateWalletInstruction,
   type ParsedExecuteInstruction,
+  type ParsedInitializeConfigInstruction,
+  type ParsedInitTreasuryShardInstruction,
   type ParsedRemoveAuthorityInstruction,
+  type ParsedSweepTreasuryInstruction,
   type ParsedTransferOwnershipInstruction,
+  type ParsedUpdateConfigInstruction,
 } from "../instructions";
 
 export const LAZORKIT_PROGRAM_PROGRAM_ADDRESS =
@@ -46,6 +58,12 @@ export enum LazorkitProgramInstruction {
   TransferOwnership,
   Execute,
   CreateSession,
+  InitializeConfig,
+  UpdateConfig,
+  CloseSession,
+  CloseWallet,
+  SweepTreasury,
+  InitTreasuryShard,
 }
 
 export function identifyLazorkitProgramInstruction(
@@ -69,6 +87,24 @@ export function identifyLazorkitProgramInstruction(
   }
   if (containsBytes(data, getU8Encoder().encode(5), 0)) {
     return LazorkitProgramInstruction.CreateSession;
+  }
+  if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+    return LazorkitProgramInstruction.InitializeConfig;
+  }
+  if (containsBytes(data, getU8Encoder().encode(7), 0)) {
+    return LazorkitProgramInstruction.UpdateConfig;
+  }
+  if (containsBytes(data, getU8Encoder().encode(8), 0)) {
+    return LazorkitProgramInstruction.CloseSession;
+  }
+  if (containsBytes(data, getU8Encoder().encode(9), 0)) {
+    return LazorkitProgramInstruction.CloseWallet;
+  }
+  if (containsBytes(data, getU8Encoder().encode(10), 0)) {
+    return LazorkitProgramInstruction.SweepTreasury;
+  }
+  if (containsBytes(data, getU8Encoder().encode(11), 0)) {
+    return LazorkitProgramInstruction.InitTreasuryShard;
   }
   throw new Error(
     "The provided instruction could not be identified as a lazorkitProgram instruction.",
@@ -95,7 +131,25 @@ export type ParsedLazorkitProgramInstruction<
     } & ParsedExecuteInstruction<TProgram>)
   | ({
       instructionType: LazorkitProgramInstruction.CreateSession;
-    } & ParsedCreateSessionInstruction<TProgram>);
+    } & ParsedCreateSessionInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.InitializeConfig;
+    } & ParsedInitializeConfigInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.UpdateConfig;
+    } & ParsedUpdateConfigInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.CloseSession;
+    } & ParsedCloseSessionInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.CloseWallet;
+    } & ParsedCloseWalletInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.SweepTreasury;
+    } & ParsedSweepTreasuryInstruction<TProgram>)
+  | ({
+      instructionType: LazorkitProgramInstruction.InitTreasuryShard;
+    } & ParsedInitTreasuryShardInstruction<TProgram>);
 
 export function parseLazorkitProgramInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -142,6 +196,48 @@ export function parseLazorkitProgramInstruction<TProgram extends string>(
       return {
         instructionType: LazorkitProgramInstruction.CreateSession,
         ...parseCreateSessionInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.InitializeConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.InitializeConfig,
+        ...parseInitializeConfigInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.UpdateConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.UpdateConfig,
+        ...parseUpdateConfigInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.CloseSession: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.CloseSession,
+        ...parseCloseSessionInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.CloseWallet: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.CloseWallet,
+        ...parseCloseWalletInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.SweepTreasury: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.SweepTreasury,
+        ...parseSweepTreasuryInstruction(instruction),
+      };
+    }
+    case LazorkitProgramInstruction.InitTreasuryShard: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: LazorkitProgramInstruction.InitTreasuryShard,
+        ...parseInitTreasuryShardInstruction(instruction),
       };
     }
     default:

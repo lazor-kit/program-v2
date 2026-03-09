@@ -115,6 +115,8 @@ export class LazorClient {
         wallet: AddressLike;
         vault: AddressLike;
         authority: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         userSeed: ReadonlyUint8Array;
         authType: number;
         authBump?: number;
@@ -130,6 +132,8 @@ export class LazorClient {
             wallet: resolveAddress(params.wallet),
             vault: resolveAddress(params.vault),
             authority: resolveAddress(params.authority),
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
             userSeed: params.userSeed,
             authType: params.authType,
             authBump,
@@ -147,6 +151,8 @@ export class LazorClient {
             meta(params.authority, "w"),
             meta("11111111111111111111111111111111" as Address, "r"), // SystemProgram
             meta("SysvarRent111111111111111111111111111111111" as Address, "r"), // Rent
+            meta(params.config, "r"),
+            meta(params.treasuryShard, "w"),
         ];
 
         return {
@@ -161,6 +167,8 @@ export class LazorClient {
         wallet: AddressLike;
         adminAuthority: AddressLike;
         newAuthority: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         authType: number;
         newRole: number;
         authPubkey: ReadonlyUint8Array;
@@ -175,6 +183,8 @@ export class LazorClient {
             wallet: resolveAddress(params.wallet),
             adminAuthority: resolveAddress(params.adminAuthority),
             newAuthority: resolveAddress(params.newAuthority),
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
             newType: params.authType,
             newRole: params.newRole,
             padding,
@@ -197,6 +207,9 @@ export class LazorClient {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
 
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
+
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
             accounts,
@@ -210,6 +223,8 @@ export class LazorClient {
         adminAuthority: AddressLike;
         targetAuthority: AddressLike;
         refundDestination: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         authorizerSigner?: TransactionSigner;
     }) {
         const instruction = getRemoveAuthorityInstruction({
@@ -218,6 +233,8 @@ export class LazorClient {
             adminAuthority: resolveAddress(params.adminAuthority),
             targetAuthority: resolveAddress(params.targetAuthority),
             refundDestination: resolveAddress(params.refundDestination),
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
         });
 
         const accounts = [
@@ -226,11 +243,15 @@ export class LazorClient {
             meta(params.adminAuthority, "w"), // Secp needs writable
             meta(params.targetAuthority, "w"), // To close it
             meta(params.refundDestination, "w"), // To receive rent
+            meta("11111111111111111111111111111111" as Address, "r"), // System
         ];
 
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
+
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
@@ -244,6 +265,8 @@ export class LazorClient {
         wallet: AddressLike;
         currentOwnerAuthority: AddressLike;
         newOwnerAuthority: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         authType: number;
         authPubkey: ReadonlyUint8Array;
         credentialHash: ReadonlyUint8Array;
@@ -256,6 +279,8 @@ export class LazorClient {
             wallet: resolveAddress(params.wallet),
             currentOwnerAuthority: resolveAddress(params.currentOwnerAuthority),
             newOwnerAuthority: resolveAddress(params.newOwnerAuthority),
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
             newType: params.authType,
             payload
         });
@@ -269,12 +294,15 @@ export class LazorClient {
             meta(params.currentOwnerAuthority, "w"), // Secp needs writable
             meta(params.newOwnerAuthority, "w"),
             meta("11111111111111111111111111111111" as Address, "r"),
-            meta("SysvarRent111111111111111111111111111111111" as Address, "r"),
+            meta("SysvarRent111111111111111111111111111111111" as Address, "r"), // Rent
         ];
 
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
+
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
@@ -288,6 +316,8 @@ export class LazorClient {
         wallet: AddressLike;
         authority: AddressLike;
         vault: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         packedInstructions: Uint8Array;
         authorizerSigner?: TransactionSigner;
         sysvarInstructions?: AddressLike;
@@ -303,6 +333,9 @@ export class LazorClient {
             meta(params.wallet, "r"),
             meta(params.authority, "w"), // Secp needs writable
             meta(params.vault, "w"), // Vault is signer (role 4 in compact), but parsed as readonly in instruction accounts
+            meta(params.config, "r"),
+            meta(params.treasuryShard, "w"),
+            meta("11111111111111111111111111111111" as Address, "r"), // System
         ];
 
         if (params.sysvarInstructions) {
@@ -325,6 +358,8 @@ export class LazorClient {
         wallet: AddressLike;
         authority: AddressLike;
         vault: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         innerInstructions: any[];
         authorizerSigner?: TransactionSigner;
         signature?: Uint8Array;
@@ -347,6 +382,9 @@ export class LazorClient {
             { address: walletAddr, role: AccountRole.READONLY },
             { address: resolveAddress(params.authority), role: AccountRole.WRITABLE },
             { address: vaultAddr, role: AccountRole.READONLY },
+            { address: resolveAddress(params.config), role: AccountRole.READONLY },
+            { address: resolveAddress(params.treasuryShard), role: AccountRole.WRITABLE },
+            { address: "11111111111111111111111111111111" as Address, role: AccountRole.READONLY },
         ];
 
         // Helper to check standard accounts
@@ -459,6 +497,8 @@ export class LazorClient {
         wallet: AddressLike;
         adminAuthority: AddressLike;
         session: AddressLike;
+        config: AddressLike;
+        treasuryShard: AddressLike;
         sessionKey: ReadonlyUint8Array;
         expiresAt: bigint | number;
         authorizerSigner?: TransactionSigner;
@@ -468,6 +508,8 @@ export class LazorClient {
             wallet: resolveAddress(params.wallet),
             adminAuthority: resolveAddress(params.adminAuthority),
             session: resolveAddress(params.session),
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
             sessionKey: params.sessionKey,
             expiresAt: BigInt(params.expiresAt)
         });
@@ -484,6 +526,9 @@ export class LazorClient {
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
+
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,

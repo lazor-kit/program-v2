@@ -7,24 +7,18 @@
  */
 
 import {
-  addDecoderSizePrefix,
-  addEncoderSizePrefix,
   combineCodec,
-  getBytesDecoder,
-  getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
   getU8Decoder,
   getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
@@ -37,23 +31,21 @@ import {
 import { LAZORKIT_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 
-export const EXECUTE_DISCRIMINATOR = 4;
+export const INIT_TREASURY_SHARD_DISCRIMINATOR = 11;
 
-export function getExecuteDiscriminatorBytes() {
-  return getU8Encoder().encode(EXECUTE_DISCRIMINATOR);
+export function getInitTreasuryShardDiscriminatorBytes() {
+  return getU8Encoder().encode(INIT_TREASURY_SHARD_DISCRIMINATOR);
 }
 
-export type ExecuteInstruction<
+export type InitTreasuryShardInstruction<
   TProgram extends string = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
   TAccountPayer extends string | AccountMeta<string> = string,
-  TAccountWallet extends string | AccountMeta<string> = string,
-  TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountVault extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
-  TAccountSysvarInstructions extends string | AccountMeta<string> = string,
+  TAccountRent extends string | AccountMeta<string> =
+    "SysvarRent111111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -63,15 +55,6 @@ export type ExecuteInstruction<
         ? WritableSignerAccount<TAccountPayer> &
             AccountSignerMeta<TAccountPayer>
         : TAccountPayer,
-      TAccountWallet extends string
-        ? ReadonlyAccount<TAccountWallet>
-        : TAccountWallet,
-      TAccountAuthority extends string
-        ? ReadonlyAccount<TAccountAuthority>
-        : TAccountAuthority,
-      TAccountVault extends string
-        ? ReadonlyAccount<TAccountVault>
-        : TAccountVault,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
         : TAccountConfig,
@@ -81,111 +64,90 @@ export type ExecuteInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
-      TAccountSysvarInstructions extends string
-        ? ReadonlyAccount<TAccountSysvarInstructions>
-        : TAccountSysvarInstructions,
+      TAccountRent extends string
+        ? ReadonlyAccount<TAccountRent>
+        : TAccountRent,
       ...TRemainingAccounts,
     ]
   >;
 
-export type ExecuteInstructionData = {
+export type InitTreasuryShardInstructionData = {
   discriminator: number;
-  instructions: ReadonlyUint8Array;
+  shardId: number;
 };
 
-export type ExecuteInstructionDataArgs = { instructions: ReadonlyUint8Array };
+export type InitTreasuryShardInstructionDataArgs = { shardId: number };
 
-export function getExecuteInstructionDataEncoder(): Encoder<ExecuteInstructionDataArgs> {
+export function getInitTreasuryShardInstructionDataEncoder(): FixedSizeEncoder<InitTreasuryShardInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", getU8Encoder()],
-      [
-        "instructions",
-        addEncoderSizePrefix(getBytesEncoder(), getU32Encoder()),
-      ],
+      ["shardId", getU8Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: EXECUTE_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: INIT_TREASURY_SHARD_DISCRIMINATOR }),
   );
 }
 
-export function getExecuteInstructionDataDecoder(): Decoder<ExecuteInstructionData> {
+export function getInitTreasuryShardInstructionDataDecoder(): FixedSizeDecoder<InitTreasuryShardInstructionData> {
   return getStructDecoder([
     ["discriminator", getU8Decoder()],
-    ["instructions", addDecoderSizePrefix(getBytesDecoder(), getU32Decoder())],
+    ["shardId", getU8Decoder()],
   ]);
 }
 
-export function getExecuteInstructionDataCodec(): Codec<
-  ExecuteInstructionDataArgs,
-  ExecuteInstructionData
+export function getInitTreasuryShardInstructionDataCodec(): FixedSizeCodec<
+  InitTreasuryShardInstructionDataArgs,
+  InitTreasuryShardInstructionData
 > {
   return combineCodec(
-    getExecuteInstructionDataEncoder(),
-    getExecuteInstructionDataDecoder(),
+    getInitTreasuryShardInstructionDataEncoder(),
+    getInitTreasuryShardInstructionDataDecoder(),
   );
 }
 
-export type ExecuteInput<
+export type InitTreasuryShardInput<
   TAccountPayer extends string = string,
-  TAccountWallet extends string = string,
-  TAccountAuthority extends string = string,
-  TAccountVault extends string = string,
   TAccountConfig extends string = string,
   TAccountTreasuryShard extends string = string,
   TAccountSystemProgram extends string = string,
-  TAccountSysvarInstructions extends string = string,
+  TAccountRent extends string = string,
 > = {
-  /** Transaction payer */
+  /** Pays for rent exemption */
   payer: TransactionSigner<TAccountPayer>;
-  /** Wallet PDA */
-  wallet: Address<TAccountWallet>;
-  /** Authority or Session PDA authorizing execution */
-  authority: Address<TAccountAuthority>;
-  /** Vault PDA */
-  vault: Address<TAccountVault>;
   /** Config PDA */
   config: Address<TAccountConfig>;
   /** Treasury Shard PDA */
   treasuryShard: Address<TAccountTreasuryShard>;
   /** System Program */
   systemProgram?: Address<TAccountSystemProgram>;
-  /** Sysvar Instructions (required for Secp256r1) */
-  sysvarInstructions?: Address<TAccountSysvarInstructions>;
-  instructions: ExecuteInstructionDataArgs["instructions"];
+  /** Rent Sysvar */
+  rent?: Address<TAccountRent>;
+  shardId: InitTreasuryShardInstructionDataArgs["shardId"];
 };
 
-export function getExecuteInstruction<
+export function getInitTreasuryShardInstruction<
   TAccountPayer extends string,
-  TAccountWallet extends string,
-  TAccountAuthority extends string,
-  TAccountVault extends string,
   TAccountConfig extends string,
   TAccountTreasuryShard extends string,
   TAccountSystemProgram extends string,
-  TAccountSysvarInstructions extends string,
+  TAccountRent extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
-  input: ExecuteInput<
+  input: InitTreasuryShardInput<
     TAccountPayer,
-    TAccountWallet,
-    TAccountAuthority,
-    TAccountVault,
     TAccountConfig,
     TAccountTreasuryShard,
     TAccountSystemProgram,
-    TAccountSysvarInstructions
+    TAccountRent
   >,
   config?: { programAddress?: TProgramAddress },
-): ExecuteInstruction<
+): InitTreasuryShardInstruction<
   TProgramAddress,
   TAccountPayer,
-  TAccountWallet,
-  TAccountAuthority,
-  TAccountVault,
   TAccountConfig,
   TAccountTreasuryShard,
   TAccountSystemProgram,
-  TAccountSysvarInstructions
+  TAccountRent
 > {
   // Program address.
   const programAddress =
@@ -194,16 +156,10 @@ export function getExecuteInstruction<
   // Original accounts.
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
-    wallet: { value: input.wallet ?? null, isWritable: false },
-    authority: { value: input.authority ?? null, isWritable: false },
-    vault: { value: input.vault ?? null, isWritable: false },
     config: { value: input.config ?? null, isWritable: false },
     treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    sysvarInstructions: {
-      value: input.sysvarInstructions ?? null,
-      isWritable: false,
-    },
+    rent: { value: input.rent ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -218,71 +174,63 @@ export function getExecuteInstruction<
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
+  if (!accounts.rent.value) {
+    accounts.rent.value =
+      "SysvarRent111111111111111111111111111111111" as Address<"SysvarRent111111111111111111111111111111111">;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.payer),
-      getAccountMeta(accounts.wallet),
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.vault),
       getAccountMeta(accounts.config),
       getAccountMeta(accounts.treasuryShard),
       getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.sysvarInstructions),
+      getAccountMeta(accounts.rent),
     ],
-    data: getExecuteInstructionDataEncoder().encode(
-      args as ExecuteInstructionDataArgs,
+    data: getInitTreasuryShardInstructionDataEncoder().encode(
+      args as InitTreasuryShardInstructionDataArgs,
     ),
     programAddress,
-  } as ExecuteInstruction<
+  } as InitTreasuryShardInstruction<
     TProgramAddress,
     TAccountPayer,
-    TAccountWallet,
-    TAccountAuthority,
-    TAccountVault,
     TAccountConfig,
     TAccountTreasuryShard,
     TAccountSystemProgram,
-    TAccountSysvarInstructions
+    TAccountRent
   >);
 }
 
-export type ParsedExecuteInstruction<
+export type ParsedInitTreasuryShardInstruction<
   TProgram extends string = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Transaction payer */
+    /** Pays for rent exemption */
     payer: TAccountMetas[0];
-    /** Wallet PDA */
-    wallet: TAccountMetas[1];
-    /** Authority or Session PDA authorizing execution */
-    authority: TAccountMetas[2];
-    /** Vault PDA */
-    vault: TAccountMetas[3];
     /** Config PDA */
-    config: TAccountMetas[4];
+    config: TAccountMetas[1];
     /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[5];
+    treasuryShard: TAccountMetas[2];
     /** System Program */
-    systemProgram: TAccountMetas[6];
-    /** Sysvar Instructions (required for Secp256r1) */
-    sysvarInstructions?: TAccountMetas[7] | undefined;
+    systemProgram: TAccountMetas[3];
+    /** Rent Sysvar */
+    rent: TAccountMetas[4];
   };
-  data: ExecuteInstructionData;
+  data: InitTreasuryShardInstructionData;
 };
 
-export function parseExecuteInstruction<
+export function parseInitTreasuryShardInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedExecuteInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+): ParsedInitTreasuryShardInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 5) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -292,24 +240,15 @@ export function parseExecuteInstruction<
     accountIndex += 1;
     return accountMeta;
   };
-  const getNextOptionalAccount = () => {
-    const accountMeta = getNextAccount();
-    return accountMeta.address === LAZORKIT_PROGRAM_PROGRAM_ADDRESS
-      ? undefined
-      : accountMeta;
-  };
   return {
     programAddress: instruction.programAddress,
     accounts: {
       payer: getNextAccount(),
-      wallet: getNextAccount(),
-      authority: getNextAccount(),
-      vault: getNextAccount(),
       config: getNextAccount(),
       treasuryShard: getNextAccount(),
       systemProgram: getNextAccount(),
-      sysvarInstructions: getNextOptionalAccount(),
+      rent: getNextAccount(),
     },
-    data: getExecuteInstructionDataDecoder().decode(instruction.data),
+    data: getInitTreasuryShardInstructionDataDecoder().decode(instruction.data),
   };
 }

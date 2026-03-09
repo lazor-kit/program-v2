@@ -32,24 +32,24 @@ import {
 import { LAZORKIT_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 
-export const REMOVE_AUTHORITY_DISCRIMINATOR = 2;
+export const CLOSE_SESSION_DISCRIMINATOR = 8;
 
-export function getRemoveAuthorityDiscriminatorBytes() {
-  return getU8Encoder().encode(REMOVE_AUTHORITY_DISCRIMINATOR);
+export function getCloseSessionDiscriminatorBytes() {
+  return getU8Encoder().encode(CLOSE_SESSION_DISCRIMINATOR);
 }
 
-export type RemoveAuthorityInstruction<
+export type CloseSessionInstruction<
   TProgram extends string = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
   TAccountPayer extends string | AccountMeta<string> = string,
   TAccountWallet extends string | AccountMeta<string> = string,
-  TAccountAdminAuthority extends string | AccountMeta<string> = string,
-  TAccountTargetAuthority extends string | AccountMeta<string> = string,
-  TAccountRefundDestination extends string | AccountMeta<string> = string,
+  TAccountSession extends string | AccountMeta<string> = string,
+  TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountAuthorizer extends string | AccountMeta<string> = string,
+  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
+  TAccountSysvarInstructions extends string | AccountMeta<string> = string,
+  TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
-  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
-  TAccountConfig extends string | AccountMeta<string> = string,
-  TAccountTreasuryShard extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -62,123 +62,123 @@ export type RemoveAuthorityInstruction<
       TAccountWallet extends string
         ? ReadonlyAccount<TAccountWallet>
         : TAccountWallet,
-      TAccountAdminAuthority extends string
-        ? ReadonlyAccount<TAccountAdminAuthority>
-        : TAccountAdminAuthority,
-      TAccountTargetAuthority extends string
-        ? WritableAccount<TAccountTargetAuthority>
-        : TAccountTargetAuthority,
-      TAccountRefundDestination extends string
-        ? WritableAccount<TAccountRefundDestination>
-        : TAccountRefundDestination,
-      TAccountSystemProgram extends string
-        ? ReadonlyAccount<TAccountSystemProgram>
-        : TAccountSystemProgram,
+      TAccountSession extends string
+        ? WritableAccount<TAccountSession>
+        : TAccountSession,
+      TAccountConfig extends string
+        ? ReadonlyAccount<TAccountConfig>
+        : TAccountConfig,
+      TAccountAuthorizer extends string
+        ? ReadonlyAccount<TAccountAuthorizer>
+        : TAccountAuthorizer,
       TAccountAuthorizerSigner extends string
         ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
             AccountSignerMeta<TAccountAuthorizerSigner>
         : TAccountAuthorizerSigner,
-      TAccountConfig extends string
-        ? ReadonlyAccount<TAccountConfig>
-        : TAccountConfig,
+      TAccountSysvarInstructions extends string
+        ? ReadonlyAccount<TAccountSysvarInstructions>
+        : TAccountSysvarInstructions,
       TAccountTreasuryShard extends string
         ? WritableAccount<TAccountTreasuryShard>
         : TAccountTreasuryShard,
+      TAccountSystemProgram extends string
+        ? ReadonlyAccount<TAccountSystemProgram>
+        : TAccountSystemProgram,
       ...TRemainingAccounts,
     ]
   >;
 
-export type RemoveAuthorityInstructionData = { discriminator: number };
+export type CloseSessionInstructionData = { discriminator: number };
 
-export type RemoveAuthorityInstructionDataArgs = {};
+export type CloseSessionInstructionDataArgs = {};
 
-export function getRemoveAuthorityInstructionDataEncoder(): FixedSizeEncoder<RemoveAuthorityInstructionDataArgs> {
+export function getCloseSessionInstructionDataEncoder(): FixedSizeEncoder<CloseSessionInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([["discriminator", getU8Encoder()]]),
-    (value) => ({ ...value, discriminator: REMOVE_AUTHORITY_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: CLOSE_SESSION_DISCRIMINATOR }),
   );
 }
 
-export function getRemoveAuthorityInstructionDataDecoder(): FixedSizeDecoder<RemoveAuthorityInstructionData> {
+export function getCloseSessionInstructionDataDecoder(): FixedSizeDecoder<CloseSessionInstructionData> {
   return getStructDecoder([["discriminator", getU8Decoder()]]);
 }
 
-export function getRemoveAuthorityInstructionDataCodec(): FixedSizeCodec<
-  RemoveAuthorityInstructionDataArgs,
-  RemoveAuthorityInstructionData
+export function getCloseSessionInstructionDataCodec(): FixedSizeCodec<
+  CloseSessionInstructionDataArgs,
+  CloseSessionInstructionData
 > {
   return combineCodec(
-    getRemoveAuthorityInstructionDataEncoder(),
-    getRemoveAuthorityInstructionDataDecoder(),
+    getCloseSessionInstructionDataEncoder(),
+    getCloseSessionInstructionDataDecoder(),
   );
 }
 
-export type RemoveAuthorityInput<
+export type CloseSessionInput<
   TAccountPayer extends string = string,
   TAccountWallet extends string = string,
-  TAccountAdminAuthority extends string = string,
-  TAccountTargetAuthority extends string = string,
-  TAccountRefundDestination extends string = string,
-  TAccountSystemProgram extends string = string,
-  TAccountAuthorizerSigner extends string = string,
+  TAccountSession extends string = string,
   TAccountConfig extends string = string,
+  TAccountAuthorizer extends string = string,
+  TAccountAuthorizerSigner extends string = string,
+  TAccountSysvarInstructions extends string = string,
   TAccountTreasuryShard extends string = string,
+  TAccountSystemProgram extends string = string,
 > = {
-  /** Transaction payer */
+  /** Receives rent refund */
   payer: TransactionSigner<TAccountPayer>;
-  /** Wallet PDA */
+  /** Session's parent wallet */
   wallet: Address<TAccountWallet>;
-  /** Admin authority PDA authorizing this action */
-  adminAuthority: Address<TAccountAdminAuthority>;
-  /** Authority PDA to be removed */
-  targetAuthority: Address<TAccountTargetAuthority>;
-  /** Account to receive rent refund */
-  refundDestination: Address<TAccountRefundDestination>;
-  /** System Program */
-  systemProgram?: Address<TAccountSystemProgram>;
-  /** Optional signer for Ed25519 authentication */
-  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
-  /** Config PDA */
+  /** Target session */
+  session: Address<TAccountSession>;
+  /** Config PDA for contract admin check */
   config: Address<TAccountConfig>;
+  /** Wallet authority PDA */
+  authorizer?: Address<TAccountAuthorizer>;
+  /** Ed25519 signer */
+  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
+  /** Secp256r1 sysvar */
+  sysvarInstructions?: Address<TAccountSysvarInstructions>;
   /** Treasury Shard PDA */
   treasuryShard: Address<TAccountTreasuryShard>;
+  /** System Program */
+  systemProgram?: Address<TAccountSystemProgram>;
 };
 
-export function getRemoveAuthorityInstruction<
+export function getCloseSessionInstruction<
   TAccountPayer extends string,
   TAccountWallet extends string,
-  TAccountAdminAuthority extends string,
-  TAccountTargetAuthority extends string,
-  TAccountRefundDestination extends string,
-  TAccountSystemProgram extends string,
-  TAccountAuthorizerSigner extends string,
+  TAccountSession extends string,
   TAccountConfig extends string,
+  TAccountAuthorizer extends string,
+  TAccountAuthorizerSigner extends string,
+  TAccountSysvarInstructions extends string,
   TAccountTreasuryShard extends string,
+  TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
-  input: RemoveAuthorityInput<
+  input: CloseSessionInput<
     TAccountPayer,
     TAccountWallet,
-    TAccountAdminAuthority,
-    TAccountTargetAuthority,
-    TAccountRefundDestination,
-    TAccountSystemProgram,
-    TAccountAuthorizerSigner,
+    TAccountSession,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountAuthorizer,
+    TAccountAuthorizerSigner,
+    TAccountSysvarInstructions,
+    TAccountTreasuryShard,
+    TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): RemoveAuthorityInstruction<
+): CloseSessionInstruction<
   TProgramAddress,
   TAccountPayer,
   TAccountWallet,
-  TAccountAdminAuthority,
-  TAccountTargetAuthority,
-  TAccountRefundDestination,
-  TAccountSystemProgram,
-  TAccountAuthorizerSigner,
+  TAccountSession,
   TAccountConfig,
-  TAccountTreasuryShard
+  TAccountAuthorizer,
+  TAccountAuthorizerSigner,
+  TAccountSysvarInstructions,
+  TAccountTreasuryShard,
+  TAccountSystemProgram
 > {
   // Program address.
   const programAddress =
@@ -188,19 +188,19 @@ export function getRemoveAuthorityInstruction<
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
     wallet: { value: input.wallet ?? null, isWritable: false },
-    adminAuthority: { value: input.adminAuthority ?? null, isWritable: false },
-    targetAuthority: { value: input.targetAuthority ?? null, isWritable: true },
-    refundDestination: {
-      value: input.refundDestination ?? null,
-      isWritable: true,
-    },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    session: { value: input.session ?? null, isWritable: true },
+    config: { value: input.config ?? null, isWritable: false },
+    authorizer: { value: input.authorizer ?? null, isWritable: false },
     authorizerSigner: {
       value: input.authorizerSigner ?? null,
       isWritable: false,
     },
-    config: { value: input.config ?? null, isWritable: false },
+    sysvarInstructions: {
+      value: input.sysvarInstructions ?? null,
+      isWritable: false,
+    },
     treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -218,66 +218,66 @@ export function getRemoveAuthorityInstruction<
     accounts: [
       getAccountMeta(accounts.payer),
       getAccountMeta(accounts.wallet),
-      getAccountMeta(accounts.adminAuthority),
-      getAccountMeta(accounts.targetAuthority),
-      getAccountMeta(accounts.refundDestination),
-      getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.authorizerSigner),
+      getAccountMeta(accounts.session),
       getAccountMeta(accounts.config),
+      getAccountMeta(accounts.authorizer),
+      getAccountMeta(accounts.authorizerSigner),
+      getAccountMeta(accounts.sysvarInstructions),
       getAccountMeta(accounts.treasuryShard),
+      getAccountMeta(accounts.systemProgram),
     ],
-    data: getRemoveAuthorityInstructionDataEncoder().encode({}),
+    data: getCloseSessionInstructionDataEncoder().encode({}),
     programAddress,
-  } as RemoveAuthorityInstruction<
+  } as CloseSessionInstruction<
     TProgramAddress,
     TAccountPayer,
     TAccountWallet,
-    TAccountAdminAuthority,
-    TAccountTargetAuthority,
-    TAccountRefundDestination,
-    TAccountSystemProgram,
-    TAccountAuthorizerSigner,
+    TAccountSession,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountAuthorizer,
+    TAccountAuthorizerSigner,
+    TAccountSysvarInstructions,
+    TAccountTreasuryShard,
+    TAccountSystemProgram
   >);
 }
 
-export type ParsedRemoveAuthorityInstruction<
+export type ParsedCloseSessionInstruction<
   TProgram extends string = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Transaction payer */
+    /** Receives rent refund */
     payer: TAccountMetas[0];
-    /** Wallet PDA */
+    /** Session's parent wallet */
     wallet: TAccountMetas[1];
-    /** Admin authority PDA authorizing this action */
-    adminAuthority: TAccountMetas[2];
-    /** Authority PDA to be removed */
-    targetAuthority: TAccountMetas[3];
-    /** Account to receive rent refund */
-    refundDestination: TAccountMetas[4];
-    /** System Program */
-    systemProgram: TAccountMetas[5];
-    /** Optional signer for Ed25519 authentication */
-    authorizerSigner?: TAccountMetas[6] | undefined;
-    /** Config PDA */
-    config: TAccountMetas[7];
+    /** Target session */
+    session: TAccountMetas[2];
+    /** Config PDA for contract admin check */
+    config: TAccountMetas[3];
+    /** Wallet authority PDA */
+    authorizer?: TAccountMetas[4] | undefined;
+    /** Ed25519 signer */
+    authorizerSigner?: TAccountMetas[5] | undefined;
+    /** Secp256r1 sysvar */
+    sysvarInstructions?: TAccountMetas[6] | undefined;
     /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[8];
+    treasuryShard: TAccountMetas[7];
+    /** System Program */
+    systemProgram: TAccountMetas[8];
   };
-  data: RemoveAuthorityInstructionData;
+  data: CloseSessionInstructionData;
 };
 
-export function parseRemoveAuthorityInstruction<
+export function parseCloseSessionInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedRemoveAuthorityInstruction<TProgram, TAccountMetas> {
+): ParsedCloseSessionInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 9) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
@@ -299,14 +299,14 @@ export function parseRemoveAuthorityInstruction<
     accounts: {
       payer: getNextAccount(),
       wallet: getNextAccount(),
-      adminAuthority: getNextAccount(),
-      targetAuthority: getNextAccount(),
-      refundDestination: getNextAccount(),
-      systemProgram: getNextAccount(),
-      authorizerSigner: getNextOptionalAccount(),
+      session: getNextAccount(),
       config: getNextAccount(),
+      authorizer: getNextOptionalAccount(),
+      authorizerSigner: getNextOptionalAccount(),
+      sysvarInstructions: getNextOptionalAccount(),
       treasuryShard: getNextAccount(),
+      systemProgram: getNextAccount(),
     },
-    data: getRemoveAuthorityInstructionDataDecoder().decode(instruction.data),
+    data: getCloseSessionInstructionDataDecoder().decode(instruction.data),
   };
 }
