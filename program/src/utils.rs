@@ -144,3 +144,85 @@ pub fn initialize_pda_account(
 
     Ok(())
 }
+
+/// Maps a pubkey to a shard ID deterministically and stably across platforms.
+pub fn hash_pubkey_to_shard(pubkey: &Pubkey, num_shards: u8) -> u8 {
+    if num_shards == 0 {
+        return 0; // Fallback, though config should ensure num_shards >= 1
+    }
+    let mut sum: u32 = 0;
+    for &b in pubkey.as_ref() {
+        sum = sum.wrapping_add(b as u32);
+    }
+    (sum % (num_shards as u32)) as u8
+}
+
+/// Collects the protocol fee from the payer and transfers it to the assigned treasury shard.
+///
+/// # Arguments
+/// * `payer` - Account paying for the fee (must be signer & writable)
+/// * `config_account` - The global config account data to read fees/shards from
+/// * `treasury_shard` - The pre-initialized treasury shard PDA receiving the fee (must be writable)
+/// * `system_program` - System Program account
+/// * `is_wallet_creation` - If true, applies `wallet_fee`, otherwise `action_fee`
+pub fn collect_protocol_fee(
+    program_id: &Pubkey,
+    payer: &AccountInfo,
+    config_account: &crate::state::config::ConfigAccount,
+    treasury_shard: &AccountInfo,
+    system_program: &AccountInfo,
+    is_wallet_creation: bool,
+) -> ProgramResult {
+    let fee = if is_wallet_creation {
+        config_account.wallet_fee
+    } else {
+        config_account.action_fee
+    };
+
+    if fee == 0 {
+        return Ok(()); // Free action
+    }
+
+    // Verify system program
+    if system_program.key() != &SYSTEM_PROGRAM_ID {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    // Verify Treasury Shard is the correct one for this payer
+    let shard_id = hash_pubkey_to_shard(payer.key(), config_account.num_shards);
+    let shard_id_bytes = [shard_id];
+    let (expected_shard_key, _bump) =
+        pinocchio::pubkey::find_program_address(&[b"treasury", &shard_id_bytes], program_id);
+
+    if treasury_shard.key() != &expected_shard_key {
+        return Err(ProgramError::InvalidSeeds);
+    }
+
+    // System Program Transfer instruction (discriminator: 2)
+    let mut transfer_data = Vec::with_capacity(12);
+    transfer_data.extend_from_slice(&2u32.to_le_bytes());
+    transfer_data.extend_from_slice(&fee.to_le_bytes());
+
+    let transfer_accounts = [
+        AccountMeta {
+            pubkey: payer.key(),
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: treasury_shard.key(),
+            is_signer: false,
+            is_writable: true, // Shards must be writable
+        },
+    ];
+
+    let transfer_ix = Instruction {
+        program_id: &Pubkey::from(SYSTEM_PROGRAM_ID),
+        accounts: &transfer_accounts,
+        data: &transfer_data,
+    };
+
+    pinocchio::program::invoke(&transfer_ix, &[&payer, &treasury_shard, &system_program])?;
+
+    Ok(())
+}
