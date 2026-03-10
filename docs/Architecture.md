@@ -18,7 +18,7 @@ LazorKit is a high-performance, secure smart wallet on Solana designed for disti
 *   **Secp256r1 (WebAuthn)**:
     *   **SlotHashes Nonce**: Uses the `SlotHashes` sysvar to verify that the signed payload references a recent slot (within 150 slots). This acts as a highly efficient "Proof of Liveness" without requiring stateful on-chain nonces or counters.
     *   **CPI Protection**: Explicit `stack_height` check prevents the authentication instruction from being called maliciously via CPI (`invoke`), defending against cross-program attack vectors.
-    *   **Signature Binding**: The `auth_payload` ensures signatures are tightly bound to the specific target account and instruction data, mitigating cross-wallet and cross-instruction replays.
+    *   **Signature Binding**: The `auth_payload` ensures signatures are tightly bound to the specific target account and instruction data. For `Execute`, it dynamically computes a `sha256` hash of all provided `AccountInfo` pubkeys and binds the signature to it, preventing cross-wallet, cross-instruction, or account reordering attacks.
 *   **Session Keys**:
     *   **Absolute Expiry**: Sessions are valid until a strict absolute slot height `expires_at` (u64).
 
@@ -39,14 +39,29 @@ pub enum AccountDiscriminator {
     Wallet = 1,
     Authority = 2,
     Session = 3,
+    Config = 4,
 }
 ```
 
-### A. Wallet Account
+### A. Config Account
+Global protocol configuration holding action and wallet creation fees.
+*   **Seeds**: `[b"config"]`
+*   **Data Structure**: Stores `admin`, `wallet_fee`, `action_fee`, and `num_shards` count.
+
+### B. Wallet Account
 Anchor for the identity.
 *   **Seeds**: `[b"wallet", user_seed]`
 
-### B. Authority Account
+### C. Vault Account
+The primary asset-holding PDA.
+*   **Seeds**: `[b"vault", wallet_pubkey]`
+
+### D. Treasury Shard
+Receives protocol fees collected from user transactions. Derived via modular arithmetic on the payer's pubkey.
+*   **Seeds**: `[b"treasury", shard_id]`
+*   **Data Structure**: None. Raw lamports PDA to prevent serialization costs.
+
+### E. Authority Account
 Represents a single authorized user (Owner, Admin, or Spender). Multi-signature schemas allow deploying multiple Authority PDAs per Wallet.
 *   **Seeds**: `[b"authority", wallet_pubkey, id_hash]`
 *   **Data Structure**:
@@ -83,10 +98,12 @@ Temporary sub-key for automated agents (like a session token).
 ## 5. Instruction Flow & Logic
 
 ### `CreateWallet`
+*   **Fees**: Parses the global `Config PDA` to charge `wallet_fee` dynamically assigning the collected amount to a calculated `Treasury Shard`.
 *   Initializes `WalletAccount`, `Vault`, and the first `Authority` (Owner).
 *   Follows the Transfer-Allocate-Assign pattern to prevent pre-funding DoS attacks.
 
 ### `Execute`
+*   **Fees**: Automatically parses the global `Config PDA` to collect `action_fee` to the calculated `Treasury Shard`.
 *   **Authentication**:
     *   **Ed25519**: Standard Instruction Introspection.
     *   **Secp256r1**:
@@ -97,11 +114,23 @@ Temporary sub-key for automated agents (like a session token).
         1.  Verify `session.wallet == wallet`.
         2.  Verify `current_slot <= session.expires_at`.
         3.  Verify `session_key` is a valid Ed25519 signer on the transaction.
-*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed` with Vault seeds across all requested target programs.
+*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed_unchecked` with Vault seeds across all requested target programs.
 
 ### `CreateSession`
 *   **Auth**: Requires `Role::Admin` or `Role::Owner`.
 *   **Action**: Derives the correct Session PDA and sets `expires_at` to a future slot height (u64).
+
+### `CloseSession`
+*   **Auth**: Custom dual-mode authorization. If the session has expired, the protocol `admin` can close it. If it is active, the `Owner` or `Admin` of the Wallet PDA can close it.
+*   **Action**: Refunds the session's rent exemption Lamports back to the instruction `payer`.
+
+### `CloseWallet`
+*   **Auth**: Only `Role::Owner` can execute this.
+*   **Action**: Extremely destructive. Collects all lamports from the `wallet_pda` and `vault_pda` state and sweeps them strictly to the designated `destination` account securely, wiping local binary limits.
+
+### Protocol Management
+*   **InitializeConfig / UpdateConfig**: Establishes global parameters managed heavily by the deployment admin.
+*   **InitTreasuryShard / SweepTreasury**: Admin instructions to sweep protocol revenue down to a single master vault while retaining mandatory 0-byte rent exemption balances in the shards to prevent permanent BPF runtime account closure exceptions.
 
 ## 6. Project Structure
 ```text
@@ -113,8 +142,14 @@ program/src/
 │   │   ├── nonce.rs     # SlotHashes verification logic
 │   │   ├── slothashes.rs# Sysvar memory-parsing
 │   │   └── webauthn.rs  # ClientDataJSON reconstruction
-├── processor/           # Handlers: create_wallet, manage_authority, etc.
-├── state/               # NoPadding definitions (Wallet, Authority, Session)
-├── utils.rs             # Protections (stack_height, dos_prevention)
+├── processor/           # Handlers
+│   ├── initialize_config.rs / update_config.rs
+│   ├── create_wallet.rs / create_session.rs
+│   ├── execute.rs / transfer_ownership.rs
+│   ├── init_treasury_shard.rs / sweep_treasury.rs
+│   └── close_wallet.rs / close_session.rs
+├── state/               # NoPadding definitions (Wallet, Authority, Session, Config)
+├── utils.rs             # Protections (stack_height, dos_prevention), fee_collection logic
+├── compact.rs           # Account-index compression tools
 └── lib.rs               # Entrypoint & routing
 ```
