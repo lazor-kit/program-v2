@@ -697,22 +697,6 @@
           "docs": [
             "Secp256r1 sysvar"
           ]
-        },
-        {
-          "name": "treasuryShard",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Treasury Shard PDA"
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "System Program"
-          ]
         }
       ],
       "args": [],
@@ -780,30 +764,6 @@
           "isOptional": true,
           "docs": [
             "Secp256r1 sysvar"
-          ]
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Config PDA"
-          ]
-        },
-        {
-          "name": "treasuryShard",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Treasury Shard PDA"
-          ]
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "System Program"
           ]
         }
       ],

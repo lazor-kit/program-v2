@@ -3,6 +3,7 @@ use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
+    sysvars::Sysvar,
     ProgramResult,
 };
 
@@ -69,15 +70,23 @@ pub fn process(
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // Transfer all lamports from treasury shard to destination wallet
+    // Transfer lamports from treasury shard to destination wallet, leaving rent exemption behind
+    let rent = pinocchio::sysvars::rent::Rent::get()?;
+    let rent_lamports = rent.minimum_balance(0);
+
     let shard_lamports = treasury_shard_pda.lamports();
+    if shard_lamports <= rent_lamports {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    let withdrawable = shard_lamports - rent_lamports;
+
     let dest_lamports = destination_wallet.lamports();
 
     unsafe {
         *destination_wallet.borrow_mut_lamports_unchecked() = dest_lamports
-            .checked_add(shard_lamports)
+            .checked_add(withdrawable)
             .ok_or(ProgramError::ArithmeticOverflow)?;
-        *treasury_shard_pda.borrow_mut_lamports_unchecked() = 0;
+        *treasury_shard_pda.borrow_mut_lamports_unchecked() = rent_lamports;
     }
 
     // Erase any data if there was any (zero data)

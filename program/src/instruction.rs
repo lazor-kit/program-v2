@@ -203,8 +203,6 @@ pub enum ProgramIx {
         desc = "Ed25519 signer"
     )]
     #[account(6, optional, name = "sysvar_instructions", desc = "Secp256r1 sysvar")]
-    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
-    #[account(8, name = "system_program", desc = "System Program")]
     CloseSession,
 
     /// Drain and close a Wallet PDA (Owner-only)
@@ -215,9 +213,6 @@ pub enum ProgramIx {
     #[account(4, writable, name = "destination", desc = "Receives all drained SOL")]
     #[account(5, signer, optional, name = "owner_signer", desc = "Ed25519 signer")]
     #[account(6, optional, name = "sysvar_instructions", desc = "Secp256r1 sysvar")]
-    #[account(7, name = "config", desc = "Config PDA")]
-    #[account(8, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
-    #[account(9, name = "system_program", desc = "System Program")]
     CloseWallet,
 
     /// Sweep funds from a treasury shard

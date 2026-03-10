@@ -92,9 +92,7 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
 
     // Initialize Config if not exists
     try {
-        await rpc.getAccountInfo(configPda, { commitment: "confirmed" }).send();
-        // If it throws or returns null (Solana.js might return null), it means not initialized
-        const accInfo = await rpc.getAccountInfo(configPda, { commitment: "confirmed" }).send();
+        const accInfo = await rpc.getAccountInfo(configPda, { commitment: "processed" }).send();
         if (!accInfo || !accInfo.value) throw new Error("Not initialized");
     } catch {
         console.log("Initializing Global Config and Treasury Shard...");
@@ -119,12 +117,17 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
             shardId,
         });
 
-        await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initConfigIx, initShardIx], [payer]);
+        try {
+            await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initConfigIx, initShardIx], [payer]);
+        } catch (e: any) {
+            // Ignore if already initialized by another parallel/sequential test
+            console.warn("Config initialization skipped or failed:", e.message);
+        }
     }
 
     // Initialize Treasury Shard if not exists (in case config existed but not this shard)
     try {
-        const accInfo = await rpc.getAccountInfo(treasuryShard, { commitment: "confirmed" }).send();
+        const accInfo = await rpc.getAccountInfo(treasuryShard, { commitment: "processed" }).send();
         if (!accInfo || !accInfo.value) throw new Error("Not initialized");
     } catch {
         console.log(`Initializing Treasury Shard ${shardId}...`);
@@ -137,7 +140,12 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
             rent: "SysvarRent111111111111111111111111111111111" as Address,
             shardId,
         });
-        await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initShardIx], [payer]);
+
+        try {
+            await processInstructions({ rpc, rpcSubscriptions, payer, configPda, treasuryShard }, [initShardIx], [payer]);
+        } catch (e: any) {
+            console.warn(`Shard ${shardId} initialization skipped or failed:`, e.message);
+        }
     }
 
     return {

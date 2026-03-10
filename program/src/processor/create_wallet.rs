@@ -156,11 +156,13 @@ pub fn process(
     }
     check_zero_data(wallet_pda, ProgramError::AccountAlreadyInitialized)?;
 
+    // Derive Vault PDA
     let (vault_key, _vault_bump) =
         find_program_address(&[b"vault", wallet_key.as_ref()], program_id);
     if !sol_assert_bytes_eq(vault_pda.key().as_ref(), vault_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
     }
+    check_zero_data(vault_pda, ProgramError::AccountAlreadyInitialized)?;
 
     // Derive canonical authority PDA and verify user-provided bump matches (audit N1)
     // Must use find_program_address to ensure canonical bump - user-supplied bump
