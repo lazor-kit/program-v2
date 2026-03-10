@@ -8,6 +8,7 @@ pub struct Ed25519Authenticator;
 impl Authenticator for Ed25519Authenticator {
     fn authenticate(
         &self,
+        _program_id: &pinocchio::pubkey::Pubkey,
         accounts: &[AccountInfo],
         authority_data: &mut [u8],
         _auth_payload: &[u8],

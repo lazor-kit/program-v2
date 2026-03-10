@@ -32,8 +32,9 @@ impl Authenticator for Secp256r1Authenticator {
     /// * `signed_payload`: The actual message/data that was signed (e.g. instruction args).
     fn authenticate(
         &self,
+        program_id: &pinocchio::pubkey::Pubkey,
         accounts: &[AccountInfo],
-        auth_data: &mut [u8],
+        authority_data: &mut [u8],
         auth_payload: &[u8],
         signed_payload: &[u8], // The message payload (e.g. compact instructions or args) that is signed
         discriminator: &[u8],
@@ -41,6 +42,8 @@ impl Authenticator for Secp256r1Authenticator {
         if auth_payload.len() < 12 {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
+
+        let _payer = accounts.get(0).ok_or(ProgramError::NotEnoughAccountKeys)?;
 
         let slot = u64::from_le_bytes(auth_payload[0..8].try_into().unwrap());
         let sysvar_ix_index = auth_payload[8] as usize;
@@ -65,13 +68,13 @@ impl Authenticator for Secp256r1Authenticator {
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
         // Check size
-        if auth_data.len() < header_size {
+        if authority_data.len() < header_size {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
 
         // Safe read
         let mut header = unsafe {
-            std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader)
+            std::ptr::read_unaligned(authority_data.as_ptr() as *const AuthorityAccountHeader)
         };
 
         // Secp256r1 on-chain data layout:
@@ -111,9 +114,10 @@ impl Authenticator for Secp256r1Authenticator {
                     signed_payload,
                     &slot.to_le_bytes(),
                     payer.key().as_ref(),
+                    program_id.as_ref(),
                 ]
                 .as_ptr() as *const u8,
-                5,
+                6,
                 hasher.as_mut_ptr(),
             );
         }
@@ -121,6 +125,9 @@ impl Authenticator for Secp256r1Authenticator {
         {
             let _ = signed_payload; // suppress unused warning for non-solana
             let _ = discriminator;
+            let _ = auth_payload;
+            let _ = payer;
+            let _ = program_id;
             hasher = [0u8; 32];
         }
 
@@ -141,12 +148,12 @@ impl Authenticator for Secp256r1Authenticator {
             client_data_hash = [0u8; 32];
         }
 
-        let auth_data_parser = AuthDataParser::new(authenticator_data_raw);
-        if !auth_data_parser.is_user_present() {
+        let authority_data_parser = AuthDataParser::new(authenticator_data_raw);
+        if !authority_data_parser.is_user_present() {
             return Err(AuthError::PermissionDenied.into());
         }
 
-        let authenticator_counter = auth_data_parser.counter() as u64;
+        let authenticator_counter = authority_data_parser.counter() as u64;
 
         if authenticator_counter > 0 && authenticator_counter <= header.counter {
             return Err(AuthError::SignatureReused.into());
@@ -154,7 +161,7 @@ impl Authenticator for Secp256r1Authenticator {
         header.counter = authenticator_counter;
         unsafe {
             std::ptr::write_unaligned(
-                auth_data.as_mut_ptr() as *mut AuthorityAccountHeader,
+                authority_data.as_mut_ptr() as *mut AuthorityAccountHeader,
                 header,
             );
         }
@@ -163,7 +170,7 @@ impl Authenticator for Secp256r1Authenticator {
         // Ensure the domain (rp_id_hash) the user provided in the instruction payload actually matches
         // the rpIdHash that the authenticator (Hardware/FaceID) signed over inside authenticatorData.
         // This validates the origin domain mathematically without wasting 32 bytes on-chain.
-        if auth_data_parser.rp_id_hash() != computed_rp_id_hash {
+        if authority_data_parser.rp_id_hash() != computed_rp_id_hash {
             return Err(AuthError::InvalidPubkey.into());
         }
 
@@ -173,7 +180,7 @@ impl Authenticator for Secp256r1Authenticator {
         // The fuzzing test confirmed the precompile supports 33-byte compressed keys.
 
         // 1. Extract the 33-byte COMPRESSED key from the precompile instruction data
-        let instruction_pubkey_bytes = &auth_data[pubkey_offset..pubkey_offset + 33];
+        let instruction_pubkey_bytes = &authority_data[pubkey_offset..pubkey_offset + 33];
         let expected_pubkey: &[u8; 33] = instruction_pubkey_bytes.try_into().unwrap();
 
         let mut signed_message = Vec::with_capacity(authenticator_data_raw.len() + 32);

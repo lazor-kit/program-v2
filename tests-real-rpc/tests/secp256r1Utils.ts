@@ -166,6 +166,7 @@ export function getSecp256r1MessageToSign(
     authPayload: Uint8Array,
     signedPayload: Uint8Array,
     payer: Uint8Array,
+    programId: Uint8Array,
     authenticatorDataRaw: Uint8Array,
     slotBytes: Uint8Array // 8 bytes Little Endian slot
 ): Uint8Array {
@@ -175,6 +176,7 @@ export function getSecp256r1MessageToSign(
     hasherHash.update(signedPayload);
     hasherHash.update(slotBytes);
     hasherHash.update(payer);
+    hasherHash.update(programId);
     const challengeHash = hasherHash.digest();
 
     const clientDataJsonRaw = Buffer.from(

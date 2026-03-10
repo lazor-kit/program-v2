@@ -72,7 +72,8 @@ pub fn process(
 
     // Transfer lamports from treasury shard to destination wallet, leaving rent exemption behind
     let rent = pinocchio::sysvars::rent::Rent::get()?;
-    let rent_lamports = rent.minimum_balance(0);
+    let shard_space = unsafe { treasury_shard_pda.borrow_data_unchecked() }.len();
+    let rent_lamports = rent.minimum_balance(shard_space);
 
     let shard_lamports = treasury_shard_pda.lamports();
     if shard_lamports <= rent_lamports {

@@ -6,7 +6,7 @@ import {
     getAddressEncoder,
     type TransactionSigner
 } from "@solana/kit";
-import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx } from "./common";
+import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx, PROGRAM_ID_STR } from "./common";
 import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "../../sdk/lazorkit-ts/src";
 
 function getRandomSeed() {
@@ -245,6 +245,7 @@ describe("Instruction: Execute", () => {
             authPayload,
             signedPayload,
             new Uint8Array(getAddressEncoder().encode(context.payer.address)),
+            new Uint8Array(getAddressEncoder().encode(PROGRAM_ID_STR as import("@solana/kit").Address)),
             authenticatorDataRaw,
             currentSlotBytes
         );

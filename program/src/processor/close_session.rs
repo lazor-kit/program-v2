@@ -147,10 +147,24 @@ pub fn process(
 
             if auth_header.authority_type == 0 {
                 // Ed25519
-                Ed25519Authenticator.authenticate(accounts, auth_data, &[], &payload, &[8])?;
+                Ed25519Authenticator.authenticate(
+                    program_id,
+                    accounts,
+                    auth_data,
+                    &[],
+                    &payload,
+                    &[8],
+                )?;
             } else if auth_header.authority_type == 1 {
                 // Secp256r1
-                Secp256r1Authenticator.authenticate(accounts, auth_data, &[], &payload, &[8])?;
+                Secp256r1Authenticator.authenticate(
+                    program_id,
+                    accounts,
+                    auth_data,
+                    &[],
+                    &payload,
+                    &[8],
+                )?;
             } else {
                 return Err(AuthError::InvalidAuthenticationKind.into());
             }

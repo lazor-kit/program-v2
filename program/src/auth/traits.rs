@@ -12,6 +12,7 @@ pub trait Authenticator {
     /// * `signed_payload` - The message/payload that was signed (e.g. instruction args).
     fn authenticate(
         &self,
+        program_id: &pinocchio::pubkey::Pubkey,
         accounts: &[AccountInfo],
         authority_data: &mut [u8],
         auth_payload: &[u8],

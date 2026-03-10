@@ -108,9 +108,6 @@ pub fn process(
 
     // Write the data
     let config_data = unsafe { config_pda.borrow_mut_data_unchecked() };
-    if (config_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
 
     let config_account = ConfigAccount {
         discriminator: AccountDiscriminator::Config as u8,

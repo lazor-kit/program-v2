@@ -47,6 +47,14 @@ fn test_create_wallet_secp256r1_repro() {
     instruction_data.extend_from_slice(&credential_id_hash);
     instruction_data.extend_from_slice(&pubkey_bytes);
 
+    // Derive Config + Treasury shard used by CreateWallet fee logic
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let shard_id: u8 = 0;
+    let shard_id_bytes = [shard_id];
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
+
     let create_wallet_ix = Instruction {
         program_id: context.program_id,
         accounts: vec![
@@ -56,6 +64,8 @@ fn test_create_wallet_secp256r1_repro() {
             AccountMeta::new(auth_pda, false),
             AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
             AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+            AccountMeta::new(config_pda, false),
+            AccountMeta::new(treasury_pda, false),
         ],
         data: {
             let mut data = vec![0]; // Discriminator
@@ -102,6 +112,13 @@ fn test_add_multiple_secp256r1_authorities() {
     );
 
     {
+        // Derive Config + Treasury shard for this wallet
+        let (config_pda, _) =
+            Pubkey::find_program_address(&[b"config"], &context.program_id);
+        let shard_id: u8 = 0;
+        let shard_id_bytes = [shard_id];
+        let (treasury_pda, _) =
+            Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
         let mut instruction_data = Vec::new();
         instruction_data.extend_from_slice(&user_seed);
         instruction_data.push(0); // Ed25519
@@ -118,6 +135,8 @@ fn test_add_multiple_secp256r1_authorities() {
                 AccountMeta::new(owner_pda, false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                AccountMeta::new(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
             ],
             data: {
                 let mut data = vec![0]; // CreateWallet
@@ -179,6 +198,14 @@ fn test_add_multiple_secp256r1_authorities() {
     add_auth_ix_data.extend_from_slice(&pubkey_bytes1);
     add_auth_ix_data.extend_from_slice(signature.as_ref());
 
+    // Re-derive Config + Treasury shard (same as used for wallet creation)
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let shard_id: u8 = 0;
+    let shard_id_bytes = [shard_id];
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
+
     let add_auth_ix1 = Instruction {
         program_id: context.program_id,
         accounts: vec![
@@ -187,7 +214,9 @@ fn test_add_multiple_secp256r1_authorities() {
             AccountMeta::new(owner_pda, false), // Admin Auth PDA (Ed25519) - Writable for counter
             AccountMeta::new(auth_pda1, false), // New Auth PDA (Secp256r1)
             AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
-            AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+            // Config + Treasury shard for protocol fee
+            AccountMeta::new(config_pda, false),
+            AccountMeta::new(treasury_pda, false),
             AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Ed25519 Master Signer (after positional accounts)
         ],
         data: add_auth_ix_data,
@@ -250,7 +279,9 @@ fn test_add_multiple_secp256r1_authorities() {
             AccountMeta::new(owner_pda, false), // Admin Auth PDA (Ed25519) - Writable for counter
             AccountMeta::new(auth_pda2, false), // New Auth PDA (Secp256r1)
             AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
-            AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+            // Config + Treasury shard for protocol fee
+            AccountMeta::new(config_pda, false),
+            AccountMeta::new(treasury_pda, false),
             AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Ed25519 Master Signer (after positional accounts)
         ],
         data: add_auth_ix_data,

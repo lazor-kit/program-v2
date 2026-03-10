@@ -196,7 +196,14 @@ pub fn process(
     match auth_header.authority_type {
         0 => {
             // Ed25519: Include payer + session_key in signed payload
-            Ed25519Authenticator.authenticate(accounts, auth_data, &[], &ed25519_payload, &[5])?;
+            Ed25519Authenticator.authenticate(
+                program_id,
+                accounts,
+                auth_data,
+                &[],
+                &ed25519_payload,
+                &[5],
+            )?;
         },
         1 => {
             // Secp256r1: Include payer in data_payload
@@ -205,6 +212,7 @@ pub fn process(
             extended_data_payload.extend_from_slice(payer.key().as_ref());
 
             Secp256r1Authenticator.authenticate(
+                program_id,
                 accounts,
                 auth_data,
                 authority_payload,

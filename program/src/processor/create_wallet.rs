@@ -157,7 +157,7 @@ pub fn process(
     check_zero_data(wallet_pda, ProgramError::AccountAlreadyInitialized)?;
 
     // Derive Vault PDA
-    let (vault_key, _vault_bump) =
+    let (vault_key, vault_bump) =
         find_program_address(&[b"vault", wallet_key.as_ref()], program_id);
     if !sol_assert_bytes_eq(vault_pda.key().as_ref(), vault_key.as_ref(), 32) {
         return Err(ProgramError::InvalidSeeds);
@@ -175,11 +175,8 @@ pub fn process(
     check_zero_data(auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
     // --- 1. Initialize Wallet Account ---
-    // Calculate rent-exempt balance for fixed 8-byte wallet account layout.
     let wallet_space = 8;
     let wallet_rent = rent.minimum_balance(wallet_space);
-
-    // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let wallet_bump_arr = [wallet_bump];
     let wallet_seeds = [
         Seed::from(b"wallet"),
@@ -197,33 +194,11 @@ pub fn process(
         &wallet_seeds,
     )?;
 
-    // Write Wallet Data
-    let wallet_data = unsafe { wallet_pda.borrow_mut_data_unchecked() };
-    if (wallet_data.as_ptr() as usize) % 8 != 0 {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    let wallet_account = WalletAccount {
-        discriminator: AccountDiscriminator::Wallet as u8,
-        bump: wallet_bump,
-        version: crate::state::CURRENT_ACCOUNT_VERSION,
-        _padding: [0; 5],
-    };
-    unsafe {
-        std::ptr::write_unaligned(
-            wallet_data.as_mut_ptr() as *mut WalletAccount,
-            wallet_account,
-        );
-    }
-
     // --- 2. Initialize Authority Account ---
-    // Authority accounts have a variable size depending on the authority type (e.g., Secp256r1 keys are larger).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
     let variable_size = full_auth_data.len();
-
     let auth_space = header_size + variable_size;
     let auth_rent = rent.minimum_balance(auth_space);
-
-    // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
     let auth_bump_arr = [auth_bump];
     let auth_seeds = [
         Seed::from(b"authority"),
@@ -242,7 +217,76 @@ pub fn process(
         &auth_seeds,
     )?;
 
-    // Write Authority Data
+    // --- 3. Prep Vault PDA ---
+    // Vault accounts are owned by SystemProgram (to support standard transfers).
+    // We fund it to rent-exemption for 0 bytes and allocate(0) to mark it as initialized.
+    let vault_rent = rent.minimum_balance(0);
+    let current_vault_balance = vault_pda.lamports();
+    if current_vault_balance < vault_rent {
+        let transfer_amount = vault_rent
+            .checked_sub(current_vault_balance)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+        let mut transfer_data = [0u8; 12];
+        transfer_data[0..4].copy_from_slice(&2u32.to_le_bytes());
+        transfer_data[4..12].copy_from_slice(&transfer_amount.to_le_bytes());
+        let transfer_accounts = [
+            pinocchio::instruction::AccountMeta {
+                pubkey: payer.key(),
+                is_signer: true,
+                is_writable: true,
+            },
+            pinocchio::instruction::AccountMeta {
+                pubkey: vault_pda.key(),
+                is_signer: false,
+                is_writable: true,
+            },
+        ];
+        let transfer_ix = pinocchio::instruction::Instruction {
+            program_id: &Pubkey::from(crate::utils::SYSTEM_PROGRAM_ID),
+            accounts: &transfer_accounts,
+            data: &transfer_data,
+        };
+        pinocchio::program::invoke(&transfer_ix, &[&payer, &vault_pda, &system_program])?;
+    }
+
+    // Allocate 0 bytes to mark as initialized (owned by system program)
+    let mut allocate_data = [0u8; 12];
+    allocate_data[0..4].copy_from_slice(&8u32.to_le_bytes());
+    allocate_data[4..12].copy_from_slice(&0u64.to_le_bytes());
+    let allocate_accounts = [pinocchio::instruction::AccountMeta {
+        pubkey: vault_pda.key(),
+        is_signer: true,
+        is_writable: true,
+    }];
+    let allocate_ix = pinocchio::instruction::Instruction {
+        program_id: &Pubkey::from(crate::utils::SYSTEM_PROGRAM_ID),
+        accounts: &allocate_accounts,
+        data: &allocate_data,
+    };
+    let vault_bump_arr = [vault_bump];
+    let vault_seeds = [
+        Seed::from(b"vault"),
+        Seed::from(wallet_key.as_ref()),
+        Seed::from(&vault_bump_arr),
+    ];
+    let signer: pinocchio::instruction::Signer = (&vault_seeds).into();
+    pinocchio::program::invoke_signed(&allocate_ix, &[&vault_pda, &system_program], &[signer])?;
+
+    // --- 4. Write Data ---
+    let wallet_data = unsafe { wallet_pda.borrow_mut_data_unchecked() };
+    let wallet_account = WalletAccount {
+        discriminator: AccountDiscriminator::Wallet as u8,
+        bump: wallet_bump,
+        version: crate::state::CURRENT_ACCOUNT_VERSION,
+        _padding: [0; 5],
+    };
+    unsafe {
+        std::ptr::write_unaligned(
+            wallet_data.as_mut_ptr() as *mut WalletAccount,
+            wallet_account,
+        );
+    }
+
     let auth_account_data = unsafe { auth_pda.borrow_mut_data_unchecked() };
     let header = AuthorityAccountHeader {
         discriminator: AccountDiscriminator::Authority as u8,
@@ -255,18 +299,14 @@ pub fn process(
         wallet: *wallet_pda.key(),
     };
 
-    // safe write
     let header_bytes = unsafe {
         std::slice::from_raw_parts(
             &header as *const AuthorityAccountHeader as *const u8,
             std::mem::size_of::<AuthorityAccountHeader>(),
         )
     };
-    auth_account_data[0..std::mem::size_of::<AuthorityAccountHeader>()]
-        .copy_from_slice(header_bytes);
-
-    let variable_target = &mut auth_account_data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    auth_account_data[0..header_size].copy_from_slice(header_bytes);
+    auth_account_data[header_size..header_size + variable_size].copy_from_slice(full_auth_data);
 
     Ok(())
 }
