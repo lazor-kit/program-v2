@@ -188,7 +188,14 @@ pub fn process(
         match auth.authority_type {
             0 => {
                 // Ed25519: Include payer + new_owner in signed payload
-                Ed25519Authenticator.authenticate(accounts, data, &[], &ed25519_payload, &[3])?;
+                Ed25519Authenticator.authenticate(
+                    program_id,
+                    accounts,
+                    data,
+                    &[],
+                    &ed25519_payload,
+                    &[3],
+                )?;
             },
             1 => {
                 // Secp256r1 (WebAuthn) - Must be Writable
@@ -201,6 +208,7 @@ pub fn process(
                 extended_data_payload.extend_from_slice(payer.key().as_ref());
 
                 Secp256r1Authenticator.authenticate(
+                    program_id,
                     accounts,
                     data,
                     authority_payload,

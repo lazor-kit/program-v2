@@ -43,6 +43,14 @@ fn test_create_wallet_ed25519() {
     instruction_data.extend_from_slice(&[0; 6]); // padding
     instruction_data.extend_from_slice(owner_keypair.pubkey().as_ref());
 
+    // Derive Config PDA and Treasury shard PDA (shard 0 for tests)
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let shard_id: u8 = 0;
+    let shard_id_bytes = [shard_id];
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
+
     // Build CreateWallet instruction
     let create_wallet_ix = Instruction {
         program_id: context.program_id,
@@ -53,6 +61,8 @@ fn test_create_wallet_ed25519() {
             AccountMeta::new(auth_pda, false),
             AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
             AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+            AccountMeta::new(config_pda, false),
+            AccountMeta::new(treasury_pda, false),
         ],
         data: {
             let mut data = vec![0]; // CreateWallet discriminator
@@ -148,6 +158,14 @@ fn test_authority_lifecycle() {
         &context.program_id,
     );
 
+    // Derive Config PDA and Treasury shard PDA for this wallet (shard 0 for tests)
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let shard_id: u8 = 0;
+    let shard_id_bytes = [shard_id];
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
+
     // Create Wallet Instruction
     {
         let mut instruction_data = Vec::new();
@@ -166,6 +184,8 @@ fn test_authority_lifecycle() {
                 AccountMeta::new(owner_auth_pda, false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                AccountMeta::new(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
             ],
             data: {
                 let mut data = vec![0]; // CreateWallet discriminator
@@ -237,7 +257,9 @@ fn test_authority_lifecycle() {
                 AccountMeta::new(owner_auth_pda, false), // PDA must be writable for auth logic
                 AccountMeta::new(admin_auth_pda, false), // New authority PDA being created
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
-                AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                // Config + Treasury shard for protocol fee
+                AccountMeta::new(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
             data: {
@@ -290,6 +312,9 @@ fn test_authority_lifecycle() {
                 AccountMeta::new(admin_auth_pda, false), // Target to remove
                 AccountMeta::new(context.payer.pubkey(), false), // Refund destination
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
+                // Config + Treasury shard for protocol fee
+                AccountMeta::new(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
             data: vec![2], // RemoveAuthority discriminator (and empty payload)
@@ -356,6 +381,14 @@ fn test_execute_with_compact_instructions() {
         &context.program_id,
     );
 
+    // Derive Config PDA and Treasury shard PDA for this wallet (shard 0 for tests)
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let shard_id: u8 = 0;
+    let shard_id_bytes = [shard_id];
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &shard_id_bytes], &context.program_id);
+
     // Create Wallet logic (simplified re-use)
     {
         let mut instruction_data = Vec::new();
@@ -374,6 +407,8 @@ fn test_execute_with_compact_instructions() {
                 AccountMeta::new(owner_auth_pda, false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                AccountMeta::new(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
             ],
             data: {
                 let mut data = vec![0];

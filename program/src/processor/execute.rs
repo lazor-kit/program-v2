@@ -40,7 +40,7 @@ pub fn process(
 ) -> ProgramResult {
     // Parse accounts
     let account_info_iter = &mut accounts.iter();
-    let _payer = account_info_iter
+    let payer = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
     let wallet_pda = account_info_iter
@@ -79,7 +79,7 @@ pub fn process(
 
     crate::utils::collect_protocol_fee(
         program_id,
-        _payer,
+        payer,
         &config_account,
         treasury_shard,
         system_program,
@@ -140,7 +140,14 @@ pub fn process(
             match authority_header.authority_type {
                 0 => {
                     // Ed25519: Verify signer (authority_payload ignored)
-                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[], &[4])?;
+                    Ed25519Authenticator.authenticate(
+                        program_id,
+                        accounts,
+                        authority_data,
+                        &[],
+                        &[],
+                        &[4],
+                    )?;
                 },
                 1 => {
                     // Secp256r1 (WebAuthn)
@@ -159,6 +166,7 @@ pub fn process(
                     extended_payload.extend_from_slice(&accounts_hash);
 
                     Secp256r1Authenticator.authenticate(
+                        program_id,
                         accounts,
                         authority_data,
                         authority_payload,

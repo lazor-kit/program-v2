@@ -23,7 +23,7 @@ console.log('✓ Read IDL from', idlPath);
 
 // ─── 2. Inject program address (missing from Shank IDL) ─────────
 idl.metadata = idl.metadata || {};
-idl.metadata.address = '2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT';
+idl.metadata.address = 'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao';
 console.log('✓ Injected program address');
 
 // ─── 2b. Patch account metadata ─────────────────────────────────

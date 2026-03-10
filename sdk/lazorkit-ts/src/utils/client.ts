@@ -15,7 +15,10 @@ import {
     getAddAuthorityInstruction,
     getRemoveAuthorityInstruction,
     getTransferOwnershipInstruction,
-    getCreateSessionInstruction
+    getCreateSessionInstruction,
+    getCloseSessionInstruction,
+    getCloseWalletInstruction,
+    getSweepTreasuryInstruction
 } from "../generated";
 
 import {
@@ -549,6 +552,115 @@ export class LazorClient {
     async getSession(address: AddressLike): Promise<SessionAccount> {
         const account = await fetchSessionAccount(this.rpc, resolveAddress(address));
         return account.data;
+    }
+
+    sweepTreasury(params: {
+        admin: TransactionSigner;
+        config: AddressLike;
+        treasuryShard: AddressLike;
+        destination: AddressLike;
+        shardId: number;
+    }) {
+        return getSweepTreasuryInstruction({
+            admin: params.admin,
+            config: resolveAddress(params.config),
+            treasuryShard: resolveAddress(params.treasuryShard),
+            destination: resolveAddress(params.destination),
+            shardId: params.shardId,
+        });
+    }
+
+    closeWallet(params: {
+        payer: TransactionSigner;
+        wallet: AddressLike;
+        vault: AddressLike;
+        ownerAuthority: AddressLike;
+        destination: AddressLike;
+        ownerSigner?: TransactionSigner;
+        sysvarInstructions?: AddressLike;
+    }) {
+        const instruction = getCloseWalletInstruction({
+            payer: params.payer,
+            wallet: resolveAddress(params.wallet),
+            vault: resolveAddress(params.vault),
+            ownerAuthority: resolveAddress(params.ownerAuthority),
+            destination: resolveAddress(params.destination),
+            ownerSigner: params.ownerSigner,
+            sysvarInstructions: params.sysvarInstructions ? resolveAddress(params.sysvarInstructions) : undefined,
+        });
+
+        const accounts = [
+            meta(params.payer, "ws"),
+            meta(params.wallet, "w"),
+            meta(params.vault, "w"),
+            meta(params.ownerAuthority, "r"),
+            meta(params.destination, "w"),
+        ];
+
+        if (params.ownerSigner) {
+            accounts.push(meta(params.ownerSigner, "s"));
+        }
+
+        if (params.sysvarInstructions) {
+            accounts.push(meta(params.sysvarInstructions, "r"));
+        }
+
+        // Always include System Program for the drain operation (Step 5)
+        accounts.push(meta("11111111111111111111111111111111" as Address, "r"));
+
+        return {
+            programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+            accounts,
+            data: instruction.data
+        };
+    }
+
+    closeSession(params: {
+        payer: TransactionSigner;
+        wallet: AddressLike;
+        session: AddressLike;
+        config: AddressLike;
+        authorizer?: AddressLike;
+        authorizerSigner?: TransactionSigner;
+        sysvarInstructions?: AddressLike;
+    }) {
+        const instruction = getCloseSessionInstruction({
+            payer: params.payer,
+            wallet: resolveAddress(params.wallet),
+            session: resolveAddress(params.session),
+            config: resolveAddress(params.config),
+            authorizer: params.authorizer ? resolveAddress(params.authorizer) : undefined,
+            authorizerSigner: params.authorizerSigner,
+            sysvarInstructions: params.sysvarInstructions ? resolveAddress(params.sysvarInstructions) : undefined,
+        });
+
+        const accounts = [
+            meta(params.payer, "ws"),
+            meta(params.wallet, "r"),
+            meta(params.session, "w"),
+            meta(params.config, "r"),
+        ];
+
+        if (params.authorizer) {
+            accounts.push(meta(params.authorizer, "r"));
+        }
+
+        if (params.authorizerSigner) {
+            accounts.push(meta(params.authorizerSigner, "s"));
+        }
+
+        if (params.sysvarInstructions) {
+            accounts.push(meta(params.sysvarInstructions, "r"));
+        }
+
+        // Include System Program just in case
+        accounts.push(meta("11111111111111111111111111111111" as Address, "r"));
+
+        return {
+            programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
+            accounts,
+            data: instruction.data
+        };
     }
 
     async getAuthorityByPublicKey(walletAddress: AddressLike, pubkey: Address | Uint8Array): Promise<AuthorityAccount | null> {

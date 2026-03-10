@@ -36,10 +36,7 @@ pub fn process(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    pinocchio::msg!("CW: Enter");
-
     let account_info_iter = &mut accounts.iter();
-    pinocchio::msg!("CW: Acc LEN: {}", accounts.len());
     let payer = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
@@ -56,18 +53,13 @@ pub fn process(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    pinocchio::msg!("CW: Payer: signer: {:?}", payer.is_signer());
-
     if !payer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
     if destination.key() == vault_pda.key() || destination.key() == wallet_pda.key() {
-        pinocchio::msg!("CW: Invalid Dest");
         return Err(ProgramError::InvalidArgument);
     }
-
-    pinocchio::msg!("CW: Auth Type Check");
 
     if wallet_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
@@ -114,24 +106,23 @@ pub fn process(
     let mut payload = Vec::with_capacity(32);
     payload.extend_from_slice(destination.key().as_ref());
 
-    pinocchio::msg!(
-        "CW: Auth check. authority_type: {}",
-        auth_header.authority_type
-    );
-
     if auth_header.authority_type == 0 {
         // Ed25519
-        pinocchio::msg!("CW: Calling Ed255");
-        Ed25519Authenticator.authenticate(accounts, auth_data, &[], &payload, &[9])?;
+        Ed25519Authenticator.authenticate(program_id, accounts, auth_data, &[], &payload, &[9])?;
     } else if auth_header.authority_type == 1 {
         // Secp256r1
-        pinocchio::msg!("CW: Calling Secp");
-        Secp256r1Authenticator.authenticate(accounts, auth_data, &[], &payload, &[9])?;
+        Secp256r1Authenticator.authenticate(
+            program_id,
+            accounts,
+            auth_data,
+            &[],
+            &payload,
+            &[9],
+        )?;
     } else {
         return Err(AuthError::InvalidAuthenticationKind.into());
     }
 
-    pinocchio::msg!("CW: Drain Vault");
     // 5. Drain Vault PDA to Destination
     let vault_lamports = vault_pda.lamports();
     if vault_lamports > 0 {
@@ -202,6 +193,5 @@ pub fn process(
     }
     wallet_data.fill(0);
 
-    pinocchio::msg!("CW: Done");
     Ok(())
 }

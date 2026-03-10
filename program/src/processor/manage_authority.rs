@@ -194,7 +194,14 @@ pub fn process_add_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Include payer + new_auth_pda in signed payload
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &ed25519_payload, &[1])?;
+            Ed25519Authenticator.authenticate(
+                program_id,
+                accounts,
+                admin_data,
+                &[],
+                &ed25519_payload,
+                &[1],
+            )?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
@@ -207,6 +214,7 @@ pub fn process_add_authority(
             extended_data_payload.extend_from_slice(payer.key().as_ref());
 
             Secp256r1Authenticator.authenticate(
+                program_id,
                 accounts,
                 admin_data,
                 authority_payload,
@@ -268,7 +276,7 @@ pub fn process_add_authority(
         wallet: *wallet_pda.key(),
     };
     unsafe {
-        *(data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
+        std::ptr::write_unaligned(data.as_mut_ptr() as *mut AuthorityAccountHeader, header);
     }
 
     let variable_target = &mut data[header_size..];
@@ -306,7 +314,7 @@ pub fn process_remove_authority(
     // Build data_payload with target pubkeys (computed after parsing accounts)
 
     let account_info_iter = &mut accounts.iter();
-    let _payer = account_info_iter
+    let payer = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
     let wallet_pda = account_info_iter
@@ -348,7 +356,7 @@ pub fn process_remove_authority(
 
     crate::utils::collect_protocol_fee(
         program_id,
-        _payer,
+        payer,
         &config,
         treasury_shard,
         system_program,
@@ -397,10 +405,18 @@ pub fn process_remove_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Include data_payload in signature verification
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &data_payload, &[2])?;
+            Ed25519Authenticator.authenticate(
+                program_id,
+                accounts,
+                admin_data,
+                &[],
+                &data_payload,
+                &[2],
+            )?;
         },
         1 => {
             Secp256r1Authenticator.authenticate(
+                program_id,
                 accounts,
                 admin_data,
                 authority_payload,
