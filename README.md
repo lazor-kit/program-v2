@@ -20,11 +20,20 @@ Granular permission management for every key with strictly separated PDAs:
 - Create temporary, time-bound keys with specific expiry (`expires_at` defined by absolute slot height).
 - Great for dApps (games, social) to offer "Log in once, act multiple times" UX without exposing the main key.
 
+### 🧹 Account State Cleanup
+- **Close Session**: Both the Wallet Admin/Owner and the Protocol Admin can close expired sessions to retrieve rent exemption SOL. Owners can also close active sessions.
+- **Close Wallet**: Owners (Role 0) can permanently destroy their `Wallet PDA` and `Vault PDA`, sweeping all remaining funds safely to a designated address.
+
+### 💰 Protocol Revenue & Treasuries
+- Secure, deterministic **Treasury Shards** distribute fee collection across multiple PDAs to prevent write-lock contention.
+- Global **Config PDA** manages protocol-wide settings (`wallet_fee`, `action_fee`, `admin`).
+
 ### 🚀 High Performance & Replay Protection
 - **Zero-Copy Serialization**: Built on `pinocchio` casting raw bytes to Rust structs for maximum CU efficiency.
 - **No-Padding Layout**: Optimized data structures (`NoPadding`) to reduce rent costs and ensure memory safety.
 - **SlotHashes Nonce**: Secp256r1 replay protection uses the `SlotHashes` sysvar as a "Proof of Liveness" (valid within 150 slots) instead of expensive on-chain counters.
 - **Transaction Compression**: Uses `CompactInstructions` to fit complex multi-call payloads into standard Solana transaction limits.
+- **Strict Account Binding**: Execution payloads include a hashed view of all relevant account pubkeys to prevent account reordering attacks.
 
 ---
 
@@ -34,8 +43,10 @@ The contract uses a highly modular PDA (Program Derived Address) architecture fo
 
 | Account Type | Description |
 | :--- | :--- |
+| **Config PDA** | Global protocol settings (Fees, Admin). Derived from `["config"]`. |
 | **Wallet PDA** | The main identity anchor. Derived from `["wallet", user_seed]`. |
 | **Vault PDA** | Holds assets (SOL/SPL Tokens). Only the Wallet PDA can sign for it. |
+| **Treasury Shard**| Collects protocol fees safely. Derived from `["treasury", shard_id]`. |
 | **Authority PDA** | Separate PDA for each authorized key (unlimited distinct authorities). Stores role. Derived from `["authority", wallet_pda, id_hash]`. |
 | **Session PDA** | Temporary authority (sub-key) with absolute slot-based expiry. Derived from `["session", wallet_pda, session_key]`. |
 
@@ -86,8 +97,10 @@ We have fixed and verified vulnerabilities including:
 
 ### Security Features
 - **Discriminator Checks**: All PDAs are strictly validated by type constant.
-- **Signature Binding**: Payloads are strictly bound to target accounts and instructions to prevent replay/swapping attacks.
+- **Config Spoofing Prevention**: Strict validation of `Config PDA` derived seeds prevents administrators from being impersonated via fake accounts.
+- **Signature & Account Binding**: Payloads are tightly bound to the target accounts (hashes of all pubkey inputs) and execution instruction data, preventing replay, payload-swapping, or account reordering attacks.
 - **Reentrancy Guards**: Initialized to prevent CPI reentrancy.
+- **Treasury Sweeping**: PDA Lamport balances are directly mutated and strictly enforce network rent-exemption floors to prevent BPF logic exceptions.
 
 ---
 
