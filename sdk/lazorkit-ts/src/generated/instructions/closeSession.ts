@@ -47,9 +47,6 @@ export type CloseSessionInstruction<
   TAccountAuthorizer extends string | AccountMeta<string> = string,
   TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
   TAccountSysvarInstructions extends string | AccountMeta<string> = string,
-  TAccountTreasuryShard extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends string | AccountMeta<string> =
-    "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -78,12 +75,6 @@ export type CloseSessionInstruction<
       TAccountSysvarInstructions extends string
         ? ReadonlyAccount<TAccountSysvarInstructions>
         : TAccountSysvarInstructions,
-      TAccountTreasuryShard extends string
-        ? WritableAccount<TAccountTreasuryShard>
-        : TAccountTreasuryShard,
-      TAccountSystemProgram extends string
-        ? ReadonlyAccount<TAccountSystemProgram>
-        : TAccountSystemProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -121,8 +112,6 @@ export type CloseSessionInput<
   TAccountAuthorizer extends string = string,
   TAccountAuthorizerSigner extends string = string,
   TAccountSysvarInstructions extends string = string,
-  TAccountTreasuryShard extends string = string,
-  TAccountSystemProgram extends string = string,
 > = {
   /** Receives rent refund */
   payer: TransactionSigner<TAccountPayer>;
@@ -138,10 +127,6 @@ export type CloseSessionInput<
   authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
   /** Secp256r1 sysvar */
   sysvarInstructions?: Address<TAccountSysvarInstructions>;
-  /** Treasury Shard PDA */
-  treasuryShard: Address<TAccountTreasuryShard>;
-  /** System Program */
-  systemProgram?: Address<TAccountSystemProgram>;
 };
 
 export function getCloseSessionInstruction<
@@ -152,8 +137,6 @@ export function getCloseSessionInstruction<
   TAccountAuthorizer extends string,
   TAccountAuthorizerSigner extends string,
   TAccountSysvarInstructions extends string,
-  TAccountTreasuryShard extends string,
-  TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: CloseSessionInput<
@@ -163,9 +146,7 @@ export function getCloseSessionInstruction<
     TAccountConfig,
     TAccountAuthorizer,
     TAccountAuthorizerSigner,
-    TAccountSysvarInstructions,
-    TAccountTreasuryShard,
-    TAccountSystemProgram
+    TAccountSysvarInstructions
   >,
   config?: { programAddress?: TProgramAddress },
 ): CloseSessionInstruction<
@@ -176,9 +157,7 @@ export function getCloseSessionInstruction<
   TAccountConfig,
   TAccountAuthorizer,
   TAccountAuthorizerSigner,
-  TAccountSysvarInstructions,
-  TAccountTreasuryShard,
-  TAccountSystemProgram
+  TAccountSysvarInstructions
 > {
   // Program address.
   const programAddress =
@@ -199,19 +178,11 @@ export function getCloseSessionInstruction<
       value: input.sysvarInstructions ?? null,
       isWritable: false,
     },
-    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
-
-  // Resolve default values.
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -223,8 +194,6 @@ export function getCloseSessionInstruction<
       getAccountMeta(accounts.authorizer),
       getAccountMeta(accounts.authorizerSigner),
       getAccountMeta(accounts.sysvarInstructions),
-      getAccountMeta(accounts.treasuryShard),
-      getAccountMeta(accounts.systemProgram),
     ],
     data: getCloseSessionInstructionDataEncoder().encode({}),
     programAddress,
@@ -236,9 +205,7 @@ export function getCloseSessionInstruction<
     TAccountConfig,
     TAccountAuthorizer,
     TAccountAuthorizerSigner,
-    TAccountSysvarInstructions,
-    TAccountTreasuryShard,
-    TAccountSystemProgram
+    TAccountSysvarInstructions
   >);
 }
 
@@ -262,10 +229,6 @@ export type ParsedCloseSessionInstruction<
     authorizerSigner?: TAccountMetas[5] | undefined;
     /** Secp256r1 sysvar */
     sysvarInstructions?: TAccountMetas[6] | undefined;
-    /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[7];
-    /** System Program */
-    systemProgram: TAccountMetas[8];
   };
   data: CloseSessionInstructionData;
 };
@@ -278,7 +241,7 @@ export function parseCloseSessionInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCloseSessionInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 9) {
+  if (instruction.accounts.length < 7) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -304,8 +267,6 @@ export function parseCloseSessionInstruction<
       authorizer: getNextOptionalAccount(),
       authorizerSigner: getNextOptionalAccount(),
       sysvarInstructions: getNextOptionalAccount(),
-      treasuryShard: getNextAccount(),
-      systemProgram: getNextAccount(),
     },
     data: getCloseSessionInstructionDataDecoder().decode(instruction.data),
   };

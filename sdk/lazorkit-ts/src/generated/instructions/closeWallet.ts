@@ -47,10 +47,6 @@ export type CloseWalletInstruction<
   TAccountDestination extends string | AccountMeta<string> = string,
   TAccountOwnerSigner extends string | AccountMeta<string> = string,
   TAccountSysvarInstructions extends string | AccountMeta<string> = string,
-  TAccountConfig extends string | AccountMeta<string> = string,
-  TAccountTreasuryShard extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends string | AccountMeta<string> =
-    "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -79,15 +75,6 @@ export type CloseWalletInstruction<
       TAccountSysvarInstructions extends string
         ? ReadonlyAccount<TAccountSysvarInstructions>
         : TAccountSysvarInstructions,
-      TAccountConfig extends string
-        ? ReadonlyAccount<TAccountConfig>
-        : TAccountConfig,
-      TAccountTreasuryShard extends string
-        ? WritableAccount<TAccountTreasuryShard>
-        : TAccountTreasuryShard,
-      TAccountSystemProgram extends string
-        ? ReadonlyAccount<TAccountSystemProgram>
-        : TAccountSystemProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -125,9 +112,6 @@ export type CloseWalletInput<
   TAccountDestination extends string = string,
   TAccountOwnerSigner extends string = string,
   TAccountSysvarInstructions extends string = string,
-  TAccountConfig extends string = string,
-  TAccountTreasuryShard extends string = string,
-  TAccountSystemProgram extends string = string,
 > = {
   /** Pays tx fee */
   payer: TransactionSigner<TAccountPayer>;
@@ -143,12 +127,6 @@ export type CloseWalletInput<
   ownerSigner?: TransactionSigner<TAccountOwnerSigner>;
   /** Secp256r1 sysvar */
   sysvarInstructions?: Address<TAccountSysvarInstructions>;
-  /** Config PDA */
-  config: Address<TAccountConfig>;
-  /** Treasury Shard PDA */
-  treasuryShard: Address<TAccountTreasuryShard>;
-  /** System Program */
-  systemProgram?: Address<TAccountSystemProgram>;
 };
 
 export function getCloseWalletInstruction<
@@ -159,9 +137,6 @@ export function getCloseWalletInstruction<
   TAccountDestination extends string,
   TAccountOwnerSigner extends string,
   TAccountSysvarInstructions extends string,
-  TAccountConfig extends string,
-  TAccountTreasuryShard extends string,
-  TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: CloseWalletInput<
@@ -171,10 +146,7 @@ export function getCloseWalletInstruction<
     TAccountOwnerAuthority,
     TAccountDestination,
     TAccountOwnerSigner,
-    TAccountSysvarInstructions,
-    TAccountConfig,
-    TAccountTreasuryShard,
-    TAccountSystemProgram
+    TAccountSysvarInstructions
   >,
   config?: { programAddress?: TProgramAddress },
 ): CloseWalletInstruction<
@@ -185,10 +157,7 @@ export function getCloseWalletInstruction<
   TAccountOwnerAuthority,
   TAccountDestination,
   TAccountOwnerSigner,
-  TAccountSysvarInstructions,
-  TAccountConfig,
-  TAccountTreasuryShard,
-  TAccountSystemProgram
+  TAccountSysvarInstructions
 > {
   // Program address.
   const programAddress =
@@ -206,20 +175,11 @@ export function getCloseWalletInstruction<
       value: input.sysvarInstructions ?? null,
       isWritable: false,
     },
-    config: { value: input.config ?? null, isWritable: false },
-    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
-
-  // Resolve default values.
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -231,9 +191,6 @@ export function getCloseWalletInstruction<
       getAccountMeta(accounts.destination),
       getAccountMeta(accounts.ownerSigner),
       getAccountMeta(accounts.sysvarInstructions),
-      getAccountMeta(accounts.config),
-      getAccountMeta(accounts.treasuryShard),
-      getAccountMeta(accounts.systemProgram),
     ],
     data: getCloseWalletInstructionDataEncoder().encode({}),
     programAddress,
@@ -245,10 +202,7 @@ export function getCloseWalletInstruction<
     TAccountOwnerAuthority,
     TAccountDestination,
     TAccountOwnerSigner,
-    TAccountSysvarInstructions,
-    TAccountConfig,
-    TAccountTreasuryShard,
-    TAccountSystemProgram
+    TAccountSysvarInstructions
   >);
 }
 
@@ -272,12 +226,6 @@ export type ParsedCloseWalletInstruction<
     ownerSigner?: TAccountMetas[5] | undefined;
     /** Secp256r1 sysvar */
     sysvarInstructions?: TAccountMetas[6] | undefined;
-    /** Config PDA */
-    config: TAccountMetas[7];
-    /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[8];
-    /** System Program */
-    systemProgram: TAccountMetas[9];
   };
   data: CloseWalletInstructionData;
 };
@@ -290,7 +238,7 @@ export function parseCloseWalletInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCloseWalletInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 10) {
+  if (instruction.accounts.length < 7) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -316,9 +264,6 @@ export function parseCloseWalletInstruction<
       destination: getNextAccount(),
       ownerSigner: getNextOptionalAccount(),
       sysvarInstructions: getNextOptionalAccount(),
-      config: getNextAccount(),
-      treasuryShard: getNextAccount(),
-      systemProgram: getNextAccount(),
     },
     data: getCloseWalletInstructionDataDecoder().decode(instruction.data),
   };

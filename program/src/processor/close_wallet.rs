@@ -32,14 +32,14 @@ pub fn process(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    // Note: Protocol fee is usually taken at the start. Since this is a final cleanup action,
-    // we may choose not to charge a fee, or the entrypoint logic has already charged it.
-    // Assuming entrypoint handles protocol fee. Wait! We decided to NOT charge fees for close actions.
     if !instruction_data.is_empty() {
         return Err(ProgramError::InvalidInstructionData);
     }
 
+    pinocchio::msg!("CW: Enter");
+
     let account_info_iter = &mut accounts.iter();
+    pinocchio::msg!("CW: Acc LEN: {}", accounts.len());
     let payer = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
@@ -56,36 +56,18 @@ pub fn process(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
+    pinocchio::msg!("CW: Payer: signer: {:?}", payer.is_signer());
+
     if !payer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // 1. Validate Wallet PDA
-    let len = accounts.len();
-    if len < 8 {
-        // 5 fixed + Config + Treasury + SystemProgram = 8 minimum
-        return Err(ProgramError::NotEnoughAccountKeys);
+    if destination.key() == vault_pda.key() || destination.key() == wallet_pda.key() {
+        pinocchio::msg!("CW: Invalid Dest");
+        return Err(ProgramError::InvalidArgument);
     }
-    let config_pda = &accounts[len - 3];
-    let treasury_shard = &accounts[len - 2];
-    let system_program = &accounts[len - 1];
 
-    let config_data = unsafe { config_pda.borrow_data_unchecked() };
-    if config_data.len() < std::mem::size_of::<crate::state::config::ConfigAccount>() {
-        return Err(ProgramError::UninitializedAccount);
-    }
-    let config = unsafe {
-        std::ptr::read_unaligned(config_data.as_ptr() as *const crate::state::config::ConfigAccount)
-    };
-
-    crate::utils::collect_protocol_fee(
-        program_id,
-        payer, // Using payer
-        &config,
-        treasury_shard,
-        system_program,
-        false, // not a wallet creation
-    )?;
+    pinocchio::msg!("CW: Auth Type Check");
 
     if wallet_pda.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
@@ -132,29 +114,79 @@ pub fn process(
     let mut payload = Vec::with_capacity(32);
     payload.extend_from_slice(destination.key().as_ref());
 
+    pinocchio::msg!(
+        "CW: Auth check. authority_type: {}",
+        auth_header.authority_type
+    );
+
     if auth_header.authority_type == 0 {
         // Ed25519
+        pinocchio::msg!("CW: Calling Ed255");
         Ed25519Authenticator.authenticate(accounts, auth_data, &[], &payload, &[9])?;
     } else if auth_header.authority_type == 1 {
         // Secp256r1
+        pinocchio::msg!("CW: Calling Secp");
         Secp256r1Authenticator.authenticate(accounts, auth_data, &[], &payload, &[9])?;
     } else {
         return Err(AuthError::InvalidAuthenticationKind.into());
     }
 
+    pinocchio::msg!("CW: Drain Vault");
     // 5. Drain Vault PDA to Destination
     let vault_lamports = vault_pda.lamports();
-    let dest_lamports = destination.lamports();
+    if vault_lamports > 0 {
+        // Must use CPI to transfer because the Vault is owned by SystemProgram
+        let mut system_program = None;
+        for acc in accounts {
+            if acc.key().as_ref() == &[0; 32] {
+                system_program = Some(acc);
+                break;
+            }
+        }
+        let sys_prog = system_program.ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    unsafe {
-        *destination.borrow_mut_lamports_unchecked() = dest_lamports
-            .checked_add(vault_lamports)
-            .ok_or(ProgramError::ArithmeticOverflow)?;
-        *vault_pda.borrow_mut_lamports_unchecked() = 0;
-    }
-    let vault_data = unsafe { vault_pda.borrow_mut_data_unchecked() };
-    if !vault_data.is_empty() {
-        vault_data.fill(0);
+        // Create instruction
+        let mut ix_data = [0u8; 12];
+        ix_data[0..4].copy_from_slice(&2u32.to_le_bytes()); // Transfer instruction index
+        ix_data[4..12].copy_from_slice(&vault_lamports.to_le_bytes());
+
+        let account_metas = [
+            pinocchio::instruction::AccountMeta {
+                pubkey: vault_pda.key(),
+                is_signer: true,
+                is_writable: true,
+            },
+            pinocchio::instruction::AccountMeta {
+                pubkey: destination.key(),
+                is_signer: false,
+                is_writable: true,
+            },
+        ];
+
+        let ix = pinocchio::instruction::Instruction {
+            program_id: sys_prog.key(),
+            accounts: &account_metas,
+            data: &ix_data,
+        };
+
+        let vault_bump_pda =
+            find_program_address(&[b"vault", wallet_pda.key().as_ref()], program_id).1;
+        let vault_bump_arr = [vault_bump_pda];
+        let seeds = [
+            pinocchio::instruction::Seed::from(b"vault"),
+            pinocchio::instruction::Seed::from(wallet_pda.key().as_ref()),
+            pinocchio::instruction::Seed::from(&vault_bump_arr),
+        ];
+        let signer: pinocchio::instruction::Signer = (&seeds).into();
+
+        let cpi_accounts = [
+            pinocchio::instruction::Account::from(vault_pda),
+            pinocchio::instruction::Account::from(destination),
+        ];
+
+        unsafe {
+            pinocchio::program::invoke_signed_unchecked(&ix, &cpi_accounts, &[signer]);
+        }
     }
 
     // 6. Drain Wallet PDA to Destination
@@ -170,5 +202,6 @@ pub fn process(
     }
     wallet_data.fill(0);
 
+    pinocchio::msg!("CW: Done");
     Ok(())
 }

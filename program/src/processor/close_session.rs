@@ -38,7 +38,6 @@ pub fn process(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    // Note: Protocol fee is not charged for cleanup actions.
     if !instruction_data.is_empty() {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -61,27 +60,16 @@ pub fn process(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let len = accounts.len();
-    if len < 6 {
-        return Err(ProgramError::NotEnoughAccountKeys);
+    let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
+    if !sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
+        return Err(ProgramError::InvalidSeeds);
     }
-    let treasury_shard = &accounts[len - 2];
-    let system_program = &accounts[len - 1];
 
     let config_data = unsafe { config_pda.borrow_data_unchecked() };
     if config_data.len() < std::mem::size_of::<ConfigAccount>() {
         return Err(ProgramError::UninitializedAccount);
     }
     let config = unsafe { std::ptr::read_unaligned(config_data.as_ptr() as *const ConfigAccount) };
-
-    crate::utils::collect_protocol_fee(
-        program_id,
-        payer,
-        &config,
-        treasury_shard,
-        system_program,
-        false, // not a wallet creation
-    )?;
 
     // 1. Validate Session PDA
     if session_pda.owner() != program_id {
@@ -122,13 +110,8 @@ pub fn process(
     let mut is_authorized = false;
 
     // Is the caller the contract admin?
-    if *payer.key() == config.admin {
-        if is_expired {
-            is_authorized = true;
-        } else {
-            // Admin cannot close active sessions
-            return Err(AuthError::PermissionDenied.into());
-        }
+    if *payer.key() == config.admin && is_expired {
+        is_authorized = true;
     }
 
     // Is there an authorizer PDA provided?

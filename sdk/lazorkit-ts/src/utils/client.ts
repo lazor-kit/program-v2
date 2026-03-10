@@ -200,7 +200,6 @@ export class LazorClient {
             meta(params.adminAuthority, "w"), // Secp needs writable
             meta(params.newAuthority, "w"),
             meta("11111111111111111111111111111111" as Address, "r"), // System
-            meta("SysvarRent111111111111111111111111111111111" as Address, "r"), // Rent
         ];
 
         if (params.authorizerSigner) {
