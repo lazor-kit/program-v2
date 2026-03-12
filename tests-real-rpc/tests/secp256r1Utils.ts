@@ -34,30 +34,65 @@ export async function signWithSecp256r1(signer: MockSecp256r1Signer, message: Ui
     const SECP256R1_N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
     const HALF_N = SECP256R1_N / 2n;
 
-    // extract 32-byte r and 32-byte s
-    const rBuffer = rawSig.slice(0, 32);
-    const sBuffer = rawSig.slice(32, 64);
+    let rBuffer: Uint8Array;
+    let sBufferLocal: Uint8Array;
+
+    // Check if signature is DER encoded (starts with 0x30)
+    if (rawSig[0] === 0x30) {
+        // DER decode: 30 <len> 02 <r_len> <r_bytes> 02 <s_len> <s_bytes>
+        let offset = 2; // skip 30 <len>
+        if (rawSig[offset] !== 0x02) throw new Error("Invalid DER: expected 0x02 for r");
+        offset++;
+        const rLen = rawSig[offset]; offset++;
+        const rRaw = rawSig.slice(offset, offset + rLen); offset += rLen;
+        if (rawSig[offset] !== 0x02) throw new Error("Invalid DER: expected 0x02 for s");
+        offset++;
+        const sLen = rawSig[offset]; offset++;
+        const sRaw = rawSig.slice(offset, offset + sLen);
+
+        // Pad/trim r and s to exactly 32 bytes
+        rBuffer = new Uint8Array(32);
+        if (rRaw.length > 32) {
+            rBuffer.set(rRaw.slice(rRaw.length - 32));
+        } else {
+            rBuffer.set(rRaw, 32 - rRaw.length);
+        }
+        sBufferLocal = new Uint8Array(32);
+        if (sRaw.length > 32) {
+            sBufferLocal.set(sRaw.slice(sRaw.length - 32));
+        } else {
+            sBufferLocal.set(sRaw, 32 - sRaw.length);
+        }
+    } else if (rawSig.length >= 64) {
+        // Raw r||s format (64 bytes)
+        rBuffer = rawSig.slice(0, 32);
+        sBufferLocal = rawSig.slice(32, 64);
+    } else {
+        throw new Error(`Unexpected signature format: length=${rawSig.length}, first byte=0x${rawSig[0]?.toString(16)}`);
+    }
 
     // convert s to bigint
     let sBigInt = 0n;
     for (let i = 0; i < 32; i++) {
-        sBigInt = (sBigInt << 8n) + BigInt(sBuffer[i]);
+        sBigInt = (sBigInt << 8n) + BigInt(sBufferLocal[i]);
     }
 
     if (sBigInt > HALF_N) {
         // Enforce low S: s = n - s
         sBigInt = SECP256R1_N - sBigInt;
 
-        // Write low S back to sBuffer
+        // Write low S back to sBufferLocal
         for (let i = 31; i >= 0; i--) {
-            sBuffer[i] = Number(sBigInt & 0xffn);
+            sBufferLocal[i] = Number(sBigInt & 0xffn);
             sBigInt >>= 8n;
         }
-
-        rawSig.set(sBuffer, 32);
     }
 
-    return rawSig;
+    // Return 64-byte raw r||s
+    const result = new Uint8Array(64);
+    result.set(rBuffer, 0);
+    result.set(sBufferLocal, 32);
+    return result;
 }
 
 function bytesOf(data: any): Uint8Array {

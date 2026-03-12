@@ -53,16 +53,16 @@ pub fn process(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    let len = accounts.len();
-    if len < 7 {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    // As per IDL, Config is at 4, Treasury at 5, SystemProgram at 6, optional Sysvar at 7
+    let config_pda = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let system_program = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    // Let's get config and treasury from fixed indices 4 and 5
-    let config_pda = accounts.get(4).ok_or(ProgramError::NotEnoughAccountKeys)?;
-    let treasury_shard = accounts.get(5).ok_or(ProgramError::NotEnoughAccountKeys)?;
-    let system_program = accounts.get(6).ok_or(ProgramError::NotEnoughAccountKeys)?;
 
     // Parse Config and Charge Fee early
     let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);

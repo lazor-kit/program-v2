@@ -18,22 +18,6 @@ pub fn setup_test() -> TestContext {
     // Load program
     let program_id = load_program(&mut svm);
 
-    TestContext {
-        svm,
-        payer,
-        program_id,
-    }
-}
-
-fn load_program(svm: &mut LiteSVM) -> Pubkey {
-    // LazorKit program ID (deterministic for tests)
-    let program_id = Pubkey::new_unique();
-
-    // Load the compiled program
-    let path = "../target/deploy/lazorkit_program.so";
-    svm.add_program_from_file(program_id, path)
-        .expect("Failed to load program");
-
     // Initialize a zero-fee Config PDA and a single Treasury shard (id 0)
     // so that protocol fee logic in tests has valid accounts to read from.
     {
@@ -53,7 +37,7 @@ fn load_program(svm: &mut LiteSVM) -> Pubkey {
             version: CURRENT_ACCOUNT_VERSION,
             num_shards: 1,
             _padding: [0; 4],
-            admin: Pubkey::default().to_bytes(),
+            admin: payer.pubkey().to_bytes().into(),
             wallet_fee: 0,
             action_fee: 0,
         };
@@ -67,7 +51,7 @@ fn load_program(svm: &mut LiteSVM) -> Pubkey {
         }
 
         let config_account = Account {
-            lamports: 1,
+            lamports: 100_000_000, // Enough for rent
             data: config_bytes,
             owner: program_id,
             executable: false,
@@ -76,7 +60,7 @@ fn load_program(svm: &mut LiteSVM) -> Pubkey {
         let _ = svm.set_account(config_pda, config_account);
 
         let treasury_account = Account {
-            lamports: 1_000_000,
+            lamports: 100_000_000,
             data: vec![],
             owner: solana_sdk::system_program::id(),
             executable: false,
@@ -84,6 +68,22 @@ fn load_program(svm: &mut LiteSVM) -> Pubkey {
         };
         let _ = svm.set_account(treasury_pda, treasury_account);
     }
+
+    TestContext {
+        svm,
+        payer,
+        program_id,
+    }
+}
+
+fn load_program(svm: &mut LiteSVM) -> Pubkey {
+    // LazorKit program ID (deterministic for tests)
+    let program_id = Pubkey::new_unique();
+
+    // Load the compiled program
+    let path = "../target/deploy/lazorkit_program.so";
+    svm.add_program_from_file(program_id, path)
+        .expect("Failed to load program");
 
     program_id
 }

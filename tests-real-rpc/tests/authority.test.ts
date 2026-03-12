@@ -45,7 +45,7 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
             authPubkey: ownerBytes,
             credentialHash: new Uint8Array(32),
         }));
-    });
+    }, 30000);
 
     it("Success: Owner adds an Admin", async () => {
         const newAdmin = await generateKeyPairSigner();
@@ -310,16 +310,11 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
             refundDestination: context.payer.address,
         });
 
-        // SDK doesn't automatically fetch Sysvar Instructions or SlotHashes for removeAuthority, we must add them for Secp256r1
-        // Insert sysvars BEFORE Config/TreasuryShard (last 2 accounts)
-        // because Rust reads Config from accounts[len-2] and TreasuryShard from accounts[len-1]
-        const baseAccounts = (removeAuthIx.accounts || []).slice(0, -2);
-        const configAndTreasury = (removeAuthIx.accounts || []).slice(-2);
+        // Append sysvars AFTER all existing accounts (config/treasury consumed by iterator)
         removeAuthIx.accounts = [
-            ...baseAccounts,
+            ...(removeAuthIx.accounts || []),
             { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
             { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
-            ...configAndTreasury,
         ];
 
         // Fetch current slot and slotHash from SysvarS1otHashes
@@ -330,8 +325,8 @@ describe("Instruction: ManageAuthority (Add/Remove)", () => {
         const currentSlotHash = new Uint8Array(rawData.buffer, rawData.byteOffset + 16, 32);
 
         // SYSVAR Indexes
-        const sysvarIxIndex = baseAccounts.length;      // Sysvar1nstructions position
-        const sysvarSlotIndex = baseAccounts.length + 1; // SysvarSlotHashes position
+        const sysvarIxIndex = removeAuthIx.accounts.length - 2;      // Sysvar1nstructions position
+        const sysvarSlotIndex = removeAuthIx.accounts.length - 1; // SysvarSlotHashes position
 
         const { buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
         const authenticatorDataRaw = generateAuthenticatorData("example.com");

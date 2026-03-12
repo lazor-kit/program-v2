@@ -5,7 +5,7 @@ use pinocchio::{
     pubkey::Pubkey, ProgramResult,
 };
 
-use crate::{error::AuthError, state::config::ConfigAccount};
+use crate::{error::AuthError, state::{config::ConfigAccount, AccountDiscriminator}};
 
 /// Arguments for `UpdateConfig`.
 /// Fixed length format: 53 bytes total.
@@ -105,6 +105,9 @@ pub fn process(
         unsafe { std::ptr::read_unaligned(config_data.as_ptr() as *const ConfigAccount) };
 
     // Verify Admin
+    if config_account.discriminator != AccountDiscriminator::Config as u8 {
+        return Err(ProgramError::InvalidAccountData);
+    }
     if config_account.admin != *admin_info.key() {
         return Err(AuthError::PermissionDenied.into()); // Only current admin can update
     }

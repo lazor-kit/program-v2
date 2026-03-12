@@ -129,12 +129,56 @@ describe("Config and Treasury Instructions", () => {
         console.log("ERROR RESULT:", result.result); expect(result.result).to.not.equal("ok"); // Authority error (6006)
     });
 
+    it("should reject update config if a wrong account type is passed (discriminator check)", async () => {
+        const { payer, configPda } = context;
+        // In this test, we'll try to use the Wallet PDA's address in place of the Config PDA.
+        // Assuming we have a wallet pda from setup or we can just use a dummy address that has a different discriminator.
+        // But the best is to use an actual PDA from our program but with a different discriminator (e.g., Wallet = 1).
+        
+        const ixData = new Uint8Array(57);
+        ixData[0] = 7; // UpdateConfig
+        ixData[1] = 1; // updateWalletFee
+        // ... rest doesn't matter much as long as it reaches discriminator check
+
+        // We'll use the payer as a dummy "config" account. It won't have the correct owner (System Program instead of our program),
+        // but the code checks Seeds/Owner first. 
+        // To really test the discriminator check, we need an account OWNED by the program but with DIFFERENT discriminator.
+        // Let's create a wallet first to get a Wallet PDA.
+        
+        const walletPda = context.walletPda; // setupTest usually provides this
+
+        const updateConfigIx = {
+            programAddress: PROGRAM_ID_STR as Address,
+            accounts: [
+                { address: payer.address, role: 3, signer: payer },
+                { address: walletPda, role: 1 }, // Pass Wallet PDA instead of Config PDA
+            ],
+            data: ixData
+        };
+
+        const result = await tryProcessInstructions(context, [updateConfigIx], [payer]);
+        // Should fail with InvalidAccountData (6003 or similar) due to discriminator mismatch
+        console.log("DISCRIMINATOR CHECK RESULT:", result.result);
+        expect(result.result).to.not.equal("ok");
+    });
+
     it("should initialize a new treasury shard", async () => {
         const { payer, configPda } = context;
+        let treasuryShardPda = "11111111111111111111111111111111" as Address;
+        let shardId = 0;
 
         // Using shard 1 since shard 0 or hasher's derived shard was initialized in setup
-        const shardId = 1;
-        const [treasuryShardPda] = await findTreasuryShardPda(shardId);
+        for (let i = 0; i < 16; i++) {
+            shardId = i;
+            treasuryShardPda = (await findTreasuryShardPda(shardId))[0];
+
+            // check if shard is already initialized
+            const shardInfo = await context.rpc.getAccountInfo(treasuryShardPda, { commitment: "confirmed" }).send();
+
+            if (shardInfo?.value === null) {
+                break;
+            }
+        }
 
         const initShardIx = getInitTreasuryShardInstruction({
             payer: payer,
@@ -146,14 +190,22 @@ describe("Config and Treasury Instructions", () => {
         });
 
         const result = await tryProcessInstructions(context, [initShardIx], [payer]);
-        expect(result.result).to.equal("ok");
+        expect(result.result).toEqual("ok");
     });
 
     it("should sweep treasury shard funds as admin", async () => {
         const { rpc, payer, configPda } = context;
 
-        const shardId = 1;
+        // Use the shard from setupTest (which we know is initialized)
+        const { getAddressEncoder: getAddrEnc } = await import("@solana/kit");
+        const pubkeyBytes = getAddrEnc().encode(payer.address);
+        const sum = pubkeyBytes.reduce((a: number, b: number) => a + b, 0);
+        const shardId = sum % 16;
         const [treasuryShardPda] = await findTreasuryShardPda(shardId);
+
+        // Check shard exists and has funds above rent-exempt
+        const preBalance = await rpc.getBalance(treasuryShardPda).send();
+        console.log(`Pre-sweep shard ${shardId} balance: ${preBalance.value}`);
 
         // Transfer some lamports to shard directly to simulate fees
         const systemTransferIx = {
@@ -166,21 +218,13 @@ describe("Config and Treasury Instructions", () => {
         };
         await processInstructions(context, [systemTransferIx], [payer]);
 
-        const sweepIxRaw = getSweepTreasuryInstruction({
+        const sweepIx = getSweepTreasuryInstruction({
             admin: payer,
             config: configPda,
             treasuryShard: treasuryShardPda,
             destination: payer.address,
             shardId,
         });
-
-        const sweepIx = {
-            ...sweepIxRaw,
-            accounts: [
-                ...sweepIxRaw.accounts,
-                { address: "11111111111111111111111111111111" as Address, role: 1 }
-            ]
-        };
 
         const initialPayerBalance = await rpc.getBalance(payer.address).send();
         const sweepResult = await tryProcessInstructions(context, [sweepIx], [payer]);

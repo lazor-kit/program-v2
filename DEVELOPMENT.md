@@ -2,6 +2,13 @@
 
 This document outlines the standard procedures for building, deploying, and testing the LazorKit program and its associated SDK.
 
+## 🚀 Local Quick Start (Recommended)
+If you are developing locally, you can run everything (Build + Validator + Tests) with a single command:
+```bash
+./scripts/test.sh
+```
+This script ensures a clean environment, builds the latest program, and runs the full Vitest suite against a local validator.
+
 ## 1. Prerequisites
 - [Solana Tool Suite](https://docs.solanalabs.com/cli/install) (latest stable)
 - [Rust](https://www.rust-lang.org/tools/install)

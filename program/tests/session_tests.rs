@@ -23,6 +23,9 @@ fn test_session_lifecycle() {
         Pubkey::find_program_address(&[b"wallet", &user_seed], &context.program_id);
     let (vault_pda, _) =
         Pubkey::find_program_address(&[b"vault", wallet_pda.as_ref()], &context.program_id);
+    let (config_pda, _) = Pubkey::find_program_address(&[b"config"], &context.program_id);
+    let (treasury_pda, _) =
+        Pubkey::find_program_address(&[b"treasury", &[0]], &context.program_id);
     let (owner_auth_pda, owner_bump) = Pubkey::find_program_address(
         &[
             b"authority",
@@ -50,6 +53,8 @@ fn test_session_lifecycle() {
                 AccountMeta::new(owner_auth_pda, false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                AccountMeta::new_readonly(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
             ],
             data: {
                 let mut data = vec![0]; // CreateWallet discriminator
@@ -121,6 +126,8 @@ fn test_session_lifecycle() {
                 AccountMeta::new(session_pda, false),    // New Session PDA
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::rent::id(), false),
+                AccountMeta::new_readonly(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Signer
             ],
             data: {
@@ -157,8 +164,8 @@ fn test_session_lifecycle() {
         transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
 
         let compact_ix = CompactInstruction {
-            program_id_index: 6,
-            accounts: vec![4, 5, 6], // Vault, Payer, SystemProgram
+            program_id_index: 9, // SystemProgram is at index 9
+            accounts: vec![7, 8, 9], // Vault (7), Payer (8), SystemProgram (9)
             data: transfer_data,
         };
         let compact_bytes = compact::serialize_compact_instructions(&[compact_ix]);
@@ -170,6 +177,9 @@ fn test_session_lifecycle() {
                 AccountMeta::new(wallet_pda, false),
                 AccountMeta::new(session_pda, false), // Session PDA as Authority
                 AccountMeta::new(vault_pda, false),
+                AccountMeta::new_readonly(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
+                AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 // Inner accounts
                 AccountMeta::new(vault_pda, false),
                 AccountMeta::new(context.payer.pubkey(), false),
@@ -215,8 +225,8 @@ fn test_session_lifecycle() {
         transfer_data.extend_from_slice(&2u32.to_le_bytes());
         transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
         let compact_ix = CompactInstruction {
-            program_id_index: 6,
-            accounts: vec![4, 5, 6], // Vault, Payer, SystemProgram
+            program_id_index: 9,
+            accounts: vec![7, 8, 9], // Vault, Payer, SystemProgram
             data: transfer_data,
         };
         let compact_bytes = compact::serialize_compact_instructions(&[compact_ix]);
@@ -228,6 +238,9 @@ fn test_session_lifecycle() {
                 AccountMeta::new(wallet_pda, false),
                 AccountMeta::new(session_pda, false),
                 AccountMeta::new(vault_pda, false),
+                AccountMeta::new_readonly(config_pda, false),
+                AccountMeta::new(treasury_pda, false),
+                AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 AccountMeta::new(vault_pda, false),
                 AccountMeta::new(context.payer.pubkey(), false),
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
