@@ -23,6 +23,7 @@ import {
 
 import {
     getAddressEncoder,
+    getAddressDecoder,
     type Address,
     type TransactionSigner,
     type ReadonlyUint8Array,
@@ -31,6 +32,7 @@ import {
     type ProgramDerivedAddress,
     AccountRole,
     upgradeRoleToSigner,
+    getBase58Decoder,
 } from "@solana/kit";
 
 import {
@@ -688,5 +690,37 @@ export class LazorClient {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * Globally finds all Authority accounts belonging to this program that match a credentialIdHash.
+     * Useful for recovering a wallet when only the Passkey (Credential ID) is known.
+     */
+    async findAllAuthoritiesByCredentialId(credentialIdHash: Uint8Array): Promise<{ authority: Address; wallet: Address; role: number; authorityType: number }[]> {
+        const base58Decoder = getBase58Decoder();
+        const base58Hash = base58Decoder.decode(credentialIdHash);
+        const accounts = await this.rpc.getProgramAccounts(LAZORKIT_PROGRAM_PROGRAM_ADDRESS, {
+            encoding: 'base64',
+            filters: [
+                { memcmp: { offset: 0, bytes: base58Decoder.decode(new Uint8Array([2])) } }, // Discriminator: Authority (2)
+                { memcmp: { offset: 48, bytes: base58Hash } }                                // credentialIdHash starts at header offset (48)
+            ]
+        }).send();
+
+        return accounts.map((acc: any) => {
+            const data = Buffer.from(acc.account.data[0], 'base64');
+            // Offset 3 (Bump), 5 (Padding - skip 3), 8 (Counter - skip 8), 16 (Wallet - 32 bytes)
+            // Wallet starts at offset 16 of the data
+            const role = data[2];
+            const authorityType = data[1];
+            const wallet = getAddressDecoder().decode(new Uint8Array(data.slice(16, 48)));
+            
+            return {
+                authority: acc.pubkey as Address,
+                wallet,
+                role,
+                authorityType
+            };
+        });
     }
 }
