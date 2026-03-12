@@ -4,7 +4,6 @@ import {
     getAddressEncoder,
     generateKeyPairSigner,
     type Address,
-    type TransactionSigner
 } from "@solana/kit";
 import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx, PROGRAM_ID_STR } from "./common";
 import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
@@ -462,17 +461,12 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
             // No authorizerSigner for Secp256r1
         });
 
-        // SDK accounts array is typically frozen, we MUST reassign a new array!
-        // Insert sysvars BEFORE Config/TreasuryShard (last 2 accounts)
-        // because Rust reads Config from accounts[len-2] and TreasuryShard from accounts[len-1]
-        const baseAccounts = (transferIx.accounts || []).slice(0, -2);
-        const configAndTreasury = (transferIx.accounts || []).slice(-2);
+        // Append sysvars AFTER all existing accounts (config/treasury consumed by iterator)
         transferIx.accounts = [
-            ...baseAccounts,
+            ...(transferIx.accounts || []),
             { address: "Sysvar1nstructions1111111111111111111111111" as any, role: 0 },
             { address: "SysvarS1otHashes111111111111111111111111111" as any, role: 0 },
             { address: "SysvarRent111111111111111111111111111111111" as any, role: 0 },
-            ...configAndTreasury,
         ];
 
         // Fetch current slot and slotHash from SysvarS1otHashes
@@ -481,8 +475,8 @@ describe("Wallet Lifecycle (Create, Discovery, Ownership)", () => {
         const rawData = Buffer.from(accountInfo.value!.data[0] as string, 'base64');
         const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
 
-        const sysvarIxIndex = baseAccounts.length;      // Sysvar1nstructions position
-        const sysvarSlotIndex = baseAccounts.length + 1; // SysvarSlotHashes position
+        const sysvarIxIndex = transferIx.accounts.length - 3;      // Sysvar1nstructions position
+        const sysvarSlotIndex = transferIx.accounts.length - 2; // SysvarSlotHashes position
 
         const authenticatorDataRaw = generateAuthenticatorData("example.com");
         const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);

@@ -96,12 +96,12 @@ pub fn process(
     // Get rent from sysvar (fixes audit issue #5 - hardcoded rent calculations)
     let rent = Rent::from_account_info(rent_sysvar)?;
 
-    let len = accounts.len();
-    if len < 8 {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    let config_pda = &accounts[len - 2];
-    let treasury_shard = &accounts[len - 1];
+    let config_pda = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
     // Parse Config and Charge Fee
     let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);

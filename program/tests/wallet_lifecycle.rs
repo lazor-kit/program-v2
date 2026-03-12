@@ -258,7 +258,7 @@ fn test_authority_lifecycle() {
                 AccountMeta::new(admin_auth_pda, false), // New authority PDA being created
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 // Config + Treasury shard for protocol fee
-                AccountMeta::new(config_pda, false),
+                AccountMeta::new_readonly(config_pda, false),
                 AccountMeta::new(treasury_pda, false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
@@ -313,7 +313,7 @@ fn test_authority_lifecycle() {
                 AccountMeta::new(context.payer.pubkey(), false), // Refund destination
                 AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
                 // Config + Treasury shard for protocol fee
-                AccountMeta::new(config_pda, false),
+                AccountMeta::new_readonly(config_pda, false),
                 AccountMeta::new(treasury_pda, false),
                 AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Actual signer
             ],
@@ -462,8 +462,8 @@ fn test_execute_with_compact_instructions() {
     transfer_data.extend_from_slice(&transfer_amount.to_le_bytes());
 
     let compact_ix = CompactInstruction {
-        program_id_index: 6,
-        accounts: vec![4, 5, 6], // Vault, Payer, SystemProgram
+        program_id_index: 9, // SystemProgram is now the 10th account (index 9)
+        accounts: vec![7, 8, 9], // Vault (7), Payer (8), SystemProgram (9)
         data: transfer_data,
     };
 
@@ -477,11 +477,14 @@ fn test_execute_with_compact_instructions() {
             AccountMeta::new(wallet_pda, false),            // Wallet
             AccountMeta::new(owner_auth_pda, false),        // Authority (PDA) must be writable
             AccountMeta::new(vault_pda, false),             // Vault (Context)
-            // Inner accounts start here:
-            AccountMeta::new(vault_pda, false), // Index 0: Vault (will satisfy Signer via seeds)
-            AccountMeta::new(context.payer.pubkey(), false), // Index 1: Payer (Dest)
-            AccountMeta::new_readonly(solana_sdk::system_program::id(), false), // Index 2: SystemProgram
-            // Authentication: Owner Keypair
+            AccountMeta::new_readonly(config_pda, false),
+            AccountMeta::new(treasury_pda, false),
+            AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
+            // Inner accounts start here (Index 7):
+            AccountMeta::new(vault_pda, false), // Index 7: Vault
+            AccountMeta::new(context.payer.pubkey(), false), // Index 8: Payer
+            AccountMeta::new_readonly(solana_sdk::system_program::id(), false), // Index 9: SystemProgram
+            // Authentication: Owner Keypair (Index 10)
             AccountMeta::new_readonly(owner_keypair.pubkey(), true), // Owner signs transaction
         ],
         data: {

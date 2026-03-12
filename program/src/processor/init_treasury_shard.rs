@@ -8,7 +8,7 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::state::config::ConfigAccount;
+use crate::state::{config::ConfigAccount, AccountDiscriminator};
 
 /// Arguments:
 /// - `shard_id`: u8
@@ -57,6 +57,10 @@ pub fn process(
 
     let config_account =
         unsafe { std::ptr::read_unaligned(config_data.as_ptr() as *const ConfigAccount) };
+
+    if config_account.discriminator != AccountDiscriminator::Config as u8 {
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     if shard_id >= config_account.num_shards {
         return Err(ProgramError::InvalidArgument);

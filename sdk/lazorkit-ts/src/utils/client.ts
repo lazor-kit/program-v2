@@ -205,12 +205,14 @@ export class LazorClient {
             meta("11111111111111111111111111111111" as Address, "r"), // System
         ];
 
+        // Config + Treasury must come right after system_program (iterator order)
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
+
+        // Optional signer goes AFTER config/treasury (trailing account)
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
-
-        accounts.push(meta(params.config, "r"));
-        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
@@ -248,12 +250,14 @@ export class LazorClient {
             meta("11111111111111111111111111111111" as Address, "r"), // System
         ];
 
+        // Config + Treasury must come right after system_program (iterator order)
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
+
+        // Optional signer goes AFTER config/treasury (trailing account)
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
-
-        accounts.push(meta(params.config, "r"));
-        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
@@ -299,12 +303,14 @@ export class LazorClient {
             meta("SysvarRent111111111111111111111111111111111" as Address, "r"), // Rent
         ];
 
+        // Config + Treasury must come right after rent sysvar (iterator order)
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
+
+        // Optional signer goes AFTER config/treasury (trailing account)
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
-
-        accounts.push(meta(params.config, "r"));
-        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
@@ -525,12 +531,14 @@ export class LazorClient {
             meta("SysvarRent111111111111111111111111111111111" as Address, "r"), // Rent
         ];
 
+        // Config + Treasury must come right after rent sysvar (iterator order)
+        accounts.push(meta(params.config, "r"));
+        accounts.push(meta(params.treasuryShard, "w"));
+
+        // Optional signer goes AFTER config/treasury (trailing account)
         if (params.authorizerSigner) {
             accounts.push(meta(params.authorizerSigner, "s"));
         }
-
-        accounts.push(meta(params.config, "r"));
-        accounts.push(meta(params.treasuryShard, "w"));
 
         return {
             programAddress: LAZORKIT_PROGRAM_PROGRAM_ADDRESS,

@@ -130,10 +130,16 @@ describe("Audit Regression Suite", () => {
 
         console.log("Execute Transaction Log:", tx2.meta.logMessages);
 
+        // Read actual action_fee from config (may have been modified by config.test.ts)
+        const configInfo = await context.rpc.getAccountInfo(context.configPda, { encoding: 'base64' }).send();
+        const configData = Buffer.from(configInfo.value!.data[0] as string, 'base64');
+        const actionFee = configData.readBigUInt64LE(48); // offset: 1+1+1+1+4+32+8 = 48
+
         const finalBalance = await context.rpc.getBalance(context.treasuryShard).send();
-        // Should be RENT_EXEMPT_MIN + action_fee (1000)
-        expect(finalBalance.value).toBe(RENT_EXEMPT_MIN + 2000n);
-        console.log("Operationality Check Passed: Shard accepted new fees after sweep.");
+        // Should be RENT_EXEMPT_MIN + action_fee (from the Execute above) + wallet_fee (from createWallet)
+        // However, sweep happened between createWallet and execute, so only the execute fee remains
+        expect(finalBalance.value).toBe(RENT_EXEMPT_MIN + actionFee);
+        console.log(`Operationality Check Passed: Shard accepted new fees (${actionFee} lamports) after sweep.`);
     });
 
     it("Regression 2: CloseWallet rejects self-transfer to prevent burn", async () => {

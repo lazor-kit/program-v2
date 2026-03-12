@@ -122,12 +122,12 @@ pub fn process_add_authority(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    let len = accounts.len();
-    if len < 7 {
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    let config_pda = &accounts[len - 2];
-    let treasury_shard = &accounts[len - 1];
+    let config_pda = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
     let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
     if !sol_assert_bytes_eq(config_pda.key().as_ref(), config_key.as_ref(), 32) {
@@ -333,13 +333,12 @@ pub fn process_remove_authority(
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
-    let len = accounts.len();
-    if len < 8 {
-        // 5 original + system_program + config + treasury_shard
-        return Err(ProgramError::NotEnoughAccountKeys);
-    }
-    let config_pda = &accounts[len - 2];
-    let treasury_shard = &accounts[len - 1];
+    let config_pda = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let treasury_shard = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
 
     // Read config
     let (config_key, _config_bump) = find_program_address(&[b"config"], program_id);
