@@ -4,7 +4,7 @@ pub mod auth;
 pub mod compact;
 pub mod entrypoint;
 pub mod error;
-pub mod idl_facade;
+// pub mod idl_facade;
 pub mod instruction;
 pub mod processor;
 pub mod state;

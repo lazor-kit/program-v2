@@ -251,6 +251,7 @@ export class LazorWeb3Client {
       { pubkey: params.currentOwnerAuthority, isWritable: true, isSigner: false },
       { pubkey: params.newOwnerAuthority, isWritable: true, isSigner: false },
       { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isWritable: false, isSigner: false },
       { pubkey: params.config, isWritable: false, isSigner: false },
       { pubkey: params.treasuryShard, isWritable: true, isSigner: false },
     ];

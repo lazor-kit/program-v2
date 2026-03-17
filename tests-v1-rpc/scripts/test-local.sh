@@ -47,6 +47,10 @@ export WS_URL="ws://127.0.0.1:8900"
 # 2. Run Test Suite
 echo "-> Running Vitest suite sequentially..."
 cd "$TEST_DIR"
-npm run test -- tests/session.test.ts --fileParallelism=false --testTimeout=30000 --hookTimeout=30000
+
+# Allow passing a specific test file or directory as argument
+TEST_TARGET=${1:-"tests/"}
+
+npm run test -- "$TEST_TARGET" --fileParallelism=false --testTimeout=30000 --hookTimeout=30000
 
 echo "✅ All tests completed!"

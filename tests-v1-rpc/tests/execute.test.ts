@@ -60,11 +60,26 @@ describe("LazorKit V1 — Execute", () => {
     await sendTx(ctx, [createWalletIx]);
     console.log("Wallet created for execute tests");
 
-    // Fund the vault so it has SOL to transfer
+    // Fund the vault so it has SOL to transfer, and authority to rule out rent
     const fundTx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: ctx.payer.publicKey,
         toPubkey: vaultPda,
+        lamports: 0.1 * LAMPORTS_PER_SOL,
+      }),
+      SystemProgram.transfer({
+        fromPubkey: ctx.payer.publicKey,
+        toPubkey: ownerAuthPda,
+        lamports: 0.1 * LAMPORTS_PER_SOL,
+      }),
+      SystemProgram.transfer({
+        fromPubkey: ctx.payer.publicKey,
+        toPubkey: ctx.treasuryShard,
+        lamports: 0.1 * LAMPORTS_PER_SOL,
+      }),
+      SystemProgram.transfer({
+        fromPubkey: ctx.payer.publicKey,
+        toPubkey: ctx.configPda,
         lamports: 0.1 * LAMPORTS_PER_SOL,
       })
     );
@@ -82,7 +97,7 @@ describe("LazorKit V1 — Execute", () => {
     // 0: payer, 1: wallet, 2: authority, 3: vault, 4: config, 5: treasuryShard, 6: systemProgram, 7: sysvarInstructions
     // We need: vault (3) as source, recipient as new account
 
-    const transferAmount = 10_000; // 0.00001 SOL
+    const transferAmount = 1_000_000; // 0.001 SOL (above rent exemption for SystemAccount)
 
     // SystemProgram.Transfer instruction data: [2,0,0,0] + u64 LE amount
     const transferData = Buffer.alloc(12);
@@ -98,7 +113,7 @@ describe("LazorKit V1 — Execute", () => {
     const compactIxs: CompactInstruction[] = [
       {
         programIdIndex: 6,  // SystemProgram
-        accountIndexes: [3, 8], // vault=3, recipient=8 (remaining account)
+        accountIndexes: [3, 7], // vault=3, recipient=7 (remaining account)
         data: transferData,
       },
     ];

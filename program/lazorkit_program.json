@@ -151,15 +151,6 @@
           ]
         },
         {
-          "name": "authorizerSigner",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Optional signer for Ed25519 authentication"
-          ]
-        },
-        {
           "name": "config",
           "isMut": false,
           "isSigner": false,
@@ -173,6 +164,15 @@
           "isSigner": false,
           "docs": [
             "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
           ]
         }
       ],
@@ -256,15 +256,6 @@
           ]
         },
         {
-          "name": "authorizerSigner",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Optional signer for Ed25519 authentication"
-          ]
-        },
-        {
           "name": "config",
           "isMut": false,
           "isSigner": false,
@@ -278,6 +269,15 @@
           "isSigner": false,
           "docs": [
             "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
           ]
         }
       ],
@@ -400,7 +400,7 @@
         },
         {
           "name": "vault",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "Vault PDA"

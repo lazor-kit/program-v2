@@ -46,15 +46,15 @@ pub enum ProgramIx {
         desc = "New authority PDA to be created"
     )]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "config", desc = "Config PDA")]
+    #[account(6, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     #[account(
-        5,
+        7,
         signer,
         optional,
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
-    #[account(6, name = "config", desc = "Config PDA")]
-    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     AddAuthority {
         new_type: u8,
         new_role: u8,
@@ -67,6 +67,7 @@ pub enum ProgramIx {
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
+        writable,
         name = "admin_authority",
         desc = "Admin authority PDA authorizing this action"
     )]
@@ -83,15 +84,15 @@ pub enum ProgramIx {
         desc = "Account to receive rent refund"
     )]
     #[account(5, name = "system_program", desc = "System Program")]
+    #[account(6, name = "config", desc = "Config PDA")]
+    #[account(7, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     #[account(
-        6,
+        8,
         signer,
         optional,
         name = "authorizer_signer",
         desc = "Optional signer for Ed25519 authentication"
     )]
-    #[account(7, name = "config", desc = "Config PDA")]
-    #[account(8, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     RemoveAuthority,
 
     /// Transfer ownership (atomic swap of Owner role)
@@ -132,7 +133,7 @@ pub enum ProgramIx {
         name = "authority",
         desc = "Authority or Session PDA authorizing execution"
     )]
-    #[account(3, name = "vault", desc = "Vault PDA")]
+    #[account(3, writable, name = "vault", desc = "Vault PDA")]
     #[account(4, name = "config", desc = "Config PDA")]
     #[account(5, writable, name = "treasury_shard", desc = "Treasury Shard PDA")]
     #[account(6, name = "system_program", desc = "System Program")]

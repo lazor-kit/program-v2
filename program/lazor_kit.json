@@ -151,15 +151,6 @@
           ]
         },
         {
-          "name": "authorizerSigner",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Optional signer for Ed25519 authentication"
-          ]
-        },
-        {
           "name": "config",
           "isMut": false,
           "isSigner": false,
@@ -173,6 +164,15 @@
           "isSigner": false,
           "docs": [
             "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
           ]
         }
       ],
@@ -225,7 +225,7 @@
         },
         {
           "name": "adminAuthority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "Admin authority PDA authorizing this action"
@@ -256,15 +256,6 @@
           ]
         },
         {
-          "name": "authorizerSigner",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Optional signer for Ed25519 authentication"
-          ]
-        },
-        {
           "name": "config",
           "isMut": false,
           "isSigner": false,
@@ -278,6 +269,15 @@
           "isSigner": false,
           "docs": [
             "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
           ]
         }
       ],
@@ -400,7 +400,7 @@
         },
         {
           "name": "vault",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "Vault PDA"
@@ -869,10 +869,6 @@
       }
     }
   ],
-  "metadata": {
-    "origin": "shank",
-    "address": "FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao"
-  },
   "accounts": [
     {
       "name": "WalletAccount",
@@ -990,6 +986,39 @@
       }
     }
   ],
+  "types": [
+    {
+      "name": "AuthorityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Ed25519"
+          },
+          {
+            "name": "Secp256r1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Role",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Owner"
+          },
+          {
+            "name": "Admin"
+          },
+          {
+            "name": "Spender"
+          }
+        ]
+      }
+    }
+  ],
   "errors": [
     {
       "code": 3001,
@@ -1034,7 +1063,7 @@
     {
       "code": 3009,
       "name": "SessionExpired",
-      "msg": "Session has expired"
+      "msg": "Session expired"
     },
     {
       "code": 3010,
@@ -1057,54 +1086,8 @@
       "msg": "Self-reentrancy is not allowed"
     }
   ],
-  "types": [
-    {
-      "name": "AuthorityType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Ed25519"
-          },
-          {
-            "name": "Secp256r1"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Role",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Owner"
-          },
-          {
-            "name": "Admin"
-          },
-          {
-            "name": "Spender"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AccountDiscriminator",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Wallet"
-          },
-          {
-            "name": "Authority"
-          },
-          {
-            "name": "Session"
-          }
-        ]
-      }
-    }
-  ]
+  "metadata": {
+    "origin": "shank",
+    "address": "FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao"
+  }
 }

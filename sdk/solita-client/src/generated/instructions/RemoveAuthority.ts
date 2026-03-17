@@ -21,12 +21,12 @@ export const RemoveAuthorityStruct = new beet.BeetArgsStruct<{
  *
  * @property [_writable_, **signer**] payer
  * @property [] wallet
- * @property [] adminAuthority
+ * @property [_writable_] adminAuthority
  * @property [_writable_] targetAuthority
  * @property [_writable_] refundDestination
- * @property [**signer**] authorizerSigner (optional)
  * @property [] config
  * @property [_writable_] treasuryShard
+ * @property [**signer**] authorizerSigner (optional)
  * @category Instructions
  * @category RemoveAuthority
  * @category generated
@@ -38,9 +38,9 @@ export type RemoveAuthorityInstructionAccounts = {
   targetAuthority: web3.PublicKey
   refundDestination: web3.PublicKey
   systemProgram?: web3.PublicKey
-  authorizerSigner?: web3.PublicKey
   config: web3.PublicKey
   treasuryShard: web3.PublicKey
+  authorizerSigner?: web3.PublicKey
 }
 
 export const removeAuthorityInstructionDiscriminator = 2
@@ -76,7 +76,7 @@ export function createRemoveAuthorityInstruction(
     },
     {
       pubkey: accounts.adminAuthority,
-      isWritable: false,
+      isWritable: true,
       isSigner: false,
     },
     {
@@ -95,11 +95,6 @@ export function createRemoveAuthorityInstruction(
       isSigner: false,
     },
     {
-      pubkey: accounts.authorizerSigner ?? programId,
-      isWritable: false,
-      isSigner: accounts.authorizerSigner != null,
-    },
-    {
       pubkey: accounts.config,
       isWritable: false,
       isSigner: false,
@@ -108,6 +103,11 @@ export function createRemoveAuthorityInstruction(
       pubkey: accounts.treasuryShard,
       isWritable: true,
       isSigner: false,
+    },
+    {
+      pubkey: accounts.authorizerSigner ?? programId,
+      isWritable: false,
+      isSigner: accounts.authorizerSigner != null,
     },
   ]
 

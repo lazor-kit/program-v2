@@ -193,7 +193,7 @@ createErrorFromNameLookup.set(
 )
 
 /**
- * SessionExpired: 'Session has expired'
+ * SessionExpired: 'Session expired'
  *
  * @category Errors
  * @category generated
@@ -202,7 +202,7 @@ export class SessionExpiredError extends Error {
   readonly code: number = 0xbc1
   readonly name: string = 'SessionExpired'
   constructor() {
-    super('Session has expired')
+    super('Session expired')
     if (typeof Error.captureStackTrace === 'function') {
       Error.captureStackTrace(this, SessionExpiredError)
     }

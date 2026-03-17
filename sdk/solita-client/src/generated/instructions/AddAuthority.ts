@@ -45,9 +45,9 @@ export const AddAuthorityStruct = new beet.FixableBeetArgsStruct<
  * @property [] wallet
  * @property [] adminAuthority
  * @property [_writable_] newAuthority
- * @property [**signer**] authorizerSigner (optional)
  * @property [] config
  * @property [_writable_] treasuryShard
+ * @property [**signer**] authorizerSigner (optional)
  * @category Instructions
  * @category AddAuthority
  * @category generated
@@ -58,9 +58,9 @@ export type AddAuthorityInstructionAccounts = {
   adminAuthority: web3.PublicKey
   newAuthority: web3.PublicKey
   systemProgram?: web3.PublicKey
-  authorizerSigner?: web3.PublicKey
   config: web3.PublicKey
   treasuryShard: web3.PublicKey
+  authorizerSigner?: web3.PublicKey
 }
 
 export const addAuthorityInstructionDiscriminator = 1
@@ -114,11 +114,6 @@ export function createAddAuthorityInstruction(
       isSigner: false,
     },
     {
-      pubkey: accounts.authorizerSigner ?? programId,
-      isWritable: false,
-      isSigner: accounts.authorizerSigner != null,
-    },
-    {
       pubkey: accounts.config,
       isWritable: false,
       isSigner: false,
@@ -127,6 +122,11 @@ export function createAddAuthorityInstruction(
       pubkey: accounts.treasuryShard,
       isWritable: true,
       isSigner: false,
+    },
+    {
+      pubkey: accounts.authorizerSigner ?? programId,
+      isWritable: false,
+      isSigner: accounts.authorizerSigner != null,
     },
   ]
 

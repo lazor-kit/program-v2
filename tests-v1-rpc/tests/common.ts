@@ -59,6 +59,39 @@ export async function sendTx(
 }
 
 /**
+ * Send instructions expecting a failure, returning error string for matching.
+ */
+export async function tryProcessInstruction(
+  ctx: TestContext,
+  instructions: import("@solana/web3.js").TransactionInstruction | import("@solana/web3.js").TransactionInstruction[],
+  signers: Keypair[] = []
+): Promise<{ result: string }> {
+  try {
+    const ixs = Array.isArray(instructions) ? instructions : [instructions];
+    await sendTx(ctx, ixs, signers);
+    return { result: "ok" };
+  } catch (e: any) {
+    return { result: e.message || "simulation failed" };
+  }
+}
+
+/**
+ * Multiple instructions variant
+ */
+export async function tryProcessInstructions(
+  ctx: TestContext,
+  instructions: TransactionInstruction[],
+  signers: Keypair[] = []
+): Promise<{ result: string }> {
+  try {
+    await sendTx(ctx, instructions, signers);
+    return { result: "ok" };
+  } catch (e: any) {
+    return { result: e.message || "simulation failed" };
+  }
+}
+
+/**
  * Initialize test context:
  * - Create connection
  * - Generate or load payer and airdrop
@@ -173,4 +206,16 @@ export async function setupTest(): Promise<TestContext> {
   }
 
   return ctx;
+}
+
+export function getSystemTransferIx(
+  fromPubkey: PublicKey,
+  toPubkey: PublicKey,
+  lamports: bigint
+) {
+  return SystemProgram.transfer({
+    fromPubkey,
+    toPubkey,
+    lamports: Number(lamports),
+  });
 }

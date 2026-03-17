@@ -38,7 +38,7 @@ export const ExecuteStruct = new beet.FixableBeetArgsStruct<
  * @property [_writable_, **signer**] payer
  * @property [] wallet
  * @property [] authority
- * @property [] vault
+ * @property [_writable_] vault
  * @property [] config
  * @property [_writable_] treasuryShard
  * @property [] sysvarInstructions (optional)
@@ -99,7 +99,7 @@ export function createExecuteInstruction(
     },
     {
       pubkey: accounts.vault,
-      isWritable: false,
+      isWritable: true,
       isSigner: false,
     },
     {
