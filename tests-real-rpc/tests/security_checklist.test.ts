@@ -11,7 +11,7 @@ import {
   tryProcessInstruction,
   type TestContext,
 } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "../../sdk/lazorkit-ts/src";
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "@lazorkit/codama-client/src";
 
 function getRandomSeed() {
   return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));

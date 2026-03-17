@@ -13,7 +13,7 @@ import {
     sendAndConfirmTransactionFactory,
 } from "@solana/kit";
 import { setupTest, processInstruction, type TestContext } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
+import { findWalletPda, findVaultPda, findAuthorityPda } from "@lazorkit/codama-client/src";
 import crypto from "crypto";
 
 describe("Real RPC Integration Suite", () => {

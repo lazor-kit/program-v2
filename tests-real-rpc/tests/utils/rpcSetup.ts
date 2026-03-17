@@ -1,5 +1,5 @@
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
-import { LazorClient } from "../../../sdk/lazorkit-ts/src";
+import { LazorClient } from "../@lazorkit/codama-client/src";
 import dotenv from "dotenv";
 
 dotenv.config();

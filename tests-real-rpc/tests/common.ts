@@ -19,7 +19,7 @@ import {
     createSolanaRpcSubscriptions,
     lamports,
 } from "@solana/kit";
-import { LazorClient } from "../../sdk/lazorkit-ts/src";
+import { LazorClient } from "@lazorkit/codama-client/src";
 import * as dotenv from "dotenv";
 import bs58 from "bs58";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
@@ -81,7 +81,7 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
     const client = new LazorClient(rpc);
 
     // Compute Config and Treasury Shard PDAs
-    const { findConfigPda, findTreasuryShardPda } = await import("../../sdk/lazorkit-ts/src/utils/pdas");
+    const { findConfigPda, findTreasuryShardPda } = await import("@lazorkit/codama-client/src/utils/pdas");
     const { getAddressEncoder } = await import("@solana/kit");
 
     const [configPda] = await findConfigPda();
@@ -96,7 +96,7 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
         if (!accInfo || !accInfo.value) throw new Error("Not initialized");
     } catch {
         console.log("Initializing Global Config and Treasury Shard...");
-        const { getInitializeConfigInstruction, getInitTreasuryShardInstruction } = await import("../../sdk/lazorkit-ts/src");
+        const { getInitializeConfigInstruction, getInitTreasuryShardInstruction } = await import("@lazorkit/codama-client/src");
 
         const initConfigIx = getInitializeConfigInstruction({
             admin: payer,
@@ -131,7 +131,7 @@ export async function setupTest(): Promise<{ context: TestContext, client: Lazor
         if (!accInfo || !accInfo.value) throw new Error("Not initialized");
     } catch {
         console.log(`Initializing Treasury Shard ${shardId}...`);
-        const { getInitTreasuryShardInstruction } = await import("../../sdk/lazorkit-ts/src");
+        const { getInitTreasuryShardInstruction } = await import("@lazorkit/codama-client/src");
         const initShardIx = getInitTreasuryShardInstruction({
             payer: payer,
             config: configPda,

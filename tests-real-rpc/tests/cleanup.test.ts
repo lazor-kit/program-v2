@@ -13,7 +13,7 @@ import {
     findVaultPda,
     findAuthorityPda,
     findSessionPda
-} from "../../sdk/lazorkit-ts/src";
+} from "@lazorkit/codama-client/src";
 
 describe("Cleanup Instructions", () => {
     let context: any;

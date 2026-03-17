@@ -6,8 +6,8 @@ import {
     type Address,
 } from "@solana/kit";
 import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx, PROGRAM_ID_STR } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
-import { LazorClient } from "../../sdk/lazorkit-ts/src";
+import { findWalletPda, findVaultPda, findAuthorityPda } from "@lazorkit/codama-client/src";
+import { LazorClient } from "@lazorkit/codama-client/src";
 
 function getRandomSeed() {
     return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));

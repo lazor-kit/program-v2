@@ -1620,6 +1620,7 @@ dependencies = [
  "assertions",
  "base64ct",
  "blake3",
+ "borsh 1.6.0",
  "ecdsa",
  "getrandom 0.2.17",
  "litesvm",
@@ -1633,6 +1634,7 @@ dependencies = [
  "shank",
  "shank_idl",
  "solana-sdk",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

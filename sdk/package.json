@@ -1,0 +1,12 @@
+{
+  "name": "lazorkit-sdk-workspace",
+  "private": true,
+  "workspaces": [
+    "codama-client",
+    "solita-client"
+  ],
+  "scripts": {
+    "generate:all": "npm run generate --workspace=@lazorkit/codama-client && npm run generate --workspace=@lazorkit/solita-client",
+    "build:all": "npm run build --workspace=@lazorkit/codama-client && npm run build --workspace=@lazorkit/solita-client"
+  }
+}

@@ -4,7 +4,7 @@
 PROGRAM_ID=$1
 ROOT_DIR=$(pwd)
 PROGRAM_DIR="$ROOT_DIR/program"
-SDK_DIR="$ROOT_DIR/sdk/lazorkit-ts"
+SDK_DIR="$ROOT_DIR/sdk"
 
 if [ -z "$PROGRAM_ID" ]; then
     echo "Usage: $0 <new_program_id>"
@@ -27,16 +27,19 @@ echo "[3/4] Generating IDL..."
 cd "$PROGRAM_DIR"
 # Assuming shank is installed. If not, this will fail with a clear msg.
 if command -v shank &> /dev/null; then
-    shank idl -o . --out-filename idl.json -p "$PROGRAM_ID"
+    shank idl -o . --out-filename lazor_kit.json -p "$PROGRAM_ID"
 else
     echo "❌ Error: shank CLI not found. Please install it with 'cargo install shank-cli'."
     exit 1
 fi
 
-# Step 4: Regenerate SDK with Codama
-echo "[4/4] Regenerating Codama SDK..."
+# Step 4: Regenerate SDK with Codama and Solita
+echo "[4/4] Patching IDL and Regenerating SDKs..."
+cd "$ROOT_DIR"
+node scripts/patch_idl.js
+
 cd "$SDK_DIR"
-npm run generate
+npm run generate:all
 
 echo "--- ✅ All Done! ---"
 echo "Next: Deploy your program using 'solana program deploy program/target/deploy/lazorkit_program.so -u d'"

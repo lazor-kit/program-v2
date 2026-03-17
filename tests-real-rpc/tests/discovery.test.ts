@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { setupTest, processInstruction, type TestContext } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "../../sdk/lazorkit-ts/src";
+import { findWalletPda, findVaultPda, findAuthorityPda } from "@lazorkit/codama-client/src";
 import crypto from "crypto";
 
 describe("Recovery by Credential Hash", () => {

@@ -13,7 +13,7 @@ import {
     getSweepTreasuryInstruction,
     findConfigPda,
     findTreasuryShardPda
-} from "../../sdk/lazorkit-ts/src";
+} from "@lazorkit/codama-client/src";
 
 describe("Config and Treasury Instructions", () => {
     let context: any;

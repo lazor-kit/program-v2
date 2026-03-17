@@ -20,7 +20,7 @@ import {
     findVaultPda,
     findAuthorityPda,
     findSessionPda
-} from "../../sdk/lazorkit-ts/src";
+} from "@lazorkit/codama-client/src";
 
 function getRandomSeed() {
     return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));

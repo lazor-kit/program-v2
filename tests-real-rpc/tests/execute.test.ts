@@ -7,7 +7,7 @@ import {
     type TransactionSigner
 } from "@solana/kit";
 import { setupTest, processInstruction, tryProcessInstruction, type TestContext, getSystemTransferIx, PROGRAM_ID_STR } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "../../sdk/lazorkit-ts/src";
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "@lazorkit/codama-client/src";
 
 function getRandomSeed() {
     return new Uint8Array(32).map(() => Math.floor(Math.random() * 256));
