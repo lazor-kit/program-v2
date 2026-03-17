@@ -32,11 +32,10 @@ pub enum ProgramIx {
     },
 
     /// Add a new authority to the wallet
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin authority PDA authorizing this action"
     )]
@@ -64,11 +63,10 @@ pub enum ProgramIx {
     },
 
     /// Remove an authority from the wallet
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin authority PDA authorizing this action"
     )]
@@ -97,7 +95,7 @@ pub enum ProgramIx {
     RemoveAuthority,
 
     /// Transfer ownership (atomic swap of Owner role)
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
@@ -127,7 +125,7 @@ pub enum ProgramIx {
     },
 
     /// Execute transactions
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
@@ -150,13 +148,13 @@ pub enum ProgramIx {
     #[account(
         0,
         signer,
+        writable,
         name = "payer",
         desc = "Transaction payer and rent contributor"
     )]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
         name = "admin_authority",
         desc = "Admin/Owner authority PDA authorizing logic"
     )]
@@ -210,7 +208,7 @@ pub enum ProgramIx {
     CloseSession,
 
     /// Drain and close a Wallet PDA (Owner-only)
-    #[account(0, signer, name = "payer", desc = "Pays tx fee")]
+    #[account(0, signer, writable, name = "payer", desc = "Pays tx fee")]
     #[account(1, writable, name = "wallet", desc = "Wallet PDA to close")]
     #[account(2, writable, name = "vault", desc = "Vault PDA to drain")]
     #[account(3, name = "owner_authority", desc = "Owner Authority PDA")]

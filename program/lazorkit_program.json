@@ -1,0 +1,1108 @@
+{
+  "version": "0.1.0",
+  "name": "lazorkit_program",
+  "instructions": [
+    {
+      "name": "CreateWallet",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Payer and rent contributor"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Vault PDA"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Initial owner authority PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "userSeed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "authType",
+          "type": "u8"
+        },
+        {
+          "name": "authBump",
+          "type": "u8"
+        },
+        {
+          "name": "padding",
+          "type": {
+            "array": [
+              "u8",
+              6
+            ]
+          }
+        },
+        {
+          "name": "payload",
+          "type": "bytes"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 0
+      }
+    },
+    {
+      "name": "AddAuthority",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "adminAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Admin authority PDA authorizing this action"
+          ]
+        },
+        {
+          "name": "newAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "New authority PDA to be created"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "newType",
+          "type": "u8"
+        },
+        {
+          "name": "newRole",
+          "type": "u8"
+        },
+        {
+          "name": "padding",
+          "type": {
+            "array": [
+              "u8",
+              6
+            ]
+          }
+        },
+        {
+          "name": "payload",
+          "type": "bytes"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 1
+      }
+    },
+    {
+      "name": "RemoveAuthority",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "adminAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Admin authority PDA authorizing this action"
+          ]
+        },
+        {
+          "name": "targetAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Authority PDA to be removed"
+          ]
+        },
+        {
+          "name": "refundDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Account to receive rent refund"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 2
+      }
+    },
+    {
+      "name": "TransferOwnership",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "currentOwnerAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Current owner authority PDA"
+          ]
+        },
+        {
+          "name": "newOwnerAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "New owner authority PDA to be created"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "newType",
+          "type": "u8"
+        },
+        {
+          "name": "payload",
+          "type": "bytes"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 3
+      }
+    },
+    {
+      "name": "Execute",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Authority or Session PDA authorizing execution"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Vault PDA"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Sysvar Instructions (required for Secp256r1)"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "instructions",
+          "type": "bytes"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 4
+      }
+    },
+    {
+      "name": "CreateSession",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer and rent contributor"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "adminAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Admin/Owner authority PDA authorizing logic"
+          ]
+        },
+        {
+          "name": "session",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "New session PDA to be created"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Optional signer for Ed25519 authentication"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "sessionKey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": "i64"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 5
+      }
+    },
+    {
+      "name": "InitializeConfig",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Initial contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "walletFee",
+          "type": "u64"
+        },
+        {
+          "name": "actionFee",
+          "type": "u64"
+        },
+        {
+          "name": "numShards",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 6
+      }
+    },
+    {
+      "name": "UpdateConfig",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Current contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 7
+      }
+    },
+    {
+      "name": "CloseSession",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Receives rent refund"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Session's parent wallet"
+          ]
+        },
+        {
+          "name": "session",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Target session"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA for contract admin check"
+          ]
+        },
+        {
+          "name": "authorizer",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Wallet authority PDA"
+          ]
+        },
+        {
+          "name": "authorizerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Ed25519 signer"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Secp256r1 sysvar"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 8
+      }
+    },
+    {
+      "name": "CloseWallet",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Pays tx fee"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA to close"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Vault PDA to drain"
+          ]
+        },
+        {
+          "name": "ownerAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Owner Authority PDA"
+          ]
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Receives all drained SOL"
+          ]
+        },
+        {
+          "name": "ownerSigner",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": true,
+          "docs": [
+            "Ed25519 signer"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Secp256r1 sysvar"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 9
+      }
+    },
+    {
+      "name": "SweepTreasury",
+      "accounts": [
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Contract admin"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Receives swept funds"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "shardId",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 10
+      }
+    },
+    {
+      "name": "InitTreasuryShard",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Pays for rent exemption"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Config PDA"
+          ]
+        },
+        {
+          "name": "treasuryShard",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Treasury Shard PDA"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "shardId",
+          "type": "u8"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 11
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "name": "WalletAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminator",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminator",
+            "type": "u8"
+          },
+          {
+            "name": "authorityType",
+            "type": "u8"
+          },
+          {
+            "name": "role",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "counter",
+            "type": "u64"
+          },
+          {
+            "name": "wallet",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminator",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "wallet",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sessionKey",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "AuthorityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Ed25519"
+          },
+          {
+            "name": "Secp256r1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Role",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Owner"
+          },
+          {
+            "name": "Admin"
+          },
+          {
+            "name": "Spender"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 3001,
+      "name": "InvalidAuthorityPayload",
+      "msg": "Invalid authority payload"
+    },
+    {
+      "code": 3002,
+      "name": "PermissionDenied",
+      "msg": "Permission denied"
+    },
+    {
+      "code": 3003,
+      "name": "InvalidInstruction",
+      "msg": "Invalid instruction"
+    },
+    {
+      "code": 3004,
+      "name": "InvalidPubkey",
+      "msg": "Invalid public key"
+    },
+    {
+      "code": 3005,
+      "name": "InvalidMessageHash",
+      "msg": "Invalid message hash"
+    },
+    {
+      "code": 3006,
+      "name": "SignatureReused",
+      "msg": "Signature has already been used"
+    },
+    {
+      "code": 3007,
+      "name": "InvalidSignatureAge",
+      "msg": "Invalid signature age"
+    },
+    {
+      "code": 3008,
+      "name": "InvalidSessionDuration",
+      "msg": "Invalid session duration"
+    },
+    {
+      "code": 3009,
+      "name": "SessionExpired",
+      "msg": "Session expired"
+    },
+    {
+      "code": 3010,
+      "name": "AuthorityDoesNotSupportSession",
+      "msg": "Authority type does not support sessions"
+    },
+    {
+      "code": 3011,
+      "name": "InvalidAuthenticationKind",
+      "msg": "Invalid authentication kind"
+    },
+    {
+      "code": 3012,
+      "name": "InvalidMessage",
+      "msg": "Invalid message"
+    },
+    {
+      "code": 3013,
+      "name": "SelfReentrancyNotAllowed",
+      "msg": "Self-reentrancy is not allowed"
+    }
+  ],
+  "metadata": {
+    "origin": "shank",
+    "address": "11111111111111111111111111111111"
+  }
+}

@@ -10,14 +10,6 @@ console.log('--- 🛠 Patching IDL for Runtime Alignments ---');
 idl.metadata = idl.metadata || {};
 idl.metadata.address = 'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao';
 
-// 2. Patch account metadata & instruction layouts
-for (const ix of idl.instructions) {
-    for (const acc of ix.accounts) {
-        if (acc.name === 'adminAuthority') acc.isSigner = false;
-        if (acc.name === 'payer') acc.isMut = true;
-    }
-}
-
 // 3. Cast [u8; 32] fields to publicKey for Accounts
 if (idl.accounts) {
     idl.accounts.forEach(acc => {
