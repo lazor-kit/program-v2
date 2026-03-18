@@ -94,7 +94,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [walletPda] = findWalletPda(userSeed);
     const [vaultPda] = findVaultPda(walletPda);
-    
+
     const owner = Keypair.generate();
     const ownerBytes = owner.publicKey.toBytes();
     const [authPda] = findAuthorityPda(walletPda, ownerBytes);
@@ -127,7 +127,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [walletPda] = findWalletPda(userSeed);
     const [vaultPda] = findVaultPda(walletPda);
-    
+
     const currentOwner = Keypair.generate();
     const currentOwnerBytes = currentOwner.publicKey.toBytes();
     const [currentAuthPda] = findAuthorityPda(walletPda, currentOwnerBytes);
@@ -163,9 +163,9 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     });
 
     const fs = require("fs");
-    const keysLog = transferIx.keys.map((k,i) => `${i}: ${k.pubkey.toBase58()}`).join("\n");
+    const keysLog = transferIx.keys.map((k, i) => `${i}: ${k.pubkey.toBase58()}`).join("\n");
     fs.writeFileSync("/tmp/keys.log", keysLog);
-    
+
     await sendTx(ctx, [transferIx], [currentOwner]);
 
     const acc = await AuthorityAccount.fromAccountAddress(ctx.connection, newAuthPda);
@@ -176,7 +176,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [walletPda] = findWalletPda(userSeed);
     const [vaultPda] = findVaultPda(walletPda);
-    
+
     const owner = Keypair.generate();
     const ownerBytes = owner.publicKey.toBytes();
     const [ownerAuthPda] = findAuthorityPda(walletPda, ownerBytes);
@@ -238,7 +238,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [wPda] = findWalletPda(userSeed);
     const [vPda] = findVaultPda(wPda);
-    
+
     const o = Keypair.generate();
     const oBytes = o.publicKey.toBytes();
     const [aPda] = findAuthorityPda(wPda, oBytes);
@@ -284,7 +284,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [wPda] = findWalletPda(userSeed);
     const [vPda] = findVaultPda(wPda);
-    
+
     const o = Keypair.generate();
     const oBytes = o.publicKey.toBytes();
     const [aPda] = findAuthorityPda(wPda, oBytes);
@@ -328,7 +328,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const userSeed = getRandomSeed();
     const [wPda] = findWalletPda(userSeed);
     const [vPda] = findVaultPda(wPda);
-    
+
     const oldOwner = Keypair.generate();
     const oldBytes = oldOwner.publicKey.toBytes();
     const [oldPda] = findAuthorityPda(wPda, oldBytes);
@@ -426,7 +426,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     // Indices based on layout (SysvarInstructions is 1st sysvar added, SlotHashes is 2nd, Rent is 3rd)
     // Precompiles iterate account keys. In Solita compact layout they can be populated differently.
     // Let's rely on standard sysvar indices.
-    const sysvarIxIndex = transferIx.keys.length - 3; 
+    const sysvarIxIndex = transferIx.keys.length - 3;
     const sysvarSlotIndex = transferIx.keys.length - 2;
 
     const authenticatorDataRaw = generateAuthenticatorData("example.com");

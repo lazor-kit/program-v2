@@ -271,6 +271,9 @@ describe("LazorKit V1 — Session", () => {
       expiresAt,
     });
 
+    const adminMeta = createSessionIx.keys.find(k => k.pubkey.equals(secpAdminPda));
+    if (adminMeta) adminMeta.isWritable = true;
+
     createSessionIx.keys = [
       ...(createSessionIx.keys || []),
       { pubkey: new PublicKey("Sysvar1nstructions1111111111111111111111111"), isSigner: false, isWritable: false },
