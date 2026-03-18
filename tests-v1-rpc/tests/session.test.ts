@@ -1,9 +1,3 @@
-/**
- * LazorKit V1 Client — Session tests
- *
- * Tests: CreateSession, CloseSession with Ed25519 and Secp256r1.
- */
-
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
@@ -12,6 +6,8 @@ import {
   findAuthorityPda,
   findSessionPda,
   AuthorityAccount,
+  LazorClient,
+  AuthType // <--- Add AuthType
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 
@@ -29,40 +25,33 @@ describe("LazorKit V1 — Session", () => {
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
+  let highClient: LazorClient; // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
+    highClient = new LazorClient(ctx.connection); // <--- Initialize
 
     ownerKeypair = Keypair.generate();
     userSeed = getRandomSeed();
 
-    const [wPda] = findWalletPda(userSeed);
-    walletPda = wPda;
-    const [vPda] = findVaultPda(walletPda);
-    vaultPda = vPda;
-    
-    let bump;
-    const [oPda, oBump] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
-    ownerAuthPda = oPda;
-    bump = oBump;
-
-    const createWalletIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: ownerAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authBump: bump,
-      authPubkey: ownerKeypair.publicKey.toBytes(),
+    const { ix, walletPda: w } = await highClient.createWallet({
+          payer: ctx.payer,
+          authType: AuthType.Ed25519,
+          owner: ownerKeypair.publicKey,
+          userSeed
     });
-
-    await sendTx(ctx, [createWalletIx]);
-
+    await sendTx(ctx, [ix]);
+    walletPda = w;
+ 
+    const [v] = findVaultPda(walletPda);
+    vaultPda = v;
+ 
+    const [oPda] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
+    ownerAuthPda = oPda;
+ 
     // Fund vault
-    await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPda, 500_000_000n)]);
+    const [vPda] = findVaultPda(walletPda);
+    await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vPda, 500_000_000n)]);
     console.log("Wallet created and funded for session tests");
   }, 30_000);
 
@@ -72,23 +61,19 @@ describe("LazorKit V1 — Session", () => {
 
     const expiresAt = 999999999n;
 
-    const ix = ctx.client.createSession({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      session: sessionPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      sessionKey: Array.from(sessionKey.publicKey.toBytes()),
-      expiresAt,
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix } = await highClient.createSession({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      sessionKey: sessionKey.publicKey,
+      expiresAt: expiresAt,
+      walletPda
     });
 
     await sendTx(ctx, [ix], [ownerKeypair]);
 
     const sessionAcc = await ctx.connection.getAccountInfo(sessionPda);
     expect(sessionAcc).not.toBeNull();
-    // Discriminator verification if needed
   }, 30_000);
 
   it("Success: Execution using session key", async () => {
@@ -97,35 +82,27 @@ describe("LazorKit V1 — Session", () => {
 
     const expiresAt = BigInt(2 ** 62); // far future
 
-    await sendTx(ctx, [ctx.client.createSession({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      session: sessionPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      sessionKey: Array.from(sessionKey.publicKey.toBytes()),
-      expiresAt,
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    await highClient.createSession({
+      payer: ctx.payer,
+      adminType: 0,
+      adminSigner: ownerKeypair,
+      sessionKey: sessionKey.publicKey,
+      expiresAt: expiresAt,
+      walletPda
+    });
 
     const recipient = Keypair.generate().publicKey;
     
-    // Build single Execute instruction
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: sessionPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    // Execute using session key
+    await highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: sessionPda,
       innerInstructions: [
         getSystemTransferIx(vaultPda, recipient, 1_000_000n)
       ],
-      authorizerSigner: sessionKey.publicKey,
+      signer: sessionKey
     });
-
-    await sendTx(ctx, [executeIx], [sessionKey]);
 
     const balance = await ctx.connection.getBalance(recipient);
     expect(balance).toBe(1_000_000);
@@ -133,30 +110,32 @@ describe("LazorKit V1 — Session", () => {
 
   it("Failure: Spender cannot create session", async () => {
     const spender = Keypair.generate();
+
+    await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: 0,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: spender.publicKey.toBytes(),
+      authType: 0,
+      role: 2, // Spender
+      walletPda
+    });
+
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
-
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: spenderPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2, // Spender
-      authPubkey: spender.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
-
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-    const ix = ctx.client.createSession({
+    const configPda = PublicKey.findProgramAddressSync([Buffer.from("config")], highClient.programId)[0];
+    const shardId = ctx.payer.publicKey.toBytes().reduce((a: number, b: number) => a + b, 0) % 16;
+    const [treasuryShard] = PublicKey.findProgramAddressSync([Buffer.from("treasury"), new Uint8Array([shardId])], highClient.programId);
+
+    const ix = highClient.client.createSession({
       payer: ctx.payer.publicKey,
       wallet: walletPda,
       adminAuthority: spenderPda, // Spender
       session: sessionPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+      config: configPda,
+      treasuryShard: treasuryShard,
       sessionKey: Array.from(sessionKey.publicKey.toBytes()),
       expiresAt: BigInt(2 ** 62),
       authorizerSigner: spender.publicKey,
@@ -170,28 +149,29 @@ describe("LazorKit V1 — Session", () => {
     const sessionKey1 = Keypair.generate();
     const [sessionPda1] = findSessionPda(walletPda, sessionKey1.publicKey);
 
-    await sendTx(ctx, [ctx.client.createSession({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      session: sessionPda1,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      sessionKey: Array.from(sessionKey1.publicKey.toBytes()),
+    await highClient.createSession({
+      payer: ctx.payer,
+      adminType: 0,
+      adminSigner: ownerKeypair,
+      sessionKey: sessionKey1.publicKey,
       expiresAt: BigInt(2 ** 62),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+      walletPda
+    });
 
     const sessionKey2 = Keypair.generate();
     const [sessionPda2] = findSessionPda(walletPda, sessionKey2.publicKey);
 
-    const ix = ctx.client.createSession({
+    const configPda = PublicKey.findProgramAddressSync([Buffer.from("config")], highClient.programId)[0];
+    const shardId = ctx.payer.publicKey.toBytes().reduce((a: number, b: number) => a + b, 0) % 16;
+    const [treasuryShard] = PublicKey.findProgramAddressSync([Buffer.from("treasury"), new Uint8Array([shardId])], highClient.programId);
+
+    const ix = highClient.client.createSession({
       payer: ctx.payer.publicKey,
       wallet: walletPda,
       adminAuthority: sessionPda1, // Session PDA
       session: sessionPda2,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+      config: configPda,
+      treasuryShard: treasuryShard,
       sessionKey: Array.from(sessionKey2.publicKey.toBytes()),
       expiresAt: BigInt(2 ** 62),
       authorizerSigner: sessionKey1.publicKey,

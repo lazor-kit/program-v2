@@ -20,4 +20,5 @@ export {
 } from "./utils/pdas";
 export * from "./utils/packing";
 export { LazorWeb3Client } from "./utils/client";
+export * from "./utils/wrapper";
 

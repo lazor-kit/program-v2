@@ -5,14 +5,17 @@ import {
     findWalletPda,
     findVaultPda,
     findAuthorityPda,
-    findSessionPda
+    findSessionPda,
+    LazorClient // <--- Add LazorClient
 } from "@lazorkit/solita-client";
 
 describe("Cleanup Instructions", () => {
     let ctx: TestContext;
+    let highClient: LazorClient; // <--- Add highClient
 
     beforeAll(async () => {
         ctx = await setupTest();
+        highClient = new LazorClient(ctx.connection); // <--- Initialize
     });
 
     const getRandomSeed = () => {
@@ -167,44 +170,29 @@ describe("Cleanup Instructions", () => {
     it("should allow wallet owner to close a wallet and sweep rent", async () => {
         const owner = Keypair.generate();
         const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
 
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
+        const { walletPda } = await highClient.createWallet({
+            payer: ctx.payer,
             authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
+            owner: owner.publicKey,
+            userSeed
+        });
+
+        const [vaultPda] = findVaultPda(walletPda);
 
         // Place lamports to simulate direct fees or balance
-        await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPda, 25000000n)]);
+        const [vPda] = findVaultPda(walletPda);
+        await highClient.sendTx([getSystemTransferIx(ctx.payer.publicKey, vPda, 25000000n)], [ctx.payer]);
 
         const destWallet = Keypair.generate();
 
-        const closeWalletIx = ctx.client.closeWallet({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            ownerAuthority: ownerAuthPda,
-            ownerSigner: owner.publicKey,
+        await highClient.closeWallet({
+            payer: ctx.payer,
+            walletPda,
             destination: destWallet.publicKey,
+            adminType: 0,
+            adminSigner: owner
         });
-        closeWalletIx.keys.push({
-            pubkey: SystemProgram.programId,
-            isWritable: false,
-            isSigner: false,
-        });
-
-        const result = await tryProcessInstructions(ctx, [closeWalletIx], [ctx.payer, owner]);
-        expect(result.result).toBe("ok");
 
         const destBalance = await ctx.connection.getBalance(destWallet.publicKey);
         expect(destBalance).toBeGreaterThan(25000000);

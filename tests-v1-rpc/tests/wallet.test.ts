@@ -5,15 +5,19 @@ import {
   findVaultPda,
   findAuthorityPda,
   AuthorityAccount,
+  LazorClient,
+  AuthType // <--- Add AuthType
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
 import { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } from "./secp256r1Utils";
 
 describe("LazorKit V1 — Wallet Lifecycle", () => {
   let ctx: TestContext;
+  let highClient: LazorClient; // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
+    highClient = new LazorClient(ctx.connection); // <--- Initialize
   }, 30_000);
 
   function getRandomSeed() {
@@ -26,27 +30,18 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Success: Create wallet with Ed25519 owner", async () => {
     const userSeed = getRandomSeed();
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-
     const owner = Keypair.generate();
-    const ownerBytes = owner.publicKey.toBytes();
-    const [authPda, authBump] = findAuthorityPda(walletPda, ownerBytes);
 
-    const ix = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: authPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0, // Ed25519
-      authPubkey: ownerBytes,
+    const { ix, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey,
+      userSeed
     });
 
-    const sig = await sendTx(ctx, [ix]);
-    expect(sig).toBeDefined();
+    await sendTx(ctx, [ix]);
+
+    const [authPda] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
 
     const authAcc = await AuthorityAccount.fromAccountAddress(ctx.connection, authPda);
     expect(authAcc.authorityType).toBe(0); // Ed25519
@@ -55,33 +50,21 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Success: Create wallet with Secp256r1 (WebAuthn) owner", async () => {
     const userSeed = getRandomSeed();
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-
     const credentialIdHash = getRandomSeed();
     const p256Pubkey = new Uint8Array(33).map(() => Math.floor(Math.random() * 256));
     p256Pubkey[0] = 0x02;
 
-    const [authPda, authBump] = findAuthorityPda(walletPda, credentialIdHash);
-
-    const ix = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: authPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 1, // Secp256r1
-      authPubkey: p256Pubkey,
+    const { ix, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Secp256r1,
+      pubkey: p256Pubkey,
       credentialHash: credentialIdHash,
+      userSeed
     });
 
-    // In CreateWallet layout, credentialHash is usually passed if it is required on-chain layout,
-    // but in V1 client implementation of createWallet, it may only need authPubkey if it matches structure.
-    // Let's rely on LazorWeb3Client defaults.
-    const sig = await sendTx(ctx, [ix]);
-    expect(sig).toBeDefined();
+    await sendTx(ctx, [ix]);
+
+    const [authPda] = findAuthorityPda(walletPda, credentialIdHash);
 
     const authAcc = await AuthorityAccount.fromAccountAddress(ctx.connection, authPda);
     expect(authAcc.authorityType).toBe(1); // Secp256r1
@@ -92,81 +75,53 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Discovery: Ed25519 — pubkey → PDA → wallet", async () => {
     const userSeed = getRandomSeed();
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-
     const owner = Keypair.generate();
-    const ownerBytes = owner.publicKey.toBytes();
-    const [authPda] = findAuthorityPda(walletPda, ownerBytes);
 
-    const ix = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: authPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: ownerBytes,
+    const { ix, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey,
+      userSeed
     });
 
     await sendTx(ctx, [ix]);
 
     // Discover
-    const discoveredAuth = await ctx.client.getAuthorityByPublicKey(ctx.connection, walletPda, owner.publicKey);
-    expect(discoveredAuth).not.toBeNull();
-    // getAuthorityByPublicKey usually returns account address state representation in V1 Client.
-    // Let's verify it is defined.
-    expect(discoveredAuth).toBeDefined();
+    const discoveredWallets = await LazorClient.findWalletByOwner(ctx.connection, owner.publicKey);
+    expect(discoveredWallets).toContainEqual(walletPda);
   }, 30_000);
 
   // --- Transfer Ownership ---
 
   it("Success: Transfer ownership (Ed25519 -> Ed25519)", async () => {
     const userSeed = getRandomSeed();
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-
     const currentOwner = Keypair.generate();
-    const currentOwnerBytes = currentOwner.publicKey.toBytes();
-    const [currentAuthPda] = findAuthorityPda(walletPda, currentOwnerBytes);
 
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: currentAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: currentOwnerBytes,
+    const { ix, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: currentOwner.publicKey,
+      userSeed
     });
 
-    await sendTx(ctx, [createIx]);
+    await sendTx(ctx, [ix]);
 
     const newOwner = Keypair.generate();
     const newOwnerBytes = newOwner.publicKey.toBytes();
+    const [currentAuthPda] = findAuthorityPda(walletPda, currentOwner.publicKey.toBytes());
     const [newAuthPda] = findAuthorityPda(walletPda, newOwnerBytes);
 
-    const transferIx = ctx.client.transferOwnership({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
+    const ixTransfer = await highClient.transferOwnership({
+      payer: ctx.payer,
+      walletPda,
       currentOwnerAuthority: currentAuthPda,
       newOwnerAuthority: newAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
+      authType: AuthType.Ed25519,
       authPubkey: newOwnerBytes,
-      authorizerSigner: currentOwner.publicKey,
+      signer: currentOwner
     });
 
-    const fs = require("fs");
-    const keysLog = transferIx.keys.map((k, i) => `${i}: ${k.pubkey.toBase58()}`).join("\n");
-    fs.writeFileSync("/tmp/keys.log", keysLog);
-
-    await sendTx(ctx, [transferIx], [currentOwner]);
+    await sendTx(ctx, [ixTransfer], [currentOwner]);
 
     const acc = await AuthorityAccount.fromAccountAddress(ctx.connection, newAuthPda);
     expect(acc.role).toBe(0); // Owner
@@ -174,58 +129,44 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Failure: Admin cannot transfer ownership", async () => {
     const userSeed = getRandomSeed();
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-
     const owner = Keypair.generate();
-    const ownerBytes = owner.publicKey.toBytes();
-    const [ownerAuthPda] = findAuthorityPda(walletPda, ownerBytes);
 
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: ownerAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: ownerBytes,
+    const { ix, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey,
+      userSeed
     });
 
-    await sendTx(ctx, [createIx]);
+    await sendTx(ctx, [ix]);
+
+    const [ownerAuthPda] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
 
     // Add Admin
     const admin = Keypair.generate();
-    const adminBytes = admin.publicKey.toBytes();
-    const [adminPda] = findAuthorityPda(walletPda, adminBytes);
+    const [adminPda] = findAuthorityPda(walletPda, admin.publicKey.toBytes());
 
-    const addAuthIx = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: adminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 1, // Admin
-      authPubkey: adminBytes,
-      authorizerSigner: owner.publicKey,
+    const { ix: ixAdd } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: owner,
+      newAuthorityPubkey: admin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: 1, // Admin (Wait, I should use Role.Admin if I can import it)
+      walletPda
     });
 
-    await sendTx(ctx, [addAuthIx], [owner]);
+    await sendTx(ctx, [ixAdd], [owner]);
 
     // Admin tries to transfer
-    const transferIx = ctx.client.transferOwnership({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
+    const transferIx = await highClient.transferOwnership({
+      payer: ctx.payer,
+      walletPda,
       currentOwnerAuthority: adminPda,
       newOwnerAuthority: adminPda, // Irrelevant
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      authPubkey: adminBytes,
-      authorizerSigner: admin.publicKey,
+      authType: AuthType.Ed25519,
+      authPubkey: admin.publicKey.toBytes(),
+      signer: admin,
     });
 
     const result = await tryProcessInstruction(ctx, [transferIx], [admin]);
@@ -236,42 +177,23 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Failure: Cannot create wallet with same seed twice", async () => {
     const userSeed = getRandomSeed();
-    const [wPda] = findWalletPda(userSeed);
-    const [vPda] = findVaultPda(wPda);
-
     const o = Keypair.generate();
-    const oBytes = o.publicKey.toBytes();
-    const [aPda] = findAuthorityPda(wPda, oBytes);
-
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
-      vault: vPda,
-      authority: aPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: oBytes,
+    const { ix: createIx } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: o.publicKey,
+      userSeed
     });
 
     await sendTx(ctx, [createIx]);
 
     // Second creation
     const o2 = Keypair.generate();
-    const o2Bytes = o2.publicKey.toBytes();
-    const [a2Pda] = findAuthorityPda(wPda, o2Bytes);
-
-    const create2Ix = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
-      vault: vPda,
-      authority: a2Pda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: o2Bytes,
+    const { ix: create2Ix } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: o2.publicKey,
+      userSeed
     });
 
     const result = await tryProcessInstruction(ctx, [create2Ix]);
@@ -282,40 +204,29 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Failure: Cannot transfer ownership to zero address", async () => {
     const userSeed = getRandomSeed();
-    const [wPda] = findWalletPda(userSeed);
-    const [vPda] = findVaultPda(wPda);
-
     const o = Keypair.generate();
-    const oBytes = o.publicKey.toBytes();
-    const [aPda] = findAuthorityPda(wPda, oBytes);
 
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
-      vault: vPda,
-      authority: aPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: oBytes,
+    const { ix: createIx, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: o.publicKey,
+      userSeed
     });
 
     await sendTx(ctx, [createIx]);
 
     const zeroPubkey = new Uint8Array(32).fill(0);
-    const [zeroPda] = findAuthorityPda(wPda, zeroPubkey);
+    const [zeroPda] = findAuthorityPda(walletPda, zeroPubkey);
+    const [aPda] = findAuthorityPda(walletPda, o.publicKey.toBytes());
 
-    const transferIx = ctx.client.transferOwnership({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
+    const transferIx = await highClient.transferOwnership({
+      payer: ctx.payer,
+      walletPda,
       currentOwnerAuthority: aPda,
       newOwnerAuthority: zeroPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
+      authType: AuthType.Ed25519,
       authPubkey: zeroPubkey,
-      authorizerSigner: o.publicKey,
+      signer: o,
     });
 
     const result = await tryProcessInstruction(ctx, [transferIx], [o]);
@@ -326,41 +237,30 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
 
   it("Success: After transfer ownership, old owner account is closed", async () => {
     const userSeed = getRandomSeed();
-    const [wPda] = findWalletPda(userSeed);
-    const [vPda] = findVaultPda(wPda);
-
     const oldOwner = Keypair.generate();
-    const oldBytes = oldOwner.publicKey.toBytes();
-    const [oldPda] = findAuthorityPda(wPda, oldBytes);
 
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
-      vault: vPda,
-      authority: oldPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authPubkey: oldBytes,
+    const { ix: createIx, walletPda } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: oldOwner.publicKey,
+      userSeed
     });
 
     await sendTx(ctx, [createIx]);
 
     const newOwner = Keypair.generate();
     const newBytes = newOwner.publicKey.toBytes();
-    const [newPda] = findAuthorityPda(wPda, newBytes);
+    const [oldPda] = findAuthorityPda(walletPda, oldOwner.publicKey.toBytes());
+    const [newPda] = findAuthorityPda(walletPda, newBytes);
 
-    const transferIx = ctx.client.transferOwnership({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
+    const transferIx = await highClient.transferOwnership({
+      payer: ctx.payer,
+      walletPda,
       currentOwnerAuthority: oldPda,
       newOwnerAuthority: newPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
+      authType: AuthType.Ed25519,
       authPubkey: newBytes,
-      authorizerSigner: oldOwner.publicKey,
+      signer: oldOwner,
     });
 
     await sendTx(ctx, [transferIx], [oldOwner]);
@@ -372,23 +272,17 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
   it("Success: Secp256r1 Owner transfers ownership to Ed25519", async () => {
     const userSeed = getRandomSeed();
     const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
 
     // 1. Create Wallet with Secp256r1 Owner
     const secpOwner = await generateMockSecp256r1Signer();
-    const [secpOwnerPda, ownerBump] = findAuthorityPda(walletPda, secpOwner.credentialIdHash);
+    const [secpOwnerPda] = findAuthorityPda(walletPda, secpOwner.credentialIdHash);
 
-    const createIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: secpOwnerPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 1, // Secp256r1
-      authPubkey: secpOwner.publicKeyBytes,
+    const { ix: createIx } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Secp256r1,
+      pubkey: secpOwner.publicKeyBytes,
       credentialHash: secpOwner.credentialIdHash,
+      userSeed
     });
 
     await sendTx(ctx, [createIx]);
@@ -399,14 +293,12 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     const [newAuthPda] = findAuthorityPda(walletPda, newOwnerBytes);
 
     // 3. Perform Transfer
-    const transferIx = ctx.client.transferOwnership({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
+    const transferIx = await highClient.transferOwnership({
+      payer: ctx.payer,
+      walletPda,
       currentOwnerAuthority: secpOwnerPda,
       newOwnerAuthority: newAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
+      authType: AuthType.Ed25519,
       authPubkey: newOwnerBytes,
     });
 

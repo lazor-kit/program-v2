@@ -1,9 +1,3 @@
-/**
- * LazorKit V1 Client — Authority tests
- *
- * Tests: AddAuthority, RemoveAuthority with Ed25519 and Secp256r1.
- */
-
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
@@ -11,6 +5,9 @@ import {
   findVaultPda,
   findAuthorityPda,
   AuthorityAccount,
+  LazorClient,
+  AuthType,
+  Role // <--- Add AuthType, Role
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
 
@@ -28,80 +25,69 @@ describe("LazorKit V1 — Authority", () => {
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
+  let highClient: LazorClient; // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
+    highClient = new LazorClient(ctx.connection); // <--- Initialize
 
     ownerKeypair = Keypair.generate();
     userSeed = getRandomSeed();
 
-    const [wPda] = findWalletPda(userSeed);
-    walletPda = wPda;
-    const [vPda] = findVaultPda(walletPda);
-    vaultPda = vPda;
-    
-    let bump;
-    const [oPda, oBump] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
-    ownerAuthPda = oPda;
-    bump = oBump;
-
-    const createWalletIx = ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      vault: vaultPda,
-      authority: ownerAuthPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      userSeed,
-      authType: 0,
-      authBump: bump,
-      authPubkey: ownerKeypair.publicKey.toBytes(),
+    const { ix, walletPda: w } = await highClient.createWallet({
+          payer: ctx.payer,
+          authType: AuthType.Ed25519,
+          owner: ownerKeypair.publicKey,
+          userSeed
     });
+    await sendTx(ctx, [ix]);
+    walletPda = w;
 
-    await sendTx(ctx, [createWalletIx]);
+    const [v] = findVaultPda(walletPda);
+    vaultPda = v;
+
+    const [oPda] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
+    ownerAuthPda = oPda;
+
     console.log("Wallet created for authority tests");
   }, 30_000);
 
   it("Success: Owner adds an Admin (Ed25519)", async () => {
     const newAdmin = Keypair.generate();
-    const [newAdminPda] = findAuthorityPda(walletPda, newAdmin.publicKey.toBytes());
 
-    const ix = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: newAdminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, // Ed25519
-      newRole: 1,  // Admin
-      authPubkey: newAdmin.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: newAdmin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Admin,
+      walletPda
     });
 
     await sendTx(ctx, [ix], [ownerKeypair]);
+
+    const [newAdminPda] = findAuthorityPda(walletPda, newAdmin.publicKey.toBytes());
     const acc = await AuthorityAccount.fromAccountAddress(ctx.connection, newAdminPda);
     expect(acc.role).toBe(1); // Admin
   }, 30_000);
 
   it("Success: Admin adds a Spender", async () => {
     const spender = Keypair.generate();
-    const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
-    const ix = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: spenderPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 2, // Spender
-      authPubkey: spender.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair, // Owner still adds here, or admin if we update signer
+      newAuthorityPubkey: spender.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
     });
 
     await sendTx(ctx, [ix], [ownerKeypair]);
+
+    const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
     const acc = await AuthorityAccount.fromAccountAddress(ctx.connection, spenderPda);
     expect(acc.role).toBe(2); // Spender
   }, 30_000);
@@ -111,23 +97,21 @@ describe("LazorKit V1 — Authority", () => {
     const p256Pubkey = new Uint8Array(33);
     crypto.getRandomValues(p256Pubkey);
     p256Pubkey[0] = 0x02;
-    const [newAdminPda] = findAuthorityPda(walletPda, credentialIdHash);
 
-    const ix = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: newAdminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 1, // Secp256r1
-      newRole: 1,  // Admin
-      authPubkey: p256Pubkey,
-      credentialHash: credentialIdHash,
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: p256Pubkey,
+      authType: AuthType.Secp256r1,
+      role: Role.Admin,
+      walletPda,
+      credentialHash: credentialIdHash
     });
 
     await sendTx(ctx, [ix], [ownerKeypair]);
+
+    const [newAdminPda] = findAuthorityPda(walletPda, credentialIdHash);
     const acc = await AuthorityAccount.fromAccountAddress(ctx.connection, newAdminPda);
     expect(acc.authorityType).toBe(1); // Secp256r1
     expect(acc.role).toBe(1); // Admin
@@ -135,136 +119,119 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Admin tries to add an Admin", async () => {
     const admin = Keypair.generate();
-    const [adminPda] = findAuthorityPda(walletPda, admin.publicKey.toBytes());
 
     // First, add the Admin
-    const addAdminIx = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: adminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 1,
-      authPubkey: admin.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix: ixAdd } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: admin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Admin,
+      walletPda
     });
-    await sendTx(ctx, [addAdminIx], [ownerKeypair]);
+
+    await sendTx(ctx, [ixAdd], [ownerKeypair]);
 
     const anotherAdmin = Keypair.generate();
-    const [anotherAdminPda] = findAuthorityPda(walletPda, anotherAdmin.publicKey.toBytes());
 
     // Admin tries to add another Admin -> should fail
-    const ix = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: adminPda,
-      newAuthority: anotherAdminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 1, // Admin (forbidden for Admin to add Admin)
-      authPubkey: anotherAdmin.publicKey.toBytes(),
-      authorizerSigner: admin.publicKey,
+    const { ix: ixFail } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: admin,
+      newAuthorityPubkey: anotherAdmin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Admin,
+      walletPda
     });
 
-    const result = await tryProcessInstruction(ctx, ix, [admin]);
+    const result = await tryProcessInstruction(ctx, [ixFail], [admin]);
     expect(result.result).toMatch(/simulation failed|3002|0xbba/i); // PermissionDenied
   }, 30_000);
 
   it("Success: Admin removes a Spender", async () => {
     // Add Admin
     const admin = Keypair.generate();
-    const [adminPda] = findAuthorityPda(walletPda, admin.publicKey.toBytes());
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: adminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 1,
-      authPubkey: admin.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    const { ix: ixAddAdmin } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: admin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Admin,
+      walletPda
+    });
+    await sendTx(ctx, [ixAddAdmin], [ownerKeypair]);
 
     // Add Spender
     const spender = Keypair.generate();
+    const { ix: ixAddSpender } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: spender.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
+    });
+    await sendTx(ctx, [ixAddSpender], [ownerKeypair]);
+
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: spenderPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0,
-      newRole: 2,
-      authPubkey: spender.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
 
     // Admin removes Spender
-    const removeIx = ctx.client.removeAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: adminPda,
-      targetAuthority: spenderPda,
+    const ixRemove = await highClient.removeAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: admin,
+      authorityToRemovePda: spenderPda,
       refundDestination: ctx.payer.publicKey,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authorizerSigner: admin.publicKey,
+      walletPda
     });
+    await sendTx(ctx, [ixRemove], [admin]);
 
-    await sendTx(ctx, [removeIx], [admin]);
     const info = await ctx.connection.getAccountInfo(spenderPda);
     expect(info).toBeNull();
   }, 30_000);
 
   it("Failure: Spender tries to remove another Spender", async () => {
     const s1 = Keypair.generate();
-    const [s1Pda] = findAuthorityPda(walletPda, s1.publicKey.toBytes());
+    const { ix: ixAdd1 } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: s1.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
+    });
+    await sendTx(ctx, [ixAdd1], [ownerKeypair]);
+
     const s2 = Keypair.generate();
+    const { ix: ixAdd2 } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: s2.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
+    });
+    await sendTx(ctx, [ixAdd2], [ownerKeypair]);
+
+    const [s1Pda] = findAuthorityPda(walletPda, s1.publicKey.toBytes());
     const [s2Pda] = findAuthorityPda(walletPda, s2.publicKey.toBytes());
 
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: s1Pda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: s1.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
-
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: s2Pda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: s2.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
-
-    const removeIx = ctx.client.removeAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: s1Pda,
-      targetAuthority: s2Pda,
+    const removeIx = await highClient.removeAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: s1,
+      authorityToRemovePda: s2Pda,
       refundDestination: ctx.payer.publicKey,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authorizerSigner: s1.publicKey,
+      walletPda
     });
 
-    const result = await tryProcessInstruction(ctx, removeIx, [s1]);
+    const result = await tryProcessInstruction(ctx, [removeIx], [s1]);
     expect(result.result).toMatch(/simulation failed|3002|0xbba/i);
   }, 30_000);
 
@@ -274,44 +241,42 @@ describe("LazorKit V1 — Authority", () => {
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
     // Add Secp256r1 Admin
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: secpAdminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 1, // Secp256r1
-      newRole: 1,
-      authPubkey: secpAdmin.publicKeyBytes,
-      credentialHash: secpAdmin.credentialIdHash,
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    const { ix: ixAddSecp } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: secpAdmin.publicKeyBytes,
+      authType: AuthType.Secp256r1,
+      role: Role.Admin,
+      walletPda,
+      credentialHash: secpAdmin.credentialIdHash
+    });
+    await sendTx(ctx, [ixAddSecp], [ownerKeypair]);
 
     // Create a disposable Spender
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPda, victim.publicKey.toBytes());
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: victimPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: victim.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    
+    const { ix: ixAddVictim } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: victim.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
+    });
+    await sendTx(ctx, [ixAddVictim], [ownerKeypair]);
 
     // Secp256r1 Admin removes the victim
-    const removeAuthIx = ctx.client.removeAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: secpAdminPda,
-      targetAuthority: victimPda,
+    const removeAuthIx = await highClient.removeAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Secp256r1,
+      authorityToRemovePda: victimPda,
       refundDestination: ctx.payer.publicKey,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+      walletPda,
+      adminCredentialHash: secpAdmin.credentialIdHash,
+      adminSignature: new Uint8Array(64) // Dummy, overwritten later
     });
 
     removeAuthIx.keys = [
@@ -366,121 +331,108 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Spender cannot add any authority", async () => {
     const spender = Keypair.generate();
-    const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: spenderPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: spender.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    const { ix: ixAdd } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: spender.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
+    });
+    await sendTx(ctx, [ixAdd], [ownerKeypair]);
 
     const victim = Keypair.generate();
-    const [victimPda] = findAuthorityPda(walletPda, victim.publicKey.toBytes());
+    const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
-    const addIx = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: spenderPda,
-      newAuthority: victimPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: victim.publicKey.toBytes(),
-      authorizerSigner: spender.publicKey,
+    // Spender tries to add -> should fail
+    const { ix: ixFail } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: spender,
+      newAuthorityPubkey: victim.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
     });
 
-    const result = await tryProcessInstruction(ctx, addIx, [spender]);
+    const result = await tryProcessInstruction(ctx, [ixFail], [spender]);
     expect(result.result).toMatch(/simulation failed|3002|0xbba/i);
   }, 30_000);
 
   it("Failure: Admin cannot remove Owner", async () => {
     const admin = Keypair.generate();
-    const [adminPda] = findAuthorityPda(walletPda, admin.publicKey.toBytes());
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: adminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 1,
-      authPubkey: admin.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    const { ix: ixAddAdmin } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: admin.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Admin,
+      walletPda
+    });
+    await sendTx(ctx, [ixAddAdmin], [ownerKeypair]);
 
-    const removeIx = ctx.client.removeAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: adminPda,
-      targetAuthority: ownerAuthPda,
+    // Admin tries to remove Owner
+    const removeIx = await highClient.removeAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: admin,
+      authorityToRemovePda: ownerAuthPda,
       refundDestination: ctx.payer.publicKey,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authorizerSigner: admin.publicKey,
+      walletPda
     });
 
-    const result = await tryProcessInstruction(ctx, removeIx, [admin]);
+    const result = await tryProcessInstruction(ctx, [removeIx], [admin]);
     expect(result.result).toMatch(/simulation failed|3002|0xbba/i);
   }, 30_000);
 
   it("Failure: Authority from Wallet A cannot add authority to Wallet B", async () => {
     const userSeedB = getRandomSeed();
     const [walletPdaB] = findWalletPda(userSeedB);
-    const [vaultPdaB] = findVaultPda(walletPdaB);
     const ownerB = Keypair.generate();
-    const [ownerBAuthPda] = findAuthorityPda(walletPdaB, ownerB.publicKey.toBytes());
 
-    await sendTx(ctx, [ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPdaB, vault: vaultPdaB, authority: ownerBAuthPda,
-      config: ctx.configPda, treasuryShard: ctx.treasuryShard,
-      userSeed: userSeedB, authType: 0,
-      authPubkey: ownerB.publicKey.toBytes(),
-    })]);
+    const { ix: ixCreateB } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: ownerB.publicKey,
+      userSeed: userSeedB
+    });
+    await sendTx(ctx, [ixCreateB]);
 
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPdaB, victim.publicKey.toBytes());
 
-    const ix = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPdaB, // Target is B
-      adminAuthority: ownerAuthPda, // Wallet A
-      newAuthority: victimPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: victim.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair, // Wallet A
+      newAuthorityPubkey: victim.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda: walletPdaB // target is B
     });
 
-    const result = await tryProcessInstruction(ctx, ix, [ownerKeypair]);
+    const result = await tryProcessInstruction(ctx, [ix], [ownerKeypair]);
     expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
   }, 30_000);
 
   it("Failure: Cannot add same authority twice", async () => {
     const newUser = Keypair.generate();
-    const [newUserPda] = findAuthorityPda(walletPda, newUser.publicKey.toBytes());
 
-    const addIx = ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: newUserPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 0, newRole: 2,
-      authPubkey: newUser.publicKey.toBytes(),
-      authorizerSigner: ownerKeypair.publicKey,
+    const { ix: addIx } = await highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: newUser.publicKey.toBytes(),
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
+      walletPda
     });
 
     await sendTx(ctx, [addIx], [ownerKeypair]);
 
-    const result = await tryProcessInstruction(ctx, addIx, [ownerKeypair]);
+    const result = await tryProcessInstruction(ctx, [addIx], [ownerKeypair]);
     expect(result.result).toMatch(/simulation failed|already in use|AccountAlreadyInitialized/i);
   }, 30_000);
 
@@ -491,26 +443,25 @@ describe("LazorKit V1 — Authority", () => {
     const o = Keypair.generate();
     const [oPda] = findAuthorityPda(wPda, o.publicKey.toBytes());
 
-    await sendTx(ctx, [ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: wPda, vault: vPda, authority: oPda,
-      config: ctx.configPda, treasuryShard: ctx.treasuryShard,
-      userSeed: userSeed2, authType: 0,
-      authPubkey: o.publicKey.toBytes(),
-    })]);
+    const { ix: ixCreate } = await highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: o.publicKey,
+      userSeed: userSeed2
+    });
+    await sendTx(ctx, [ixCreate]);
 
-    const removeIx = ctx.client.removeAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: wPda,
-      adminAuthority: oPda,
-      targetAuthority: oPda,
+    const removeIx = await highClient.removeAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: o,
+      authorityToRemovePda: oPda,
       refundDestination: ctx.payer.publicKey,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authorizerSigner: o.publicKey,
+      walletPda: wPda
     });
 
     await sendTx(ctx, [removeIx], [o]);
+
     const info = await ctx.connection.getAccountInfo(oPda);
     expect(info).toBeNull();
   }, 30_000);
