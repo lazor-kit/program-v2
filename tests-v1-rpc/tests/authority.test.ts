@@ -5,7 +5,6 @@ import {
   findVaultPda,
   findAuthorityPda,
   AuthorityAccount,
-  LazorClient,
   AuthType,
   Role // <--- Add AuthType, Role
 } from "@lazorkit/solita-client";
@@ -25,20 +24,20 @@ describe("LazorKit V1 — Authority", () => {
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
-  let highClient: LazorClient; // <--- Add highClient
+  // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
-    highClient = new LazorClient(ctx.connection); // <--- Initialize
+    // <--- Initialize
 
     ownerKeypair = Keypair.generate();
     userSeed = getRandomSeed();
 
-    const { ix, walletPda: w } = await highClient.createWallet({
-          payer: ctx.payer,
-          authType: AuthType.Ed25519,
-          owner: ownerKeypair.publicKey,
-          userSeed
+    const { ix, walletPda: w } = await ctx.highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: ownerKeypair.publicKey,
+      userSeed
     });
     await sendTx(ctx, [ix]);
     walletPda = w;
@@ -55,7 +54,7 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Owner adds an Admin (Ed25519)", async () => {
     const newAdmin = Keypair.generate();
 
-    const { ix } = await highClient.addAuthority({
+    const { ix } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -75,7 +74,7 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Admin adds a Spender", async () => {
     const spender = Keypair.generate();
 
-    const { ix } = await highClient.addAuthority({
+    const { ix } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair, // Owner still adds here, or admin if we update signer
@@ -98,7 +97,7 @@ describe("LazorKit V1 — Authority", () => {
     crypto.getRandomValues(p256Pubkey);
     p256Pubkey[0] = 0x02;
 
-    const { ix } = await highClient.addAuthority({
+    const { ix } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -121,7 +120,7 @@ describe("LazorKit V1 — Authority", () => {
     const admin = Keypair.generate();
 
     // First, add the Admin
-    const { ix: ixAdd } = await highClient.addAuthority({
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -136,7 +135,7 @@ describe("LazorKit V1 — Authority", () => {
     const anotherAdmin = Keypair.generate();
 
     // Admin tries to add another Admin -> should fail
-    const { ix: ixFail } = await highClient.addAuthority({
+    const { ix: ixFail } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: admin,
@@ -153,7 +152,7 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Admin removes a Spender", async () => {
     // Add Admin
     const admin = Keypair.generate();
-    const { ix: ixAddAdmin } = await highClient.addAuthority({
+    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -166,7 +165,7 @@ describe("LazorKit V1 — Authority", () => {
 
     // Add Spender
     const spender = Keypair.generate();
-    const { ix: ixAddSpender } = await highClient.addAuthority({
+    const { ix: ixAddSpender } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -180,7 +179,7 @@ describe("LazorKit V1 — Authority", () => {
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
     // Admin removes Spender
-    const ixRemove = await highClient.removeAuthority({
+    const ixRemove = await ctx.highClient.removeAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: admin,
@@ -196,7 +195,7 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Spender tries to remove another Spender", async () => {
     const s1 = Keypair.generate();
-    const { ix: ixAdd1 } = await highClient.addAuthority({
+    const { ix: ixAdd1 } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -208,7 +207,7 @@ describe("LazorKit V1 — Authority", () => {
     await sendTx(ctx, [ixAdd1], [ownerKeypair]);
 
     const s2 = Keypair.generate();
-    const { ix: ixAdd2 } = await highClient.addAuthority({
+    const { ix: ixAdd2 } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -222,7 +221,7 @@ describe("LazorKit V1 — Authority", () => {
     const [s1Pda] = findAuthorityPda(walletPda, s1.publicKey.toBytes());
     const [s2Pda] = findAuthorityPda(walletPda, s2.publicKey.toBytes());
 
-    const removeIx = await highClient.removeAuthority({
+    const removeIx = await ctx.highClient.removeAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: s1,
@@ -241,7 +240,7 @@ describe("LazorKit V1 — Authority", () => {
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
     // Add Secp256r1 Admin
-    const { ix: ixAddSecp } = await highClient.addAuthority({
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -256,8 +255,8 @@ describe("LazorKit V1 — Authority", () => {
     // Create a disposable Spender
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPda, victim.publicKey.toBytes());
-    
-    const { ix: ixAddVictim } = await highClient.addAuthority({
+
+    const { ix: ixAddVictim } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -269,7 +268,7 @@ describe("LazorKit V1 — Authority", () => {
     await sendTx(ctx, [ixAddVictim], [ownerKeypair]);
 
     // Secp256r1 Admin removes the victim
-    const removeAuthIx = await highClient.removeAuthority({
+    const removeAuthIx = await ctx.highClient.removeAuthority({
       payer: ctx.payer,
       adminType: AuthType.Secp256r1,
       authorityToRemovePda: victimPda,
@@ -331,7 +330,7 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Spender cannot add any authority", async () => {
     const spender = Keypair.generate();
-    const { ix: ixAdd } = await highClient.addAuthority({
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -346,7 +345,7 @@ describe("LazorKit V1 — Authority", () => {
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
     // Spender tries to add -> should fail
-    const { ix: ixFail } = await highClient.addAuthority({
+    const { ix: ixFail } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: spender,
@@ -362,7 +361,7 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Admin cannot remove Owner", async () => {
     const admin = Keypair.generate();
-    const { ix: ixAddAdmin } = await highClient.addAuthority({
+    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -374,7 +373,7 @@ describe("LazorKit V1 — Authority", () => {
     await sendTx(ctx, [ixAddAdmin], [ownerKeypair]);
 
     // Admin tries to remove Owner
-    const removeIx = await highClient.removeAuthority({
+    const removeIx = await ctx.highClient.removeAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: admin,
@@ -392,7 +391,7 @@ describe("LazorKit V1 — Authority", () => {
     const [walletPdaB] = findWalletPda(userSeedB);
     const ownerB = Keypair.generate();
 
-    const { ix: ixCreateB } = await highClient.createWallet({
+    const { ix: ixCreateB } = await ctx.highClient.createWallet({
       payer: ctx.payer,
       authType: AuthType.Ed25519,
       owner: ownerB.publicKey,
@@ -403,7 +402,7 @@ describe("LazorKit V1 — Authority", () => {
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPdaB, victim.publicKey.toBytes());
 
-    const { ix } = await highClient.addAuthority({
+    const { ix } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair, // Wallet A
@@ -420,7 +419,7 @@ describe("LazorKit V1 — Authority", () => {
   it("Failure: Cannot add same authority twice", async () => {
     const newUser = Keypair.generate();
 
-    const { ix: addIx } = await highClient.addAuthority({
+    const { ix: addIx } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
@@ -443,7 +442,7 @@ describe("LazorKit V1 — Authority", () => {
     const o = Keypair.generate();
     const [oPda] = findAuthorityPda(wPda, o.publicKey.toBytes());
 
-    const { ix: ixCreate } = await highClient.createWallet({
+    const { ix: ixCreate } = await ctx.highClient.createWallet({
       payer: ctx.payer,
       authType: AuthType.Ed25519,
       owner: o.publicKey,
@@ -451,7 +450,7 @@ describe("LazorKit V1 — Authority", () => {
     });
     await sendTx(ctx, [ixCreate]);
 
-    const removeIx = await highClient.removeAuthority({
+    const removeIx = await ctx.highClient.removeAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: o,

@@ -20,6 +20,7 @@ import {
   LazorWeb3Client,
   findConfigPda,
   findTreasuryShardPda,
+  LazorClient,
 } from "@lazorkit/solita-client";
 import * as dotenv from "dotenv";
 
@@ -37,7 +38,7 @@ export interface TestContext {
   configPda: PublicKey;
   treasuryShard: PublicKey;
   shardId: number;
-  client: LazorWeb3Client;
+  highClient: LazorClient;
 }
 
 /**
@@ -146,7 +147,7 @@ export async function setupTest(): Promise<TestContext> {
   }
 
   // ── Client ────────────────────────────────────────────────────────
-  const client = new LazorWeb3Client(PROGRAM_ID);
+  const highClient = new LazorClient(connection, PROGRAM_ID);
 
   // ── Config PDA ────────────────────────────────────────────────────
   const [configPda] = findConfigPda(PROGRAM_ID);
@@ -163,7 +164,7 @@ export async function setupTest(): Promise<TestContext> {
     configPda,
     treasuryShard,
     shardId,
-    client,
+    highClient,
   };
 
   // ── Initialize Config if not yet ──────────────────────────────────
@@ -173,9 +174,8 @@ export async function setupTest(): Promise<TestContext> {
   } catch {
     console.log("Initializing Global Config...");
     try {
-      const initConfigIx = client.initializeConfig({
-        admin: payer.publicKey,
-        config: configPda,
+      const initConfigIx = await highClient.initializeConfig({
+        admin: payer,
         walletFee: 10000n,
         actionFee: 1000n,
         numShards: 16,
@@ -193,10 +193,8 @@ export async function setupTest(): Promise<TestContext> {
   } catch {
     console.log(`Initializing Treasury Shard ${shardId}...`);
     try {
-      const initShardIx = client.initTreasuryShard({
-        payer: payer.publicKey,
-        config: configPda,
-        treasuryShard: treasuryShard,
+      const initShardIx = await highClient.initTreasuryShard({
+        payer: payer,
         shardId,
       });
       await sendTx(ctx, [initShardIx]);

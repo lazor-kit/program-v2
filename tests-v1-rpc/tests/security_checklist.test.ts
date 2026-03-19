@@ -1,7 +1,7 @@
 import { expect, describe, it, beforeAll } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { setupTest, sendTx, tryProcessInstructions, type TestContext } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "@lazorkit/solita-client";
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda, LazorClient, AuthType } from "@lazorkit/solita-client";
 
 function getRandomSeed() {
     const seed = new Uint8Array(32);
@@ -15,10 +15,8 @@ describe("Security Checklist Gaps", () => {
     let vaultPda: PublicKey;
     let owner: Keypair;
     let ownerAuthPda: PublicKey;
-
     beforeAll(async () => {
         ctx = await setupTest();
-
         const userSeed = getRandomSeed();
         const [w] = findWalletPda(userSeed);
         walletPda = w;
@@ -30,34 +28,26 @@ describe("Security Checklist Gaps", () => {
         const [o, authBump] = findAuthorityPda(walletPda, ownerBytes);
         ownerAuthPda = o;
 
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: ownerBytes,
-        })]);
+        const { ix: ixCreate } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey,
+            userSeed
+        });
+        await sendTx(ctx, [ixCreate]);
     }, 180_000);
 
     it("CreateSession rejects System Program spoofing", async () => {
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-        const ix = ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: 999999999n,
-            authorizerSigner: owner.publicKey,
+            walletPda
         });
 
         // Index 4 is SystemProgram
@@ -74,24 +64,21 @@ describe("Security Checklist Gaps", () => {
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: BigInt(2 ** 62),
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
         // Call CloseSession without authorizer accounts
-        const closeIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: ctx.configPda,
+        const closeIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
         });
 
         const result = await tryProcessInstructions(ctx, [closeIx], [ctx.payer]);

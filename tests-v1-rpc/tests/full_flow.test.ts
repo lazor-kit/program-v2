@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { setupTest, sendTx, type TestContext } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "@lazorkit/solita-client";
+import { findWalletPda, findVaultPda, findAuthorityPda, LazorClient, AuthType } from "@lazorkit/solita-client";
 import { Connection, PublicKey } from "@solana/web3.js";
 
 describe("Real RPC Integration Suite — Full Flow", () => {
     let ctx: TestContext;
-
     // Test data
     let userSeed: Uint8Array;
     let walletPda: PublicKey;
@@ -16,7 +15,6 @@ describe("Real RPC Integration Suite — Full Flow", () => {
 
     beforeAll(async () => {
         ctx = await setupTest();
-
         // Initialize Wallet Config Variables
         userSeed = new Uint8Array(32);
         crypto.getRandomValues(userSeed);
@@ -53,18 +51,12 @@ describe("Real RPC Integration Suite — Full Flow", () => {
 
         const [_, authBump] = findAuthorityPda(walletPda, credentialIdHash);
 
-        const ix = ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: authPda,
-            userSeed,
-            authType: 1, // Secp256r1
-            authBump,
-            authPubkey: p256PubkeyCompressed,
+        const { ix } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Secp256r1,
+            pubkey: p256PubkeyCompressed,
             credentialHash: credentialIdHash,
+            userSeed
         });
 
         const txResult = await sendTx(ctx, [ix]);

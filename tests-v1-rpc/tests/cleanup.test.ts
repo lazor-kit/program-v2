@@ -6,16 +6,18 @@ import {
     findVaultPda,
     findAuthorityPda,
     findSessionPda,
-    LazorClient // <--- Add LazorClient
+    LazorClient,
+    AuthType, // <--- Add AuthType
+    Role      // <--- Add Role
 } from "@lazorkit/solita-client";
 
 describe("Cleanup Instructions", () => {
     let ctx: TestContext;
-    let highClient: LazorClient; // <--- Add highClient
+    // <--- Add highClient
 
     beforeAll(async () => {
         ctx = await setupTest();
-        highClient = new LazorClient(ctx.connection); // <--- Initialize
+        // <--- Initialize
     });
 
     const getRandomSeed = () => {
@@ -26,47 +28,35 @@ describe("Cleanup Instructions", () => {
 
     it("should allow wallet owner to close an active session", async () => {
         const owner = Keypair.generate();
-        const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
-
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
+        const { ix: ixCreate, walletPda, authorityPda: ownerAuthPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey
+        });
+        await sendTx(ctx, [ixCreate]);
 
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
         const validUntil = BigInt(Math.floor(Date.now() / 1000) + 3600); // active
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: validUntil,
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
-        const closeSessionIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: ctx.configPda,
-            authorizer: ownerAuthPda,
-            authorizerSigner: owner.publicKey,
+        const closeSessionIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
+            authorizer: {
+                authorizerPda: ownerAuthPda,
+                signer: owner
+            }
         });
 
         const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer, owner]);
@@ -75,45 +65,31 @@ describe("Cleanup Instructions", () => {
 
     it("should allow contract admin to close an expired session", async () => {
         const owner = Keypair.generate();
-        const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
-
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
+        const { ix: ixCreate, walletPda, authorityPda: ownerAuthPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey
+        });
+        await sendTx(ctx, [ixCreate]);
 
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
         const validUntil = 0n; // expired
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: validUntil,
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
-        const closeSessionIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: ctx.configPda,
+        const closeSessionIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
         });
 
         const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer]);
@@ -122,45 +98,31 @@ describe("Cleanup Instructions", () => {
 
     it("should reject contract admin closing an active session", async () => {
         const owner = Keypair.generate();
-        const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
-
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
+        const { ix: ixCreate, walletPda, authorityPda: ownerAuthPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey
+        });
+        await sendTx(ctx, [ixCreate]);
 
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
         const validUntil = BigInt(Math.floor(Date.now() / 1000) + 3600); // active
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: validUntil,
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
-        const closeSessionIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: ctx.configPda,
+        const closeSessionIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
         });
 
         const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer]);
@@ -171,28 +133,30 @@ describe("Cleanup Instructions", () => {
         const owner = Keypair.generate();
         const userSeed = getRandomSeed();
 
-        const { walletPda } = await highClient.createWallet({
+        const { ix, walletPda } = await ctx.highClient.createWallet({
             payer: ctx.payer,
-            authType: 0,
+            authType: AuthType.Ed25519,
             owner: owner.publicKey,
             userSeed
         });
+        await sendTx(ctx, [ix]);
 
         const [vaultPda] = findVaultPda(walletPda);
 
         // Place lamports to simulate direct fees or balance
         const [vPda] = findVaultPda(walletPda);
-        await highClient.sendTx([getSystemTransferIx(ctx.payer.publicKey, vPda, 25000000n)], [ctx.payer]);
+        await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vPda, 25000000n)]);
 
         const destWallet = Keypair.generate();
 
-        await highClient.closeWallet({
+        const closeIx = await ctx.highClient.closeWallet({
             payer: ctx.payer,
             walletPda,
             destination: destWallet.publicKey,
-            adminType: 0,
+            adminType: AuthType.Ed25519,
             adminSigner: owner
         });
+        await sendTx(ctx, [closeIx], [owner]);
 
         const destBalance = await ctx.connection.getBalance(destWallet.publicKey);
         expect(destBalance).toBeGreaterThan(25000000);
@@ -201,38 +165,22 @@ describe("Cleanup Instructions", () => {
     it("should reject non-owner from closing a wallet", async () => {
         const owner = Keypair.generate();
         const attacker = Keypair.generate();
-        const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
-
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
+        const { ix: ixCreate, walletPda, authorityPda: ownerAuthPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey
+        });
+        await sendTx(ctx, [ixCreate]);
 
         const destWallet = Keypair.generate();
 
-        const closeWalletIx = ctx.client.closeWallet({
-            payer: attacker.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            ownerAuthority: ownerAuthPda,
-            ownerSigner: attacker.publicKey,
+        const closeWalletIx = await ctx.highClient.closeWallet({
+            payer: attacker,
+            walletPda: walletPda,
             destination: destWallet.publicKey,
-        });
-        closeWalletIx.keys.push({
-            pubkey: SystemProgram.programId,
-            isWritable: false,
-            isSigner: false,
+            adminType: AuthType.Ed25519,
+            adminSigner: attacker,
+            adminAuthorityPda: ownerAuthPda
         });
 
         const result = await tryProcessInstructions(ctx, [closeWalletIx], [attacker]);
@@ -241,36 +189,21 @@ describe("Cleanup Instructions", () => {
 
     it("should reject closing wallet if destination is the vault PDA", async () => {
         const owner = Keypair.generate();
-        const userSeed = getRandomSeed();
-        const [walletPda] = findWalletPda(userSeed);
-        const [vaultPda] = findVaultPda(walletPda);
-        const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
-
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: owner.publicKey.toBytes(),
-        })]);
-
-        const closeWalletIx = ctx.client.closeWallet({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            ownerAuthority: ownerAuthPda,
-            ownerSigner: owner.publicKey,
-            destination: vaultPda, // self-destruct bug check
+        const { ix: ixCreate, walletPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey,
         });
-        closeWalletIx.keys.push({
-            pubkey: SystemProgram.programId,
-            isWritable: false,
-            isSigner: false,
+        await sendTx(ctx, [ixCreate]);
+
+        const [vaultPda] = findVaultPda(walletPda);
+
+        const closeWalletIx = await ctx.highClient.closeWallet({
+            payer: ctx.payer,
+            walletPda: walletPda,
+            destination: vaultPda,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner
         });
 
         const result = await tryProcessInstructions(ctx, [closeWalletIx], [ctx.payer, owner]);

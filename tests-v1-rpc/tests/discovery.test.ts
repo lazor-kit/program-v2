@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { setupTest, sendTx, type TestContext, PROGRAM_ID } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda } from "@lazorkit/solita-client";
+import { findWalletPda, findVaultPda, findAuthorityPda, LazorClient, AuthType } from "@lazorkit/solita-client";
 import bs58 from "bs58";
 
 async function findAllAuthoritiesByCredentialId(ctx: TestContext, credentialIdHash: Uint8Array): Promise<any[]> {
@@ -30,10 +30,9 @@ async function findAllAuthoritiesByCredentialId(ctx: TestContext, credentialIdHa
 
 describe("Recovery by Credential Hash", () => {
     let ctx: TestContext;
-
     beforeAll(async () => {
         ctx = await setupTest();
-    }, 30000);
+        }, 30000);
 
     it("Should discover a wallet by its credential hash", async () => {
         // 1. Setup random data
@@ -52,18 +51,12 @@ describe("Recovery by Credential Hash", () => {
 
         // 2. Create the wallet
         console.log("Creating wallet for discovery test...");
-        const createIx = ctx.client.createWallet({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: authPda,
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            userSeed,
-            authType: 1, // Secp256r1
-            authBump,
-            authPubkey,
+        const { ix: createIx } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Secp256r1,
+            pubkey: authPubkey,
             credentialHash: credentialIdHash,
+            userSeed
         });
 
         await sendTx(ctx, [createIx]);

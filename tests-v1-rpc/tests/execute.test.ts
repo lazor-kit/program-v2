@@ -11,7 +11,9 @@ import {
   findVaultPda,
   findAuthorityPda,
   findSessionPda,
-  LazorClient // <--- Add LazorClient
+  LazorClient,
+  AuthType,
+  Role // <--- Add AuthType, Role
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 
@@ -29,39 +31,36 @@ describe("LazorKit V1 — Execute", () => {
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
-  let highClient: LazorClient; // <--- Add highClient
+  // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
-    highClient = new LazorClient(ctx.connection); // <--- Initialize
+    // <--- Initialize
 
     ownerKeypair = Keypair.generate();
-    userSeed = getRandomSeed();
 
-    const { walletPda: w } = await highClient.createWallet({
+    const { ix, walletPda: w, authorityPda } = await ctx.highClient.createWallet({
           payer: ctx.payer,
-          authType: 0,
+          authType: AuthType.Ed25519,
           owner: ownerKeypair.publicKey,
-          userSeed
     });
+    await sendTx(ctx, [ix]);
     walletPda = w;
-
+    ownerAuthPda = authorityPda;
+ 
     const [v] = findVaultPda(walletPda);
     vaultPda = v;
-
-    const [oPda] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
-    ownerAuthPda = oPda;
-
+ 
     // Fund vault
     const [vPda] = findVaultPda(walletPda);
-    await highClient.sendTx([getSystemTransferIx(ctx.payer.publicKey, vPda, 200_000_000n)], [ctx.payer]);
+    await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vPda, 200_000_000n)]);
     console.log("Wallet created and funded for execute tests");
   }, 30_000);
 
   it("Success: Owner executes a transfer", async () => {
     const recipient = Keypair.generate().publicKey;
 
-    await highClient.execute({
+    const ix = await ctx.highClient.execute({
       payer: ctx.payer,
       walletPda,
       authorityPda: ownerAuthPda,
@@ -70,6 +69,7 @@ describe("LazorKit V1 — Execute", () => {
       ],
       signer: ownerKeypair
     });
+    await sendTx(ctx, [ix], [ownerKeypair]);
 
     const balance = await ctx.connection.getBalance(recipient);
     expect(balance).toBe(1_000_000);
@@ -79,20 +79,21 @@ describe("LazorKit V1 — Execute", () => {
     const spender = Keypair.generate();
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
-    await highClient.addAuthority({
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
-      adminType: 0,
+      adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       newAuthorityPubkey: spender.publicKey.toBytes(),
-      authType: 0,
-      role: 2, // Spender
+      authType: AuthType.Ed25519,
+      role: Role.Spender,
       walletPda
     });
+    await sendTx(ctx, [ixAdd], [ownerKeypair]);
 
     const recipient = Keypair.generate().publicKey;
 
     // Execute using spender key
-    await highClient.execute({
+    const executeIx = await ctx.highClient.execute({
       payer: ctx.payer,
       walletPda,
       authorityPda: spenderPda,
@@ -101,6 +102,7 @@ describe("LazorKit V1 — Execute", () => {
       ],
       signer: spender
     });
+    await sendTx(ctx, [executeIx], [spender]);
 
     const balance = await ctx.connection.getBalance(recipient);
     expect(balance).toBe(1_000_000);
@@ -110,19 +112,20 @@ describe("LazorKit V1 — Execute", () => {
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-    await highClient.createSession({
+    const { ix: ixCreate } = await ctx.highClient.createSession({
       payer: ctx.payer,
-      adminType: 0,
+      adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       sessionKey: sessionKey.publicKey,
       expiresAt: BigInt(2 ** 62),
       walletPda
     });
+    await sendTx(ctx, [ixCreate], [ownerKeypair]);
 
     const recipient = Keypair.generate().publicKey;
 
     // Execute using session key
-    await highClient.execute({
+    const executeIx = await ctx.highClient.execute({
       payer: ctx.payer,
       walletPda,
       authorityPda: sessionPda,
@@ -131,6 +134,7 @@ describe("LazorKit V1 — Execute", () => {
       ],
       signer: sessionKey
     });
+    await sendTx(ctx, [executeIx], [sessionKey]);
 
     const balance = await ctx.connection.getBalance(recipient);
     expect(balance).toBe(1_000_000);
@@ -141,32 +145,28 @@ describe("LazorKit V1 — Execute", () => {
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
-    await sendTx(ctx, [ctx.client.addAuthority({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      newAuthority: secpAdminPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      authType: 1, // Secp256r1
-      newRole: 1,  // Admin
-      authPubkey: secpAdmin.publicKeyBytes,
-      credentialHash: secpAdmin.credentialIdHash,
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+    // Add Secp256r1 Admin
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      newAuthorityPubkey: secpAdmin.publicKeyBytes,
+      authType: AuthType.Secp256r1,
+      role: Role.Admin,
+      walletPda,
+      credentialHash: secpAdmin.credentialIdHash
+    });
+    await sendTx(ctx, [ixAddSecp], [ownerKeypair]);
 
     const recipient = Keypair.generate().publicKey;
     const innerInstructions = [
       getSystemTransferIx(vaultPda, recipient, 2_000_000n)
     ];
 
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: secpAdminPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: secpAdminPda,
       innerInstructions,
     });
 
@@ -243,33 +243,28 @@ describe("LazorKit V1 — Execute", () => {
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
     // Create session that is immediately expired (slot 0 or far past)
-    await sendTx(ctx, [ctx.client.createSession({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      adminAuthority: ownerAuthPda,
-      session: sessionPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
-      sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+    const { ix: ixCreate } = await ctx.highClient.createSession({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: ownerKeypair,
+      sessionKey: sessionKey.publicKey,
       expiresAt: 0n,
-      authorizerSigner: ownerKeypair.publicKey,
-    })], [ownerKeypair]);
+      walletPda
+    });
+    await sendTx(ctx, [ixCreate], [ownerKeypair]);
 
     const recipient = Keypair.generate().publicKey;
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: sessionPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: sessionPda,
       innerInstructions: [
         getSystemTransferIx(vaultPda, recipient, 100n)
       ],
-      authorizerSigner: sessionKey.publicKey,
+      signer: sessionKey
     });
 
-    const result = await tryProcessInstruction(ctx, executeIx, [sessionKey]);
+    const result = await tryProcessInstruction(ctx, [executeIx], [sessionKey]);
     expect(result.result).toMatch(/3009|0xbc1|simulation failed/i);
   }, 30_000);
 
@@ -277,20 +272,17 @@ describe("LazorKit V1 — Execute", () => {
     const thief = Keypair.generate();
     const recipient = Keypair.generate().publicKey;
 
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: ownerAuthPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: ownerAuthPda,
       innerInstructions: [
         getSystemTransferIx(vaultPda, recipient, 100n)
       ],
-      authorizerSigner: thief.publicKey,
+      signer: thief
     });
 
-    const result = await tryProcessInstruction(ctx, executeIx, [thief]);
+    const result = await tryProcessInstruction(ctx, [executeIx], [thief]);
     expect(result.result).toMatch(/signature|unauthorized|simulation failed/i);
   }, 30_000);
 
@@ -301,32 +293,29 @@ describe("LazorKit V1 — Execute", () => {
     const ownerB = Keypair.generate();
     const [ownerBAuthPda] = findAuthorityPda(walletPdaB, ownerB.publicKey.toBytes());
 
-    await sendTx(ctx, [ctx.client.createWallet({
-      payer: ctx.payer.publicKey,
-      wallet: walletPdaB, vault: vaultPdaB, authority: ownerBAuthPda,
-      config: ctx.configPda, treasuryShard: ctx.treasuryShard,
-      userSeed: userSeedB, authType: 0,
-      authPubkey: ownerB.publicKey.toBytes(),
-    })]);
+    const { ix: ixCreateB } = await ctx.highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: ownerB.publicKey,
+      userSeed: userSeedB
+    });
+    await sendTx(ctx, [ixCreateB]);
 
     await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPdaB, 100_000_000n)]);
 
     const recipient = Keypair.generate().publicKey;
 
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPdaB,         // Target B
-      authority: ownerAuthPda,     // Auth A
-      vault: vaultPdaB,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda: walletPdaB,         // Target B
+      authorityPda: ownerAuthPda,     // Auth A
       innerInstructions: [
         getSystemTransferIx(vaultPdaB, recipient, 1_000_000n)
       ],
-      authorizerSigner: ownerKeypair.publicKey,
+      signer: ownerKeypair
     });
 
-    const result = await tryProcessInstruction(ctx, executeIx, [ownerKeypair]);
+    const result = await tryProcessInstruction(ctx, [executeIx], [ownerKeypair]);
     expect(result.result).toMatch(/simulation failed|InvalidAccountData/i);
   }, 30_000);
 
@@ -334,18 +323,15 @@ describe("LazorKit V1 — Execute", () => {
     const recipient1 = Keypair.generate().publicKey;
     const recipient2 = Keypair.generate().publicKey;
 
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: ownerAuthPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: ownerAuthPda,
       innerInstructions: [
         getSystemTransferIx(vaultPda, recipient1, 1_000_000n),
         getSystemTransferIx(vaultPda, recipient2, 2_000_000n),
       ],
-      authorizerSigner: ownerKeypair.publicKey,
+      signer: ownerKeypair
     });
 
     await sendTx(ctx, [executeIx], [ownerKeypair]);
@@ -357,15 +343,12 @@ describe("LazorKit V1 — Execute", () => {
   }, 30_000);
 
   it("Success: Execute with empty inner instructions", async () => {
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: ownerAuthPda,
-      vault: vaultPda,
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: ownerAuthPda,
       innerInstructions: [],
-      authorizerSigner: ownerKeypair.publicKey,
+      signer: ownerKeypair
     });
 
     await sendTx(ctx, [executeIx], [ownerKeypair]);
@@ -375,20 +358,18 @@ describe("LazorKit V1 — Execute", () => {
     const fakeVault = Keypair.generate();
     const recipient = Keypair.generate().publicKey;
 
-    const executeIx = ctx.client.buildExecute({
-      payer: ctx.payer.publicKey,
-      wallet: walletPda,
-      authority: ownerAuthPda,
-      vault: fakeVault.publicKey, // Fake
-      config: ctx.configPda,
-      treasuryShard: ctx.treasuryShard,
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer,
+      walletPda,
+      authorityPda: ownerAuthPda,
       innerInstructions: [
         getSystemTransferIx(fakeVault.publicKey, recipient, 1_000_000n)
       ],
-      authorizerSigner: ownerKeypair.publicKey,
+      signer: ownerKeypair,
+      vaultPda: fakeVault.publicKey
     });
 
-    const result = await tryProcessInstruction(ctx, executeIx, [ownerKeypair, fakeVault]);
+    const result = await tryProcessInstruction(ctx, [executeIx], [ownerKeypair, fakeVault]);
     expect(result.result).toMatch(/simulation failed|InvalidSeeds/i);
   }, 30_000);
 });

@@ -5,19 +5,21 @@ import {
   findConfigPda,
   findTreasuryShardPda,
   findWalletPda,
+  LazorClient, // <--- Add LazorClient
 } from "@lazorkit/solita-client";
 
 describe("Config and Treasury Instructions", () => {
     let ctx: TestContext;
+    // <--- Add highClient
 
     beforeAll(async () => {
         ctx = await setupTest();
+        // <--- Initialize
     });
 
     it("should fail to initialize an already initialized Config PDA", async () => {
-        const initConfigIx = ctx.client.initializeConfig({
-            admin: ctx.payer.publicKey,
-            config: ctx.configPda,
+        const initConfigIx = await ctx.highClient.initializeConfig({
+            admin: ctx.payer,
             walletFee: 10000n,
             actionFee: 1000n,
             numShards: 16
@@ -127,10 +129,8 @@ describe("Config and Treasury Instructions", () => {
             }
         }
 
-        const initShardIx = ctx.client.initTreasuryShard({
-            payer: ctx.payer.publicKey,
-            config: ctx.configPda,
-            treasuryShard: treasuryShardPda,
+        const initShardIx = await ctx.highClient.initTreasuryShard({
+            payer: ctx.payer,
             shardId,
         });
 
@@ -147,10 +147,8 @@ describe("Config and Treasury Instructions", () => {
         // Fund shard directly to simulate fees
         await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, treasuryShardPda, 10000n)]);
 
-        const sweepIx = ctx.client.sweepTreasury({
-            admin: ctx.payer.publicKey,
-            config: ctx.configPda,
-            treasuryShard: treasuryShardPda,
+        const sweepIx = await ctx.highClient.sweepTreasury({
+            admin: ctx.payer,
             destination: ctx.payer.publicKey,
             shardId,
         });
@@ -167,10 +165,8 @@ describe("Config and Treasury Instructions", () => {
         const shardId = 0;
         const [treasuryShardPda] = findTreasuryShardPda(shardId, PROGRAM_ID);
 
-        const sweepIx = ctx.client.sweepTreasury({
-            admin: nonAdmin.publicKey,
-            config: ctx.configPda,
-            treasuryShard: treasuryShardPda,
+        const sweepIx = await ctx.highClient.sweepTreasury({
+            admin: nonAdmin,
             destination: nonAdmin.publicKey,
             shardId,
         });

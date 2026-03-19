@@ -1,13 +1,7 @@
 import { expect, describe, it, beforeAll } from "vitest";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { setupTest, sendTx, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from "@lazorkit/solita-client";
-
-function getRandomSeed() {
-    const seed = new Uint8Array(32);
-    crypto.getRandomValues(seed);
-    return seed;
-}
+import { findVaultPda, findSessionPda, AuthType } from "@lazorkit/solita-client";
 
 describe("Audit Regression Suite", () => {
     let ctx: TestContext;
@@ -15,34 +9,22 @@ describe("Audit Regression Suite", () => {
     let vaultPda: PublicKey;
     let owner: Keypair;
     let ownerAuthPda: PublicKey;
-
     beforeAll(async () => {
         ctx = await setupTest();
-
-        const userSeed = getRandomSeed();
-        const [w] = findWalletPda(userSeed);
-        walletPda = w;
-        const [v] = findVaultPda(walletPda);
-        vaultPda = v;
-
         owner = Keypair.generate();
-        const ownerBytes = owner.publicKey.toBytes();
-        const [o, authBump] = findAuthorityPda(walletPda, ownerBytes);
-        ownerAuthPda = o;
 
         // Create the wallet
-        await sendTx(ctx, [ctx.client.createWallet({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            authority: ownerAuthPda,
-            userSeed,
-            authType: 0,
-            authBump,
-            authPubkey: ownerBytes,
-        })]);
+        const { ix: ixCreate, walletPda: w, authorityPda } = await ctx.highClient.createWallet({
+            payer: ctx.payer,
+            authType: AuthType.Ed25519,
+            owner: owner.publicKey,
+        });
+        await sendTx(ctx, [ixCreate]);
+
+        walletPda = w;
+        ownerAuthPda = authorityPda;
+        const [v] = findVaultPda(walletPda);
+        vaultPda = v;
 
         // Fund vault to simulate balances for executes
         await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPda, 100_000_000n)]);
@@ -56,10 +38,8 @@ describe("Audit Regression Suite", () => {
         const sum = pubkeyBytes.reduce((a: number, b: number) => a + b, 0);
         const shardId = sum % 16;
 
-        const sweepIx = ctx.client.sweepTreasury({
-            admin: ctx.payer.publicKey,
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
+        const sweepIx = await ctx.highClient.sweepTreasury({
+            admin: ctx.payer,
             destination: ctx.payer.publicKey,
             shardId,
         });
@@ -79,17 +59,14 @@ describe("Audit Regression Suite", () => {
 
         // Operationality Check
         const recipient = Keypair.generate().publicKey;
-        const executeIx = ctx.client.buildExecute({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            authority: ownerAuthPda,
-            vault: vaultPda,
+        const executeIx = await ctx.highClient.execute({
+            payer: ctx.payer,
+            walletPda,
+            authorityPda: ownerAuthPda,
             innerInstructions: [
                 getSystemTransferIx(vaultPda, recipient, 890880n)
             ],
-            authorizerSigner: owner.publicKey,
+            signer: owner
         });
 
         await sendTx(ctx, [executeIx], [owner]);
@@ -103,15 +80,14 @@ describe("Audit Regression Suite", () => {
     });
 
     it("Regression 2: CloseWallet rejects self-transfer to prevent burn", async () => {
-        const closeIx = ctx.client.closeWallet({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            ownerAuthority: ownerAuthPda,
-            destination: vaultPda, // ATTACK: Self-transfer
-            ownerSigner: owner.publicKey,
+        const closeIx = await ctx.highClient.closeWallet({
+            payer: ctx.payer,
+            walletPda,
+            destination: vaultPda,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner
         });
-        
+
         closeIx.keys.push({ pubkey: SystemProgram.programId, isWritable: false, isSigner: false });
 
         const result = await tryProcessInstructions(ctx, [closeIx], [ctx.payer, owner]);
@@ -122,32 +98,31 @@ describe("Audit Regression Suite", () => {
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: BigInt(2 ** 62),
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
         const [fakeConfigPda] = await PublicKey.findProgramAddress(
             [Buffer.from("fake_config")],
             ctx.payer.publicKey // random seed program
         );
 
-        const closeSessionIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: fakeConfigPda, // SPOOFED
-            authorizer: ownerAuthPda,
-            authorizerSigner: owner.publicKey,
+        const closeSessionIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
+            configPda: fakeConfigPda,
+            authorizer: {
+                authorizerPda: ownerAuthPda,
+                signer: owner
+            }
         });
-
         const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer, owner]);
         expect(result.result).not.toBe("ok");
     });
@@ -156,41 +131,36 @@ describe("Audit Regression Suite", () => {
         const sessionKey = Keypair.generate();
         const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-        await sendTx(ctx, [ctx.client.createSession({
-            config: ctx.configPda,
-            treasuryShard: ctx.treasuryShard,
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            adminAuthority: ownerAuthPda,
-            session: sessionPda,
-            sessionKey: Array.from(sessionKey.publicKey.toBytes()),
+        const { ix: ixCreateSession } = await ctx.highClient.createSession({
+            payer: ctx.payer,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner,
+            sessionKey: sessionKey.publicKey,
             expiresAt: BigInt(2 ** 62),
-            authorizerSigner: owner.publicKey,
-        })], [owner]);
+            walletPda
+        });
+        await sendTx(ctx, [ixCreateSession], [owner]);
 
         const shardBalanceBefore = await ctx.connection.getBalance(ctx.treasuryShard);
 
-        const closeSessionIx = ctx.client.closeSession({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            session: sessionPda,
-            config: ctx.configPda,
-            authorizer: ownerAuthPda,
-            authorizerSigner: owner.publicKey,
+        const closeSessionIx = await ctx.highClient.closeSession({
+            payer: ctx.payer,
+            walletPda,
+            sessionPda: sessionPda,
+            authorizer: {
+                authorizerPda: ownerAuthPda,
+                signer: owner
+            }
         });
-
         await sendTx(ctx, [closeSessionIx], [owner]);
 
-        const closeWalletIx = ctx.client.closeWallet({
-            payer: ctx.payer.publicKey,
-            wallet: walletPda,
-            vault: vaultPda,
-            ownerAuthority: ownerAuthPda,
+        const closeWalletIx = await ctx.highClient.closeWallet({
+            payer: ctx.payer,
+            walletPda,
             destination: ctx.payer.publicKey,
-            ownerSigner: owner.publicKey,
+            adminType: AuthType.Ed25519,
+            adminSigner: owner
         });
-        closeWalletIx.keys.push({ pubkey: SystemProgram.programId, isWritable: false, isSigner: false });
-
         await sendTx(ctx, [closeWalletIx], [owner]);
 
         const shardBalanceAfter = await ctx.connection.getBalance(ctx.treasuryShard);

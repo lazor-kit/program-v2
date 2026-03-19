@@ -30,7 +30,7 @@ export enum AuthType {
 
 export { Role };
 
-// 1. Tạo ví: Phân biệt Ed25519 và Secp256r1
+// 1. Create Wallet: Distinguish Ed25519 and Secp256r1
 export type CreateWalletParams =
     | {
         payer: Keypair;
@@ -40,20 +40,20 @@ export type CreateWalletParams =
     }
     | {
         payer: Keypair;
-        authType: AuthType.Secp256r1;
+        authType?: AuthType.Secp256r1; // <--- Optional for default
         pubkey: Uint8Array; // 33 bytes compressed
         credentialHash: Uint8Array; // 32 bytes
         userSeed?: Uint8Array;
     };
 
-// 2. Chữ ký Phê duyệt (Admin/Owner Signer)
+// 2. Authorizer Signer (Admin/Owner)
 export type AdminSignerOptions =
     | {
         adminType: AuthType.Ed25519;
         adminSigner: Keypair;
     }
     | {
-        adminType: AuthType.Secp256r1;
+        adminType?: AuthType.Secp256r1; // <--- Optional for default
         adminCredentialHash: Uint8Array; // 32 bytes to derive PDA
         adminSignature: Uint8Array; // 64/65 bytes signature 
     };
@@ -69,7 +69,7 @@ export class LazorClient {
     }
 
     /**
-     * Gửi Transaction hỗ trợ nhiều Instructions và mảng Signers
+     * Send Transaction supporting multiple Instructions and Signers array
      */
     public async sendTx(
         instructions: TransactionInstruction[],
@@ -90,8 +90,8 @@ export class LazorClient {
         return pubkey.toBytes().reduce((a, b) => a + b, 0) % 16;
     }
 
-    // 1. Tạo ví (Tối giản tham số)
-    async createWallet(params: CreateWalletParams): Promise<{ ix: TransactionInstruction, walletPda: PublicKey, userSeed: Uint8Array }> {
+    // 1. Create Wallet (Simplified parameters)
+    async createWallet(params: CreateWalletParams): Promise<{ ix: TransactionInstruction, walletPda: PublicKey, authorityPda: PublicKey, userSeed: Uint8Array }> {
         const userSeed = params.userSeed || crypto.getRandomValues(new Uint8Array(32));
         const [walletPda] = findWalletPda(userSeed, this.programId);
         const [vaultPda] = findVaultPda(walletPda, this.programId);
@@ -101,12 +101,15 @@ export class LazorClient {
         let authPubkey: Uint8Array;
         let credentialHash: Uint8Array = new Uint8Array(32);
 
+        const authType = params.authType ?? AuthType.Secp256r1;
+
         if (params.authType === AuthType.Ed25519) { 
             authPubkey = params.owner.toBytes();
             [authorityPda, authBump] = findAuthorityPda(walletPda, authPubkey, this.programId);
         } else { 
-            authPubkey = params.pubkey;
-            credentialHash = params.credentialHash;
+            const p = params as { pubkey: Uint8Array, credentialHash: Uint8Array };
+            authPubkey = p.pubkey;
+            credentialHash = p.credentialHash;
             [authorityPda, authBump] = findAuthorityPda(walletPda, credentialHash, this.programId);
         }
 
@@ -122,38 +125,47 @@ export class LazorClient {
             vault: vaultPda,
             authority: authorityPda,
             userSeed,
-            authType: params.authType,
+            authType: authType,
             authBump: authBump,
             authPubkey: authPubkey,
             credentialHash: credentialHash
         });
 
-        return { ix, walletPda, userSeed };
+        return { ix, walletPda, authorityPda, userSeed };
     }
 
-    // 2. Quản lý Quyền (Authority)
+    // 2. Manage Authority
     async addAuthority(params: {
         payer: Keypair;
         walletPda: PublicKey;
         newAuthorityPubkey: Uint8Array;
-        authType: AuthType;
-        role: Role;
+        authType?: AuthType;
+        role?: Role;
         credentialHash?: Uint8Array;
+        adminAuthorityPda?: PublicKey; // <--- Add optional override
     } & AdminSignerOptions): Promise<{ ix: TransactionInstruction, newAuthority: PublicKey }> {
         const [configPda] = findConfigPda(this.programId);
         const shardId = this.getShardId(params.payer.publicKey);
         const [treasuryShard] = findTreasuryShardPda(shardId, this.programId);
 
-        const idSeed = params.authType === AuthType.Secp256r1 
+        const authType = params.authType ?? AuthType.Secp256r1;
+        const role = params.role ?? Role.Spender;
+        const adminType = params.adminType ?? AuthType.Secp256r1;
+
+        const idSeed = authType === AuthType.Secp256r1 
             ? params.credentialHash || new Uint8Array(32) 
             : params.newAuthorityPubkey.slice(0, 32);
         const [newAuthority] = findAuthorityPda(params.walletPda, idSeed, this.programId);
 
         let adminAuthority: PublicKey;
-        if (params.adminType === AuthType.Ed25519) {
-             [adminAuthority] = findAuthorityPda(params.walletPda, params.adminSigner.publicKey.toBytes(), this.programId);
+        if (params.adminAuthorityPda) {
+             adminAuthority = params.adminAuthorityPda;
+        } else if (adminType === AuthType.Ed25519) {
+             const p = params as { adminSigner: Keypair };
+             [adminAuthority] = findAuthorityPda(params.walletPda, p.adminSigner.publicKey.toBytes(), this.programId);
         } else {
-             [adminAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash, this.programId);
+             const p = params as { adminCredentialHash: Uint8Array };
+             [adminAuthority] = findAuthorityPda(params.walletPda, p.adminCredentialHash, this.programId);
         }
 
         const ix = this.client.addAuthority({
@@ -163,34 +175,39 @@ export class LazorClient {
             newAuthority,
             config: configPda,
             treasuryShard,
-            authType: params.authType,
-            newRole: params.role,
+            authType: authType,
+            newRole: role,
             authPubkey: params.newAuthorityPubkey,
             credentialHash: params.credentialHash,
-            authorizerSigner: params.adminType === AuthType.Ed25519 ? params.adminSigner.publicKey : undefined
+            authorizerSigner: adminType === AuthType.Ed25519 ? (params as any).adminSigner.publicKey : undefined
         });
 
         return { ix, newAuthority };
     }
 
-    // 3. Tạo Session
+    // 3. Create Session
     async createSession(params: {
         payer: Keypair;
         walletPda: PublicKey;
         sessionKey: PublicKey;
-        expiresAt: bigint;
+        expiresAt?: bigint;
     } & AdminSignerOptions): Promise<{ ix: TransactionInstruction, sessionPda: PublicKey }> {
         const [configPda] = findConfigPda(this.programId);
         const shardId = this.getShardId(params.payer.publicKey);
         const [treasuryShard] = findTreasuryShardPda(shardId, this.programId);
 
+        const expiresAt = params.expiresAt ?? BigInt(Math.floor(Date.now() / 1000) + 3600);
+        const adminType = params.adminType ?? AuthType.Secp256r1;
+
         const [sessionPda] = findSessionPda(params.walletPda, params.sessionKey, this.programId);
 
         let adminAuthority: PublicKey;
-        if (params.adminType === AuthType.Ed25519) {
-            [adminAuthority] = findAuthorityPda(params.walletPda, params.adminSigner.publicKey.toBytes(), this.programId);
+        if (adminType === AuthType.Ed25519) {
+            const p = params as { adminSigner: Keypair };
+            [adminAuthority] = findAuthorityPda(params.walletPda, p.adminSigner.publicKey.toBytes(), this.programId);
         } else {
-             [adminAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash, this.programId);
+            const p = params as { adminCredentialHash: Uint8Array };
+            [adminAuthority] = findAuthorityPda(params.walletPda, p.adminCredentialHash, this.programId);
         }
 
         const ix = this.client.createSession({
@@ -201,14 +218,14 @@ export class LazorClient {
             adminAuthority,
             session: sessionPda,
             sessionKey: Array.from(params.sessionKey.toBytes()),
-            expiresAt: params.expiresAt,
-            authorizerSigner: params.adminType === AuthType.Ed25519 ? params.adminSigner.publicKey : undefined
+            expiresAt: expiresAt,
+            authorizerSigner: adminType === AuthType.Ed25519 ? (params as any).adminSigner.publicKey : undefined
         });
 
         return { ix, sessionPda };
     }
 
-    // 4. Giải phóng thực thi (Execute)
+    // 4. Execute Instructions
     async execute(params: {
         payer: Keypair;
         walletPda: PublicKey;
@@ -216,11 +233,12 @@ export class LazorClient {
         innerInstructions: TransactionInstruction[];
         signer?: Keypair; 
         signature?: Uint8Array; 
+        vaultPda?: PublicKey; // <--- Add optional override
     }): Promise<TransactionInstruction> {
         const [configPda] = findConfigPda(this.programId);
         const shardId = this.getShardId(params.payer.publicKey);
         const [treasuryShard] = findTreasuryShardPda(shardId, this.programId);
-        const [vaultPda] = findVaultPda(params.walletPda, this.programId);
+        const [vaultPda] = params.vaultPda ? [params.vaultPda] : findVaultPda(params.walletPda, this.programId);
 
         const ix = this.client.buildExecute({
             config: configPda,
@@ -243,7 +261,7 @@ export class LazorClient {
         return ix;
     }
 
-    // 5. Khám phá ví (Discovery)
+    // 5. Discover Wallets
     static async findWalletByOwner(
         connection: Connection,
         owner: PublicKey,
@@ -287,12 +305,12 @@ export class LazorClient {
          }
          return results;
     }
-    // 6. Xóa Quyền (removeAuthority)
+    // 6. Remove Authority
     async removeAuthority(params: {
         payer: Keypair;
         walletPda: PublicKey;
         authorityToRemovePda: PublicKey;
-        refundDestination: PublicKey; // Nơi nhận refund khi đóng account
+        refundDestination: PublicKey; // Refund destination on close account
     } & AdminSignerOptions): Promise<TransactionInstruction> {
         const [configPda] = findConfigPda(this.programId);
         const shardId = this.getShardId(params.payer.publicKey);
@@ -319,19 +337,23 @@ export class LazorClient {
         return ix;
     }
 
-    // 7. Dọn dẹp (Cleanup)
+    // 7. Cleanup
     async closeWallet(params: {
         payer: Keypair;
         walletPda: PublicKey;
         destination: PublicKey;
+        vaultPda?: PublicKey;           // <--- Add optional override
+        adminAuthorityPda?: PublicKey;   // <--- Add optional override
     } & AdminSignerOptions): Promise<TransactionInstruction> {
-        const [vaultPda] = findVaultPda(params.walletPda, this.programId);
+        const [vaultPda] = params.vaultPda ? [params.vaultPda] : findVaultPda(params.walletPda, this.programId);
         
         let ownerAuthority: PublicKey;
-        if (params.adminType === AuthType.Ed25519) {
+        if (params.adminAuthorityPda) {
+             ownerAuthority = params.adminAuthorityPda;
+        } else if (params.adminType === AuthType.Ed25519) {
             [ownerAuthority] = findAuthorityPda(params.walletPda, params.adminSigner.publicKey.toBytes(), this.programId);
         } else {
-            [ownerAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash, this.programId);
+            [ownerAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash ?? new Uint8Array(), this.programId);
         }
 
         const ix = this.client.closeWallet({
@@ -408,7 +430,7 @@ export class LazorClient {
         return ix;
     }
 
-    // 9. Chuyển nhượng quyền sở hữu (Transfer Ownership)
+    // 9. Transfer Ownership
     async transferOwnership(params: {
         payer: Keypair;
         walletPda: PublicKey;
@@ -437,5 +459,60 @@ export class LazorClient {
         });
 
         return ix;
+    }
+
+    // 10. Close Session
+    async closeSession(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        sessionPda: PublicKey;
+        configPda?: PublicKey; // <--- Add optional override
+        authorizer?: {
+            authorizerPda: PublicKey;
+            signer: Keypair;
+        };
+    }): Promise<TransactionInstruction> {
+        const [configPda] = params.configPda ? [params.configPda] : findConfigPda(this.programId);
+        
+        const ix = this.client.closeSession({
+            config: configPda,
+            payer: params.payer.publicKey,
+            wallet: params.walletPda,
+            session: params.sessionPda,
+            authorizer: params.authorizer ? params.authorizer.authorizerPda : undefined,
+            authorizerSigner: params.authorizer ? params.authorizer.signer.publicKey : undefined
+        });
+        
+        return ix;
+    }
+
+    // === Layer 2: Transaction Builders ===
+
+    async createWalletTxn(params: CreateWalletParams): Promise<{ transaction: Transaction, walletPda: PublicKey, authorityPda: PublicKey, userSeed: Uint8Array }> {
+        const { ix, walletPda, authorityPda, userSeed } = await this.createWallet(params);
+        const transaction = new Transaction().add(ix);
+        transaction.feePayer = params.payer.publicKey;
+        return { transaction, walletPda, authorityPda, userSeed };
+    }
+
+    async addAuthorityTxn(params: Parameters<typeof this.addAuthority>[0]): Promise<{ transaction: Transaction, newAuthority: PublicKey }> {
+        const { ix, newAuthority } = await this.addAuthority(params);
+        const transaction = new Transaction().add(ix);
+        transaction.feePayer = params.payer.publicKey;
+        return { transaction, newAuthority };
+    }
+
+    async createSessionTxn(params: Parameters<typeof this.createSession>[0]): Promise<{ transaction: Transaction, sessionPda: PublicKey }> {
+        const { ix, sessionPda } = await this.createSession(params);
+        const transaction = new Transaction().add(ix);
+        transaction.feePayer = params.payer.publicKey;
+        return { transaction, sessionPda };
+    }
+
+    async executeTxn(params: Parameters<typeof this.execute>[0]): Promise<Transaction> {
+        const ix = await this.execute(params);
+        const transaction = new Transaction().add(ix);
+        transaction.feePayer = params.payer.publicKey;
+        return transaction;
     }
 }
