@@ -21,4 +21,5 @@ export {
 export * from "./utils/packing";
 export { LazorWeb3Client } from "./utils/client";
 export * from "./utils/wrapper";
+export * from "./utils/secp256r1";
 

@@ -8,7 +8,7 @@ import {
   LazorClient,
   AuthType // <--- Add AuthType
 } from "@lazorkit/solita-client";
-import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
+import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
 import { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } from "./secp256r1Utils";
 
 describe("LazorKit V1 — Wallet Lifecycle", () => {
@@ -20,11 +20,7 @@ describe("LazorKit V1 — Wallet Lifecycle", () => {
     // <--- Initialize
   }, 30_000);
 
-  function getRandomSeed() {
-    const seed = new Uint8Array(32);
-    crypto.getRandomValues(seed);
-    return seed;
-  }
+
 
   // --- Create Wallet ---
 

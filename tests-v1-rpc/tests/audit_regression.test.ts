@@ -88,8 +88,6 @@ describe("Audit Regression Suite", () => {
             adminSigner: owner
         });
 
-        closeIx.keys.push({ pubkey: SystemProgram.programId, isWritable: false, isSigner: false });
-
         const result = await tryProcessInstructions(ctx, [closeIx], [ctx.payer, owner]);
         expect(result.result).not.toBe("ok");
     });

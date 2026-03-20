@@ -10,13 +10,9 @@ import {
   AuthType,
   Role // <--- Add Role
 } from "@lazorkit/solita-client";
-import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
+import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 
-function getRandomSeed() {
-  const seed = new Uint8Array(32);
-  crypto.getRandomValues(seed);
-  return seed;
-}
+
 
 describe("LazorKit V1 — Session", () => {
   let ctx: TestContext;
@@ -157,9 +153,9 @@ describe("LazorKit V1 — Session", () => {
     const sessionKey2 = Keypair.generate();
     const [sessionPda2] = findSessionPda(walletPda, sessionKey2.publicKey);
 
-    const configPda = PublicKey.findProgramAddressSync([Buffer.from("config")], ctx.highClient.programId)[0];
+    const configPda = ctx.highClient.getConfigPda();
     const shardId = ctx.payer.publicKey.toBytes().reduce((a: number, b: number) => a + b, 0) % 16;
-    const [treasuryShard] = PublicKey.findProgramAddressSync([Buffer.from("treasury"), new Uint8Array([shardId])], ctx.highClient.programId);
+    const treasuryShard = ctx.highClient.getTreasuryShardPda(shardId);
 
     // Explicitly pass sessionPda1 as adminAuthority to test contract account validation
     const ix = ctx.highClient.client.createSession({
@@ -238,7 +234,7 @@ describe("LazorKit V1 — Session", () => {
       payer: ctx.payer,
       adminType: AuthType.Secp256r1,
       adminCredentialHash: secpAdmin.credentialIdHash,
-      adminSignature: new Uint8Array(64), // Dummy, overwritten later
+
       sessionKey: sessionKey.publicKey,
       expiresAt,
       walletPda

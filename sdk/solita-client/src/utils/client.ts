@@ -546,10 +546,10 @@ export class LazorWeb3Client {
   // ─── Utility helpers ─────────────────────────────────────────────
 
   async getAuthorityByPublicKey(
-    connection: any,
+    connection: import("@solana/web3.js").Connection,
     walletAddress: PublicKey,
     pubkey: PublicKey
-  ): Promise<any | null> {
+  ): Promise<{ address: PublicKey; data: Buffer } | null> {
     const [pda] = findAuthorityPda(walletAddress, pubkey.toBytes(), this.programId);
     try {
       const accountInfo = await connection.getAccountInfo(pda);

@@ -1,6 +1,6 @@
 import { expect, describe, it, beforeAll } from "vitest";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { setupTest, sendTx, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
+import { setupTest, sendTx, getRandomSeed, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 import {
     findWalletPda,
     findVaultPda,
@@ -20,11 +20,7 @@ describe("Cleanup Instructions", () => {
         // <--- Initialize
     });
 
-    const getRandomSeed = () => {
-        const seed = new Uint8Array(32);
-        crypto.getRandomValues(seed);
-        return seed;
-    };
+
 
     it("should allow wallet owner to close an active session", async () => {
         const owner = Keypair.generate();

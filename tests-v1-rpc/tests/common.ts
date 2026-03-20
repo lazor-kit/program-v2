@@ -21,16 +21,22 @@ import {
   findConfigPda,
   findTreasuryShardPda,
   LazorClient,
+  PROGRAM_ID,
 } from "@lazorkit/solita-client";
+
+export { PROGRAM_ID };
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const PROGRAM_ID = new PublicKey(
-  "FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao"
-);
+/** Generates a random 32-byte seed. Shared across all test files. */
+export function getRandomSeed(): Uint8Array {
+  const seed = new Uint8Array(32);
+  crypto.getRandomValues(seed);
+  return seed;
+}
 
 export interface TestContext {
   connection: Connection;

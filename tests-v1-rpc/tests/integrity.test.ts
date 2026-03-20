@@ -1,13 +1,9 @@
 import { expect, describe, it, beforeAll } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { setupTest, sendTx, type TestContext } from "./common";
+import { setupTest, sendTx, getRandomSeed, type TestContext } from "./common";
 import { findWalletPda, findVaultPda, findAuthorityPda, LazorClient, AuthType, Role } from "@lazorkit/solita-client";
 
-function getRandomSeed() {
-    const seed = new Uint8Array(32);
-    crypto.getRandomValues(seed);
-    return seed;
-}
+
 
 const HEADER_SIZE = 48;
 const DATA_OFFSET = HEADER_SIZE;                   

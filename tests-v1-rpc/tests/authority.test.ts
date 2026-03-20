@@ -8,13 +8,9 @@ import {
   AuthType,
   Role // <--- Add AuthType, Role
 } from "@lazorkit/solita-client";
-import { setupTest, sendTx, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
+import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, tryProcessInstructions, type TestContext, PROGRAM_ID } from "./common";
 
-function getRandomSeed() {
-  const seed = new Uint8Array(32);
-  crypto.getRandomValues(seed);
-  return seed;
-}
+
 
 describe("LazorKit V1 — Authority", () => {
   let ctx: TestContext;
@@ -275,7 +271,7 @@ describe("LazorKit V1 — Authority", () => {
       refundDestination: ctx.payer.publicKey,
       walletPda,
       adminCredentialHash: secpAdmin.credentialIdHash,
-      adminSignature: new Uint8Array(64) // Dummy, overwritten later
+
     });
 
     removeAuthIx.keys = [
