@@ -1,5 +1,5 @@
 /**
- * LazorWeb3Client — High-level wrapper for LazorKit instructions using @solana/web3.js v1.
+ * LazorInstructionBuilder — Low-level wrapper for LazorKit instructions using @solana/web3.js v1.
  *
  * IMPLEMENTATION NOTE:
  * We manually encode instruction data for instructions with `bytes` fields (CreateWallet,
@@ -30,7 +30,7 @@ import {
 import { packCompactInstructions, type CompactInstruction } from "./packing";
 import { findAuthorityPda } from "./pdas";
 
-export class LazorWeb3Client {
+export class LazorInstructionBuilder {
   constructor(private programId: PublicKey = PROGRAM_ID) { }
 
   private getAuthPayload(
@@ -143,24 +143,24 @@ export class LazorWeb3Client {
     newAuthority: PublicKey;
     config: PublicKey;
     treasuryShard: PublicKey;
-    authType: number;
+    newAuthType: number;
     newRole: number;
-    authPubkey: Uint8Array;
-    credentialHash?: Uint8Array;
+    newAuthPubkey: Uint8Array;
+    newCredentialHash?: Uint8Array;
     authorizerSigner?: PublicKey;
   }): TransactionInstruction {
     const padding = new Uint8Array(6).fill(0);
     const payload = this.getAuthPayload(
-      params.authType,
-      params.authPubkey,
-      params.credentialHash || new Uint8Array(32)
+      params.newAuthType,
+      params.newAuthPubkey,
+      params.newCredentialHash || new Uint8Array(32)
     );
 
     const data = Buffer.alloc(1 + 1 + 1 + 6 + payload.length);
     let offset = 0;
 
     data.writeUInt8(1, offset); offset += 1; // disc
-    data.writeUInt8(params.authType, offset); offset += 1;
+    data.writeUInt8(params.newAuthType, offset); offset += 1;
     data.writeUInt8(params.newRole, offset); offset += 1;
     data.set(padding, offset); offset += 6;
     data.set(payload, offset);
@@ -227,22 +227,22 @@ export class LazorWeb3Client {
     newOwnerAuthority: PublicKey;
     config: PublicKey;
     treasuryShard: PublicKey;
-    authType: number;
-    authPubkey: Uint8Array;
-    credentialHash?: Uint8Array;
+    newAuthType: number;
+    newAuthPubkey: Uint8Array;
+    newCredentialHash?: Uint8Array;
     authorizerSigner?: PublicKey;
   }): TransactionInstruction {
     const payload = this.getAuthPayload(
-      params.authType,
-      params.authPubkey,
-      params.credentialHash || new Uint8Array(32)
+      params.newAuthType,
+      params.newAuthPubkey,
+      params.newCredentialHash || new Uint8Array(32)
     );
 
     const data = Buffer.alloc(1 + 1 + payload.length);
     let offset = 0;
 
     data.writeUInt8(3, offset); offset += 1; // disc
-    data.writeUInt8(params.authType, offset); offset += 1;
+    data.writeUInt8(params.newAuthType, offset); offset += 1;
     data.set(payload, offset);
 
     const keys: AccountMeta[] = [

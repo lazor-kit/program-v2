@@ -144,7 +144,7 @@ describe("CreateWallet & Discovery", () => {
     });
     await sendTx(ctx, [ix]);
 
-    const discoveredWallets = await LazorClient.findWalletByOwner(ctx.connection, owner.publicKey);
+    const discoveredWallets = await LazorClient.findWalletsByEd25519Pubkey(ctx.connection, owner.publicKey);
     expect(discoveredWallets).toContainEqual(walletPda);
   }, 30_000);
 
@@ -259,30 +259,28 @@ describe("CreateWallet & Discovery", () => {
     const credHash1 = getRandomSeed();
     const pubkey1 = new Uint8Array(33); pubkey1[0] = 0x02; crypto.getRandomValues(pubkey1.subarray(1));
 
-    const { ix: ixAdd1, newAuthority: authPda1 } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd1, newAuthority: authPda1 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
-      newAuthorityPubkey: pubkey1,
-      authType: AuthType.Secp256r1,
+      newAuthPubkey: pubkey1,
+      newAuthType: AuthType.Secp256r1,
       role: Role.Admin,
-      credentialHash: credHash1
+      newCredentialHash: credHash1
     });
     await sendTx(ctx, [ixAdd1], [owner]);
 
     const credHash2 = getRandomSeed();
     const pubkey2 = new Uint8Array(33); pubkey2[0] = 0x03; crypto.getRandomValues(pubkey2.subarray(1));
 
-    const { ix: ixAdd2, newAuthority: authPda2 } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd2, newAuthority: authPda2 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
-      newAuthorityPubkey: pubkey2,
-      authType: AuthType.Secp256r1,
+      newAuthPubkey: pubkey2,
+      newAuthType: AuthType.Secp256r1,
       role: Role.Spender,
-      credentialHash: credHash2
+      newCredentialHash: credHash2
     });
     await sendTx(ctx, [ixAdd2], [owner]);
 
@@ -343,13 +341,12 @@ describe("CreateWallet & Discovery", () => {
 
     const newAuthority = Keypair.generate();
 
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
-      newAuthorityPubkey: newAuthority.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: newAuthority.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
     });
     await sendTx(ctx, [ixAdd], [owner]);

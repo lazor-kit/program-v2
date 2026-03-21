@@ -14,7 +14,7 @@
 import { PublicKey, TransactionInstruction, Connection } from "@solana/web3.js";
 // Remove node:crypto import
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data as any);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data as unknown as BufferSource);
     return new Uint8Array(hashBuffer);
 }
 
@@ -136,8 +136,8 @@ export async function buildAuthenticatorData(rpId = "example.com"): Promise<Uint
 
 
 /**
- * Computes the SHA-256 message that gets embedded in the WebAuthn `clientDataJSON.challenge`
- * and subsequently signed by the Secp256r1 key.
+ * Computes the raw 69-byte message that gets signed by the Secp256r1 key.
+ * This consists of the 37-byte authenticator data and the 32-byte SHA-256 hash of the clientDataJSON.
  *
  * The contract verifies this exact message construction on-chain.
  */
@@ -160,7 +160,7 @@ export async function buildSecp256r1Message(params: {
     const totalLen = 1 + authPayload.length + signedPayload.length + 8 + 32 + 32;
     const combined = new Uint8Array(totalLen);
     let offset = 0;
-    
+
     combined[0] = discriminator; offset += 1;
     combined.set(authPayload, offset); offset += authPayload.length;
     combined.set(signedPayload, offset); offset += signedPayload.length;

@@ -101,12 +101,11 @@ describe("Session Management", () => {
 
   it("Failure: Spender cannot create session", async () => {
     const spender = Keypair.generate();
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: spender.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: spender.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -147,7 +146,7 @@ describe("Session Management", () => {
     const shardId = ctx.payer.publicKey.toBytes().reduce((a: number, b: number) => a + b, 0) % 16;
     const treasuryShard = ctx.highClient.getTreasuryShardPda(shardId);
 
-    const ix = ctx.highClient.client.createSession({
+    const ix = ctx.highClient.builder.createSession({
       payer: ctx.payer.publicKey,
       wallet: walletPda,
       adminAuthority: sessionPda1,
@@ -179,11 +178,10 @@ describe("Session Management", () => {
 
     const newUser = Keypair.generate();
 
-    const { ix } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       walletPda: walletPda,
-      newAuthorityPubkey: newUser.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: newUser.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       adminType: AuthType.Ed25519,
       adminSigner: sessionKey as any,
@@ -199,15 +197,14 @@ describe("Session Management", () => {
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
-    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: secpAdmin.publicKeyBytes,
-      authType: AuthType.Secp256r1,
+      newAuthPubkey: secpAdmin.publicKeyBytes,
+      newAuthType: AuthType.Secp256r1,
       role: Role.Admin,
       walletPda,
-      credentialHash: secpAdmin.credentialIdHash
+      newCredentialHash: secpAdmin.credentialIdHash
     });
     await sendTx(ctx, [ixAddSecp], [ownerKeypair]);
 

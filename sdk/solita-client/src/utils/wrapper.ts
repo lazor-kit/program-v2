@@ -8,7 +8,7 @@ import {
     type AccountMeta
 } from "@solana/web3.js";
 
-import { LazorWeb3Client } from "./client";
+import { LazorInstructionBuilder } from "./client";
 import {
     findWalletPda,
     findVaultPda,
@@ -106,13 +106,13 @@ export type AdminSignerOptions =
  * any helper you prefer so that this SDK stays free of transport assumptions.
  */
 export class LazorClient {
-    public client: LazorWeb3Client;
+    public builder: LazorInstructionBuilder;
 
     constructor(
         public connection: Connection,
         public programId: PublicKey = PROGRAM_ID
     ) {
-        this.client = new LazorWeb3Client(programId);
+        this.builder = new LazorInstructionBuilder(programId);
     }
 
     // ─── PDA helpers (instance convenience) ──────────────────────────────────
@@ -201,7 +201,7 @@ export class LazorClient {
 
         const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
 
-        const ix = this.client.createWallet({
+        const ix = this.builder.createWallet({
             config: configPda,
             treasuryShard,
             payer: params.payer.publicKey,
@@ -228,22 +228,22 @@ export class LazorClient {
     async addAuthority(params: {
         payer: Keypair;
         walletPda: PublicKey;
-        newAuthorityPubkey: Uint8Array;
-        authType?: AuthType;
+        newAuthType?: AuthType;
+        newAuthPubkey: Uint8Array;
+        newCredentialHash?: Uint8Array;
         role?: Role;
-        credentialHash?: Uint8Array;
         /** Override the admin Authority PDA instead of auto-deriving it. */
         adminAuthorityPda?: PublicKey;
     } & AdminSignerOptions): Promise<{ ix: TransactionInstruction; newAuthority: PublicKey }> {
         const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
 
-        const authType = params.authType ?? AuthType.Secp256r1;
+        const newAuthType = params.newAuthType ?? AuthType.Secp256r1;
         const role = params.role ?? Role.Spender;
         const adminType = params.adminType ?? AuthType.Secp256r1;
 
-        const idSeed = authType === AuthType.Secp256r1
-            ? (params.credentialHash ?? new Uint8Array(32))
-            : params.newAuthorityPubkey.slice(0, 32);
+        const idSeed = newAuthType === AuthType.Secp256r1
+            ? (params.newCredentialHash ?? new Uint8Array(32))
+            : params.newAuthPubkey.slice(0, 32);
         const [newAuthority] = findAuthorityPda(params.walletPda, idSeed, this.programId);
 
         let adminAuthority: PublicKey;
@@ -257,17 +257,17 @@ export class LazorClient {
             [adminAuthority] = findAuthorityPda(params.walletPda, p.adminCredentialHash, this.programId);
         }
 
-        const ix = this.client.addAuthority({
+        const ix = this.builder.addAuthority({
             payer: params.payer.publicKey,
             wallet: params.walletPda,
             adminAuthority,
             newAuthority,
             config: configPda,
             treasuryShard,
-            authType,
+            newAuthType,
             newRole: role,
-            authPubkey: params.newAuthorityPubkey,
-            credentialHash: params.credentialHash,
+            newAuthPubkey: params.newAuthPubkey,
+            newCredentialHash: params.newCredentialHash,
             authorizerSigner: adminType === AuthType.Ed25519 ? (params as any).adminSigner.publicKey : undefined,
         });
 
@@ -296,7 +296,7 @@ export class LazorClient {
             [adminAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash, this.programId);
         }
 
-        return this.client.removeAuthority({
+        return this.builder.removeAuthority({
             config: configPda,
             treasuryShard,
             payer: params.payer.publicKey,
@@ -357,7 +357,7 @@ export class LazorClient {
             [adminAuthority] = findAuthorityPda(params.walletPda, p.adminCredentialHash, this.programId);
         }
 
-        const ix = this.client.createSession({
+        const ix = this.builder.createSession({
             config: configPda,
             treasuryShard,
             payer: params.payer.publicKey,
@@ -388,7 +388,7 @@ export class LazorClient {
     }): Promise<TransactionInstruction> {
         const configPda = params.configPda ?? findConfigPda(this.programId)[0];
 
-        return this.client.closeSession({
+        return this.builder.closeSession({
             config: configPda,
             payer: params.payer.publicKey,
             wallet: params.walletPda,
@@ -433,7 +433,7 @@ export class LazorClient {
             );
         }
 
-        const ix = this.client.buildExecute({
+        const ix = this.builder.buildExecute({
             config: configPda,
             treasuryShard,
             payer: params.payer.publicKey,
@@ -459,7 +459,7 @@ export class LazorClient {
      * 1. Secp256r1 Precompile Instruction
      * 2. LazorKit Execute Instruction with appended signature payload
      * 
-     * @returns Array of [PrecompileIx, ExecuteIx]
+     * @returns { precompileIx, executeIx } object containing both instructions
      */
     async executeWithSecp256r1(params: {
         payer: Keypair;
@@ -618,7 +618,7 @@ export class LazorClient {
             [ownerAuthority] = findAuthorityPda(params.walletPda, params.adminCredentialHash ?? new Uint8Array(), this.programId);
         }
 
-        const ix = this.client.closeWallet({
+        const ix = this.builder.closeWallet({
             payer: params.payer.publicKey,
             wallet: params.walletPda,
             vault: vaultPda,
@@ -645,24 +645,24 @@ export class LazorClient {
         walletPda: PublicKey;
         currentOwnerAuthority: PublicKey;
         newOwnerAuthority: PublicKey;
-        authType: AuthType;
-        authPubkey: Uint8Array;
-        credentialHash?: Uint8Array;
+        newAuthType: AuthType;
+        newAuthPubkey: Uint8Array;
+        newCredentialHash?: Uint8Array;
         /** Ed25519 signer (optional — for Secp256r1, auth comes via precompile instruction). */
         signer?: Keypair;
     }): Promise<TransactionInstruction> {
         const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
 
-        return this.client.transferOwnership({
+        return this.builder.transferOwnership({
             payer: params.payer.publicKey,
             wallet: params.walletPda,
             currentOwnerAuthority: params.currentOwnerAuthority,
             newOwnerAuthority: params.newOwnerAuthority,
             config: configPda,
             treasuryShard,
-            authType: params.authType,
-            authPubkey: params.authPubkey,
-            credentialHash: params.credentialHash,
+            newAuthType: params.newAuthType,
+            newAuthPubkey: params.newAuthPubkey,
+            newCredentialHash: params.newCredentialHash,
             authorizerSigner: params.signer?.publicKey,
         });
     }
@@ -679,7 +679,7 @@ export class LazorClient {
         numShards: number;
     }): Promise<TransactionInstruction> {
         const configPda = findConfigPda(this.programId)[0];
-        return this.client.initializeConfig({
+        return this.builder.initializeConfig({
             admin: params.admin.publicKey,
             config: configPda,
             walletFee: BigInt(params.walletFee),
@@ -697,7 +697,7 @@ export class LazorClient {
     }): Promise<TransactionInstruction> {
         const configPda = findConfigPda(this.programId)[0];
         const [treasuryShard] = findTreasuryShardPda(params.shardId, this.programId);
-        return this.client.initTreasuryShard({
+        return this.builder.initTreasuryShard({
             payer: params.payer.publicKey,
             config: configPda,
             treasuryShard,
@@ -715,7 +715,7 @@ export class LazorClient {
     }): Promise<TransactionInstruction> {
         const configPda = findConfigPda(this.programId)[0];
         const [treasuryShard] = findTreasuryShardPda(params.shardId, this.programId);
-        return this.client.sweepTreasury({
+        return this.builder.sweepTreasury({
             admin: params.admin.publicKey,
             config: configPda,
             treasuryShard,
@@ -773,9 +773,9 @@ export class LazorClient {
     /**
      * Finds all Wallet PDAs associated with a given Ed25519 public key.
      */
-    static async findWalletByOwner(
+    static async findWalletsByEd25519Pubkey(
         connection: Connection,
-        owner: PublicKey,
+        ed25519Pubkey: PublicKey,
         programId: PublicKey = PROGRAM_ID
     ): Promise<PublicKey[]> {
         const accounts = await connection.getProgramAccounts(programId, {
@@ -788,7 +788,7 @@ export class LazorClient {
             const data = a.account.data;
             if (data[0] === 2 && data[1] === 0) { // disc=2 (Authority), type=0 (Ed25519)
                 const storedPubkey = data.subarray(48, 80);
-                if (Buffer.compare(storedPubkey, owner.toBuffer()) === 0) {
+                if (Buffer.compare(storedPubkey, ed25519Pubkey.toBuffer()) === 0) {
                     results.push(new PublicKey(data.subarray(16, 48)));
                 }
             }
@@ -799,7 +799,7 @@ export class LazorClient {
     /**
      * Finds all Wallet PDAs associated with a Secp256r1 credential hash.
      */
-    static async findWalletByCredentialHash(
+    static async findWalletsByCredentialHash(
         connection: Connection,
         credentialHash: Uint8Array,
         programId: PublicKey = PROGRAM_ID

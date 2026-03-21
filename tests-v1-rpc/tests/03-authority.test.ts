@@ -50,12 +50,11 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Owner adds an Admin (Ed25519)", async () => {
     const newAdmin = Keypair.generate();
 
-    const { ix } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: newAdmin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: newAdmin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
       walletPda
     });
@@ -70,12 +69,11 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Admin adds a Spender", async () => {
     const spender = Keypair.generate();
 
-    const { ix } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair, // Owner still adds here, or admin if we update signer
-      newAuthorityPubkey: spender.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: spender.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -93,15 +91,14 @@ describe("LazorKit V1 — Authority", () => {
     crypto.getRandomValues(p256Pubkey);
     p256Pubkey[0] = 0x02;
 
-    const { ix } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: p256Pubkey,
-      authType: AuthType.Secp256r1,
+      newAuthPubkey: p256Pubkey,
+      newAuthType: AuthType.Secp256r1,
       role: Role.Admin,
       walletPda,
-      credentialHash: credentialIdHash
+      newCredentialHash: credentialIdHash
     });
 
     await sendTx(ctx, [ix], [ownerKeypair]);
@@ -116,12 +113,11 @@ describe("LazorKit V1 — Authority", () => {
     const admin = Keypair.generate();
 
     // First, add the Admin
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: admin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: admin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
       walletPda
     });
@@ -131,12 +127,11 @@ describe("LazorKit V1 — Authority", () => {
     const anotherAdmin = Keypair.generate();
 
     // Admin tries to add another Admin -> should fail
-    const { ix: ixFail } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixFail } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: admin,
-      newAuthorityPubkey: anotherAdmin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: anotherAdmin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
       walletPda
     });
@@ -148,12 +143,11 @@ describe("LazorKit V1 — Authority", () => {
   it("Success: Admin removes a Spender", async () => {
     // Add Admin
     const admin = Keypair.generate();
-    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: admin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: admin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
       walletPda
     });
@@ -161,12 +155,11 @@ describe("LazorKit V1 — Authority", () => {
 
     // Add Spender
     const spender = Keypair.generate();
-    const { ix: ixAddSpender } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddSpender } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: spender.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: spender.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -191,24 +184,22 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Spender tries to remove another Spender", async () => {
     const s1 = Keypair.generate();
-    const { ix: ixAdd1 } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd1 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: s1.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: s1.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
     await sendTx(ctx, [ixAdd1], [ownerKeypair]);
 
     const s2 = Keypair.generate();
-    const { ix: ixAdd2 } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd2 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: s2.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: s2.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -236,15 +227,14 @@ describe("LazorKit V1 — Authority", () => {
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
     // Add Secp256r1 Admin
-    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: secpAdmin.publicKeyBytes,
-      authType: AuthType.Secp256r1,
+      newAuthPubkey: secpAdmin.publicKeyBytes,
+      newAuthType: AuthType.Secp256r1,
       role: Role.Admin,
       walletPda,
-      credentialHash: secpAdmin.credentialIdHash
+      newCredentialHash: secpAdmin.credentialIdHash
     });
     await sendTx(ctx, [ixAddSecp], [ownerKeypair]);
 
@@ -252,12 +242,11 @@ describe("LazorKit V1 — Authority", () => {
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPda, victim.publicKey.toBytes());
 
-    const { ix: ixAddVictim } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddVictim } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: victim.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: victim.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -322,12 +311,11 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Spender cannot add any authority", async () => {
     const spender = Keypair.generate();
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: spender.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: spender.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -337,12 +325,11 @@ describe("LazorKit V1 — Authority", () => {
     const [spenderPda] = findAuthorityPda(walletPda, spender.publicKey.toBytes());
 
     // Spender tries to add -> should fail
-    const { ix: ixFail } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixFail } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: spender,
-      newAuthorityPubkey: victim.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: victim.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });
@@ -353,12 +340,11 @@ describe("LazorKit V1 — Authority", () => {
 
   it("Failure: Admin cannot remove Owner", async () => {
     const admin = Keypair.generate();
-    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: admin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: admin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Admin,
       walletPda
     });
@@ -394,12 +380,11 @@ describe("LazorKit V1 — Authority", () => {
     const victim = Keypair.generate();
     const [victimPda] = findAuthorityPda(walletPdaB, victim.publicKey.toBytes());
 
-    const { ix } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair, // Wallet A
-      newAuthorityPubkey: victim.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: victim.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda: walletPdaB // target is B
     });
@@ -411,12 +396,11 @@ describe("LazorKit V1 — Authority", () => {
   it("Failure: Cannot add same authority twice", async () => {
     const newUser = Keypair.generate();
 
-    const { ix: addIx } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: addIx } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
-      newAuthorityPubkey: newUser.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: newUser.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: Role.Spender,
       walletPda
     });

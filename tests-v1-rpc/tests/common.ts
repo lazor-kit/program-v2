@@ -17,7 +17,6 @@ import {
   type TransactionInstruction,
 } from "@solana/web3.js";
 import {
-  LazorWeb3Client,
   findConfigPda,
   findTreasuryShardPda,
   LazorClient,

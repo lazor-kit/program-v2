@@ -103,7 +103,7 @@ export async function computeAccountsHash(
     }
 
     // Compute SHA-256 hash using Web Crypto API
-    const hashBuffer = await crypto.subtle.digest("SHA-256", result as any);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", result);
     return new Uint8Array(hashBuffer);
 }
 

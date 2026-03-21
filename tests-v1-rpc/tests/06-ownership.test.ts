@@ -58,8 +58,8 @@ describe("Ownership & Wallet Lifecycle", () => {
       walletPda: wPda,
       currentOwnerAuthority: oPda,
       newOwnerAuthority: newAuthPda,
-      authType: AuthType.Ed25519,
-      authPubkey: newOwner.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
+      newAuthPubkey: newOwner.publicKey.toBytes(),
       signer: o
     });
     await sendTx(ctx, [transferIx], [o]);
@@ -81,12 +81,11 @@ describe("Ownership & Wallet Lifecycle", () => {
     });
     await sendTx(ctx, [ix]);
 
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({
-      payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: o,
-      newAuthorityPubkey: admin.publicKey.toBytes(),
-      authType: AuthType.Ed25519,
+      newAuthPubkey: admin.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
       role: 1,
       walletPda: wPda
     });
@@ -101,8 +100,8 @@ describe("Ownership & Wallet Lifecycle", () => {
       walletPda: wPda,
       currentOwnerAuthority: adminPda,
       newOwnerAuthority: newAuthPda,
-      authType: AuthType.Ed25519,
-      authPubkey: newOwner.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
+      newAuthPubkey: newOwner.publicKey.toBytes(),
       signer: admin
     });
 
@@ -129,8 +128,8 @@ describe("Ownership & Wallet Lifecycle", () => {
       walletPda: wPda,
       currentOwnerAuthority: oPda,
       newOwnerAuthority: zeroPda,
-      authType: AuthType.Ed25519,
-      authPubkey: zeroKey,
+      newAuthType: AuthType.Ed25519,
+      newAuthPubkey: zeroKey,
       signer: o
     });
 
@@ -157,8 +156,8 @@ describe("Ownership & Wallet Lifecycle", () => {
       walletPda: wPda,
       currentOwnerAuthority: oPda,
       newOwnerAuthority: newAuthPda,
-      authType: AuthType.Ed25519,
-      authPubkey: newOwner.publicKey.toBytes(),
+      newAuthType: AuthType.Ed25519,
+      newAuthPubkey: newOwner.publicKey.toBytes(),
       signer: o
     });
     await sendTx(ctx, [transferIx], [o]);
@@ -192,8 +191,8 @@ describe("Ownership & Wallet Lifecycle", () => {
       walletPda: wPda,
       currentOwnerAuthority: secpOwnerPda,
       newOwnerAuthority: newAuthPda,
-      authType: AuthType.Ed25519,
-      authPubkey: newOwnerBytes,
+      newAuthType: AuthType.Ed25519,
+      newAuthPubkey: newOwnerBytes,
     });
 
     const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(transferIx);
