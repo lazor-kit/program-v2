@@ -1,3 +1,10 @@
+/**
+ * 05-session.test.ts
+ *
+ * Tests for: CreateSession, CloseSession (Ed25519 + Secp256r1)
+ * Merged from: session.test.ts + close-session tests from cleanup.test.ts
+ */
+
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
@@ -8,62 +15,53 @@ import {
   AuthorityAccount,
   LazorClient,
   AuthType,
-  Role // <--- Add Role
+  Role,
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 
-
-
-describe("LazorKit V1 — Session", () => {
+describe("Session Management", () => {
   let ctx: TestContext;
-
   let ownerKeypair: Keypair;
   let userSeed: Uint8Array;
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
-  // <--- Add highClient
 
   beforeAll(async () => {
     ctx = await setupTest();
-    // <--- Initialize
-
     ownerKeypair = Keypair.generate();
     userSeed = getRandomSeed();
 
     const { ix, walletPda: w } = await ctx.highClient.createWallet({
-          payer: ctx.payer,
-          authType: AuthType.Ed25519,
-          owner: ownerKeypair.publicKey,
-          userSeed
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: ownerKeypair.publicKey,
+      userSeed
     });
     await sendTx(ctx, [ix]);
     walletPda = w;
- 
+
     const [v] = findVaultPda(walletPda);
     vaultPda = v;
- 
+
     const [oPda] = findAuthorityPda(walletPda, ownerKeypair.publicKey.toBytes());
     ownerAuthPda = oPda;
- 
-    // Fund vault
-    const [vPda] = findVaultPda(walletPda);
-    await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vPda, 500_000_000n)]);
-    console.log("Wallet created and funded for session tests");
+
+    await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPda, 500_000_000n)]);
   }, 30_000);
+
+  // ─── Create Session ────────────────────────────────────────────────────────
 
   it("Success: Owner creates a session key", async () => {
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
-
-    const expiresAt = 999999999n;
 
     const { ix } = await ctx.highClient.createSession({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       sessionKey: sessionKey.publicKey,
-      expiresAt: expiresAt,
+      expiresAt: 999999999n,
       walletPda
     });
 
@@ -77,28 +75,22 @@ describe("LazorKit V1 — Session", () => {
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
 
-    const expiresAt = BigInt(2 ** 62); // far future
-
     const { ix: createIx } = await ctx.highClient.createSession({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       sessionKey: sessionKey.publicKey,
-      expiresAt: expiresAt,
+      expiresAt: BigInt(2 ** 62),
       walletPda
     });
     await sendTx(ctx, [createIx], [ownerKeypair]);
 
     const recipient = Keypair.generate().publicKey;
-    
-    // Execute using session key
     const executeIx = await ctx.highClient.execute({
       payer: ctx.payer,
       walletPda,
       authorityPda: sessionPda,
-      innerInstructions: [
-        getSystemTransferIx(vaultPda, recipient, 1_000_000n)
-      ],
+      innerInstructions: [getSystemTransferIx(vaultPda, recipient, 1_000_000n)],
       signer: sessionKey
     });
     await sendTx(ctx, [executeIx], [sessionKey]);
@@ -109,7 +101,6 @@ describe("LazorKit V1 — Session", () => {
 
   it("Failure: Spender cannot create session", async () => {
     const spender = Keypair.generate();
-
     const { ix: ixAdd } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
@@ -122,11 +113,10 @@ describe("LazorKit V1 — Session", () => {
     await sendTx(ctx, [ixAdd], [ownerKeypair]);
 
     const sessionKey = Keypair.generate();
-
     const { ix: ixFail } = await ctx.highClient.createSession({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
-      adminSigner: spender, // Spender tries to sign
+      adminSigner: spender,
       sessionKey: sessionKey.publicKey,
       expiresAt: BigInt(2 ** 62),
       walletPda
@@ -157,11 +147,10 @@ describe("LazorKit V1 — Session", () => {
     const shardId = ctx.payer.publicKey.toBytes().reduce((a: number, b: number) => a + b, 0) % 16;
     const treasuryShard = ctx.highClient.getTreasuryShardPda(shardId);
 
-    // Explicitly pass sessionPda1 as adminAuthority to test contract account validation
     const ix = ctx.highClient.client.createSession({
       payer: ctx.payer.publicKey,
       wallet: walletPda,
-      adminAuthority: sessionPda1, // Session PDA
+      adminAuthority: sessionPda1,
       session: sessionPda2,
       config: configPda,
       treasuryShard: treasuryShard,
@@ -189,14 +178,12 @@ describe("LazorKit V1 — Session", () => {
     await sendTx(ctx, [ixCreate], [ownerKeypair]);
 
     const newUser = Keypair.generate();
-    const [newUserPda] = findAuthorityPda(walletPda, newUser.publicKey.toBytes());
 
-    // Explicitly pass sessionPda as adminAuthority to test contract account validation
     const { ix } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       walletPda: walletPda,
       newAuthorityPubkey: newUser.publicKey.toBytes(),
-      authType: AuthType.Ed25519, 
+      authType: AuthType.Ed25519,
       role: Role.Spender,
       adminType: AuthType.Ed25519,
       adminSigner: sessionKey as any,
@@ -208,11 +195,10 @@ describe("LazorKit V1 — Session", () => {
   }, 30_000);
 
   it("Success: Secp256r1 Admin creates a session", async () => {
-    const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
+    const { generateMockSecp256r1Signer, buildAuthPayload, buildSecp256r1Message, buildSecp256r1PrecompileIx, buildAuthenticatorData, readCurrentSlot, appendSecp256r1Sysvars } = await import("./secp256r1Utils");
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
-    // Add Secp256r1 Admin
     const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
       payer: ctx.payer,
       adminType: AuthType.Ed25519,
@@ -227,14 +213,12 @@ describe("LazorKit V1 — Session", () => {
 
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
-
     const expiresAt = 999999999n;
 
     const { ix: createSessionIx } = await ctx.highClient.createSession({
       payer: ctx.payer,
       adminType: AuthType.Secp256r1,
       adminCredentialHash: secpAdmin.credentialIdHash,
-
       sessionKey: sessionKey.publicKey,
       expiresAt,
       walletPda
@@ -243,54 +227,135 @@ describe("LazorKit V1 — Session", () => {
     const adminMeta = createSessionIx.keys.find(k => k.pubkey.equals(secpAdminPda));
     if (adminMeta) adminMeta.isWritable = true;
 
-    createSessionIx.keys = [
-      ...(createSessionIx.keys || []),
-      { pubkey: new PublicKey("Sysvar1nstructions1111111111111111111111111"), isSigner: false, isWritable: false },
-      { pubkey: new PublicKey("SysvarS1otHashes111111111111111111111111111"), isSigner: false, isWritable: false },
-    ];
+    const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(createSessionIx);
+    const currentSlot = await readCurrentSlot(ctx.connection);
 
-    const slotHashesAddress = new PublicKey("SysvarS1otHashes111111111111111111111111111");
-    const accountInfo = await ctx.connection.getAccountInfo(slotHashesAddress);
-    const rawData = accountInfo!.data;
-    const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+    const authenticatorData = await buildAuthenticatorData("example.com");
+    const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot: currentSlot });
 
-    const sysvarIxIndex = createSessionIx.keys.length - 2;
-    const sysvarSlotIndex = createSessionIx.keys.length - 1;
-
-    const authenticatorDataRaw = generateAuthenticatorData("example.com");
-    const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
-
-    // signedPayload: session_key (32) + expiresAt (8) + payer(32)
     const signedPayload = new Uint8Array(32 + 8 + 32);
     signedPayload.set(sessionKey.publicKey.toBytes(), 0);
     new DataView(signedPayload.buffer).setBigUint64(32, expiresAt, true);
     signedPayload.set(ctx.payer.publicKey.toBytes(), 40);
 
-    const currentSlotBytes = new Uint8Array(8);
-    new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
+    const msgToSign = await buildSecp256r1Message({
+      discriminator: 5,
+      authPayload, signedPayload,
+      payer: ctx.payer.publicKey,
+      programId: PROGRAM_ID,
+      slot: currentSlot,
+    });
 
-    const msgToSign = getSecp256r1MessageToSign(
-      new Uint8Array([5]), // CreateSession
-      authPayload,
-      signedPayload,
-      ctx.payer.publicKey.toBytes(),
-      PROGRAM_ID.toBytes(),
-      authenticatorDataRaw,
-      currentSlotBytes
-    );
+    const sysvarIx = await buildSecp256r1PrecompileIx(secpAdmin, msgToSign);
 
-    const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+    const newIxData = Buffer.alloc(ixWithSysvars.data.length + authPayload.length);
+    ixWithSysvars.data.copy(newIxData, 0);
+    newIxData.set(authPayload, ixWithSysvars.data.length);
+    ixWithSysvars.data = newIxData;
 
-    // Append authPayload
-    const newIxData = Buffer.alloc(createSessionIx.data.length + authPayload.length);
-    createSessionIx.data.copy(newIxData, 0);
-    newIxData.set(authPayload, createSessionIx.data.length);
-    createSessionIx.data = newIxData;
-
-    const result = await tryProcessInstructions(ctx, [sysvarIx, createSessionIx]);
+    const result = await tryProcessInstructions(ctx, [sysvarIx, ixWithSysvars]);
     expect(result.result).toBe("ok");
 
     const sessionAcc = await ctx.connection.getAccountInfo(sessionPda);
     expect(sessionAcc).not.toBeNull();
   }, 30_000);
+
+  // ─── Close Session ─────────────────────────────────────────────────────────
+
+  it("CloseSession: wallet owner closes an active session", async () => {
+    const owner = Keypair.generate();
+    const { ix: ixCreate, walletPda: wPda, authorityPda: oAuthPda } = await ctx.highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey
+    });
+    await sendTx(ctx, [ixCreate]);
+
+    const sessionKey = Keypair.generate();
+    const [sessionPda] = findSessionPda(wPda, sessionKey.publicKey);
+
+    const { ix: ixCreateSession } = await ctx.highClient.createSession({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: owner,
+      sessionKey: sessionKey.publicKey,
+      expiresAt: BigInt(Math.floor(Date.now() / 1000) + 3600),
+      walletPda: wPda
+    });
+    await sendTx(ctx, [ixCreateSession], [owner]);
+
+    const closeSessionIx = await ctx.highClient.closeSession({
+      payer: ctx.payer,
+      walletPda: wPda,
+      sessionPda,
+      authorizer: { authorizerPda: oAuthPda, signer: owner }
+    });
+
+    const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer, owner]);
+    expect(result.result).toBe("ok");
+  });
+
+  it("CloseSession: contract admin closes an expired session", async () => {
+    const owner = Keypair.generate();
+    const { ix: ixCreate, walletPda: wPda } = await ctx.highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey
+    });
+    await sendTx(ctx, [ixCreate]);
+
+    const sessionKey = Keypair.generate();
+    const [sessionPda] = findSessionPda(wPda, sessionKey.publicKey);
+
+    const { ix: ixCreateSession } = await ctx.highClient.createSession({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: owner,
+      sessionKey: sessionKey.publicKey,
+      expiresAt: 0n,
+      walletPda: wPda
+    });
+    await sendTx(ctx, [ixCreateSession], [owner]);
+
+    const closeSessionIx = await ctx.highClient.closeSession({
+      payer: ctx.payer,
+      walletPda: wPda,
+      sessionPda,
+    });
+
+    const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer]);
+    expect(result.result).toBe("ok");
+  });
+
+  it("CloseSession: rejects contract admin closing an active session", async () => {
+    const owner = Keypair.generate();
+    const { ix: ixCreate, walletPda: wPda } = await ctx.highClient.createWallet({
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: owner.publicKey
+    });
+    await sendTx(ctx, [ixCreate]);
+
+    const sessionKey = Keypair.generate();
+    const [sessionPda] = findSessionPda(wPda, sessionKey.publicKey);
+
+    const { ix: ixCreateSession } = await ctx.highClient.createSession({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519,
+      adminSigner: owner,
+      sessionKey: sessionKey.publicKey,
+      expiresAt: BigInt(Math.floor(Date.now() / 1000) + 3600),
+      walletPda: wPda
+    });
+    await sendTx(ctx, [ixCreateSession], [owner]);
+
+    const closeSessionIx = await ctx.highClient.closeSession({
+      payer: ctx.payer,
+      walletPda: wPda,
+      sessionPda,
+    });
+
+    const result = await tryProcessInstructions(ctx, [closeSessionIx], [ctx.payer]);
+    expect(result.result).not.toBe("ok");
+  });
 });

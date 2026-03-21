@@ -11,7 +11,6 @@ import {
   findVaultPda,
   findAuthorityPda,
   findSessionPda,
-  LazorClient,
   AuthType,
   Role // <--- Add AuthType, Role
 } from "@lazorkit/solita-client";
@@ -27,7 +26,6 @@ describe("LazorKit V1 — Execute", () => {
   let ctx: TestContext;
 
   let ownerKeypair: Keypair;
-  let userSeed: Uint8Array;
   let walletPda: PublicKey;
   let vaultPda: PublicKey;
   let ownerAuthPda: PublicKey;
@@ -40,17 +38,17 @@ describe("LazorKit V1 — Execute", () => {
     ownerKeypair = Keypair.generate();
 
     const { ix, walletPda: w, authorityPda } = await ctx.highClient.createWallet({
-          payer: ctx.payer,
-          authType: AuthType.Ed25519,
-          owner: ownerKeypair.publicKey,
+      payer: ctx.payer,
+      authType: AuthType.Ed25519,
+      owner: ownerKeypair.publicKey,
     });
     await sendTx(ctx, [ix]);
     walletPda = w;
     ownerAuthPda = authorityPda;
- 
+
     const [v] = findVaultPda(walletPda);
     vaultPda = v;
- 
+
     // Fund vault
     const [vPda] = findVaultPda(walletPda);
     await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vPda, 200_000_000n)]);
@@ -141,7 +139,8 @@ describe("LazorKit V1 — Execute", () => {
   }, 30_000);
 
   it("Success: Secp256r1 Admin executes a transfer", async () => {
-    const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign } = await import("./secp256r1Utils");
+    const { generateMockSecp256r1Signer, buildAuthPayload, buildSecp256r1Message, buildSecp256r1PrecompileIx, buildAuthenticatorData, readCurrentSlot, appendSecp256r1Sysvars } = await import("./secp256r1Utils");
+    const { computeAccountsHash } = await import("@lazorkit/solita-client");
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
@@ -170,73 +169,67 @@ describe("LazorKit V1 — Execute", () => {
       innerInstructions,
     });
 
-    executeIx.keys = [
-      ...(executeIx.keys || []),
-      { pubkey: new PublicKey("Sysvar1nstructions1111111111111111111111111"), isSigner: false, isWritable: false },
-      { pubkey: new PublicKey("SysvarS1otHashes111111111111111111111111111"), isSigner: false, isWritable: false }
-    ];
+    // Append sysvars via SDK helper
+    const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(executeIx);
 
-    const argsDataExecute = executeIx.data.subarray(1); // after discriminator
+    const argsDataExecute = ixWithSysvars.data.subarray(1); // after discriminator
 
-    const slotHashesAddress = new PublicKey("SysvarS1otHashes111111111111111111111111111");
-    const accountInfo = await ctx.connection.getAccountInfo(slotHashesAddress);
-    const rawData = accountInfo!.data;
-    const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+    // Read slot via SDK
+    const currentSlot = await readCurrentSlot(ctx.connection);
 
-    const sysvarIxIndex = executeIx.keys.length - 2;
-    const sysvarSlotIndex = executeIx.keys.length - 1;
+    // Build auth payload via SDK
+    const authenticatorData = await buildAuthenticatorData("example.com");
+    const authPayload = buildAuthPayload({
+      sysvarIxIndex,
+      sysvarSlotIndex,
+      authenticatorData,
+      slot: currentSlot,
+    });
 
-    const { generateAuthenticatorData } = await import("./secp256r1Utils");
-    const authenticatorDataRaw = generateAuthenticatorData("example.com");
-
-    const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
-
-    // Compute Accounts Hash
-    const systemProgramId = SystemProgram.programId;
-    const accountsHashData = new Uint8Array(32 * 3);
-    accountsHashData.set(systemProgramId.toBytes(), 0);
-    accountsHashData.set(vaultPda.toBytes(), 32);
-    accountsHashData.set(recipient.toBytes(), 64);
-
-    const crypto = await import("crypto");
-    const accountsHashHasher = crypto.createHash('sha256');
-    accountsHashHasher.update(accountsHashData);
-    const accountsHash = new Uint8Array(accountsHashHasher.digest());
+    // Compute accounts hash using SDK function
+    // Build compact instructions to match what buildExecute produced
+    const compactIxs = [{
+      programIdIndex: ixWithSysvars.keys.findIndex(k => k.pubkey.equals(SystemProgram.programId)),
+      accountIndexes: [
+        ixWithSysvars.keys.findIndex(k => k.pubkey.equals(vaultPda)),
+        ixWithSysvars.keys.findIndex(k => k.pubkey.equals(recipient)),
+      ],
+      data: innerInstructions[0].data,
+    }];
+    const accountsHash = await computeAccountsHash(ixWithSysvars.keys, compactIxs);
 
     // signedPayload: compact_instructions + accounts_hash
     const signedPayload = new Uint8Array(argsDataExecute.length + 32);
     signedPayload.set(argsDataExecute, 0);
     signedPayload.set(accountsHash, argsDataExecute.length);
 
-    const currentSlotBytes = new Uint8Array(8);
-    new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
-
-    const discriminator = new Uint8Array([4]); // Execute
-    const msgToSign = getSecp256r1MessageToSign(
-      discriminator,
+    // Build message via SDK
+    const msgToSign = await buildSecp256r1Message({
+      discriminator: 4, // Execute
       authPayload,
       signedPayload,
-      ctx.payer.publicKey.toBytes(),
-      PROGRAM_ID.toBytes(),
-      authenticatorDataRaw,
-      currentSlotBytes
-    );
+      payer: ctx.payer.publicKey,
+      programId: PROGRAM_ID,
+      slot: currentSlot,
+    });
 
-    const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+    // Build precompile instruction via SDK
+    const sysvarIx = await buildSecp256r1PrecompileIx(secpAdmin, msgToSign);
 
     // Pack the payload into executeIx.data
     const finalExecuteData = new Uint8Array(1 + argsDataExecute.length + authPayload.length);
-    finalExecuteData.set(discriminator, 0);
+    finalExecuteData[0] = 4; // discriminator
     finalExecuteData.set(argsDataExecute, 1);
     finalExecuteData.set(authPayload, 1 + argsDataExecute.length);
-    executeIx.data = Buffer.from(finalExecuteData);
+    ixWithSysvars.data = Buffer.from(finalExecuteData);
 
-    const result = await tryProcessInstructions(ctx, [sysvarIx, executeIx]);
+    const result = await tryProcessInstructions(ctx, [sysvarIx, ixWithSysvars]);
     expect(result.result).toBe("ok");
 
     const balance = await ctx.connection.getBalance(recipient);
     expect(balance).toBe(2_000_000);
   }, 30_000);
+
 
   it("Failure: Session expired", async () => {
     const sessionKey = Keypair.generate();

@@ -231,7 +231,7 @@ describe("LazorKit V1 — Authority", () => {
   }, 30_000);
 
   it("Success: Secp256r1 Admin removes a Spender", async () => {
-    const { generateMockSecp256r1Signer, createSecp256r1Instruction, buildSecp256r1AuthPayload, getSecp256r1MessageToSign, generateAuthenticatorData } = await import("./secp256r1Utils");
+    const { generateMockSecp256r1Signer, buildAuthPayload, buildSecp256r1Message, buildSecp256r1PrecompileIx, buildAuthenticatorData, readCurrentSlot, appendSecp256r1Sysvars } = await import("./secp256r1Utils");
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
@@ -271,58 +271,54 @@ describe("LazorKit V1 — Authority", () => {
       refundDestination: ctx.payer.publicKey,
       walletPda,
       adminCredentialHash: secpAdmin.credentialIdHash,
-
     });
 
-    removeAuthIx.keys = [
-      ...(removeAuthIx.keys || []),
-      { pubkey: new PublicKey("Sysvar1nstructions1111111111111111111111111"), isSigner: false, isWritable: false },
-      { pubkey: new PublicKey("SysvarS1otHashes111111111111111111111111111"), isSigner: false, isWritable: false },
-    ];
+    // Append sysvars via SDK helper
+    const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(removeAuthIx);
 
-    const slotHashesAddress = new PublicKey("SysvarS1otHashes111111111111111111111111111");
-    const accountInfo = await ctx.connection.getAccountInfo(slotHashesAddress);
-    const rawData = accountInfo!.data;
-    const currentSlot = new DataView(rawData.buffer, rawData.byteOffset, rawData.byteLength).getBigUint64(8, true);
+    // Read slot via SDK
+    const currentSlot = await readCurrentSlot(ctx.connection);
 
-    const sysvarIxIndex = removeAuthIx.keys.length - 2;
-    const sysvarSlotIndex = removeAuthIx.keys.length - 1;
-
-    const authenticatorDataRaw = generateAuthenticatorData("example.com");
-    const authPayload = buildSecp256r1AuthPayload(sysvarIxIndex, sysvarSlotIndex, authenticatorDataRaw, currentSlot);
+    // Build auth payload via SDK
+    const authenticatorData = await buildAuthenticatorData("example.com");
+    const authPayload = buildAuthPayload({
+      sysvarIxIndex,
+      sysvarSlotIndex,
+      authenticatorData,
+      slot: currentSlot,
+    });
 
     // signedPayload: target_auth_pda (32) + refund_dest (32)
     const signedPayload = new Uint8Array(64);
     signedPayload.set(victimPda.toBytes(), 0);
     signedPayload.set(ctx.payer.publicKey.toBytes(), 32);
 
-    const currentSlotBytes = new Uint8Array(8);
-    new DataView(currentSlotBytes.buffer).setBigUint64(0, currentSlot, true);
-
-    const msgToSign = getSecp256r1MessageToSign(
-      new Uint8Array([2]), // RemoveAuthority discriminator
+    // Build message via SDK
+    const msgToSign = await buildSecp256r1Message({
+      discriminator: 2, // RemoveAuthority
       authPayload,
       signedPayload,
-      ctx.payer.publicKey.toBytes(),
-      PROGRAM_ID.toBytes(),
-      authenticatorDataRaw,
-      currentSlotBytes
-    );
+      payer: ctx.payer.publicKey,
+      programId: PROGRAM_ID,
+      slot: currentSlot,
+    });
 
-    const sysvarIx = await createSecp256r1Instruction(secpAdmin, msgToSign);
+    // Build precompile instruction via SDK
+    const sysvarIx = await buildSecp256r1PrecompileIx(secpAdmin, msgToSign);
 
     // Append authPayload to data
-    const newIxData = Buffer.alloc(removeAuthIx.data.length + authPayload.length);
-    removeAuthIx.data.copy(newIxData, 0);
-    newIxData.set(authPayload, removeAuthIx.data.length);
-    removeAuthIx.data = newIxData;
+    const newIxData = Buffer.alloc(ixWithSysvars.data.length + authPayload.length);
+    ixWithSysvars.data.copy(newIxData, 0);
+    newIxData.set(authPayload, ixWithSysvars.data.length);
+    ixWithSysvars.data = newIxData;
 
-    const result = await tryProcessInstructions(ctx, [sysvarIx, removeAuthIx]);
+    const result = await tryProcessInstructions(ctx, [sysvarIx, ixWithSysvars]);
     expect(result.result).toBe("ok");
 
     const info = await ctx.connection.getAccountInfo(victimPda);
     expect(info).toBeNull();
   }, 30_000);
+
 
   it("Failure: Spender cannot add any authority", async () => {
     const spender = Keypair.generate();

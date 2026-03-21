@@ -12,7 +12,13 @@
  */
 
 import { PublicKey, TransactionInstruction, Connection } from "@solana/web3.js";
-import { createHash } from "crypto";
+// Remove node:crypto import
+async function sha256(data: Uint8Array): Promise<Uint8Array> {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data as any);
+    return new Uint8Array(hashBuffer);
+}
+
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -118,8 +124,9 @@ export function buildAuthPayload(params: {
  *
  * @param rpId  Relying party ID. Default: "example.com"
  */
-export function buildAuthenticatorData(rpId = "example.com"): Uint8Array {
-    const rpIdHash = createHash("sha256").update(rpId).digest();
+export async function buildAuthenticatorData(rpId = "example.com"): Promise<Uint8Array> {
+    const rpIdBytes = new TextEncoder().encode(rpId);
+    const rpIdHash = await sha256(rpIdBytes);
     const data = new Uint8Array(37);
     data.set(rpIdHash, 0); // 32 bytes: rpIdHash
     data[32] = 0x01;       // User Present flag
@@ -127,13 +134,14 @@ export function buildAuthenticatorData(rpId = "example.com"): Uint8Array {
     return data;
 }
 
+
 /**
  * Computes the SHA-256 message that gets embedded in the WebAuthn `clientDataJSON.challenge`
  * and subsequently signed by the Secp256r1 key.
  *
  * The contract verifies this exact message construction on-chain.
  */
-export function buildSecp256r1Message(params: {
+export async function buildSecp256r1Message(params: {
     /** Instruction discriminator byte (e.g. 0=CreateWallet, 1=AddAuthority, …) */
     discriminator: number;
     authPayload: Uint8Array;
@@ -142,20 +150,25 @@ export function buildSecp256r1Message(params: {
     payer: PublicKey;
     programId: PublicKey;
     slot: bigint;
-}): Uint8Array {
+}): Promise<Uint8Array> {
     const { discriminator, authPayload, signedPayload, payer, programId, slot } = params;
 
     const slotBytes = new Uint8Array(8);
     new DataView(slotBytes.buffer).setBigUint64(0, slot, true);
 
-    const challengeHash = createHash("sha256")
-        .update(new Uint8Array([discriminator]))
-        .update(authPayload)
-        .update(signedPayload)
-        .update(slotBytes)
-        .update(payer.toBytes())
-        .update(programId.toBytes())
-        .digest();
+    // Concatenate all parts for challenge hashing
+    const totalLen = 1 + authPayload.length + signedPayload.length + 8 + 32 + 32;
+    const combined = new Uint8Array(totalLen);
+    let offset = 0;
+    
+    combined[0] = discriminator; offset += 1;
+    combined.set(authPayload, offset); offset += authPayload.length;
+    combined.set(signedPayload, offset); offset += signedPayload.length;
+    combined.set(slotBytes, offset); offset += 8;
+    combined.set(payer.toBytes(), offset); offset += 32;
+    combined.set(programId.toBytes(), offset);
+
+    const challengeHash = await sha256(combined);
 
     // Encode challenge as base64url (no padding)
     const challengeB64 = Buffer.from(challengeHash)
@@ -171,14 +184,15 @@ export function buildSecp256r1Message(params: {
         crossOrigin: false,
     });
 
-    const authenticatorData = buildAuthenticatorData();
-    const clientDataHash = createHash("sha256").update(clientDataJson).digest();
+    const authenticatorData = await buildAuthenticatorData();
+    const clientDataHash = await sha256(new TextEncoder().encode(clientDataJson));
 
     const message = new Uint8Array(authenticatorData.length + clientDataHash.length);
     message.set(authenticatorData, 0);
     message.set(clientDataHash, authenticatorData.length);
     return message;
 }
+
 
 // ─── Precompile instruction builder ──────────────────────────────────────────
 

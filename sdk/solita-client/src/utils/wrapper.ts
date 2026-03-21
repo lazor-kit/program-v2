@@ -20,6 +20,9 @@ import {
 } from "./pdas";
 
 import { Role } from "../generated";
+import { type Secp256r1Signer, buildSecp256r1Message, buildSecp256r1PrecompileIx, appendSecp256r1Sysvars, buildAuthPayload, buildAuthenticatorData, readCurrentSlot } from "./secp256r1";
+import { computeAccountsHash, packCompactInstructions, type CompactInstruction } from "./packing";
+import bs58 from "bs58";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +32,14 @@ export enum AuthType {
 }
 
 export { Role };
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+export const AUTHORITY_ACCOUNT_HEADER_SIZE = 48;
+export const AUTHORITY_ACCOUNT_ED25519_SIZE = 48 + 32;   // 80 bytes
+export const AUTHORITY_ACCOUNT_SECP256R1_SIZE = 48 + 65; // 113 bytes
+export const DISCRIMINATOR_AUTHORITY = 2;
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -444,6 +455,141 @@ export class LazorClient {
     }
 
     /**
+     * Builds a bundle of two instructions for Secp256r1 Execution:
+     * 1. Secp256r1 Precompile Instruction
+     * 2. LazorKit Execute Instruction with appended signature payload
+     * 
+     * @returns Array of [PrecompileIx, ExecuteIx]
+     */
+    async executeWithSecp256r1(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        innerInstructions: TransactionInstruction[];
+        signer: Secp256r1Signer;
+        /** Optional: absolute slot height for liveness proof. fetched automatically if 0n/omitted */
+        slot?: bigint;
+        rpId?: string;
+    }): Promise<{ precompileIx: TransactionInstruction, executeIx: TransactionInstruction }> {
+        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const vaultPda = findVaultPda(params.walletPda, this.programId)[0];
+        const [authorityPda] = findAuthorityPda(params.walletPda, params.signer.credentialIdHash, this.programId);
+
+        // 1. Replicate deduplication to get exact account list for hashing
+        const baseAccounts: PublicKey[] = [
+            params.payer.publicKey,
+            params.walletPda,
+            authorityPda,
+            vaultPda,
+            configPda,
+            treasuryShard,
+            SystemProgram.programId,
+        ];
+
+        const accountMap = new Map<string, number>();
+        const accountMetas: AccountMeta[] = [];
+
+        baseAccounts.forEach((pk, idx) => {
+            accountMap.set(pk.toBase58(), idx);
+            accountMetas.push({
+                pubkey: pk,
+                isWritable: idx === 0 || idx === 2 || idx === 3 || idx === 5,
+                isSigner: idx === 0,
+            });
+        });
+
+        const vaultKey = vaultPda.toBase58();
+        const walletKey = params.walletPda.toBase58();
+
+        const addAccount = (pubkey: PublicKey, isSigner: boolean, isWritable: boolean): number => {
+            const key = pubkey.toBase58();
+            if (key === vaultKey || key === walletKey) isSigner = false;
+
+            if (!accountMap.has(key)) {
+                const idx = accountMetas.length;
+                accountMap.set(key, idx);
+                accountMetas.push({ pubkey, isWritable, isSigner });
+                return idx;
+            } else {
+                const idx = accountMap.get(key)!;
+                const existing = accountMetas[idx];
+                if (isWritable) existing.isWritable = true;
+                if (isSigner) existing.isSigner = true;
+                return idx;
+            }
+        };
+
+        const compactIxs: CompactInstruction[] = [];
+        for (const ix of params.innerInstructions) {
+            const programIdIndex = addAccount(ix.programId, false, false);
+            const accountIndexes: number[] = [];
+            for (const acc of ix.keys) {
+                accountIndexes.push(addAccount(acc.pubkey, acc.isSigner, acc.isWritable));
+            }
+            compactIxs.push({ programIdIndex, accountIndexes, data: ix.data });
+        }
+
+        const packedInstructions = packCompactInstructions(compactIxs);
+
+        // 2. Load Slot
+        const slot = params.slot ?? await readCurrentSlot(this.connection);
+
+        // 3. Build Auth Payload
+        const executeIxBase = new TransactionInstruction({
+            programId: this.programId,
+            keys: [...accountMetas], // copy
+            data: Buffer.alloc(0)
+        });
+        const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(executeIxBase);
+
+        const authenticatorData = await buildAuthenticatorData(params.rpId);
+
+        const authPayload = buildAuthPayload({
+            sysvarIxIndex,
+            sysvarSlotIndex,
+            authenticatorData,
+            slot,
+            rpId: params.rpId
+        });
+
+        // 4. Compute Accounts Hash
+        const accountsHash = await computeAccountsHash(ixWithSysvars.keys, compactIxs);
+
+        // 5. Build Combined Signed Payload = PackedInstructions + AccountsHash
+        const signedPayload = new Uint8Array(packedInstructions.length + 32);
+        signedPayload.set(packedInstructions, 0);
+        signedPayload.set(accountsHash, packedInstructions.length);
+
+        // 6. Generate Message to Sign
+        const message = await buildSecp256r1Message({
+            discriminator: 4, // Execute
+            authPayload,
+            signedPayload,
+            payer: params.payer.publicKey,
+            programId: this.programId,
+            slot
+        });
+
+        // 7. Get Precompile Instruction
+        const precompileIx = await buildSecp256r1PrecompileIx(params.signer, message);
+
+        // 8. Build final Execute Instruction Data
+        // Layout: [disc(4)] [packedInstructions] [authPayload]
+        const finalData = Buffer.alloc(1 + packedInstructions.length + authPayload.length);
+        finalData[0] = 4; // disc
+        finalData.set(packedInstructions, 1);
+        finalData.set(authPayload, 1 + packedInstructions.length);
+
+        const executeIx = new TransactionInstruction({
+            programId: this.programId,
+            keys: ixWithSysvars.keys,
+            data: finalData
+        });
+
+        return { precompileIx, executeIx };
+    }
+
+
+    /**
      * Builds a `CloseWallet` instruction.
      *
      * - `destination` is optional — defaults to `payer.publicKey`.
@@ -633,8 +779,9 @@ export class LazorClient {
         programId: PublicKey = PROGRAM_ID
     ): Promise<PublicKey[]> {
         const accounts = await connection.getProgramAccounts(programId, {
-            filters: [{ dataSize: 48 + 32 }], // Ed25519 authority size
+            filters: [{ dataSize: AUTHORITY_ACCOUNT_ED25519_SIZE }], // Ed25519 authority size
         });
+
 
         const results: PublicKey[] = [];
         for (const a of accounts) {
@@ -658,8 +805,9 @@ export class LazorClient {
         programId: PublicKey = PROGRAM_ID
     ): Promise<PublicKey[]> {
         const accounts = await connection.getProgramAccounts(programId, {
-            filters: [{ dataSize: 48 + 65 }], // Secp256r1 authority size (48 + 32 + 33)
+            filters: [{ dataSize: AUTHORITY_ACCOUNT_SECP256R1_SIZE }], // Secp256r1 authority size
         });
+
 
         const results: PublicKey[] = [];
         for (const a of accounts) {
@@ -699,11 +847,12 @@ export class LazorClient {
     }>> {
         const accounts = await connection.getProgramAccounts(programId, {
             filters: [
-                { dataSize: 48 + 65 },          // Secp256r1 authority size
-                { memcmp: { offset: 0, bytes: Buffer.from([2]).toString("base64") } },  // disc = Authority
-                { memcmp: { offset: 48, bytes: Buffer.from(credentialHash).toString("base64") } }, // credentialHash
+                { dataSize: AUTHORITY_ACCOUNT_SECP256R1_SIZE },          // Secp256r1 authority size
+                { memcmp: { offset: 0, bytes: bs58.encode(Buffer.from([DISCRIMINATOR_AUTHORITY])) } },  // disc = Authority
+                { memcmp: { offset: 48, bytes: bs58.encode(Buffer.from(credentialHash)) } }, // credentialHash
             ],
         });
+
 
         return accounts.map(a => {
             const data = a.account.data;

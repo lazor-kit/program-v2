@@ -2,10 +2,10 @@ import { expect, describe, it, beforeAll } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { setupTest, sendTx, tryProcessInstructions, type TestContext, PROGRAM_ID, getSystemTransferIx } from "./common";
 import {
-  findConfigPda,
-  findTreasuryShardPda,
-  findWalletPda,
-  LazorClient, // <--- Add LazorClient
+    findConfigPda,
+    findTreasuryShardPda,
+    findWalletPda,
+    LazorClient, // <--- Add LazorClient
 } from "@lazorkit/solita-client";
 
 describe("Config and Treasury Instructions", () => {
@@ -42,7 +42,7 @@ describe("Config and Treasury Instructions", () => {
         const view = new DataView(ixData.buffer);
         view.setBigUint64(9, 20000n, true); // walletFee (offset 8+1)
         view.setBigUint64(17, 2000n, true); // actionFee (offset 16+1)
-        
+
         const adminBytes = ctx.payer.publicKey.toBytes();
         ixData.set(adminBytes, 25);
 
