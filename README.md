@@ -60,9 +60,10 @@ The contract uses a highly modular PDA (Program Derived Address) architecture fo
   - `processor/`: Instruction handlers (`create_wallet`, `execute`, `manage_authority`, etc.).
   - `auth/`: Authentication logic for Ed25519 and Secp256r1 (with `slothashes` nonce).
   - `state/`: Account data structures (`Wallet`, `Authority`, `Session`).
-- `tests-e2e/`: Comprehensive End-to-End Test Suite.
-  - `scenarios/`: Test scenarios covering Happy Path, Failures, and Audit Retro.
-  - `scenarios/audit/`: Dedicated regression tests for security vulnerabilities.
+- `sdk/solita-client/`: The TypeScript SDK built for high-level interaction.
+  - `src/utils/wrapper.ts`: The `LazorClient` abstraction providing automatic PDA derivation.
+- `tests-v1-rpc/`: Comprehensive End-to-End Test Suite simulating live scenarios via Localnet.
+  - `tests/`: Feature-mapped tests containing 69 assertions over Session Keys, Executions, and Treasuries.
 
 ---
 
@@ -75,10 +76,10 @@ cargo build-sbf
 ```
 
 ### Test
-Run the comprehensive E2E test suite (LiteSVM-based):
+Run the comprehensive E2E test suite locally (Starts `solana-test-validator` automatically):
 ```bash
-cd tests-e2e
-cargo run --bin lazorkit-tests-e2e
+cd tests-v1-rpc
+./scripts/test-local.sh
 ```
 
 ---

@@ -1,0 +1,24 @@
+0a5a0bf feat(sdk, tests): deep audit and refactor solita client SDK
+42bcf9b refactor(sdk): fix misleading naming conventions
+2a49639 test: refactor solita-client test suite to 7 feature-based files and use native Web Crypto API for secp256r1
+a0d99ca refactor: optimize sdk ergonomics and cleanup test infrastructure
+945683d refactor: optimize LazorClient with Smart Defaults, Transaction Builders, setup streamline, and English translate
+6976c67 feat: introduce a high-level client for simplified contract interaction and update existing tests to utilize it.
+9e9ec2f feat: complete solita v1 sdk test suite with 100% parity
+6643be7 feat: introduce secp256r1 utilities, update program IDL for account mutability and ordering, and remove `AccountDiscriminator` type.
+cef6373 feat: 100% Rust layout extraction and remove redundant patch layouts
+1b1fe92 feat: monorepo dual SDK layout and Rust IDL facade alignment with Shank
+76f1876 feat: Implement and test global wallet discovery by credential hash with a new client method, and remove outdated local test workflow documentation.
+9df9bbd feat: Implement security checklist, audit regression tests, and harden instruction account validation by reordering instruction accounts.
+d0f0a4a fix(audit): resolve critical security issue and add program_id to authenticate
+8876579 docs: update README and Architecture with latest auth, config, and fee mechanisms
+e4d4a29 fix(audit): resolve critical security issues (SweepTreasury DoS, Config Spoofing, Lamport Burns)
+5d86858 fix: Add missing protocol fee collection and fix account parsing in AddAuthority
+0320988 fix: Audit findings (CloseWallet account count, CloseSession optimization, lint fix)
+239a82b fix: Correct Secp256r1 sysvar ordering and discriminators in tests
+897edcd feat: Update SDK with new generated code & client methods
+2925d0f feat: Wire new instructions in entrypoint & IDL
+494424f feat: Add CloseSession and CloseWallet processors
+04500cd feat: Integrate protocol fee into existing processors
+43606fc feat: Add collect_protocol_fee utility
+08d58d9 feat: Add Config PDA, Treasury Shard state & processors

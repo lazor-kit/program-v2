@@ -132,7 +132,14 @@ Temporary sub-key for automated agents (like a session token).
 *   **InitializeConfig / UpdateConfig**: Establishes global parameters managed heavily by the deployment admin.
 *   **InitTreasuryShard / SweepTreasury**: Admin instructions to sweep protocol revenue down to a single master vault while retaining mandatory 0-byte rent exemption balances in the shards to prevent permanent BPF runtime account closure exceptions.
 
-## 6. Project Structure
+## 6. Client SDK Abstraction (Solita)
+The TypeScript SDK (`solita-client`) relies on a two-tier approach to interface cleanly with the `NoPadding` C-Structs output by Rust.
+### A. `LazorInstructionBuilder` (Low-Level)
+Because Solita commonly auto-injects a standardized `4-byte` length prefix to buffer types (via `@metaplex-foundation/beet`), the SDK completely bypasses the generated `createWallet`, `addAuthority`, and `transferOwnership` payload generators. It uses manually constructed `Buffer.alloc` maps reflecting EXACT byte offsets defined in Rust.
+### B. `LazorClient` (High-Level Wrapper)
+An ergonomic layer providing developers with automatically resolved PDAs, transaction compaction methods, and native Web Crypto API wrappers to seamlessly translate WebAuthn responses into pre-packaged Secp256r1 `Execution` Instructions.
+
+## 7. Project Structure
 ```text
 program/src/
 ├── auth/

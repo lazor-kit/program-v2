@@ -12,52 +12,49 @@ This script ensures a clean environment, builds the latest program, and runs the
 ## 1. Prerequisites
 - [Solana Tool Suite](https://docs.solanalabs.com/cli/install) (latest stable)
 - [Rust](https://www.rust-lang.org/tools/install)
-- [Node.js & npm](https://nodejs.org/)
-- [Shank CLI](https://github.com/metaplex-foundation/shank) (for IDL generation)
-- [Codama CLI](https://github.com/metaplex-foundation/codama) (for SDK generation)
+- [Node.js, npm & pnpm](https://nodejs.org/)
+- [Solita](https://github.com/metaplex-foundation/solita) (for legacy web3.js v1 SDK generation)
 
 ## 2. Project Structure
 - `/program`: Rust smart contract (Pinocchio-based)
   - Highly optimized, zero-copy architecture (`NoPadding`).
-- `/sdk/lazorkit-ts`: TypeScript SDK generated via Codama.
-  - Contains generated instructions for interaction with the contract.
-- `/tests-real-rpc`: Integration tests running against a live RPC (Devnet/Localhost).
-- `/scripts`: Automation utility scripts (e.g., syncing program IDs).
+- `/sdk/solita-client`: TypeScript SDK generated via Solita & manually augmented.
+  - Contains generated instructions wrapped by a high-level `LazorClient` to manage derivations and Secp256r1 webauth payloads.
+- `/tests-v1-rpc`: Integration tests running against a local test validator using Vitest and legacy `@solana/web3.js` (v1).
+- `/scripts`: Automation utility scripts.
 
 ## 3. Core Workflows
 
 ### A. Program ID Synchronization
-Whenever you redeploy the program to a new address, run the sync script to update all references across Rust, the SDK generator, and your tests:
-```bash
-./scripts/sync-program-id.sh <YOUR_NEW_PROGRAM_ID>
-```
-*Note: This script will update hardcoded IDs and typically trigger SDK regeneration automatically.*
+Whenever you redeploy the program to a new address, ensure you update the `PROGRAM_ID` constants in:
+- `program/src/lib.rs` (Declare id)
+- `sdk/solita-client/src/utils/pdas.ts`
 
-### B. IDL & SDK Generation
-If you modify instruction parameters or account structures in the Rust program, you must regenerate both the IDL and the SDK:
-1. **Update IDL** (using Shank):
+### B. SDK Generation & Augmentation
+If you modify instruction parameters or account structures in the Rust program, you must regenerate the SDK:
+1. **Regenerate SDK** (using Solita):
    ```bash
-   cd program && shank idl -o . --out-filename idl.json -p <YOUR_PROGRAM_ID>
+   cd program && yarn solita
    ```
-2. **Regenerate SDK** (using Codama):
+2. **Rebuild Client Wrapper**:
+   Since the smart contract uses strict `[repr(C)]` / `NoPadding` layouts, the generated `beet` serializers from Solita often inject a 4-byte padding prefix. Lay out custom parameter inputs manually within `sdk/solita-client/src/utils/client.ts` to construct precise buffer offsets.
    ```bash
-   cd sdk/lazorkit-ts && npm run generate
+   cd sdk/solita-client && pnpm run build
    ```
 
 ### C. Testing & Validation
-Tests are built to run against an actual RPC node (`tests-real-rpc`), ensuring realistic validation of behaviors like `SlotHashes` nonce verification and resource limits.
+Tests run exclusively on a localized `solana-test-validator` to guarantee execution determinism, specifically for verifying the `SlotHashes` sysvar.
 
-1. **Setup Env**: Ensure `.env` in `tests-real-rpc/` has your `PRIVATE_KEY`, `RPC_URL`, and `WS_URL`.
-2. **Run All Tests**:
+1. **Run Full Test Suite** (Recommended for full validation):
    ```bash
-   cd tests-real-rpc && npm run test:devnet
+   cd tests-v1-rpc && ./scripts/test-local.sh
    ```
-3. **Run Single Test File** (Recommended for debugging):
-   ```bash
-   cd tests-real-rpc && npm run test:devnet:file tests/instructions/create_wallet.test.ts
-   ```
+   *Note: This script will spawn the validator, await fee stabilization, and trigger all 69 Vitest endpoints sequentially.*
 
-### D. Deployment & IDL Publishing
+2. **Run Single Test File**:
+   ```bash
+   cd tests-v1-rpc && vitest run tests/06-ownership.test.ts
+   ```
 1. **Build the Program**:
    ```bash
    cargo build-sbf
