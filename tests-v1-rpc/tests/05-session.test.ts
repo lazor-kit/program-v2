@@ -8,12 +8,10 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
-  findWalletPda,
   findVaultPda,
   findAuthorityPda,
   findSessionPda,
-  AuthorityAccount,
-  LazorClient,
+  SessionAccount,
   AuthType,
   Role,
 } from "@lazorkit/solita-client";
@@ -67,8 +65,14 @@ describe("Session Management", () => {
 
     await sendTx(ctx, [ix], [ownerKeypair]);
 
-    const sessionAcc = await ctx.connection.getAccountInfo(sessionPda);
-    expect(sessionAcc).not.toBeNull();
+    const sessionAccInfo = await ctx.connection.getAccountInfo(sessionPda);
+    expect(sessionAccInfo).not.toBeNull();
+
+    // Verification of data mapping using Solita classes
+    const sessionAcc = await SessionAccount.fromAccountAddress(ctx.connection, sessionPda);
+    expect(sessionAcc.sessionKey.toBase58()).toBe(sessionKey.publicKey.toBase58());
+    expect(sessionAcc.wallet.toBase58()).toBe(walletPda.toBase58());
+    expect(sessionAcc.expiresAt.toString()).toBe("999999999");
   }, 30_000);
 
   it("Success: Execution using session key", async () => {
@@ -101,7 +105,8 @@ describe("Session Management", () => {
 
   it("Failure: Spender cannot create session", async () => {
     const spender = Keypair.generate();
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       newAuthPubkey: spender.publicKey.toBytes(),
@@ -178,7 +183,8 @@ describe("Session Management", () => {
 
     const newUser = Keypair.generate();
 
-    const { ix } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       walletPda: walletPda,
       newAuthPubkey: newUser.publicKey.toBytes(),
       newAuthType: AuthType.Ed25519,
@@ -197,7 +203,8 @@ describe("Session Management", () => {
     const secpAdmin = await generateMockSecp256r1Signer();
     const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
 
-    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: ownerKeypair,
       newAuthPubkey: secpAdmin.publicKeyBytes,
@@ -257,6 +264,30 @@ describe("Session Management", () => {
     expect(sessionAcc).not.toBeNull();
   }, 30_000);
 
+  it("Failure: Execution fails if the session has been closed", async () => {
+    const sessionKey = Keypair.generate();
+    const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
+
+    const { ix: createIx } = await ctx.highClient.createSession({
+      payer: ctx.payer, adminType: AuthType.Ed25519, adminSigner: ownerKeypair, sessionKey: sessionKey.publicKey, expiresAt: 9999999999n, walletPda
+    });
+    await sendTx(ctx, [createIx], [ownerKeypair]);
+
+    // Close the session immediately
+    const closeIx = await ctx.highClient.closeSession({
+      payer: ctx.payer, walletPda, sessionPda, authorizer: { authorizerPda: ownerAuthPda, signer: ownerKeypair }
+    });
+    await sendTx(ctx, [closeIx], [ownerKeypair]);
+
+    const recipient = Keypair.generate().publicKey;
+    const executeIx = await ctx.highClient.execute({
+      payer: ctx.payer, walletPda, authorityPda: sessionPda, innerInstructions: [getSystemTransferIx(vaultPda, recipient, 100n)], signer: sessionKey
+    });
+
+    const result = await tryProcessInstruction(ctx, [executeIx], [sessionKey]);
+    expect(result.result).toMatch(/simulation failed|UninitializedAccount|InvalidAccountData|0xbc4/i);
+  }, 30_000);
+
   // ─── Close Session ─────────────────────────────────────────────────────────
 
   it("CloseSession: wallet owner closes an active session", async () => {
@@ -292,7 +323,7 @@ describe("Session Management", () => {
     expect(result.result).toBe("ok");
   });
 
-  it("CloseSession: contract admin closes an expired session", async () => {
+  it("CloseSession: cranker (anyone) closes an expired session", async () => {
     const owner = Keypair.generate();
     const { ix: ixCreate, walletPda: wPda } = await ctx.highClient.createWallet({
       payer: ctx.payer,
@@ -324,7 +355,7 @@ describe("Session Management", () => {
     expect(result.result).toBe("ok");
   });
 
-  it("CloseSession: rejects contract admin closing an active session", async () => {
+  it("CloseSession: rejects cranker (anyone) closing an active session", async () => {
     const owner = Keypair.generate();
     const { ix: ixCreate, walletPda: wPda } = await ctx.highClient.createWallet({
       payer: ctx.payer,

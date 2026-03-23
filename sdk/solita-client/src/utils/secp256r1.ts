@@ -150,8 +150,10 @@ export async function buildSecp256r1Message(params: {
     payer: PublicKey;
     programId: PublicKey;
     slot: bigint;
+    /** Origin of the website requesting the signature (e.g. "https://my-dapp.com"). Defaults to "https://example.com" */
+    origin?: string;
 }): Promise<Uint8Array> {
-    const { discriminator, authPayload, signedPayload, payer, programId, slot } = params;
+    const { discriminator, authPayload, signedPayload, payer, programId, slot, origin } = params;
 
     const slotBytes = new Uint8Array(8);
     new DataView(slotBytes.buffer).setBigUint64(0, slot, true);
@@ -180,7 +182,7 @@ export async function buildSecp256r1Message(params: {
     const clientDataJson = JSON.stringify({
         type: "webauthn.get",
         challenge: challengeB64,
-        origin: "https://example.com",
+        origin: origin ?? "https://example.com",
         crossOrigin: false,
     });
 

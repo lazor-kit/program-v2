@@ -56,7 +56,12 @@ export class LazorInstructionBuilder {
    * CreateWallet — manually serializes instruction data to avoid Solita's bytes prefix.
    *
    * On-chain layout:
-   * [disc: u8(0)] [userSeed: 32] [authType: u8] [authBump: u8] [padding: 6] [payload: bytes]
+   * [disc: u8(0)]        // offset 0
+   * [userSeed: 32]       // offset 1
+   * [authType: u8]       // offset 33
+   * [authBump: u8]       // offset 34
+   * [padding: 6]         // offset 35 (6 bytes to align to 8-byte boundary for AuthPayload enum)
+   * [payload: bytes]     // offset 41 (Ed25519=32 bytes, Secp256r1=65 bytes)
    */
   createWallet(params: {
     payer: PublicKey;
@@ -134,7 +139,13 @@ export class LazorInstructionBuilder {
 
   /**
    * AddAuthority — manually serializes to avoid prefix.
-   * Layout: [disc(1)][type(1)][role(1)][pad(6)][payload(Ed=32, Secp=65)]
+   *
+   * On-chain layout:
+   * [disc: u8(1)]        // offset 0
+   * [newAuthType: u8]    // offset 1
+   * [newRole: u8]        // offset 2
+   * [padding: 6]         // offset 3
+   * [payload: bytes]     // offset 9 (Ed25519=32 bytes, Secp256r1=65 bytes)
    */
   addAuthority(params: {
     payer: PublicKey;
@@ -218,7 +229,13 @@ export class LazorInstructionBuilder {
 
   /**
    * TransferOwnership — manually serializes to avoid prefix.
-   * Layout: [disc(3)][type(1)][payload(Ed=32, Secp=65)]
+   * 
+   * On-chain layout:
+   * [disc: u8(3)]        // offset 0
+   * [newAuthType: u8]    // offset 1
+   * [payload: bytes]     // offset 2 (Ed25519=32 bytes, Secp256r1=65 bytes)
+   * Note: No padding is used here because the Rust struct `TransferOwnershipArgs` 
+   * packs `new_owner_authority` (`AuthPayload` enum) right after `new_auth_type`.
    */
   transferOwnership(params: {
     payer: PublicKey;
@@ -499,6 +516,50 @@ export class LazorInstructionBuilder {
       },
       this.programId
     );
+  }
+
+  updateConfig(params: {
+    admin: PublicKey;
+    config: PublicKey;
+    walletFee?: bigint | number;
+    actionFee?: bigint | number;
+    numShards?: number;
+    newAdmin?: PublicKey;
+  }): TransactionInstruction {
+    const data = Buffer.alloc(57);
+    data[0] = 7; // UpdateConfig discriminator
+
+    const updateWalletFee = params.walletFee !== undefined ? 1 : 0;
+    const updateActionFee = params.actionFee !== undefined ? 1 : 0;
+    const updateNumShards = params.numShards !== undefined ? 1 : 0;
+    const updateAdmin = params.newAdmin !== undefined ? 1 : 0;
+    const numShards = params.numShards ?? 0;
+
+    data.writeUInt8(updateWalletFee, 1);
+    data.writeUInt8(updateActionFee, 2);
+    data.writeUInt8(updateNumShards, 3);
+    data.writeUInt8(updateAdmin, 4);
+    data.writeUInt8(numShards, 5);
+    // Padding 3 bytes (indices 6, 7, 8) are already 0 from alloc
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    view.setBigUint64(9, BigInt(params.walletFee ?? 0), true);
+    view.setBigUint64(17, BigInt(params.actionFee ?? 0), true);
+
+    if (params.newAdmin) {
+      data.set(params.newAdmin.toBytes(), 25);
+    }
+
+    const keys: AccountMeta[] = [
+      { pubkey: params.admin, isWritable: false, isSigner: true },
+      { pubkey: params.config, isWritable: true, isSigner: false },
+    ];
+
+    return new TransactionInstruction({
+      programId: this.programId,
+      keys,
+      data,
+    });
   }
 
   initTreasuryShard(params: {

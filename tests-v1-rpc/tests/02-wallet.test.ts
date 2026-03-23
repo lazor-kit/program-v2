@@ -17,7 +17,6 @@ import {
   Role,
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
-import bs58 from "bs58";
 
 describe("CreateWallet & Discovery", () => {
   let ctx: TestContext;
@@ -259,7 +258,8 @@ describe("CreateWallet & Discovery", () => {
     const credHash1 = getRandomSeed();
     const pubkey1 = new Uint8Array(33); pubkey1[0] = 0x02; crypto.getRandomValues(pubkey1.subarray(1));
 
-    const { ix: ixAdd1, newAuthority: authPda1 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAdd1, newAuthority: authPda1 } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
@@ -273,7 +273,8 @@ describe("CreateWallet & Discovery", () => {
     const credHash2 = getRandomSeed();
     const pubkey2 = new Uint8Array(33); pubkey2[0] = 0x03; crypto.getRandomValues(pubkey2.subarray(1));
 
-    const { ix: ixAdd2, newAuthority: authPda2 } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAdd2, newAuthority: authPda2 } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
@@ -314,12 +315,10 @@ describe("CreateWallet & Discovery", () => {
     await sendTx(ctx, [getSystemTransferIx(ctx.payer.publicKey, vaultPda, 10_000_000n)]);
 
     const recipient = Keypair.generate().publicKey;
-    const [authorityPda] = findAuthorityPda(walletPda, owner.publicKey.toBytes());
 
     const executeIx = await ctx.highClient.execute({
       payer: ctx.payer,
       walletPda,
-      authorityPda,
       innerInstructions: [getSystemTransferIx(vaultPda, recipient, 1_000_000n)],
       signer: owner
     });
@@ -341,7 +340,8 @@ describe("CreateWallet & Discovery", () => {
 
     const newAuthority = Keypair.generate();
 
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       walletPda,
       adminType: AuthType.Ed25519,
       adminSigner: owner,
@@ -376,7 +376,6 @@ describe("CreateWallet & Discovery", () => {
     const execTx = await ctx.highClient.executeTxn({
       payer: ctx.payer,
       walletPda,
-      authorityPda,
       innerInstructions: [getSystemTransferIx(vaultPda, recipient, 1_000_000n)],
       signer: owner
     });

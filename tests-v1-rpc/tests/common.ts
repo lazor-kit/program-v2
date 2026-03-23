@@ -13,7 +13,6 @@ import {
   Transaction,
   sendAndConfirmTransaction,
   SystemProgram,
-  SYSVAR_RENT_PUBKEY,
   type TransactionInstruction,
 } from "@solana/web3.js";
 import {

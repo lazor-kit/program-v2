@@ -31,29 +31,12 @@ describe("Config and Treasury Instructions", () => {
     });
 
     it("should update config parameters by admin", async () => {
-        const ixData = new Uint8Array(57);
-        ixData[0] = 7; // UpdateConfig discriminator
-        ixData[1] = 1; // updateWalletFee
-        ixData[2] = 1; // updateActionFee
-        ixData[3] = 1; // updateNumShards
-        ixData[4] = 0; // updateAdmin
-        ixData[5] = 32; // numShards
-
-        const view = new DataView(ixData.buffer);
-        view.setBigUint64(9, 20000n, true); // walletFee (offset 8+1)
-        view.setBigUint64(17, 2000n, true); // actionFee (offset 16+1)
-
-        const adminBytes = ctx.payer.publicKey.toBytes();
-        ixData.set(adminBytes, 25);
-
-        const updateConfigIx = {
-            programId: PROGRAM_ID,
-            keys: [
-                { pubkey: ctx.payer.publicKey, isSigner: true, isWritable: false },
-                { pubkey: ctx.configPda, isWritable: true, isSigner: false },
-            ],
-            data: Buffer.from(ixData)
-        };
+        const updateConfigIx = await ctx.highClient.updateConfig({
+            admin: ctx.payer,
+            walletFee: 20000n,
+            actionFee: 2000n,
+            numShards: 32,
+        });
 
         const result = await tryProcessInstructions(ctx, [updateConfigIx], [ctx.payer]);
         expect(result.result).toBe("ok");
@@ -64,28 +47,10 @@ describe("Config and Treasury Instructions", () => {
     it("should reject update config from non-admin", async () => {
         const nonAdmin = Keypair.generate();
 
-        const ixData = new Uint8Array(57);
-        ixData[0] = 7; // UpdateConfig
-        ixData[1] = 1; // updateWalletFee
-        ixData[2] = 0;
-        ixData[3] = 0;
-        ixData[4] = 0;
-        ixData[5] = 32;
-
-        const adminBytes = nonAdmin.publicKey.toBytes();
-        ixData.set(adminBytes, 25);
-
-        const view = new DataView(ixData.buffer);
-        view.setBigUint64(9, 50000n, true);
-
-        const updateConfigIx = {
-            programId: PROGRAM_ID,
-            keys: [
-                { pubkey: nonAdmin.publicKey, isSigner: true, isWritable: false },
-                { pubkey: ctx.configPda, isWritable: true, isSigner: false },
-            ],
-            data: Buffer.from(ixData)
-        };
+        const updateConfigIx = await ctx.highClient.updateConfig({
+            admin: nonAdmin,
+            walletFee: 50000n,
+        });
 
         const result = await tryProcessInstructions(ctx, [updateConfigIx], [nonAdmin]);
         expect(result.result).not.toBe("ok");
@@ -97,18 +62,11 @@ describe("Config and Treasury Instructions", () => {
         crypto.getRandomValues(userSeed);
         const [walletPda] = findWalletPda(userSeed);
 
-        const ixData = new Uint8Array(57);
-        ixData[0] = 7; // UpdateConfig
-        ixData[1] = 1;
-
-        const updateConfigIx = {
-            programId: PROGRAM_ID,
-            keys: [
-                { pubkey: ctx.payer.publicKey, isSigner: true, isWritable: false },
-                { pubkey: walletPda, isWritable: true, isSigner: false }, // WRONG Account
-            ],
-            data: Buffer.from(ixData)
-        };
+        const updateConfigIx = await ctx.highClient.updateConfig({
+            admin: ctx.payer,
+            walletFee: 50000n,
+            configPda: walletPda, // WRONG Account
+        });
 
         const result = await tryProcessInstructions(ctx, [updateConfigIx], [ctx.payer]);
         expect(result.result).not.toBe("ok");
@@ -163,7 +121,6 @@ describe("Config and Treasury Instructions", () => {
     it("should reject sweep treasury from non-admin", async () => {
         const nonAdmin = Keypair.generate();
         const shardId = 0;
-        const [treasuryShardPda] = findTreasuryShardPda(shardId, PROGRAM_ID);
 
         const sweepIx = await ctx.highClient.sweepTreasury({
             admin: nonAdmin,

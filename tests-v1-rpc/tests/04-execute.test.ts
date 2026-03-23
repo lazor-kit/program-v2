@@ -228,7 +228,6 @@ describe("LazorKit V1 — Execute", () => {
     expect(balance).toBe(2_000_000);
   }, 30_000);
 
-
   it("Failure: Session expired", async () => {
     const sessionKey = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKey.publicKey);
@@ -362,5 +361,75 @@ describe("LazorKit V1 — Execute", () => {
 
     const result = await tryProcessInstruction(ctx, [executeIx], [ownerKeypair, fakeVault]);
     expect(result.result).toMatch(/simulation failed|InvalidSeeds/i);
+  }, 30_000);
+
+  it("Failure: Secp256r1 execution fails if inner instructions are tampered with (AccountsHash mismatch)", async () => {
+    const { generateMockSecp256r1Signer, buildAuthPayload, buildSecp256r1Message, buildSecp256r1PrecompileIx, buildAuthenticatorData, readCurrentSlot, appendSecp256r1Sysvars } = await import("./secp256r1Utils");
+    const { computeAccountsHash } = await import("@lazorkit/solita-client");
+    const secpAdmin = await generateMockSecp256r1Signer();
+
+    // Add Secp256r1 Admin
+    const { ix: ixAddSecp } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+      adminType: AuthType.Ed25519, adminSigner: ownerKeypair,
+      newAuthPubkey: secpAdmin.publicKeyBytes, newAuthType: AuthType.Secp256r1,
+      role: Role.Admin, walletPda, newCredentialHash: secpAdmin.credentialIdHash
+    });
+    await sendTx(ctx, [ixAddSecp], [ownerKeypair]);
+    const [secpAdminPda] = findAuthorityPda(walletPda, secpAdmin.credentialIdHash);
+
+    const recipient = Keypair.generate().publicKey;
+    
+    // LEGITIMATE INSTRUCTION
+    const legitInstructions = [ getSystemTransferIx(vaultPda, recipient, 10_000n) ];
+    // MALICIOUS INSTRUCTION (Tampering value or recipient)
+    const maliciousInstructions = [ getSystemTransferIx(vaultPda, recipient, 50_000_000n) ];
+
+    const executeIxOriginal = await ctx.highClient.execute({
+      payer: ctx.payer, walletPda, authorityPda: secpAdminPda, innerInstructions: legitInstructions,
+    });
+    const { ix: ixWithSysvarsOriginal, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(executeIxOriginal);
+    const argsDataExecute = ixWithSysvarsOriginal.data.subarray(1); // after discriminator
+
+    const currentSlot = await readCurrentSlot(ctx.connection);
+    const authenticatorData = await buildAuthenticatorData("example.com");
+    const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot: currentSlot });
+
+    // Compute legitimate accounts hash
+    const compactIxs = [{
+      programIdIndex: ixWithSysvarsOriginal.keys.findIndex(k => k.pubkey.equals(SystemProgram.programId)),
+      accountIndexes: [
+        ixWithSysvarsOriginal.keys.findIndex(k => k.pubkey.equals(vaultPda)),
+        ixWithSysvarsOriginal.keys.findIndex(k => k.pubkey.equals(recipient)),
+      ],
+      data: legitInstructions[0].data,
+    }];
+    const legitAccountsHash = await computeAccountsHash(ixWithSysvarsOriginal.keys, compactIxs);
+
+    // SIGN the legit payload
+    const signedPayload = new Uint8Array(argsDataExecute.length + 32);
+    signedPayload.set(argsDataExecute, 0); signedPayload.set(legitAccountsHash, argsDataExecute.length);
+    const msgToSign = await buildSecp256r1Message({
+      discriminator: 4, authPayload, signedPayload, payer: ctx.payer.publicKey, programId: PROGRAM_ID, slot: currentSlot,
+    });
+    const sysvarIx = await buildSecp256r1PrecompileIx(secpAdmin, msgToSign);
+
+    // BUILD Malicious transaction
+    const executeIxMalicious = await ctx.highClient.execute({
+      payer: ctx.payer, walletPda, authorityPda: secpAdminPda, innerInstructions: maliciousInstructions,
+    });
+    const { ix: ixWithSysvarsMalicious } = appendSecp256r1Sysvars(executeIxMalicious);
+
+    // Package the legit signature/payload into the malicious execution
+    const argsDataExecuteMalicious = ixWithSysvarsMalicious.data.subarray(1);
+    const finalExecuteData = new Uint8Array(1 + argsDataExecuteMalicious.length + authPayload.length);
+    finalExecuteData[0] = 4;
+    finalExecuteData.set(argsDataExecuteMalicious, 1);
+    finalExecuteData.set(authPayload, 1 + argsDataExecuteMalicious.length);
+    ixWithSysvarsMalicious.data = Buffer.from(finalExecuteData);
+
+    const result = await tryProcessInstructions(ctx, [sysvarIx, ixWithSysvarsMalicious]);
+    
+    // Expect failure because the derived hash from the malicious instruction won't match the legit signed hash!
+    expect(result.result).toMatch(/simulation failed|3004|InstructionDidNotDeserialize|Data/i);
   }, 30_000);
 });

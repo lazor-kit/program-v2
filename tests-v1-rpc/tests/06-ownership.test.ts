@@ -13,6 +13,7 @@ import {
   findAuthorityPda,
   AuthorityAccount,
   AuthType,
+  Role,
 } from "@lazorkit/solita-client";
 import { setupTest, sendTx, getRandomSeed, tryProcessInstruction, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 import { generateMockSecp256r1Signer, buildSecp256r1PrecompileIx, buildAuthPayload, buildSecp256r1Message, buildAuthenticatorData, readCurrentSlot, appendSecp256r1Sysvars } from "./secp256r1Utils";
@@ -81,7 +82,8 @@ describe("Ownership & Wallet Lifecycle", () => {
     });
     await sendTx(ctx, [ix]);
 
-    const { ix: ixAdd } = await ctx.highClient.addAuthority({ payer: ctx.payer,
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
       adminType: AuthType.Ed25519,
       adminSigner: o,
       newAuthPubkey: admin.publicKey.toBytes(),
@@ -260,27 +262,61 @@ describe("Ownership & Wallet Lifecycle", () => {
     expect(destBalance).toBeGreaterThan(25_000_000);
   });
 
-  it("CloseWallet: rejects non-owner closing wallet", async () => {
+  it("CloseWallet: rejects Admin closing wallet", async () => {
     const owner = Keypair.generate();
-    const attacker = Keypair.generate();
-    const { ix: ixCreate, walletPda: wPda, authorityPda: oAuthPda } = await ctx.highClient.createWallet({
+    const admin = Keypair.generate();
+    const { ix: ixCreate, walletPda: wPda } = await ctx.highClient.createWallet({
       payer: ctx.payer,
       authType: AuthType.Ed25519,
       owner: owner.publicKey
     });
     await sendTx(ctx, [ixCreate]);
 
+    const { ix: ixAddAdmin } = await ctx.highClient.addAuthority({
+      payer: ctx.payer, walletPda: wPda,
+      adminType: AuthType.Ed25519, adminSigner: owner,
+      newAuthPubkey: admin.publicKey.toBytes(), newAuthType: AuthType.Ed25519, role: Role.Admin
+    });
+    await sendTx(ctx, [ixAddAdmin], [owner]);
+
     const closeWalletIx = await ctx.highClient.closeWallet({
-      payer: attacker,
+      payer: ctx.payer,
       walletPda: wPda,
-      destination: Keypair.generate().publicKey,
+      destination: ctx.payer.publicKey,
       adminType: AuthType.Ed25519,
-      adminSigner: attacker,
-      adminAuthorityPda: oAuthPda
+      adminSigner: admin // Try closing with Valid Admin!
     });
 
-    const result = await tryProcessInstructions(ctx, [closeWalletIx], [attacker]);
-    expect(result.result).not.toBe("ok");
+    const result = await tryProcessInstructions(ctx, [closeWalletIx], [admin]);
+    expect(result.result).toMatch(/simulation failed|3002|0xbba|PermissionDenied/i);
+  });
+
+  it("Failure: Cannot transfer ownership to an already existing authority", async () => {
+    const o = Keypair.generate();
+    const { ix, walletPda: wPda } = await ctx.highClient.createWallet({
+      payer: ctx.payer, authType: AuthType.Ed25519, owner: o.publicKey
+    });
+    await sendTx(ctx, [ix]);
+
+    const spender = Keypair.generate();
+    const { ix: ixAdd } = await ctx.highClient.addAuthority({
+      payer: ctx.payer,
+      adminType: AuthType.Ed25519, adminSigner: o,
+      newAuthPubkey: spender.publicKey.toBytes(), newAuthType: AuthType.Ed25519, role: Role.Spender, walletPda: wPda
+    });
+    await sendTx(ctx, [ixAdd], [o]);
+
+    const [oPda] = findAuthorityPda(wPda, o.publicKey.toBytes());
+    const [spenderPda] = findAuthorityPda(wPda, spender.publicKey.toBytes());
+
+    const transferIx = await ctx.highClient.transferOwnership({
+      payer: ctx.payer, walletPda: wPda,
+      currentOwnerAuthority: oPda, newOwnerAuthority: spenderPda,
+      newAuthType: AuthType.Ed25519, newAuthPubkey: spender.publicKey.toBytes(), signer: o
+    });
+
+    const result = await tryProcessInstruction(ctx, [transferIx], [o]);
+    expect(result.result).toMatch(/simulation failed|already in use|AccountAlreadyInitialized/i);
   });
 
   it("CloseWallet: rejects if destination is the vault PDA", async () => {

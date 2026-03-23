@@ -60,8 +60,10 @@ export type CreateWalletParams =
     | {
         payer: Keypair;
         authType?: AuthType.Secp256r1;
-        pubkey: Uint8Array;       // 33-byte compressed P-256 public key
-        credentialHash: Uint8Array; // 32-byte SHA-256 hash of the WebAuthn credential ID
+        /** 33-byte compressed P-256 public key */
+        pubkey: Uint8Array;       
+        /** 32-byte SHA-256 hash of the WebAuthn credential ID */
+        credentialHash: Uint8Array; 
         userSeed?: Uint8Array;
     };
 
@@ -469,6 +471,8 @@ export class LazorClient {
         /** Optional: absolute slot height for liveness proof. fetched automatically if 0n/omitted */
         slot?: bigint;
         rpId?: string;
+        /** Optional: Fully qualified origin URL like "https://my-app.com" */
+        origin?: string;
     }): Promise<{ precompileIx: TransactionInstruction, executeIx: TransactionInstruction }> {
         const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
         const vaultPda = findVaultPda(params.walletPda, this.programId)[0];
@@ -566,7 +570,8 @@ export class LazorClient {
             signedPayload,
             payer: params.payer.publicKey,
             programId: this.programId,
-            slot
+            slot,
+            origin: params.origin
         });
 
         // 7. Get Precompile Instruction
@@ -685,6 +690,28 @@ export class LazorClient {
             walletFee: BigInt(params.walletFee),
             actionFee: BigInt(params.actionFee),
             numShards: params.numShards,
+        });
+    }
+
+    /**
+     * Builds an `UpdateConfig` instruction.
+     */
+    async updateConfig(params: {
+        admin: Keypair;
+        walletFee?: bigint | number;
+        actionFee?: bigint | number;
+        numShards?: number;
+        newAdmin?: PublicKey;
+        configPda?: PublicKey;
+    }): Promise<TransactionInstruction> {
+        const configPda = params.configPda ?? findConfigPda(this.programId)[0];
+        return this.builder.updateConfig({
+            admin: params.admin.publicKey,
+            config: configPda,
+            walletFee: params.walletFee,
+            actionFee: params.actionFee,
+            numShards: params.numShards,
+            newAdmin: params.newAdmin,
         });
     }
 

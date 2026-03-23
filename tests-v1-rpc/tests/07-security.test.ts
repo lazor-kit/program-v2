@@ -6,12 +6,10 @@
  */
 
 import { expect, describe, it, beforeAll } from "vitest";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { setupTest, sendTx, getRandomSeed, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import { setupTest, sendTx, tryProcessInstructions, type TestContext, getSystemTransferIx, PROGRAM_ID } from "./common";
 import {
-  findWalletPda,
   findVaultPda,
-  findAuthorityPda,
   findSessionPda,
   AuthType,
 } from "@lazorkit/solita-client";
@@ -90,6 +88,21 @@ describe("Security & Audit Regression", () => {
   });
 
   // ─── Audit Regression ─────────────────────────────────────────────────────
+
+  it("Failure: Unauthorized user cannot sweep protocol treasury", async () => {
+    const thief = Keypair.generate();
+    const pubkeyBytes = thief.publicKey.toBytes();
+    const shardId = pubkeyBytes.reduce((a: number, b: number) => a + b, 0) % 16;
+
+    const sweepIx = await ctx.highClient.sweepTreasury({
+      admin: thief, // Thief trying to pretend to be the Protocol Admin
+      destination: thief.publicKey,
+      shardId,
+    });
+
+    const result = await tryProcessInstructions(ctx, [sweepIx], [thief]);
+    expect(result.result).toMatch(/simulation failed|ConstraintHasOne|PermissionDenied|0x7d1|0x7dc/i);
+  });
 
   it("Regression: SweepTreasury preserves rent-exemption and remains operational", async () => {
     const pubkeyBytes = ctx.payer.publicKey.toBytes();
@@ -206,7 +219,7 @@ describe("Security & Audit Regression", () => {
     const txId2 = await sendTx(ctx, [closeWalletIx], [owner]);
 
     const payerBalanceAfter = await ctx.connection.getBalance(ctx.payer.publicKey);
-    
+
     // The only cost should be the 2 transaction signature fees (usually 5000 lamports each)
     // plus potential rent refunds. We can just verify the payer didn't lose more than network fees.
     const expectedMaxCost = 15000;
