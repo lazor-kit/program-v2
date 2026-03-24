@@ -206,10 +206,11 @@ describe("Ownership & Wallet Lifecycle", () => {
     const authenticatorData = await buildAuthenticatorData("example.com");
     const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot: currentSlot });
 
-    const signedPayload = new Uint8Array(1 + 32 + 32);
+    const signedPayload = new Uint8Array(1 + 32 + 32 + 32);
     signedPayload[0] = 0;
     signedPayload.set(newOwnerBytes, 1);
     signedPayload.set(ctx.payer.publicKey.toBytes(), 33);
+    signedPayload.set(wPda.toBytes(), 65);
 
     const msgToSign = await buildSecp256r1Message({
       discriminator: 3,
@@ -220,8 +221,8 @@ describe("Ownership & Wallet Lifecycle", () => {
     });
 
     const sysvarIx = await buildSecp256r1PrecompileIx(secpOwner, msgToSign);
-
     const originalData = Buffer.from(ixWithSysvars.data);
+
     ixWithSysvars.data = Buffer.concat([originalData, Buffer.from(authPayload)]);
 
     const result = await tryProcessInstructions(ctx, [sysvarIx, ixWithSysvars]);

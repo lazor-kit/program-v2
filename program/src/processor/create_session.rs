@@ -188,10 +188,11 @@ pub fn process(
     // `instruction_data` here is [args][payload].
     let data_payload = &instruction_data[..payload_offset];
 
-    // Include payer in signed payload to prevent payer swap
-    let mut ed25519_payload = Vec::with_capacity(64);
+    // Include payer + wallet to prevent payer swap and cross-wallet replay
+    let mut ed25519_payload = Vec::with_capacity(96);
     ed25519_payload.extend_from_slice(payer.key().as_ref());
     ed25519_payload.extend_from_slice(&args.session_key);
+    ed25519_payload.extend_from_slice(wallet_pda.key().as_ref());
 
     match auth_header.authority_type {
         0 => {
@@ -206,10 +207,11 @@ pub fn process(
             )?;
         },
         1 => {
-            // Secp256r1: Include payer in data_payload
-            let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 32);
+            // Secp256r1: Include payer + wallet in data_payload
+            let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 64);
             extended_data_payload.extend_from_slice(data_payload);
             extended_data_payload.extend_from_slice(payer.key().as_ref());
+            extended_data_payload.extend_from_slice(wallet_pda.key().as_ref());
 
             Secp256r1Authenticator.authenticate(
                 program_id,

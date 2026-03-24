@@ -237,10 +237,11 @@ describe("Session Management", () => {
     const authenticatorData = await buildAuthenticatorData("example.com");
     const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot: currentSlot });
 
-    const signedPayload = new Uint8Array(32 + 8 + 32);
+    const signedPayload = new Uint8Array(32 + 8 + 32 + 32);
     signedPayload.set(sessionKey.publicKey.toBytes(), 0);
     new DataView(signedPayload.buffer).setBigUint64(32, expiresAt, true);
     signedPayload.set(ctx.payer.publicKey.toBytes(), 40);
+    signedPayload.set(walletPda.toBytes(), 72);
 
     const msgToSign = await buildSecp256r1Message({
       discriminator: 5,

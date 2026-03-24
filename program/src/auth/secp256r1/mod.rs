@@ -105,18 +105,21 @@ impl Authenticator for Secp256r1Authenticator {
 
         #[allow(unused_assignments)]
         let mut hasher = [0u8; 32];
+        let slot_bytes = slot.to_le_bytes();
+        let payer_bytes = payer.key();
+        let program_id_bytes = program_id.as_ref();
+        let slices = [
+            discriminator,
+            auth_payload,
+            signed_payload,
+            slot_bytes.as_slice(),
+            payer_bytes.as_ref(),
+            program_id_bytes,
+        ];
         #[cfg(target_os = "solana")]
         unsafe {
             let _res = pinocchio::syscalls::sol_sha256(
-                [
-                    discriminator,
-                    auth_payload,
-                    signed_payload,
-                    &slot.to_le_bytes(),
-                    payer.key().as_ref(),
-                    program_id.as_ref(),
-                ]
-                .as_ptr() as *const u8,
+                slices.as_ptr() as *const u8,
                 6,
                 hasher.as_mut_ptr(),
             );

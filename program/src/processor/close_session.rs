@@ -38,9 +38,8 @@ pub fn process(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    if !instruction_data.is_empty() {
-        return Err(ProgramError::InvalidInstructionData);
-    }
+    // Issue: Passkey signatures require authority_payload.
+    let authority_payload = instruction_data;
 
     let account_info_iter = &mut accounts.iter();
     let payer = account_info_iter
@@ -161,7 +160,7 @@ pub fn process(
                     program_id,
                     accounts,
                     auth_data,
-                    &[],
+                    authority_payload,
                     &payload,
                     &[8],
                 )?;

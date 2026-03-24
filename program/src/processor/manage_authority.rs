@@ -186,10 +186,11 @@ pub fn process_add_authority(
     }
 
     // Unified Authentication
-    // Include payer + target in signed payload to prevent account swap attacks
-    let mut ed25519_payload = Vec::with_capacity(64);
+    // Include payer + target + wallet in signed payload to prevent account swap replay attacks
+    let mut ed25519_payload = Vec::with_capacity(96);
     ed25519_payload.extend_from_slice(payer.key().as_ref());
     ed25519_payload.extend_from_slice(new_auth_pda.key().as_ref());
+    ed25519_payload.extend_from_slice(wallet_pda.key().as_ref());
 
     match admin_header.authority_type {
         0 => {
@@ -208,10 +209,11 @@ pub fn process_add_authority(
             if !admin_auth_pda.is_writable() {
                 return Err(ProgramError::InvalidAccountData);
             }
-            // Secp256r1: Include payer in signed payload
-            let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 32);
+            // Secp256r1: Include payer + wallet in signed payload
+            let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 64);
             extended_data_payload.extend_from_slice(data_payload);
             extended_data_payload.extend_from_slice(payer.key().as_ref());
+            extended_data_payload.extend_from_slice(wallet_pda.key().as_ref());
 
             Secp256r1Authenticator.authenticate(
                 program_id,
