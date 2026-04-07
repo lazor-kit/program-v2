@@ -47,9 +47,9 @@ export type RemoveAuthorityInstruction<
   TAccountRefundDestination extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
-  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountTreasuryShard extends string | AccountMeta<string> = string,
+  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -63,7 +63,7 @@ export type RemoveAuthorityInstruction<
         ? ReadonlyAccount<TAccountWallet>
         : TAccountWallet,
       TAccountAdminAuthority extends string
-        ? ReadonlyAccount<TAccountAdminAuthority>
+        ? WritableAccount<TAccountAdminAuthority>
         : TAccountAdminAuthority,
       TAccountTargetAuthority extends string
         ? WritableAccount<TAccountTargetAuthority>
@@ -74,16 +74,16 @@ export type RemoveAuthorityInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
-      TAccountAuthorizerSigner extends string
-        ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
-            AccountSignerMeta<TAccountAuthorizerSigner>
-        : TAccountAuthorizerSigner,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
         : TAccountConfig,
       TAccountTreasuryShard extends string
         ? WritableAccount<TAccountTreasuryShard>
         : TAccountTreasuryShard,
+      TAccountAuthorizerSigner extends string
+        ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
+            AccountSignerMeta<TAccountAuthorizerSigner>
+        : TAccountAuthorizerSigner,
       ...TRemainingAccounts,
     ]
   >;
@@ -120,9 +120,9 @@ export type RemoveAuthorityInput<
   TAccountTargetAuthority extends string = string,
   TAccountRefundDestination extends string = string,
   TAccountSystemProgram extends string = string,
-  TAccountAuthorizerSigner extends string = string,
   TAccountConfig extends string = string,
   TAccountTreasuryShard extends string = string,
+  TAccountAuthorizerSigner extends string = string,
 > = {
   /** Transaction payer */
   payer: TransactionSigner<TAccountPayer>;
@@ -136,12 +136,12 @@ export type RemoveAuthorityInput<
   refundDestination: Address<TAccountRefundDestination>;
   /** System Program */
   systemProgram?: Address<TAccountSystemProgram>;
-  /** Optional signer for Ed25519 authentication */
-  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
   /** Config PDA */
   config: Address<TAccountConfig>;
   /** Treasury Shard PDA */
   treasuryShard: Address<TAccountTreasuryShard>;
+  /** Optional signer for Ed25519 authentication */
+  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
 };
 
 export function getRemoveAuthorityInstruction<
@@ -151,9 +151,9 @@ export function getRemoveAuthorityInstruction<
   TAccountTargetAuthority extends string,
   TAccountRefundDestination extends string,
   TAccountSystemProgram extends string,
-  TAccountAuthorizerSigner extends string,
   TAccountConfig extends string,
   TAccountTreasuryShard extends string,
+  TAccountAuthorizerSigner extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: RemoveAuthorityInput<
@@ -163,9 +163,9 @@ export function getRemoveAuthorityInstruction<
     TAccountTargetAuthority,
     TAccountRefundDestination,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountTreasuryShard,
+    TAccountAuthorizerSigner
   >,
   config?: { programAddress?: TProgramAddress },
 ): RemoveAuthorityInstruction<
@@ -176,9 +176,9 @@ export function getRemoveAuthorityInstruction<
   TAccountTargetAuthority,
   TAccountRefundDestination,
   TAccountSystemProgram,
-  TAccountAuthorizerSigner,
   TAccountConfig,
-  TAccountTreasuryShard
+  TAccountTreasuryShard,
+  TAccountAuthorizerSigner
 > {
   // Program address.
   const programAddress =
@@ -188,19 +188,19 @@ export function getRemoveAuthorityInstruction<
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
     wallet: { value: input.wallet ?? null, isWritable: false },
-    adminAuthority: { value: input.adminAuthority ?? null, isWritable: false },
+    adminAuthority: { value: input.adminAuthority ?? null, isWritable: true },
     targetAuthority: { value: input.targetAuthority ?? null, isWritable: true },
     refundDestination: {
       value: input.refundDestination ?? null,
       isWritable: true,
     },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    config: { value: input.config ?? null, isWritable: false },
+    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
     authorizerSigner: {
       value: input.authorizerSigner ?? null,
       isWritable: false,
     },
-    config: { value: input.config ?? null, isWritable: false },
-    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -222,9 +222,9 @@ export function getRemoveAuthorityInstruction<
       getAccountMeta(accounts.targetAuthority),
       getAccountMeta(accounts.refundDestination),
       getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.authorizerSigner),
       getAccountMeta(accounts.config),
       getAccountMeta(accounts.treasuryShard),
+      getAccountMeta(accounts.authorizerSigner),
     ],
     data: getRemoveAuthorityInstructionDataEncoder().encode({}),
     programAddress,
@@ -236,9 +236,9 @@ export function getRemoveAuthorityInstruction<
     TAccountTargetAuthority,
     TAccountRefundDestination,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountTreasuryShard,
+    TAccountAuthorizerSigner
   >);
 }
 
@@ -260,12 +260,12 @@ export type ParsedRemoveAuthorityInstruction<
     refundDestination: TAccountMetas[4];
     /** System Program */
     systemProgram: TAccountMetas[5];
-    /** Optional signer for Ed25519 authentication */
-    authorizerSigner?: TAccountMetas[6] | undefined;
     /** Config PDA */
-    config: TAccountMetas[7];
+    config: TAccountMetas[6];
     /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[8];
+    treasuryShard: TAccountMetas[7];
+    /** Optional signer for Ed25519 authentication */
+    authorizerSigner?: TAccountMetas[8] | undefined;
   };
   data: RemoveAuthorityInstructionData;
 };
@@ -303,9 +303,9 @@ export function parseRemoveAuthorityInstruction<
       targetAuthority: getNextAccount(),
       refundDestination: getNextAccount(),
       systemProgram: getNextAccount(),
-      authorizerSigner: getNextOptionalAccount(),
       config: getNextAccount(),
       treasuryShard: getNextAccount(),
+      authorizerSigner: getNextOptionalAccount(),
     },
     data: getRemoveAuthorityInstructionDataDecoder().decode(instruction.data),
   };

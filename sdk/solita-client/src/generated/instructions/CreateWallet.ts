@@ -79,7 +79,7 @@ export const createWalletInstructionDiscriminator = 0
 export function createCreateWalletInstruction(
   accounts: CreateWalletInstructionAccounts,
   args: CreateWalletInstructionArgs,
-  programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
+  programId = new web3.PublicKey('DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2')
 ) {
   const [data] = CreateWalletStruct.serialize({
     instructionDiscriminator: createWalletInstructionDiscriminator,

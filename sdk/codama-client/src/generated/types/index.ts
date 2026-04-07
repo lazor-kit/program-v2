@@ -6,6 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./accountDiscriminator";
 export * from "./authorityType";
 export * from "./role";

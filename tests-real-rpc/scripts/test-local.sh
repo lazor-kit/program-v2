@@ -27,7 +27,7 @@ mkdir -p "$SOLANA_DIR"
 
 solana-test-validator \
     --ledger "$SOLANA_DIR" \
-    --bpf-program FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao "$DEPLOY_DIR/lazorkit_program.so" \
+    --bpf-program DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2 "$DEPLOY_DIR/lazorkit_program.so" \
     --reset \
     --quiet &
 

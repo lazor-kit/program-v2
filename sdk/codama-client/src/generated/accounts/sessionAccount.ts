@@ -15,8 +15,6 @@ import {
   fetchEncodedAccounts,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -43,8 +41,8 @@ export type SessionAccount = {
   bump: number;
   version: number;
   padding: ReadonlyUint8Array;
-  wallet: Address;
-  sessionKey: Address;
+  wallet: ReadonlyUint8Array;
+  sessionKey: ReadonlyUint8Array;
   expiresAt: bigint;
 };
 
@@ -53,8 +51,8 @@ export type SessionAccountArgs = {
   bump: number;
   version: number;
   padding: ReadonlyUint8Array;
-  wallet: Address;
-  sessionKey: Address;
+  wallet: ReadonlyUint8Array;
+  sessionKey: ReadonlyUint8Array;
   expiresAt: number | bigint;
 };
 
@@ -65,8 +63,8 @@ export function getSessionAccountEncoder(): FixedSizeEncoder<SessionAccountArgs>
     ["bump", getU8Encoder()],
     ["version", getU8Encoder()],
     ["padding", fixEncoderSize(getBytesEncoder(), 5)],
-    ["wallet", getAddressEncoder()],
-    ["sessionKey", getAddressEncoder()],
+    ["wallet", fixEncoderSize(getBytesEncoder(), 32)],
+    ["sessionKey", fixEncoderSize(getBytesEncoder(), 32)],
     ["expiresAt", getU64Encoder()],
   ]);
 }
@@ -78,8 +76,8 @@ export function getSessionAccountDecoder(): FixedSizeDecoder<SessionAccount> {
     ["bump", getU8Decoder()],
     ["version", getU8Decoder()],
     ["padding", fixDecoderSize(getBytesDecoder(), 5)],
-    ["wallet", getAddressDecoder()],
-    ["sessionKey", getAddressDecoder()],
+    ["wallet", fixDecoderSize(getBytesDecoder(), 32)],
+    ["sessionKey", fixDecoderSize(getBytesDecoder(), 32)],
     ["expiresAt", getU64Decoder()],
   ]);
 }

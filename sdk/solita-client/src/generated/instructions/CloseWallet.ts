@@ -55,7 +55,7 @@ export const closeWalletInstructionDiscriminator = 9
  */
 export function createCloseWalletInstruction(
   accounts: CloseWalletInstructionAccounts,
-  programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
+  programId = new web3.PublicKey('DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2')
 ) {
   const [data] = CloseWalletStruct.serialize({
     instructionDiscriminator: closeWalletInstructionDiscriminator,

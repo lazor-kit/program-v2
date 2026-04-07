@@ -65,7 +65,7 @@ export const sweepTreasuryInstructionDiscriminator = 10
 export function createSweepTreasuryInstruction(
   accounts: SweepTreasuryInstructionAccounts,
   args: SweepTreasuryInstructionArgs,
-  programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
+  programId = new web3.PublicKey('DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2')
 ) {
   const [data] = SweepTreasuryStruct.serialize({
     instructionDiscriminator: sweepTreasuryInstructionDiscriminator,

@@ -70,7 +70,7 @@ export type ExecuteInstruction<
         ? ReadonlyAccount<TAccountAuthority>
         : TAccountAuthority,
       TAccountVault extends string
-        ? ReadonlyAccount<TAccountVault>
+        ? WritableAccount<TAccountVault>
         : TAccountVault,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
@@ -196,7 +196,7 @@ export function getExecuteInstruction<
     payer: { value: input.payer ?? null, isWritable: true },
     wallet: { value: input.wallet ?? null, isWritable: false },
     authority: { value: input.authority ?? null, isWritable: false },
-    vault: { value: input.vault ?? null, isWritable: false },
+    vault: { value: input.vault ?? null, isWritable: true },
     config: { value: input.config ?? null, isWritable: false },
     treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },

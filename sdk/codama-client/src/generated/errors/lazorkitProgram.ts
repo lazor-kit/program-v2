@@ -30,7 +30,7 @@ export const LAZORKIT_PROGRAM_ERROR__SIGNATURE_REUSED = 0xbbe; // 3006
 export const LAZORKIT_PROGRAM_ERROR__INVALID_SIGNATURE_AGE = 0xbbf; // 3007
 /** InvalidSessionDuration: Invalid session duration */
 export const LAZORKIT_PROGRAM_ERROR__INVALID_SESSION_DURATION = 0xbc0; // 3008
-/** SessionExpired: Session has expired */
+/** SessionExpired: Session expired */
 export const LAZORKIT_PROGRAM_ERROR__SESSION_EXPIRED = 0xbc1; // 3009
 /** AuthorityDoesNotSupportSession: Authority type does not support sessions */
 export const LAZORKIT_PROGRAM_ERROR__AUTHORITY_DOES_NOT_SUPPORT_SESSION = 0xbc2; // 3010
@@ -72,7 +72,7 @@ if (process.env.NODE_ENV !== "production") {
     [LAZORKIT_PROGRAM_ERROR__INVALID_SIGNATURE_AGE]: `Invalid signature age`,
     [LAZORKIT_PROGRAM_ERROR__PERMISSION_DENIED]: `Permission denied`,
     [LAZORKIT_PROGRAM_ERROR__SELF_REENTRANCY_NOT_ALLOWED]: `Self-reentrancy is not allowed`,
-    [LAZORKIT_PROGRAM_ERROR__SESSION_EXPIRED]: `Session has expired`,
+    [LAZORKIT_PROGRAM_ERROR__SESSION_EXPIRED]: `Session expired`,
     [LAZORKIT_PROGRAM_ERROR__SIGNATURE_REUSED]: `Signature has already been used`,
   };
 }

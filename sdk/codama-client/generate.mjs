@@ -23,7 +23,7 @@ console.log('✓ Read IDL from', idlPath);
 
 // ─── 2. Inject program address (missing from Shank IDL) ─────────
 idl.metadata = idl.metadata || {};
-idl.metadata.address = 'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao';
+idl.metadata.address = 'DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2';
 console.log('✓ Injected program address');
 
 // Removed inline patching; it is now handled by root `scripts/patch_idl.js`

@@ -42,7 +42,7 @@ export const updateConfigInstructionDiscriminator = 7
  */
 export function createUpdateConfigInstruction(
   accounts: UpdateConfigInstructionAccounts,
-  programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
+  programId = new web3.PublicKey('DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2')
 ) {
   const [data] = UpdateConfigStruct.serialize({
     instructionDiscriminator: updateConfigInstructionDiscriminator,

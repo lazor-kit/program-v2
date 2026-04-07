@@ -1,39 +1,26 @@
-# LazorKit Architecture
+---
+# LazorKit – Protocol Architecture
+---
 
-## 1. Overview
-LazorKit is a high-performance, secure smart wallet on Solana designed for distinct Authority storage and modern authentication (Passkeys). It uses `pinocchio` for efficient zero-copy state management and optimized syscalls.
+## 1. Introduction
 
-## 2. Core Principles
-*   **Zero-Copy Executions**: We strictly use `pinocchio` to cast raw bytes into Rust structs. This bypasses Borsh serialization overhead for maximum performance.
-    *   *Requirement*: All state structs must implement `NoPadding` (via `#[derive(NoPadding)]`) to ensure memory safety and perfect packing.
-*   **Separated Storage (PDAs)**: Uses a deterministic PDA for *each* Authority.
-    *   *Benefit*: Unlimited distinct authorities per wallet without resizing costs or hitting `10KiB` limits limits inside a single account.
-*   **Strict RBAC**: Hardcoded Permission Roles (Owner, Admin, Spender) for predictability and secure delegation.
-*   **Transaction Compression**: Uses `CompactInstructions` (Index-based referencing) to fit complex multi-call payloads into standard Solana transaction limits (~1232 bytes).
+LazorKit is a next-generation Solana smart wallet, architected for maximum performance, account abstraction, and strong native security guarantees—even for modern authentication (WebAuthn/Passkey). It leverages zero-copy, deterministic Program-Derived Address (PDA) storage and flexible multi-role authorities for seamless dApp, automation, and end-user scenarios.
 
-## 3. Security Mechanisms
+## 2. Design Highlights
 
-### Replay Protection
-*   **Ed25519**: Relies on standard Solana runtime signature verification.
-*   **Secp256r1 (WebAuthn)**:
-    *   **SlotHashes Nonce**: Uses the `SlotHashes` sysvar to verify that the signed payload references a recent slot (within 150 slots). This acts as a highly efficient "Proof of Liveness" without requiring stateful on-chain nonces or counters.
-    *   **CPI Protection**: Explicit `stack_height` check prevents the authentication instruction from being called maliciously via CPI (`invoke`), defending against cross-program attack vectors.
-    *   **Signature Binding**: The `auth_payload` ensures signatures are tightly bound to the specific target account and instruction data. For `Execute`, it dynamically computes a `sha256` hash of all provided `AccountInfo` pubkeys and binds the signature to it, preventing cross-wallet, cross-instruction, or account reordering attacks.
-*   **Session Keys**:
-    *   **Absolute Expiry**: Sessions are valid until a strict absolute slot height `expires_at` (u64).
+- **Zero-Copy Layout:** All state is mapped with `NoPadding` and accessed directly via byte interpretation—no serialization overhead, always memory safe, ready for high-frequency, low-rent operations.
+- **Full PDA Separation:** Every distinct wallet/authority/session/config/treasury is a deterministic, unique PDA. This gives unlimited key management and instant admin revocation without oversized accounts.
+- **Role-Based RBAC**: Owner, Admin, and Spender roles are strictly separated (at the PDA/data level), with rigorous upgrade/prune logic tied to owner actions.
+- **Replay & Binding Protection**: No signature or authority can be reused or replayed elsewhere (payload is always context-bound, includes hashes of pubkey/account/intent, and relies on explicit slot-height nonce logic for secp256r1).
+- **Sharded Fee Treasury**: Revenue goes to one of many rent-exempt treasury shards, using round-robin or modular pubkey sharding; maximizes Solana parallelism, avoids write locks.
+- **Versioning & Upgradability:** Every account struct is versioned for safe future program upgrades (with clear path for migration or expansion).
 
-### WebAuthn "Passkey" Support
-*   **Modules**: `program/src/auth/secp256r1`
-*   **Mechanism**:
-    *   Reconstructs `clientDataJson` on-chain dynamically based on the current context (`challenge` and `origin`).
-    *   Verifies `authenticatorData` flags (User Presence/User Verification).
-    *   Uses `Secp256r1SigVerify` precompile via Sysvar Introspection (`load_current_index_param`).
-    *   *Abstraction*: Implements the `Authority` trait for unified verification logic across both key types.
-
-## 4. Account Structure (PDAs)
+## 3. PDA + Account Structure
 
 ### Discriminators
-```rust
+All accounts are prefixed with a u8 discriminator (see enum below); all instruction flows enforce this, preventing spoof/collision.
+
+```
 #[repr(u8)]
 pub enum AccountDiscriminator {
     Wallet = 1,
@@ -43,120 +30,136 @@ pub enum AccountDiscriminator {
 }
 ```
 
-### A. Config Account
-Global protocol configuration holding action and wallet creation fees.
-*   **Seeds**: `[b"config"]`
-*   **Data Structure**: Stores `admin`, `wallet_fee`, `action_fee`, and `num_shards` count.
-
-### B. Wallet Account
-Anchor for the identity.
-*   **Seeds**: `[b"wallet", user_seed]`
-
-### C. Vault Account
-The primary asset-holding PDA.
-*   **Seeds**: `[b"vault", wallet_pubkey]`
-
-### D. Treasury Shard
-Receives protocol fees collected from user transactions. Derived via modular arithmetic on the payer's pubkey.
-*   **Seeds**: `[b"treasury", shard_id]`
-*   **Data Structure**: None. Raw lamports PDA to prevent serialization costs.
-
-### E. Authority Account
-Represents a single authorized user (Owner, Admin, or Spender). Multi-signature schemas allow deploying multiple Authority PDAs per Wallet.
-*   **Seeds**: `[b"authority", wallet_pubkey, id_hash]`
-*   **Data Structure**:
-    ```rust
-    #[repr(C)]
-    #[derive(NoPadding)]
-    pub struct AuthorityAccountHeader {
-        pub discriminator: u8,
-        pub authority_type: u8, // 0=Ed25519, 1=Secp256r1
-        pub role: u8,           // 0=Owner, 1=Admin, 2=Spender
-        pub bump: u8,
-        pub wallet: Pubkey,
-    }
-    ```
-    *   **Type 1 (Secp256r1)** adds padding to reach 8-byte alignment: `[ u32 padding ] + [ credential_id_hash (32) ] + [ pubkey (64) ]`.
-
-### C. Session Account (Ephemeral)
-Temporary sub-key for automated agents (like a session token).
-*   **Seeds**: `[b"session", wallet_pubkey, session_key]`
-*   **Data Structure**:
-    ```rust
-    #[repr(C, align(8))]
-    #[derive(NoPadding)]
-    pub struct SessionAccount {
-        pub discriminator: u8,
-        pub bump: u8,
-        pub _padding: [u8; 6],
-        pub wallet: Pubkey,
-        pub session_key: Pubkey,
-        pub expires_at: u64, // Absolute Slot Height
-    }
-    ```
-
-## 5. Instruction Flow & Logic
-
-### `CreateWallet`
-*   **Fees**: Parses the global `Config PDA` to charge `wallet_fee` dynamically assigning the collected amount to a calculated `Treasury Shard`.
-*   Initializes `WalletAccount`, `Vault`, and the first `Authority` (Owner).
-*   Follows the Transfer-Allocate-Assign pattern to prevent pre-funding DoS attacks.
-
-### `Execute`
-*   **Fees**: Automatically parses the global `Config PDA` to collect `action_fee` to the calculated `Treasury Shard`.
-*   **Authentication**:
-    *   **Ed25519**: Standard Instruction Introspection.
-    *   **Secp256r1**:
-        1.  Verify `SlotHashes` history to ensure the signed `current_slot` is within 150 blocks of the exact current network slot.
-        2.  Reconstruct `clientDataJson` using that `current_slot`.
-        3.  Verify Signature against `sha256(clientDataJson + authData)`.
-    *   **Session**:
-        1.  Verify `session.wallet == wallet`.
-        2.  Verify `current_slot <= session.expires_at`.
-        3.  Verify `session_key` is a valid Ed25519 signer on the transaction.
-*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed_unchecked` with Vault seeds across all requested target programs.
-
-### `CreateSession`
-*   **Auth**: Requires `Role::Admin` or `Role::Owner`.
-*   **Action**: Derives the correct Session PDA and sets `expires_at` to a future slot height (u64).
-
-### `CloseSession`
-*   **Auth**: Custom dual-mode authorization. If the session has expired, the protocol `admin` can close it. If it is active, the `Owner` or `Admin` of the Wallet PDA can close it.
-*   **Action**: Refunds the session's rent exemption Lamports back to the instruction `payer`.
-
-### `CloseWallet`
-*   **Auth**: Only `Role::Owner` can execute this.
-*   **Action**: Extremely destructive. Collects all lamports from the `wallet_pda` and `vault_pda` state and sweeps them strictly to the designated `destination` account securely, wiping local binary limits.
-
-### Protocol Management
-*   **InitializeConfig / UpdateConfig**: Establishes global parameters managed heavily by the deployment admin.
-*   **InitTreasuryShard / SweepTreasury**: Admin instructions to sweep protocol revenue down to a single master vault while retaining mandatory 0-byte rent exemption balances in the shards to prevent permanent BPF runtime account closure exceptions.
-
-## 6. Client SDK Abstraction (Solita)
-The TypeScript SDK (`solita-client`) relies on a two-tier approach to interface cleanly with the `NoPadding` C-Structs output by Rust.
-### A. `LazorInstructionBuilder` (Low-Level)
-Because Solita commonly auto-injects a standardized `4-byte` length prefix to buffer types (via `@metaplex-foundation/beet`), the SDK completely bypasses the generated `createWallet`, `addAuthority`, and `transferOwnership` payload generators. It uses manually constructed `Buffer.alloc` maps reflecting EXACT byte offsets defined in Rust.
-### B. `LazorClient` (High-Level Wrapper)
-An ergonomic layer providing developers with automatically resolved PDAs, transaction compaction methods, and native Web Crypto API wrappers to seamlessly translate WebAuthn responses into pre-packaged Secp256r1 `Execution` Instructions.
-
-## 7. Project Structure
-```text
-program/src/
-├── auth/
-│   ├── ed25519.rs       # Native signer verification
-│   ├── secp256r1/
-│   │   ├── mod.rs       # Passkey entrypoint
-│   │   ├── nonce.rs     # SlotHashes verification logic
-│   │   ├── slothashes.rs# Sysvar memory-parsing
-│   │   └── webauthn.rs  # ClientDataJSON reconstruction
-├── processor/           # Handlers
-│   ├── initialize_config.rs / update_config.rs
-│   ├── create_wallet.rs / create_session.rs
-│   ├── execute.rs / transfer_ownership.rs
-│   ├── init_treasury_shard.rs / sweep_treasury.rs
-│   └── close_wallet.rs / close_session.rs
-├── state/               # NoPadding definitions (Wallet, Authority, Session, Config)
-├── utils.rs             # Protections (stack_height, dos_prevention), fee_collection logic
-├── compact.rs           # Account-index compression tools
-└── lib.rs               # Entrypoint & routing
+### ConfigAccount
 ```
+pub struct ConfigAccount {
+  pub discriminator: u8, // must be 4
+  pub bump: u8,
+  pub version: u8,
+  pub num_shards: u8,  // # treasury shards
+  pub _padding: [u8; 4],
+  pub admin: Pubkey,
+  pub wallet_fee: u64,
+  pub action_fee: u64,
+}
+```
+
+### AuthorityAccountHeader
+```
+pub struct AuthorityAccountHeader {
+  pub discriminator: u8, // 2
+  pub authority_type: u8, // 0 = Ed25519, 1 = Secp256r1
+  pub role: u8, // 0 = Owner, 1 = Admin, 2 = Spender
+  pub bump: u8, pub version: u8,
+  pub _padding: [u8; 3], pub counter: u64, pub wallet: Pubkey,
+}
+```
+
+### SessionAccount
+```
+pub struct SessionAccount {
+  pub discriminator: u8, pub bump: u8, pub version: u8, pub _padding: [u8; 5],
+  pub wallet: Pubkey, pub session_key: Pubkey, pub expires_at: u64,
+}
+```
+
+### WalletAccount
+```
+pub struct WalletAccount {
+  pub discriminator: u8, pub bump: u8, pub version: u8, pub _padding: [u8; 5]
+}
+```
+
+----
+
+### PDA Derivation Table
+
+| Account         | PDA Derivation Path                                       | Notes                                   |
+|-----------------|----------------------------------------------------------|-----------------------------------------|
+| Config PDA      | `["config"]`                                            | Protocol config, admin, shard count     |
+| Treasury Shard  | `["treasury", u8_shard_id]`                             | Receives protocol fees                  |
+| Wallet PDA      | `["wallet", user_seed]`                                 | User's main wallet anchor (addressable) |
+| Vault PDA       | `["vault", wallet_pubkey]`                              | Holds wallet assets, owned by program   |
+| Authority PDA   | `["authority", wallet, hash(id_bytes)]`                 | For each Authority (Owner/Admin/Spend)  |
+| Session PDA     | `["session", wallet, session_pubkey]`                   | For ephemeral session authority         |
+
+----
+
+## 4. Instruction Workflow
+
+**CreateWallet**
+- Collects `wallet_fee` from payer to correct Treasury Shard
+- Initializes Config (first), Wallet, Vault, and Owner Authority
+- Assigns version – always checks for existing wallet
+
+**Execute**
+- Processes a compressed list of instructions (batched via CompactInstructions)
+- Authenticates authority as:
+    - Ed25519 (native Solana sig)
+    - Secp256r1 (WebAuthn/Passkey, using SlotHashes sysvar for liveness proof)
+    - Session (if session PDA is valid/not expired)
+- Charges `action_fee` to payer routed to Treasury Shard
+- Validates all discriminators, recalculates all seeds for PDAs
+    - Strict binding: hash(pubkeys...) included in the approval payload
+
+**Add/RemoveAuthority, UpdateRole**
+- Owner/Admin may add authorities of any type
+- Each authority is strictly attached to [wallet, id_hash]
+- Roles can be upgraded or pruned; old authorities can be deactivated instantly
+
+**CreateSession**
+- Only Owner/Admin can create; sets future slot expiry; all permissions as Spender
+
+**CloseSession**
+- If expired: Protocol admin can close (recover rent/lamports)
+- If active: Only wallet Owner or Admin can close
+
+**CloseWallet**
+- Full destroy, sweeps all wallet/vault lamports to destination
+- Only Owner (role 0) may close wallet; all other authorities orphaned post-call
+
+**UpdateConfig/InitTreasuryShard/SweepTreasury**
+- Protocol admin can reconfigure protocol fees/treasury logic
+- All protocol-level actions recalculate all seeds and enforce discriminator/owner match
+
+----
+
+## 5. Security Cornerstones
+
+- **Discriminator Enforcement:** No account is interpreted without the correct type/material
+- **Stack Depth Guarding:** All authentication flows enforce Solana stack height to prevent malicious cross-program invocations (CPI)
+- **SlotHashes Nonce / Proof of Liveness:** For passkey authorities, all signoffs must target a recent Solana Slot (+150 slots), no on-chain counter required
+- **Account/Instruction Binding:** No signature can be swapped; each critical payload is hashed/bound to the unique account pubkeys it targets (prevents cross-wallet replays)
+- **Strict Reentrancy Protection:** All instruction flows have tight CPI limits, must be called directly by a signer or admin
+- **Version-aware State:** Every on-chain struct includes a version field for safe upgrades
+
+----
+## 6. Client SDK Approach
+
+- **Solita-based TypeScript SDK:** Autogenerated bindings (solita-client/) directly mirror Rust's NoPadding layout. All buffers/manual accounts constructed to match, including explicit offset mapping (avoids Beet/prefix issues).
+- **High-level API (`LazorClient`):** Expose ergonomic calls for dApps/frontends, with automatic PDA resolution, pointer-safe transaction building, and Passkey ↔️ on-chain mapping logic.
+- **Compression/Batching Ready:** SDK enables packing multiple high-level instructions into a single compressed Solana transaction for peak efficiency.
+
+----
+## 7. Source Layout
+
+```
+program/src/
+├── auth/            # Ed25519, Secp256r1, and Passkey verification
+├── processor/       # Per-instruction handler (wallet, authority, session, treasury, etc.)
+├── state/           # All account definitions/discriminators
+├── utils.rs, compact.rs # Helper / compression / fee code
+├── lib.rs           # Program entrypoint + router
+```
+
+- `sdk/solita-client/` – TypeScript SDK tooling and runtime
+- `tests-v1-rpc/` – E2E test suite; simulates real dApp usage and security regression
+
+----
+## 8. Upgrade Path and Extensibility
+
+- Each on-chain struct is explicitly versioned and padded for smooth migration
+- All PDA derivations withstand future expansion (admin can increase # treasury shards; new roles can be mapped; session/authority logic is modular)
+- Interop: Solita SDK allows cutover to any client/chain that understands buffer layout
+
+---

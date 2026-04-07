@@ -77,7 +77,7 @@ export const transferOwnershipInstructionDiscriminator = 3
 export function createTransferOwnershipInstruction(
   accounts: TransferOwnershipInstructionAccounts,
   args: TransferOwnershipInstructionArgs,
-  programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
+  programId = new web3.PublicKey('DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2')
 ) {
   const [data] = TransferOwnershipStruct.serialize({
     instructionDiscriminator: transferOwnershipInstructionDiscriminator,

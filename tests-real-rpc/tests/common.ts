@@ -28,7 +28,7 @@ dotenv.config();
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const PROGRAM_ID_STR = "FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao";
+export const PROGRAM_ID_STR = "DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2";
 
 export interface TestContext {
     rpc: any;

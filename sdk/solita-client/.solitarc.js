@@ -11,5 +11,5 @@ module.exports = {
   binaryInstallDir,
   programDir,
   removeExistingIdl: false,
-  binaryArgs: '-p FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao',
+  binaryArgs: '-p DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2',
 };

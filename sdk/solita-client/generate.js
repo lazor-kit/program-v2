@@ -15,7 +15,7 @@ const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
 if (!idl.metadata || !idl.metadata.address) {
     console.warn(`⚠️ Warning: idl.metadata.address is missing. Setting default.`);
     idl.metadata = idl.metadata || {};
-    idl.metadata.address = 'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao';
+    idl.metadata.address = 'DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2';
 }
 
 const outputDir = path.join(__dirname, 'src', 'generated');

@@ -152,8 +152,10 @@ export async function buildSecp256r1Message(params: {
     slot: bigint;
     /** Origin of the website requesting the signature (e.g. "https://my-dapp.com"). Defaults to "https://example.com" */
     origin?: string;
+    /** Relying party ID used to build authenticatorData. Must match authPayload rpId. */
+    rpId?: string;
 }): Promise<Uint8Array> {
-    const { discriminator, authPayload, signedPayload, payer, programId, slot, origin } = params;
+    const { discriminator, authPayload, signedPayload, payer, programId, slot, origin, rpId } = params;
 
     const slotBytes = new Uint8Array(8);
     new DataView(slotBytes.buffer).setBigUint64(0, slot, true);
@@ -186,7 +188,7 @@ export async function buildSecp256r1Message(params: {
         crossOrigin: false,
     });
 
-    const authenticatorData = await buildAuthenticatorData();
+    const authenticatorData = await buildAuthenticatorData(rpId ?? "example.com");
     const clientDataHash = await sha256(new TextEncoder().encode(clientDataJson));
 
     const message = new Uint8Array(authenticatorData.length + clientDataHash.length);

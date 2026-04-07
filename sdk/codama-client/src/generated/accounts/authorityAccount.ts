@@ -15,8 +15,6 @@ import {
   fetchEncodedAccounts,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -46,7 +44,7 @@ export type AuthorityAccount = {
   version: number;
   padding: ReadonlyUint8Array;
   counter: bigint;
-  wallet: Address;
+  wallet: ReadonlyUint8Array;
 };
 
 export type AuthorityAccountArgs = {
@@ -57,7 +55,7 @@ export type AuthorityAccountArgs = {
   version: number;
   padding: ReadonlyUint8Array;
   counter: number | bigint;
-  wallet: Address;
+  wallet: ReadonlyUint8Array;
 };
 
 /** Gets the encoder for {@link AuthorityAccountArgs} account data. */
@@ -70,7 +68,7 @@ export function getAuthorityAccountEncoder(): FixedSizeEncoder<AuthorityAccountA
     ["version", getU8Encoder()],
     ["padding", fixEncoderSize(getBytesEncoder(), 3)],
     ["counter", getU64Encoder()],
-    ["wallet", getAddressEncoder()],
+    ["wallet", fixEncoderSize(getBytesEncoder(), 32)],
   ]);
 }
 
@@ -84,7 +82,7 @@ export function getAuthorityAccountDecoder(): FixedSizeDecoder<AuthorityAccount>
     ["version", getU8Decoder()],
     ["padding", fixDecoderSize(getBytesDecoder(), 3)],
     ["counter", getU64Decoder()],
-    ["wallet", getAddressDecoder()],
+    ["wallet", fixDecoderSize(getBytesDecoder(), 32)],
   ]);
 }
 

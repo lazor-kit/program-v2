@@ -61,9 +61,9 @@ export type CreateWalletParams =
         payer: Keypair;
         authType?: AuthType.Secp256r1;
         /** 33-byte compressed P-256 public key */
-        pubkey: Uint8Array;       
+        pubkey: Uint8Array;
         /** 32-byte SHA-256 hash of the WebAuthn credential ID */
-        credentialHash: Uint8Array; 
+        credentialHash: Uint8Array;
         userSeed?: Uint8Array;
     };
 
@@ -155,13 +155,32 @@ export class LazorClient {
 
     // ─── Internal helpers ─────────────────────────────────────────────────────
 
-    private getShardId(pubkey: PublicKey): number {
-        return pubkey.toBytes().reduce((a, b) => a + b, 0) % 16;
+    private computeShardId(pubkey: PublicKey, numShards: number): number {
+        const n = Math.max(1, Math.min(255, Math.floor(numShards)));
+        return pubkey.toBytes().reduce((a, b) => a + b, 0) % n;
     }
 
-    private getCommonPdas(payerPubkey: PublicKey): { configPda: PublicKey; treasuryShard: PublicKey } {
+    private async getConfigNumShards(configPda: PublicKey): Promise<number> {
+        const info = await this.connection.getAccountInfo(configPda, "confirmed");
+        if (!info?.data || info.data.length < 4) return 16;
+
+        // ConfigAccount layout (program/src/state/config.rs):
+        // [0]=discriminator, [1]=bump, [2]=version, [3]=num_shards
+        const discriminator = info.data[0];
+        const numShards = info.data[3];
+
+        // Discriminator 4 = Config. If this is not a Config PDA, fall back to default.
+        if (discriminator !== 4) return 16;
+        if (numShards === 0) return 16;
+        return numShards;
+    }
+
+    private async getCommonPdas(
+        payerPubkey: PublicKey
+    ): Promise<{ configPda: PublicKey; treasuryShard: PublicKey }> {
         const configPda = findConfigPda(this.programId)[0];
-        const shardId = this.getShardId(payerPubkey);
+        const numShards = await this.getConfigNumShards(configPda);
+        const shardId = this.computeShardId(payerPubkey, numShards);
         const treasuryShard = findTreasuryShardPda(shardId, this.programId)[0];
         return { configPda, treasuryShard };
     }
@@ -201,7 +220,7 @@ export class LazorClient {
             [authorityPda, authBump] = findAuthorityPda(walletPda, credentialHash, this.programId);
         }
 
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
 
         const ix = this.builder.createWallet({
             config: configPda,
@@ -237,7 +256,7 @@ export class LazorClient {
         /** Override the admin Authority PDA instead of auto-deriving it. */
         adminAuthorityPda?: PublicKey;
     } & AdminSignerOptions): Promise<{ ix: TransactionInstruction; newAuthority: PublicKey }> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
 
         const newAuthType = params.newAuthType ?? AuthType.Secp256r1;
         const role = params.role ?? Role.Spender;
@@ -288,7 +307,7 @@ export class LazorClient {
         /** Where to send the recovered rent SOL. Defaults to payer. */
         refundDestination?: PublicKey;
     } & AdminSignerOptions): Promise<TransactionInstruction> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
         const refundDestination = params.refundDestination ?? params.payer.publicKey;
 
         let adminAuthority: PublicKey;
@@ -333,7 +352,7 @@ export class LazorClient {
         /** The session keypair — only set when auto-generated; null if caller supplied sessionKey. */
         sessionKeypair: Keypair | null;
     }> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
         const expiresAt = params.expiresAt != null
             ? BigInt(params.expiresAt)
             : BigInt(Math.floor(Date.now() / 1000) + 3600);
@@ -421,7 +440,7 @@ export class LazorClient {
         /** Override vault PDA if different from the canonical derivation. */
         vaultPda?: PublicKey;
     }): Promise<TransactionInstruction> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
         const vaultPda = params.vaultPda ?? findVaultPda(params.walletPda, this.programId)[0];
 
         // Auto-derive authorityPda from signer if not provided
@@ -474,7 +493,7 @@ export class LazorClient {
         /** Optional: Fully qualified origin URL like "https://my-app.com" */
         origin?: string;
     }): Promise<{ precompileIx: TransactionInstruction, executeIx: TransactionInstruction }> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
         const vaultPda = findVaultPda(params.walletPda, this.programId)[0];
         const [authorityPda] = findAuthorityPda(params.walletPda, params.signer.credentialIdHash, this.programId);
 
@@ -571,7 +590,8 @@ export class LazorClient {
             payer: params.payer.publicKey,
             programId: this.programId,
             slot,
-            origin: params.origin
+            origin: params.origin,
+            rpId: params.rpId
         });
 
         // 7. Get Precompile Instruction
@@ -591,6 +611,245 @@ export class LazorClient {
         });
 
         return { precompileIx, executeIx };
+    }
+
+    /**
+     * AddAuthority authorized by a Secp256r1 admin.
+     * Builds: 1) Secp precompile, 2) final AddAuthority ix with appended auth payload.
+     */
+    async addAuthorityWithSecp256r1(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        signer: Secp256r1Signer; // admin signer (has credentialIdHash/publicKeyBytes)
+        newAuthType: AuthType;
+        newAuthPubkey: Uint8Array;
+        newCredentialHash?: Uint8Array;
+        role: Role;
+        slot?: bigint;
+        rpId?: string;
+        origin?: string;
+    }): Promise<{ precompileIx: TransactionInstruction; addIx: TransactionInstruction }> {
+        // 1) Build base ix (without auth payload)
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
+        const { newAuthType, role } = params;
+        const { walletPda } = params;
+
+        const [adminAuthority] = findAuthorityPda(walletPda, params.signer.credentialIdHash, this.programId);
+        const [newAuthority] = findAuthorityPda(walletPda,
+            newAuthType === AuthType.Secp256r1 ? (params.newCredentialHash ?? new Uint8Array(32)) : params.newAuthPubkey.slice(0, 32),
+            this.programId);
+
+        let addIx = this.builder.addAuthority({
+            payer: params.payer.publicKey,
+            wallet: walletPda,
+            adminAuthority,
+            newAuthority,
+            config: configPda,
+            treasuryShard,
+            newAuthType,
+            newRole: role,
+            newAuthPubkey: params.newAuthPubkey,
+            newCredentialHash: params.newCredentialHash,
+        });
+
+        // 2) Append sysvars and build auth payload
+        const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(addIx);
+        const slot = params.slot ?? await readCurrentSlot(this.connection);
+        const authenticatorData = await buildAuthenticatorData(params.rpId);
+        const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot, rpId: params.rpId });
+
+        // 3) Build signed payload = data_payload (args+full_auth) + payer + wallet
+        const argsAndFull = ixWithSysvars.data.subarray(1); // after disc(1)
+        const extended = new Uint8Array(argsAndFull.length + 64);
+        extended.set(argsAndFull, 0);
+        extended.set(params.payer.publicKey.toBytes(), argsAndFull.length);
+        extended.set(walletPda.toBytes(), argsAndFull.length + 32);
+
+        const message = await buildSecp256r1Message({
+            discriminator: 1,
+            authPayload,
+            signedPayload: extended,
+            payer: params.payer.publicKey,
+            programId: this.programId,
+            slot,
+            origin: params.origin,
+            rpId: params.rpId,
+        });
+
+        const precompileIx = await buildSecp256r1PrecompileIx(params.signer, message);
+
+        // 4) Final instruction data = [disc][args+full_auth][authPayload]
+        const finalData = Buffer.alloc(1 + argsAndFull.length + authPayload.length);
+        finalData[0] = 1;
+        finalData.set(argsAndFull, 1);
+        finalData.set(authPayload, 1 + argsAndFull.length);
+        ixWithSysvars.data = finalData;
+
+        return { precompileIx, addIx: ixWithSysvars };
+    }
+
+    /** CreateSession authorized by a Secp256r1 admin. */
+    async createSessionWithSecp256r1(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        signer: Secp256r1Signer; // admin signer
+        sessionKey?: PublicKey;
+        expiresAt?: bigint | number;
+        slot?: bigint;
+        rpId?: string;
+        origin?: string;
+    }): Promise<{ precompileIx: TransactionInstruction; sessionIx: TransactionInstruction; sessionPda: PublicKey; sessionKeypair: Keypair | null }> {
+        const expiresAt = params.expiresAt != null ? BigInt(params.expiresAt) : BigInt(Math.floor(Date.now() / 1000) + 3600);
+        let sessionKeypair: Keypair | null = null;
+        let sessionKeyPubkey: PublicKey;
+        if (params.sessionKey) { sessionKeyPubkey = params.sessionKey; } else { sessionKeypair = Keypair.generate(); sessionKeyPubkey = sessionKeypair.publicKey; }
+
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
+        const [adminAuthority] = findAuthorityPda(params.walletPda, params.signer.credentialIdHash, this.programId);
+        const [sessionPda] = findSessionPda(params.walletPda, sessionKeyPubkey, this.programId);
+
+        let sessionIx = this.builder.createSession({
+            payer: params.payer.publicKey,
+            wallet: params.walletPda,
+            adminAuthority,
+            session: sessionPda,
+            config: configPda,
+            treasuryShard,
+            systemProgram: undefined as any,
+            sessionKey: Array.from(sessionKeyPubkey.toBytes()),
+            expiresAt,
+        } as any);
+
+        const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(sessionIx);
+        const slot = params.slot ?? await readCurrentSlot(this.connection);
+        const authenticatorData = await buildAuthenticatorData(params.rpId);
+        const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot, rpId: params.rpId });
+
+        // signed payload = args (after disc) + payer + wallet
+        const args = ixWithSysvars.data.subarray(1);
+        const extended = new Uint8Array(args.length + 64);
+        extended.set(args, 0);
+        extended.set(params.payer.publicKey.toBytes(), args.length);
+        extended.set(params.walletPda.toBytes(), args.length + 32);
+
+        const message = await buildSecp256r1Message({
+            discriminator: 5,
+            authPayload,
+            signedPayload: extended,
+            payer: params.payer.publicKey,
+            programId: this.programId,
+            slot,
+            origin: params.origin,
+            rpId: params.rpId,
+        });
+        const precompileIx = await buildSecp256r1PrecompileIx(params.signer, message);
+
+        const finalData = Buffer.alloc(1 + args.length + authPayload.length);
+        finalData[0] = 5;
+        finalData.set(args, 1);
+        finalData.set(authPayload, 1 + args.length);
+        ixWithSysvars.data = finalData;
+
+        return { precompileIx, sessionIx: ixWithSysvars, sessionPda, sessionKeypair };
+    }
+
+    /** RemoveAuthority authorized by Secp256r1 admin. */
+    async removeAuthorityWithSecp256r1(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        signer: Secp256r1Signer; // admin signer
+        authorityToRemovePda: PublicKey;
+        refundDestination?: PublicKey;
+        slot?: bigint;
+        rpId?: string;
+        origin?: string;
+    }): Promise<{ precompileIx: TransactionInstruction; removeIx: TransactionInstruction }> {
+        const refundDestination = params.refundDestination ?? params.payer.publicKey;
+        // base ix (no payload)
+        let ix = await this.removeAuthority({
+            payer: params.payer,
+            walletPda: params.walletPda,
+            authorityToRemovePda: params.authorityToRemovePda,
+            refundDestination,
+            adminType: AuthType.Secp256r1,
+            adminCredentialHash: params.signer.credentialIdHash,
+        } as any);
+
+        const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(ix);
+        const slot = params.slot ?? await readCurrentSlot(this.connection);
+        const authenticatorData = await buildAuthenticatorData(params.rpId);
+        const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot, rpId: params.rpId });
+
+        // data_payload = target_auth_pda || refund_dest
+        const target = params.authorityToRemovePda.toBytes();
+        const refund = refundDestination.toBytes();
+        const dataPayload = new Uint8Array(64);
+        dataPayload.set(target, 0);
+        dataPayload.set(refund, 32);
+
+        const message = await buildSecp256r1Message({
+            discriminator: 2,
+            authPayload,
+            signedPayload: dataPayload,
+            payer: params.payer.publicKey,
+            programId: this.programId,
+            slot,
+            origin: params.origin,
+            rpId: params.rpId,
+        });
+        const precompileIx = await buildSecp256r1PrecompileIx(params.signer, message);
+
+        // final data = [disc][authPayload]
+        const finalData = Buffer.alloc(1 + authPayload.length);
+        finalData[0] = 2;
+        finalData.set(authPayload, 1);
+        ixWithSysvars.data = finalData;
+
+        return { precompileIx, removeIx: ixWithSysvars };
+    }
+
+    /** CloseSession authorized by Secp256r1 admin (Owner/Admin or contract admin if expired). */
+    async closeSessionWithSecp256r1(params: {
+        payer: Keypair;
+        walletPda: PublicKey;
+        signer: Secp256r1Signer; // admin signer
+        sessionPda: PublicKey;
+        authorizerPda?: PublicKey; // optional admin/owner authority PDA
+        slot?: bigint;
+        rpId?: string;
+        origin?: string;
+    }): Promise<{ precompileIx: TransactionInstruction; closeIx: TransactionInstruction }> {
+        let ix = await this.closeSession({
+            payer: params.payer,
+            walletPda: params.walletPda,
+            sessionPda: params.sessionPda,
+            authorizer: params.authorizerPda ? { authorizerPda: params.authorizerPda, signer: Keypair.generate() } as any : undefined,
+        } as any);
+
+        const { ix: ixWithSysvars, sysvarIxIndex, sysvarSlotIndex } = appendSecp256r1Sysvars(ix);
+        const slot = params.slot ?? await readCurrentSlot(this.connection);
+        const authenticatorData = await buildAuthenticatorData(params.rpId);
+        const authPayload = buildAuthPayload({ sysvarIxIndex, sysvarSlotIndex, authenticatorData, slot, rpId: params.rpId });
+
+        const dataPayload = params.sessionPda.toBytes();
+        const message = await buildSecp256r1Message({
+            discriminator: 8,
+            authPayload,
+            signedPayload: dataPayload,
+            payer: params.payer.publicKey,
+            programId: this.programId,
+            slot,
+            origin: params.origin,
+            rpId: params.rpId,
+        });
+        const precompileIx = await buildSecp256r1PrecompileIx(params.signer, message);
+
+        const finalData = Buffer.alloc(1 + authPayload.length);
+        finalData[0] = 8;
+        finalData.set(authPayload, 1);
+        ixWithSysvars.data = finalData;
+
+        return { precompileIx, closeIx: ixWithSysvars };
     }
 
 
@@ -656,7 +915,7 @@ export class LazorClient {
         /** Ed25519 signer (optional — for Secp256r1, auth comes via precompile instruction). */
         signer?: Keypair;
     }): Promise<TransactionInstruction> {
-        const { configPda, treasuryShard } = this.getCommonPdas(params.payer.publicKey);
+        const { configPda, treasuryShard } = await this.getCommonPdas(params.payer.publicKey);
 
         return this.builder.transferOwnership({
             payer: params.payer.publicKey,

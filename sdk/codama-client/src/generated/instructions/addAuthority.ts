@@ -54,9 +54,9 @@ export type AddAuthorityInstruction<
   TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
-  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountTreasuryShard extends string | AccountMeta<string> = string,
+  TAccountAuthorizerSigner extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -70,7 +70,7 @@ export type AddAuthorityInstruction<
         ? ReadonlyAccount<TAccountWallet>
         : TAccountWallet,
       TAccountAdminAuthority extends string
-        ? ReadonlyAccount<TAccountAdminAuthority>
+        ? WritableAccount<TAccountAdminAuthority>
         : TAccountAdminAuthority,
       TAccountNewAuthority extends string
         ? WritableAccount<TAccountNewAuthority>
@@ -78,16 +78,16 @@ export type AddAuthorityInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
-      TAccountAuthorizerSigner extends string
-        ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
-            AccountSignerMeta<TAccountAuthorizerSigner>
-        : TAccountAuthorizerSigner,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
         : TAccountConfig,
       TAccountTreasuryShard extends string
         ? WritableAccount<TAccountTreasuryShard>
         : TAccountTreasuryShard,
+      TAccountAuthorizerSigner extends string
+        ? ReadonlySignerAccount<TAccountAuthorizerSigner> &
+            AccountSignerMeta<TAccountAuthorizerSigner>
+        : TAccountAuthorizerSigner,
       ...TRemainingAccounts,
     ]
   >;
@@ -146,9 +146,9 @@ export type AddAuthorityInput<
   TAccountAdminAuthority extends string = string,
   TAccountNewAuthority extends string = string,
   TAccountSystemProgram extends string = string,
-  TAccountAuthorizerSigner extends string = string,
   TAccountConfig extends string = string,
   TAccountTreasuryShard extends string = string,
+  TAccountAuthorizerSigner extends string = string,
 > = {
   /** Transaction payer */
   payer: TransactionSigner<TAccountPayer>;
@@ -160,12 +160,12 @@ export type AddAuthorityInput<
   newAuthority: Address<TAccountNewAuthority>;
   /** System Program */
   systemProgram?: Address<TAccountSystemProgram>;
-  /** Optional signer for Ed25519 authentication */
-  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
   /** Config PDA */
   config: Address<TAccountConfig>;
   /** Treasury Shard PDA */
   treasuryShard: Address<TAccountTreasuryShard>;
+  /** Optional signer for Ed25519 authentication */
+  authorizerSigner?: TransactionSigner<TAccountAuthorizerSigner>;
   newType: AddAuthorityInstructionDataArgs["newType"];
   newRole: AddAuthorityInstructionDataArgs["newRole"];
   padding: AddAuthorityInstructionDataArgs["padding"];
@@ -178,9 +178,9 @@ export function getAddAuthorityInstruction<
   TAccountAdminAuthority extends string,
   TAccountNewAuthority extends string,
   TAccountSystemProgram extends string,
-  TAccountAuthorizerSigner extends string,
   TAccountConfig extends string,
   TAccountTreasuryShard extends string,
+  TAccountAuthorizerSigner extends string,
   TProgramAddress extends Address = typeof LAZORKIT_PROGRAM_PROGRAM_ADDRESS,
 >(
   input: AddAuthorityInput<
@@ -189,9 +189,9 @@ export function getAddAuthorityInstruction<
     TAccountAdminAuthority,
     TAccountNewAuthority,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountTreasuryShard,
+    TAccountAuthorizerSigner
   >,
   config?: { programAddress?: TProgramAddress },
 ): AddAuthorityInstruction<
@@ -201,9 +201,9 @@ export function getAddAuthorityInstruction<
   TAccountAdminAuthority,
   TAccountNewAuthority,
   TAccountSystemProgram,
-  TAccountAuthorizerSigner,
   TAccountConfig,
-  TAccountTreasuryShard
+  TAccountTreasuryShard,
+  TAccountAuthorizerSigner
 > {
   // Program address.
   const programAddress =
@@ -213,15 +213,15 @@ export function getAddAuthorityInstruction<
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
     wallet: { value: input.wallet ?? null, isWritable: false },
-    adminAuthority: { value: input.adminAuthority ?? null, isWritable: false },
+    adminAuthority: { value: input.adminAuthority ?? null, isWritable: true },
     newAuthority: { value: input.newAuthority ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    config: { value: input.config ?? null, isWritable: false },
+    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
     authorizerSigner: {
       value: input.authorizerSigner ?? null,
       isWritable: false,
     },
-    config: { value: input.config ?? null, isWritable: false },
-    treasuryShard: { value: input.treasuryShard ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -245,9 +245,9 @@ export function getAddAuthorityInstruction<
       getAccountMeta(accounts.adminAuthority),
       getAccountMeta(accounts.newAuthority),
       getAccountMeta(accounts.systemProgram),
-      getAccountMeta(accounts.authorizerSigner),
       getAccountMeta(accounts.config),
       getAccountMeta(accounts.treasuryShard),
+      getAccountMeta(accounts.authorizerSigner),
     ],
     data: getAddAuthorityInstructionDataEncoder().encode(
       args as AddAuthorityInstructionDataArgs,
@@ -260,9 +260,9 @@ export function getAddAuthorityInstruction<
     TAccountAdminAuthority,
     TAccountNewAuthority,
     TAccountSystemProgram,
-    TAccountAuthorizerSigner,
     TAccountConfig,
-    TAccountTreasuryShard
+    TAccountTreasuryShard,
+    TAccountAuthorizerSigner
   >);
 }
 
@@ -282,12 +282,12 @@ export type ParsedAddAuthorityInstruction<
     newAuthority: TAccountMetas[3];
     /** System Program */
     systemProgram: TAccountMetas[4];
-    /** Optional signer for Ed25519 authentication */
-    authorizerSigner?: TAccountMetas[5] | undefined;
     /** Config PDA */
-    config: TAccountMetas[6];
+    config: TAccountMetas[5];
     /** Treasury Shard PDA */
-    treasuryShard: TAccountMetas[7];
+    treasuryShard: TAccountMetas[6];
+    /** Optional signer for Ed25519 authentication */
+    authorizerSigner?: TAccountMetas[7] | undefined;
   };
   data: AddAuthorityInstructionData;
 };
@@ -324,9 +324,9 @@ export function parseAddAuthorityInstruction<
       adminAuthority: getNextAccount(),
       newAuthority: getNextAccount(),
       systemProgram: getNextAccount(),
-      authorizerSigner: getNextOptionalAccount(),
       config: getNextAccount(),
       treasuryShard: getNextAccount(),
+      authorizerSigner: getNextOptionalAccount(),
     },
     data: getAddAuthorityInstructionDataDecoder().decode(instruction.data),
   };

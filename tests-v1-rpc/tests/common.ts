@@ -14,16 +14,16 @@ import {
   sendAndConfirmTransaction,
   SystemProgram,
   type TransactionInstruction,
-} from "@solana/web3.js";
+} from '@solana/web3.js';
 import {
   findConfigPda,
   findTreasuryShardPda,
   LazorClient,
   PROGRAM_ID,
-} from "@lazorkit/solita-client";
+} from '@lazorkit/solita-client';
 
 export { PROGRAM_ID };
-import * as dotenv from "dotenv";
+import * as dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -51,7 +51,8 @@ export interface TestContext {
 export async function sendTx(
   ctx: TestContext,
   instructions: TransactionInstruction[],
-  signers: Keypair[] = []
+  signers: Keypair[] = [],
+  options: { skipPreflight?: boolean } = {},
 ): Promise<string> {
   const tx = new Transaction();
   for (const ix of instructions) {
@@ -59,7 +60,8 @@ export async function sendTx(
   }
   const allSigners = [ctx.payer, ...signers];
   return sendAndConfirmTransaction(ctx.connection, tx, allSigners, {
-    commitment: "confirmed",
+    commitment: 'confirmed',
+    ...options,
   });
 }
 
@@ -68,15 +70,17 @@ export async function sendTx(
  */
 export async function tryProcessInstruction(
   ctx: TestContext,
-  instructions: import("@solana/web3.js").TransactionInstruction | import("@solana/web3.js").TransactionInstruction[],
-  signers: Keypair[] = []
+  instructions:
+    | import('@solana/web3.js').TransactionInstruction
+    | import('@solana/web3.js').TransactionInstruction[],
+  signers: Keypair[] = [],
 ): Promise<{ result: string }> {
   try {
     const ixs = Array.isArray(instructions) ? instructions : [instructions];
     await sendTx(ctx, ixs, signers);
-    return { result: "ok" };
+    return { result: 'ok' };
   } catch (e: any) {
-    return { result: e.message || "simulation failed" };
+    return { result: e.message || 'simulation failed' };
   }
 }
 
@@ -86,13 +90,13 @@ export async function tryProcessInstruction(
 export async function tryProcessInstructions(
   ctx: TestContext,
   instructions: TransactionInstruction[],
-  signers: Keypair[] = []
+  signers: Keypair[] = [],
 ): Promise<{ result: string }> {
   try {
     await sendTx(ctx, instructions, signers);
-    return { result: "ok" };
+    return { result: 'ok' };
   } catch (e: any) {
-    return { result: e.message || "simulation failed" };
+    return { result: e.message || 'simulation failed' };
   }
 }
 
@@ -104,18 +108,18 @@ export async function tryProcessInstructions(
  * - Derive and initialize Treasury Shard PDA
  */
 export async function setupTest(): Promise<TestContext> {
-  const rpcUrl = process.env.RPC_URL || "http://127.0.0.1:8899";
-  const connection = new Connection(rpcUrl, "confirmed");
+  const rpcUrl = process.env.RPC_URL || 'http://127.0.0.1:8899';
+  const connection = new Connection(rpcUrl, 'confirmed');
 
   // ── Payer ─────────────────────────────────────────────────────────
   let payer: Keypair;
   if (process.env.PRIVATE_KEY) {
     let keyBytes: Uint8Array;
-    if (process.env.PRIVATE_KEY.startsWith("[")) {
+    if (process.env.PRIVATE_KEY.startsWith('[')) {
       keyBytes = new Uint8Array(JSON.parse(process.env.PRIVATE_KEY));
     } else {
       // base58
-      const bs58 = await import("bs58");
+      const bs58 = await import('bs58');
       keyBytes = bs58.default.decode(process.env.PRIVATE_KEY);
     }
     payer = Keypair.fromSecretKey(keyBytes);
@@ -129,11 +133,11 @@ export async function setupTest(): Promise<TestContext> {
     const balance = await connection.getBalance(payer.publicKey);
     console.log(`Payer balance: ${balance / 1e9} SOL`);
 
-    if (balance < 500_000_000 && !rpcUrl.includes("mainnet")) {
-      console.log("Balance low, requesting airdrop...");
+    if (balance < 500_000_000 && !rpcUrl.includes('mainnet')) {
+      console.log('Balance low, requesting airdrop...');
       const sig = await connection.requestAirdrop(
         payer.publicKey,
-        2_000_000_000
+        2_000_000_000,
       );
       const latestBlockHash = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
@@ -143,11 +147,11 @@ export async function setupTest(): Promise<TestContext> {
       });
       await sleep(1000);
       console.log(
-        `New balance: ${(await connection.getBalance(payer.publicKey)) / 1e9} SOL`
+        `New balance: ${(await connection.getBalance(payer.publicKey)) / 1e9} SOL`,
       );
     }
   } catch (e) {
-    console.warn("Could not check balance or airdrop:", e);
+    console.warn('Could not check balance or airdrop:', e);
   }
 
   // ── Client ────────────────────────────────────────────────────────
@@ -174,9 +178,9 @@ export async function setupTest(): Promise<TestContext> {
   // ── Initialize Config if not yet ──────────────────────────────────
   try {
     const accInfo = await connection.getAccountInfo(configPda);
-    if (!accInfo) throw new Error("Not initialized");
+    if (!accInfo) throw new Error('Not initialized');
   } catch {
-    console.log("Initializing Global Config...");
+    console.log('Initializing Global Config...');
     try {
       const initConfigIx = await highClient.initializeConfig({
         admin: payer,
@@ -186,14 +190,14 @@ export async function setupTest(): Promise<TestContext> {
       });
       await sendTx(ctx, [initConfigIx]);
     } catch (e: any) {
-      console.warn("Config init skipped:", e.message);
+      console.warn('Config init skipped:', e.message);
     }
   }
 
   // ── Initialize Treasury Shard if not yet ──────────────────────────
   try {
     const accInfo = await connection.getAccountInfo(treasuryShard);
-    if (!accInfo) throw new Error("Not initialized");
+    if (!accInfo) throw new Error('Not initialized');
   } catch {
     console.log(`Initializing Treasury Shard ${shardId}...`);
     try {
@@ -213,7 +217,7 @@ export async function setupTest(): Promise<TestContext> {
 export function getSystemTransferIx(
   fromPubkey: PublicKey,
   toPubkey: PublicKey,
-  lamports: bigint
+  lamports: bigint,
 ) {
   return SystemProgram.transfer({
     fromPubkey,

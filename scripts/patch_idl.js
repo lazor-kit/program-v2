@@ -8,7 +8,7 @@ console.log('--- 🛠 Patching IDL for Runtime Alignments ---');
 
 // 1. Inject program address (missing from Shank IDL)
 idl.metadata = idl.metadata || {};
-idl.metadata.address = 'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao';
+idl.metadata.address = 'DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2';
 
 // 3. Cast [u8; 32] fields to publicKey for Accounts
 if (idl.accounts) {

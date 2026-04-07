@@ -11,7 +11,7 @@ use pinocchio_pubkey::declare_id;
 use pinocchio_system::ID as SYSTEM_ID;
 
 // LazorKit Program ID
-declare_id!("FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao");
+declare_id!("DfmiYzJSaeW4yBinoAF6RNa14gGmhXHiX1DNUofkztY2");
 
 #[allow(unused_imports)]
 use std::mem::MaybeUninit;
