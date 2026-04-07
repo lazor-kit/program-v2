@@ -32,10 +32,7 @@ pub fn process(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    if !instruction_data.is_empty() {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
+    // instruction_data only used for Secp256r1 auth_payload (when owner is Secp256r1)
     let account_info_iter = &mut accounts.iter();
     let payer = account_info_iter
         .next()
@@ -110,12 +107,15 @@ pub fn process(
         // Ed25519
         Ed25519Authenticator.authenticate(program_id, accounts, auth_data, &[], &payload, &[9])?;
     } else if auth_header.authority_type == 1 {
-        // Secp256r1
+        // Secp256r1: instruction_data contains auth_payload with slot, sysvar indices, rp_id, authenticator_data
+        if instruction_data.is_empty() {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
         Secp256r1Authenticator.authenticate(
             program_id,
             accounts,
             auth_data,
-            &[],
+            instruction_data,
             &payload,
             &[9],
         )?;

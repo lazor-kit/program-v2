@@ -91,12 +91,12 @@ export async function tryProcessInstructions(
   ctx: TestContext,
   instructions: TransactionInstruction[],
   signers: Keypair[] = [],
-): Promise<{ result: string }> {
+): Promise<{ result: string; error?: any }> {
   try {
     await sendTx(ctx, instructions, signers);
     return { result: 'ok' };
   } catch (e: any) {
-    return { result: e.message || 'simulation failed' };
+    return { result: e.message || 'simulation failed', error: e };
   }
 }
 

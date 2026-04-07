@@ -10,6 +10,7 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   findAuthorityPda,
+  findVaultPda,
   findSessionPda,
   AuthType,
   Role,
@@ -59,24 +60,24 @@ describe('Security Vulnerabilities - Config & Fee Extension', () => {
     // Alice authorizes a session for Wallet A using a Relayer (payer)
     const sessionKey = Keypair.generate();
     const relayer = Keypair.generate();
-    // pre-fund relayer
+    // pre-fund relayer (generous to cover fees and rent)
     await sendTx(ctx, [
       getSystemTransferIx(
         ctx.payer.publicKey,
         relayer.publicKey,
-        10_000_000_000n,
+        100_000_000_000n,
       ),
     ]);
 
     // alice authority funding for rent safety
     const [aliceAuthPda] = findAuthorityPda(walletA, alice.publicKey.toBytes());
     await sendTx(ctx, [
-      getSystemTransferIx(ctx.payer.publicKey, aliceAuthPda, 100_000_000n),
+      getSystemTransferIx(ctx.payer.publicKey, aliceAuthPda, 1_000_000_000n),
     ]);
 
-    const [vaultPda] = findAuthorityPda(walletA, walletSeedA);
+    const vaultPda = findVaultPda(walletA)[0];
     await sendTx(ctx, [
-      getSystemTransferIx(ctx.payer.publicKey, vaultPda, 100_000_000n),
+      getSystemTransferIx(ctx.payer.publicKey, vaultPda, 1_000_000_000n),
     ]);
 
     const { ix: createSessionIxA } = await ctx.highClient.createSession({
@@ -89,11 +90,26 @@ describe('Security Vulnerabilities - Config & Fee Extension', () => {
     });
 
     // The transaction goes through successfully for Wallet A!
-    const log = await sendTx(ctx, [createSessionIxA], [relayer, alice], {
-      //   skipPreflight: true,
-    });
+    try {
+      const [sessionPdaA] = findSessionPda(walletA, sessionKey.publicKey);
+      console.log(
+        'createSessionIxA keys:',
+        createSessionIxA.keys.map((k) => ({
+          pubkey: k.pubkey.toBase58(),
+          isWritable: k.isWritable,
+          isSigner: k.isSigner,
+        })),
+      );
+      console.log('sessionPdaA:', sessionPdaA.toBase58());
 
-    console.log(log);
+      const log = await sendTx(ctx, [createSessionIxA], [relayer, alice], {
+        //   skipPreflight: true,
+      });
+      console.log(log);
+    } catch (e: any) {
+      console.error('CreateSessionA failed:', e?.logs ?? e?.message ?? e);
+      throw e;
+    }
 
     const [sessionPdaA] = findSessionPda(walletA, sessionKey.publicKey);
     const accInfoA = await ctx.connection.getAccountInfo(sessionPdaA);

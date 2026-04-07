@@ -158,7 +158,9 @@ impl Authenticator for Secp256r1Authenticator {
 
         let authenticator_counter = authority_data_parser.counter() as u64;
 
-        if authenticator_counter > 0 && authenticator_counter <= header.counter {
+        // Prevent replay attacks: counter must be strictly increasing
+        // Counter 0 is always rejected (invalid state)
+        if authenticator_counter == 0 || authenticator_counter <= header.counter {
             return Err(AuthError::SignatureReused.into());
         }
         header.counter = authenticator_counter;

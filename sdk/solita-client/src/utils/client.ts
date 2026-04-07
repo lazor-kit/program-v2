@@ -14,7 +14,7 @@ import {
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
   type AccountMeta,
-} from "@solana/web3.js";
+} from '@solana/web3.js';
 
 import {
   createCloseWalletInstruction,
@@ -25,26 +25,28 @@ import {
   createInitTreasuryShardInstruction,
   createSweepTreasuryInstruction,
   PROGRAM_ID,
-} from "../generated";
+} from '../generated';
 
-import { packCompactInstructions, type CompactInstruction } from "./packing";
-import { findAuthorityPda } from "./pdas";
+import { packCompactInstructions, type CompactInstruction } from './packing';
+import { findAuthorityPda } from './pdas';
 
 export class LazorInstructionBuilder {
-  constructor(private programId: PublicKey = PROGRAM_ID) { }
+  constructor(private programId: PublicKey = PROGRAM_ID) {}
 
   private getAuthPayload(
     authType: number,
     authPubkey: Uint8Array,
-    credentialHash: Uint8Array
+    credentialHash: Uint8Array,
   ): Uint8Array {
-    if (authType === 1) { // Secp256r1
+    if (authType === 1) {
+      // Secp256r1
       // 32 bytes hash + 33 bytes key
       const payload = new Uint8Array(65);
       payload.set(credentialHash.slice(0, 32), 0);
       payload.set(authPubkey.slice(0, 33), 32);
       return payload;
-    } else { // Ed25519
+    } else {
+      // Ed25519
       // 32 bytes key
       return new Uint8Array(authPubkey.slice(0, 32));
     }
@@ -81,17 +83,22 @@ export class LazorInstructionBuilder {
     const payload = this.getAuthPayload(
       params.authType,
       params.authPubkey,
-      params.credentialHash || new Uint8Array(32)
+      params.credentialHash || new Uint8Array(32),
     );
 
     const data = Buffer.alloc(1 + 32 + 1 + 1 + 6 + payload.length);
     let offset = 0;
 
-    data.writeUInt8(0, offset); offset += 1; // disc
-    data.set(params.userSeed.slice(0, 32), offset); offset += 32;
-    data.writeUInt8(params.authType, offset); offset += 1;
-    data.writeUInt8(authBump, offset); offset += 1;
-    data.set(padding, offset); offset += 6;
+    data.writeUInt8(0, offset);
+    offset += 1; // disc
+    data.set(params.userSeed.slice(0, 32), offset);
+    offset += 32;
+    data.writeUInt8(params.authType, offset);
+    offset += 1;
+    data.writeUInt8(authBump, offset);
+    offset += 1;
+    data.set(padding, offset);
+    offset += 6;
     data.set(payload, offset);
 
     const keys: AccountMeta[] = [
@@ -131,7 +138,7 @@ export class LazorInstructionBuilder {
         ownerSigner: params.ownerSigner,
         sysvarInstructions: params.sysvarInstructions,
       },
-      this.programId
+      this.programId,
     );
   }
 
@@ -164,16 +171,20 @@ export class LazorInstructionBuilder {
     const payload = this.getAuthPayload(
       params.newAuthType,
       params.newAuthPubkey,
-      params.newCredentialHash || new Uint8Array(32)
+      params.newCredentialHash || new Uint8Array(32),
     );
 
     const data = Buffer.alloc(1 + 1 + 1 + 6 + payload.length);
     let offset = 0;
 
-    data.writeUInt8(1, offset); offset += 1; // disc
-    data.writeUInt8(params.newAuthType, offset); offset += 1;
-    data.writeUInt8(params.newRole, offset); offset += 1;
-    data.set(padding, offset); offset += 6;
+    data.writeUInt8(1, offset);
+    offset += 1; // disc
+    data.writeUInt8(params.newAuthType, offset);
+    offset += 1;
+    data.writeUInt8(params.newRole, offset);
+    offset += 1;
+    data.set(padding, offset);
+    offset += 6;
     data.set(payload, offset);
 
     const keys: AccountMeta[] = [
@@ -223,18 +234,18 @@ export class LazorInstructionBuilder {
         systemProgram: SystemProgram.programId,
         authorizerSigner: params.authorizerSigner,
       },
-      this.programId
+      this.programId,
     );
   }
 
   /**
    * TransferOwnership — manually serializes to avoid prefix.
-   * 
+   *
    * On-chain layout:
    * [disc: u8(3)]        // offset 0
    * [newAuthType: u8]    // offset 1
    * [payload: bytes]     // offset 2 (Ed25519=32 bytes, Secp256r1=65 bytes)
-   * Note: No padding is used here because the Rust struct `TransferOwnershipArgs` 
+   * Note: No padding is used here because the Rust struct `TransferOwnershipArgs`
    * packs `new_owner_authority` (`AuthPayload` enum) right after `new_auth_type`.
    */
   transferOwnership(params: {
@@ -252,20 +263,26 @@ export class LazorInstructionBuilder {
     const payload = this.getAuthPayload(
       params.newAuthType,
       params.newAuthPubkey,
-      params.newCredentialHash || new Uint8Array(32)
+      params.newCredentialHash || new Uint8Array(32),
     );
 
     const data = Buffer.alloc(1 + 1 + payload.length);
     let offset = 0;
 
-    data.writeUInt8(3, offset); offset += 1; // disc
-    data.writeUInt8(params.newAuthType, offset); offset += 1;
+    data.writeUInt8(3, offset);
+    offset += 1; // disc
+    data.writeUInt8(params.newAuthType, offset);
+    offset += 1;
     data.set(payload, offset);
 
     const keys: AccountMeta[] = [
       { pubkey: params.payer, isWritable: true, isSigner: true },
       { pubkey: params.wallet, isWritable: false, isSigner: false },
-      { pubkey: params.currentOwnerAuthority, isWritable: true, isSigner: false },
+      {
+        pubkey: params.currentOwnerAuthority,
+        isWritable: true,
+        isSigner: false,
+      },
       { pubkey: params.newOwnerAuthority, isWritable: true, isSigner: false },
       { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isWritable: false, isSigner: false },
@@ -320,7 +337,7 @@ export class LazorInstructionBuilder {
         sessionKey: sessionKeyArr as number[],
         expiresAt: BigInt(params.expiresAt),
       },
-      this.programId
+      this.programId,
     );
   }
 
@@ -343,7 +360,7 @@ export class LazorInstructionBuilder {
         authorizerSigner: params.authorizerSigner,
         sysvarInstructions: params.sysvarInstructions,
       },
-      this.programId
+      this.programId,
     );
   }
 
@@ -380,7 +397,11 @@ export class LazorInstructionBuilder {
     ];
 
     if (params.sysvarInstructions) {
-      keys.push({ pubkey: params.sysvarInstructions, isWritable: false, isSigner: false });
+      keys.push({
+        pubkey: params.sysvarInstructions,
+        isWritable: false,
+        isSigner: false,
+      });
     }
 
     if (params.remainingAccounts) {
@@ -442,7 +463,11 @@ export class LazorInstructionBuilder {
     const vaultKey = params.vault.toBase58();
     const walletKey = params.wallet.toBase58();
 
-    const addAccount = (pubkey: PublicKey, isSigner: boolean, isWritable: boolean): number => {
+    const addAccount = (
+      pubkey: PublicKey,
+      isSigner: boolean,
+      isWritable: boolean,
+    ): number => {
       const key = pubkey.toBase58();
       if (key === vaultKey || key === walletKey) isSigner = false;
 
@@ -465,7 +490,9 @@ export class LazorInstructionBuilder {
       const programIdIndex = addAccount(ix.programId, false, false);
       const accountIndexes: number[] = [];
       for (const acc of ix.keys) {
-        accountIndexes.push(addAccount(acc.pubkey, acc.isSigner, acc.isWritable));
+        accountIndexes.push(
+          addAccount(acc.pubkey, acc.isSigner, acc.isWritable),
+        );
       }
       compactIxs.push({ programIdIndex, accountIndexes, data: ix.data });
     }
@@ -514,7 +541,7 @@ export class LazorInstructionBuilder {
         actionFee: BigInt(params.actionFee),
         numShards: params.numShards,
       },
-      this.programId
+      this.programId,
     );
   }
 
@@ -579,7 +606,7 @@ export class LazorInstructionBuilder {
       {
         shardId: params.shardId,
       },
-      this.programId
+      this.programId,
     );
   }
 
@@ -600,18 +627,22 @@ export class LazorInstructionBuilder {
       {
         shardId: params.shardId,
       },
-      this.programId
+      this.programId,
     );
   }
 
   // ─── Utility helpers ─────────────────────────────────────────────
 
   async getAuthorityByPublicKey(
-    connection: import("@solana/web3.js").Connection,
+    connection: import('@solana/web3.js').Connection,
     walletAddress: PublicKey,
-    pubkey: PublicKey
+    pubkey: PublicKey,
   ): Promise<{ address: PublicKey; data: Buffer } | null> {
-    const [pda] = findAuthorityPda(walletAddress, pubkey.toBytes(), this.programId);
+    const [pda] = findAuthorityPda(
+      walletAddress,
+      pubkey.toBytes(),
+      this.programId,
+    );
     try {
       const accountInfo = await connection.getAccountInfo(pda);
       if (!accountInfo) return null;

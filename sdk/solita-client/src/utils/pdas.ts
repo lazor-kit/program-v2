@@ -1,14 +1,14 @@
 /**
  * PDA derivation helpers for LazorKit accounts.
- * 
+ *
  * Uses @solana/web3.js v1 PublicKey.findProgramAddressSync().
  * Same seed patterns as the codama-client v2 version.
  */
 
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey } from '@solana/web3.js';
 
 export const PROGRAM_ID = new PublicKey(
-  "FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao"
+  'FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao',
 );
 
 /**
@@ -17,11 +17,11 @@ export const PROGRAM_ID = new PublicKey(
  */
 export function findWalletPda(
   userSeed: Uint8Array,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("wallet"), userSeed],
-    programId
+    [Buffer.from('wallet'), userSeed],
+    programId,
   );
 }
 
@@ -31,11 +31,11 @@ export function findWalletPda(
  */
 export function findVaultPda(
   wallet: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("vault"), wallet.toBuffer()],
-    programId
+    [Buffer.from('vault'), wallet.toBuffer()],
+    programId,
   );
 }
 
@@ -48,11 +48,11 @@ export function findVaultPda(
 export function findAuthorityPda(
   wallet: PublicKey,
   idSeed: Uint8Array,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("authority"), wallet.toBuffer(), idSeed],
-    programId
+    [Buffer.from('authority'), wallet.toBuffer(), idSeed],
+    programId,
   );
 }
 
@@ -63,11 +63,11 @@ export function findAuthorityPda(
 export function findSessionPda(
   wallet: PublicKey,
   sessionKey: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("session"), wallet.toBuffer(), sessionKey.toBuffer()],
-    programId
+    [Buffer.from('session'), wallet.toBuffer(), sessionKey.toBuffer()],
+    programId,
   );
 }
 
@@ -76,12 +76,9 @@ export function findSessionPda(
  * Seeds: ["config"]
  */
 export function findConfigPda(
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("config")],
-    programId
-  );
+  return PublicKey.findProgramAddressSync([Buffer.from('config')], programId);
 }
 
 /**
@@ -90,10 +87,10 @@ export function findConfigPda(
  */
 export function findTreasuryShardPda(
   shardId: number,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("treasury"), new Uint8Array([shardId])],
-    programId
+    [Buffer.from('treasury'), new Uint8Array([shardId])],
+    programId,
   );
 }
