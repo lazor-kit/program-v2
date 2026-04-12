@@ -1,7 +1,7 @@
 use crate::auth::traits::Authenticator;
 use crate::state::authority::AuthorityAccountHeader;
 use assertions::sol_assert_bytes_eq;
-use pinocchio::{account_info::AccountInfo, program_error::ProgramError};
+use pinocchio::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 pub struct Ed25519Authenticator;
 
@@ -13,6 +13,7 @@ impl Authenticator for Ed25519Authenticator {
         _auth_payload: &[u8],
         _signed_payload: &[u8],
         _discriminator: &[u8],
+        _program_id: &Pubkey,
     ) -> Result<(), ProgramError> {
         if authority_data.len() < std::mem::size_of::<AuthorityAccountHeader>() + 32 {
             return Err(ProgramError::InvalidAccountData);

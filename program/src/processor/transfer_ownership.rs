@@ -159,7 +159,7 @@ pub fn process(
         match auth.authority_type {
             0 => {
                 // Ed25519: Include payer + new_owner in signed payload
-                Ed25519Authenticator.authenticate(accounts, data, &[], &ed25519_payload, &[3])?;
+                Ed25519Authenticator.authenticate(accounts, data, &[], &ed25519_payload, &[3], program_id)?;
             },
             1 => {
                 // Secp256r1 (WebAuthn) - Must be Writable
@@ -177,6 +177,7 @@ pub fn process(
                     authority_payload,
                     &extended_data_payload,
                     &[3],
+                    program_id,
                 )?;
             },
             _ => return Err(AuthError::InvalidAuthenticationKind.into()),

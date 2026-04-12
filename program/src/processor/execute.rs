@@ -111,7 +111,7 @@ pub fn process(
             match authority_header.authority_type {
                 0 => {
                     // Ed25519: Verify signer (authority_payload ignored)
-                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[], &[4])?;
+                    Ed25519Authenticator.authenticate(accounts, authority_data, &[], &[], &[4], program_id)?;
                 },
                 1 => {
                     // Secp256r1 (WebAuthn)
@@ -135,6 +135,7 @@ pub fn process(
                         authority_payload,
                         &extended_payload,
                         &[4],
+                        program_id,
                     )?;
                 },
                 _ => return Err(AuthError::InvalidAuthenticationKind.into()),

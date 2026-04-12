@@ -122,8 +122,12 @@ fn test_nonce_slot_truncation_fix() {
     authenticator_data.push(0x01); // UP flag
     authenticator_data.extend_from_slice(&1u32.to_be_bytes()); // counter
 
+    // Odometer counter: first use expects 1 (stored counter is 0)
+    let odometer_counter: u64 = 1;
+
     let mut auth_payload = Vec::new();
     auth_payload.extend_from_slice(&spoof_slot.to_le_bytes());
+    auth_payload.extend_from_slice(&odometer_counter.to_le_bytes()); // odometer counter
     auth_payload.push(ix_sysvar_idx);
     auth_payload.push(slothashes_sysvar_idx);
     auth_payload.push(0); // type_and_flags

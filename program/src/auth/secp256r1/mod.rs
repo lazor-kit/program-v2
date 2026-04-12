@@ -2,6 +2,7 @@ use crate::{error::AuthError, state::authority::AuthorityAccountHeader};
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
+    pubkey::Pubkey,
     sysvars::instructions::{Instructions, INSTRUCTIONS_ID},
 };
 use pinocchio_pubkey::pubkey;
@@ -25,59 +26,66 @@ pub struct Secp256r1Authenticator;
 impl Authenticator for Secp256r1Authenticator {
     /// Authenticates a Secp256r1 signature (WebAuthn/Passkeys).
     ///
-    /// # Arguments
-    /// * `accounts`: Slice of accounts, expecting Sysvar Lookups if needed.
-    /// * `auth_data`: Mutable reference to the Authority account data (to update counter).
-    /// * `auth_payload`: Auxiliary data (e.g., signature, authenticator data, client JSON parts).
-    /// * `signed_payload`: The actual message/data that was signed (e.g. instruction args).
+    /// Auth payload layout:
+    ///   [slot(8)] [counter(8)] [sysvarIxIdx(1)] [sysvarSlotIdx(1)] [flags(1)] [rpIdLen(1)] [rpId(N)] [authenticatorData(M)]
+    ///
+    /// Counter is a program-controlled odometer (swig-style). The client must submit
+    /// `on_chain_counter + 1`. The WebAuthn hardware counter is NOT used for replay protection.
     fn authenticate(
         &self,
         accounts: &[AccountInfo],
         auth_data: &mut [u8],
         auth_payload: &[u8],
-        signed_payload: &[u8], // The message payload (e.g. compact instructions or args) that is signed
+        signed_payload: &[u8],
         discriminator: &[u8],
+        program_id: &Pubkey,
     ) -> Result<(), ProgramError> {
-        if auth_payload.len() < 12 {
+        // Minimum: slot(8) + counter(8) + sysvarIxIdx(1) + sysvarSlotIdx(1) + flags(1) + rpIdLen(1) = 20
+        if auth_payload.len() < 20 {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
 
         let slot = u64::from_le_bytes(auth_payload[0..8].try_into().unwrap());
-        let sysvar_ix_index = auth_payload[8] as usize;
-        let sysvar_slothashes_index = auth_payload[9] as usize;
+        let submitted_counter = u64::from_le_bytes(auth_payload[8..16].try_into().unwrap());
+        let sysvar_ix_index = auth_payload[16] as usize;
+        let sysvar_slothashes_index = auth_payload[17] as usize;
 
         let reconstruction_params = ClientDataJsonReconstructionParams {
-            type_and_flags: auth_payload[10],
+            type_and_flags: auth_payload[18],
         };
-        let rp_id_len = auth_payload[11] as usize;
-        if auth_payload.len() < 12 + rp_id_len {
+        let rp_id_len = auth_payload[19] as usize;
+        if auth_payload.len() < 20 + rp_id_len {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
-        let rp_id = &auth_payload[12..12 + rp_id_len];
-        let authenticator_data_raw = &auth_payload[12 + rp_id_len..];
+        let rp_id = &auth_payload[20..20 + rp_id_len];
+        let authenticator_data_raw = &auth_payload[20 + rp_id_len..];
 
-        // Validate Nonce (SlotHashes)
+        // Validate Nonce (SlotHashes) — ensures signature freshness within 150 slots
         let slothashes_account = accounts
             .get(sysvar_slothashes_index)
             .ok_or(AuthError::InvalidAuthorityPayload)?;
-        // TruncatedSlot removed (Issue #16), passing u64 slot directly
         let _slot_hash = validate_nonce(slothashes_account, slot)?;
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-        // Check size
         if auth_data.len() < header_size {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
 
-        // Safe read
         let mut header = unsafe {
             std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader)
         };
 
+        // --- Odometer validation (swig-style) ---
+        // The client must submit exactly `stored_counter + 1`.
+        // This decouples replay protection from the WebAuthn hardware counter,
+        // which is unreliable for synced passkeys (iCloud, Google).
+        let expected_counter = header.counter.wrapping_add(1);
+        if submitted_counter != expected_counter {
+            return Err(AuthError::SignatureReused.into());
+        }
+
         // Secp256r1 on-chain data layout:
-        //   [Header] [credential_id_hash(32)] [Pubkey(33)]
-        // Note: credential_id_hash is stored for off-chain wallet discovery
-        //       via getProgramAccounts + memcmp filter. It is not used in authentication.
+        //   [Header(48)] [credential_id_hash(32)] [Pubkey(33)]
         let pubkey_offset = header_size + 32; // skip credential_id_hash
 
         #[allow(unused_assignments)]
@@ -100,6 +108,11 @@ impl Authenticator for Secp256r1Authenticator {
             return Err(ProgramError::MissingRequiredSignature);
         }
 
+        // Build challenge hash:
+        //   SHA256(discriminator || auth_payload || signed_payload || slot || payer || counter || program_id)
+        // The counter is included both in auth_payload (bytes 8-16) AND as a separate element
+        // for belt-and-suspenders protection.
+        let counter_bytes = expected_counter.to_le_bytes();
         #[allow(unused_assignments)]
         let mut hasher = [0u8; 32];
         #[cfg(target_os = "solana")]
@@ -111,15 +124,17 @@ impl Authenticator for Secp256r1Authenticator {
                     signed_payload,
                     &slot.to_le_bytes(),
                     payer.key().as_ref(),
+                    &counter_bytes,
+                    program_id.as_ref(),
                 ]
                 .as_ptr() as *const u8,
-                5,
+                7,
                 hasher.as_mut_ptr(),
             );
         }
         #[cfg(not(target_os = "solana"))]
         {
-            let _ = signed_payload; // suppress unused warning for non-solana
+            let _ = signed_payload;
             let _ = discriminator;
             hasher = [0u8; 32];
         }
@@ -146,33 +161,18 @@ impl Authenticator for Secp256r1Authenticator {
             return Err(AuthError::PermissionDenied.into());
         }
 
-        let authenticator_counter = auth_data_parser.counter() as u64;
+        // Note: We intentionally do NOT check auth_data_parser.counter() (the WebAuthn hardware
+        // counter). Synced passkeys (iCloud Keychain, Google Password Manager) may return 0 or
+        // non-incrementing values. The program-controlled odometer above provides replay protection.
 
-        if authenticator_counter > 0 && authenticator_counter <= header.counter {
-            return Err(AuthError::SignatureReused.into());
-        }
-        header.counter = authenticator_counter;
-        unsafe {
-            std::ptr::write_unaligned(
-                auth_data.as_mut_ptr() as *mut AuthorityAccountHeader,
-                header,
-            );
-        }
-
-        // Security Validation (Replaces on-chain storage check):
+        // Security Validation:
         // Ensure the domain (rp_id_hash) the user provided in the instruction payload actually matches
         // the rpIdHash that the authenticator (Hardware/FaceID) signed over inside authenticatorData.
-        // This validates the origin domain mathematically without wasting 32 bytes on-chain.
         if auth_data_parser.rp_id_hash() != computed_rp_id_hash {
             return Err(AuthError::InvalidPubkey.into());
         }
 
-        // Unified Model:
-        // - Precompile Instruction Data: Contains 33-byte COMPRESSED public key (Prefix, X)
-        // - Contract Storage: Contains 33-byte COMPRESSED public key (Prefix, X)
-        // The fuzzing test confirmed the precompile supports 33-byte compressed keys.
-
-        // 1. Extract the 33-byte COMPRESSED key from the precompile instruction data
+        // Extract the 33-byte COMPRESSED key from on-chain storage
         let instruction_pubkey_bytes = &auth_data[pubkey_offset..pubkey_offset + 33];
         let expected_pubkey: &[u8; 33] = instruction_pubkey_bytes.try_into().unwrap();
 
@@ -201,9 +201,18 @@ impl Authenticator for Secp256r1Authenticator {
 
         verify_secp256r1_instruction_data(
             secp_ix.get_instruction_data(),
-            expected_pubkey, // Now passing the 33-byte key, matching helper signature
+            expected_pubkey,
             &signed_message,
         )?;
+
+        // Signature verified successfully — now commit the counter update
+        header.counter = expected_counter;
+        unsafe {
+            std::ptr::write_unaligned(
+                auth_data.as_mut_ptr() as *mut AuthorityAccountHeader,
+                header,
+            );
+        }
 
         Ok(())
     }

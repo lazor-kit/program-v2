@@ -169,7 +169,7 @@ pub fn process_add_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Include payer + new_auth_pda in signed payload
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &ed25519_payload, &[1])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &ed25519_payload, &[1], program_id)?;
         },
         1 => {
             // Secp256r1 (WebAuthn) - Must be Writable
@@ -187,6 +187,7 @@ pub fn process_add_authority(
                 authority_payload,
                 &extended_data_payload,
                 &[1],
+                program_id,
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -339,7 +340,7 @@ pub fn process_remove_authority(
     match admin_header.authority_type {
         0 => {
             // Ed25519: Include data_payload in signature verification
-            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &data_payload, &[2])?;
+            Ed25519Authenticator.authenticate(accounts, admin_data, &[], &data_payload, &[2], program_id)?;
         },
         1 => {
             Secp256r1Authenticator.authenticate(
@@ -348,6 +349,7 @@ pub fn process_remove_authority(
                 authority_payload,
                 &data_payload,
                 &[2],
+                program_id,
             )?;
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
