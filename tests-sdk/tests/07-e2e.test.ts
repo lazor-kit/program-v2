@@ -217,7 +217,9 @@ describe('E2E Company Workflow', () => {
   it('Step 5: Admin creates Session', async () => {
     const sessionKp = Keypair.generate();
     const [sessionPda] = findSessionPda(walletPda, sessionKp.publicKey.toBytes());
-    const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 3600);
+    // Expires ~1 hour from now in slots (~2.5 slots/sec * 3600 = 9000 slots)
+    const currentSlot = await getSlot(ctx);
+    const expiresAt = currentSlot + 9000n;
 
     const ix = createCreateSessionIx({
       payer: ctx.payer.publicKey,

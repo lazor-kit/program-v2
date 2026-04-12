@@ -374,6 +374,17 @@ pub fn process_remove_authority(
         return Err(ProgramError::InvalidAccountData);
     }
 
+    // Prevent self-removal — removing yourself could lock the wallet
+    if admin_auth_pda.key() == target_auth_pda.key() {
+        return Err(AuthError::PermissionDenied.into());
+    }
+
+    // Prevent removing an Owner — ownership must be transferred, not removed.
+    // This prevents accidentally locking the wallet by removing the last owner.
+    if target_header.role == 0 {
+        return Err(AuthError::PermissionDenied.into());
+    }
+
     // Role-based permission check
     if admin_header.role != 0 {
         // Admin can only remove Spender

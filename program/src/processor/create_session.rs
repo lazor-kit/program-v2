@@ -5,7 +5,7 @@ use pinocchio::{
     instruction::Seed,
     program_error::ProgramError,
     pubkey::{find_program_address, Pubkey},
-    sysvars::rent::Rent,
+    sysvars::{clock::Clock, rent::Rent, Sysvar},
     ProgramResult,
 };
 
@@ -137,6 +137,20 @@ pub fn process(
     // Spender (2) cannot create sessions.
     if auth_header.role != 0 && auth_header.role != 1 {
         return Err(AuthError::PermissionDenied.into());
+    }
+
+    // Validate expires_at: must be in the future and within max session duration
+    {
+        let clock = Clock::get()?;
+        let current_slot = clock.slot;
+        if args.expires_at <= current_slot {
+            return Err(AuthError::InvalidSessionDuration.into());
+        }
+        // Max session duration: ~30 days at ~2.5 slots/sec = 6,480,000 slots
+        const MAX_SESSION_SLOTS: u64 = 6_480_000;
+        if args.expires_at > current_slot.saturating_add(MAX_SESSION_SLOTS) {
+            return Err(AuthError::InvalidSessionDuration.into());
+        }
     }
 
     // Authenticate Authorizer

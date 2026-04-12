@@ -87,6 +87,9 @@ impl Authenticator for Secp256r1Authenticator {
         // Secp256r1 on-chain data layout:
         //   [Header(48)] [credential_id_hash(32)] [Pubkey(33)]
         let pubkey_offset = header_size + 32; // skip credential_id_hash
+        if auth_data.len() < pubkey_offset + 33 {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
 
         #[allow(unused_assignments)]
         let mut computed_rp_id_hash = [0u8; 32];
@@ -156,7 +159,7 @@ impl Authenticator for Secp256r1Authenticator {
             client_data_hash = [0u8; 32];
         }
 
-        let auth_data_parser = AuthDataParser::new(authenticator_data_raw);
+        let auth_data_parser = AuthDataParser::new(authenticator_data_raw)?;
         if !auth_data_parser.is_user_present() {
             return Err(AuthError::PermissionDenied.into());
         }

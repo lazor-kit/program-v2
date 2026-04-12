@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Keypair } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, sendTxExpectError, type TestContext } from './common';
+import { setupTest, sendTx, sendTxExpectError, getSlot, type TestContext } from './common';
 import {
   findWalletPda,
   findVaultPda,
@@ -48,8 +48,9 @@ describe('CreateSession', () => {
     const sessionKeyBytes = sessionKp.publicKey.toBytes();
     const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
 
-    // Expires 1 hour from now
-    const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 3600);
+    // Expires ~1 hour from now in slots (~2.5 slots/sec * 3600 = 9000 slots)
+    const currentSlot = await getSlot(ctx);
+    const expiresAt = currentSlot + 9000n;
 
     const ix = createCreateSessionIx({
       payer: ctx.payer.publicKey,

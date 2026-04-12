@@ -112,14 +112,20 @@ pub fn reconstruct_client_data_json(
     json
 }
 
+/// Minimum authenticator data length: rpIdHash(32) + flags(1) + counter(4) = 37
+pub const AUTH_DATA_MIN_LEN: usize = 37;
+
 /// Parser for WebAuthn authenticator data
 pub struct AuthDataParser<'a> {
     data: &'a [u8],
 }
 
 impl<'a> AuthDataParser<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self { data }
+    pub fn new(data: &'a [u8]) -> Result<Self, ProgramError> {
+        if data.len() < AUTH_DATA_MIN_LEN {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
+        Ok(Self { data })
     }
 
     pub fn rp_id_hash(&self) -> &'a [u8] {

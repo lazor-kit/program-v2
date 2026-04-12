@@ -87,20 +87,24 @@ pub fn verify_secp256r1_instruction_data(
             [SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE],
     )?;
 
-    // Validate that all offsets point to the current instruction (0xFFFF)
-    // This ensures all data references are within the same instruction
-    if offsets.signature_instruction_index != 0xFFFF && offsets.signature_instruction_index != 0 {
+    // Validate that all offsets point to the current instruction (0xFFFF only).
+    // Rejecting index 0 prevents referencing a different instruction's data,
+    // which could allow signature/pubkey/message substitution attacks.
+    if offsets.signature_instruction_index != 0xFFFF {
         return Err(AuthError::InvalidInstruction.into());
     }
-    if offsets.public_key_instruction_index != 0xFFFF && offsets.public_key_instruction_index != 0 {
+    if offsets.public_key_instruction_index != 0xFFFF {
         return Err(AuthError::InvalidInstruction.into());
     }
-    if offsets.message_instruction_index != 0xFFFF && offsets.message_instruction_index != 0 {
+    if offsets.message_instruction_index != 0xFFFF {
         return Err(AuthError::InvalidInstruction.into());
     }
 
-    // Validate that the offsets match the expected fixed locations
-    // This ensures the precompile is verifying the data we're checking
+    // Validate that ALL offsets match the expected fixed locations.
+    // This ensures the precompile is verifying exactly the data we're checking.
+    if offsets.signature_offset as usize != SIGNATURE_DATA_OFFSET {
+        return Err(AuthError::InvalidInstruction.into());
+    }
     if offsets.public_key_offset as usize != PUBKEY_DATA_OFFSET {
         return Err(AuthError::InvalidInstruction.into());
     }
@@ -108,6 +112,11 @@ pub fn verify_secp256r1_instruction_data(
         return Err(AuthError::InvalidInstruction.into());
     }
     if offsets.message_data_size as usize != expected_message.len() {
+        return Err(AuthError::InvalidInstruction.into());
+    }
+
+    // Dynamic length check: instruction must contain the full message
+    if instruction_data.len() < MESSAGE_DATA_OFFSET + expected_message.len() {
         return Err(AuthError::InvalidInstruction.into());
     }
 
