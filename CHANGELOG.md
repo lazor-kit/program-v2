@@ -8,11 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Deferred Execution: 2-transaction flow for large payloads exceeding the ~574-byte limit of a single Secp256r1 Execute tx
+- Authorize instruction (disc=6): TX1 signs over instruction/account hashes, creates DeferredExec PDA
+- ExecuteDeferred instruction (disc=7): TX2 verifies hashes and executes via CPI with vault signing
+- ReclaimDeferred instruction (disc=8): closes expired DeferredExec accounts, refunds rent to original payer
+- DeferredExecAccount (176 bytes): stores instruction/account hashes, wallet, authority, payer, expiry
+- Deferred execution benchmarks (CU + tx size measurements for TX1/TX2)
+- Error codes 3014-3018 for deferred execution (expired, hash mismatch, invalid expiry, unauthorized reclaim)
+- SDK builders: `createAuthorizeIx`, `createExecuteDeferredIx`, `createReclaimDeferredIx`
+- SDK helpers: `findDeferredExecPda`, `computeInstructionsHash`
+- LazorKitClient methods: `authorizeSecp256r1`, `executeDeferredSecp256r1`, `reclaimDeferred`
+- 7 new integration tests for deferred execution (tests-sdk, total now 35)
 - Odometer counter replay protection for Secp256r1 (monotonic u32 per authority)
 - program_id included in challenge hash (cross-program replay prevention)
 - rpId stored on authority account at creation (saves ~14 bytes per transaction)
 - TypeScript SDK (`sdk/solita-client`) with Solita code generation
-- Integration test suite (`tests-sdk/`) with 28 tests across 7 files
+- Integration test suite (`tests-sdk/`) with 35 tests across 8 files
 - Benchmark script for CU and transaction size measurements
 - CompactInstructions accounts hash for anti-reordering protection
 - Session expiry validation (future check + 30-day max duration)

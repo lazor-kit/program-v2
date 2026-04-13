@@ -1,4 +1,5 @@
 pub mod authority;
+pub mod deferred;
 pub mod session;
 pub mod wallet;
 
@@ -11,6 +12,8 @@ pub enum AccountDiscriminator {
     Authority = 2,
     /// A Session account (Ephemeral Spender).
     Session = 3,
+    /// A Deferred Execution authorization account.
+    DeferredExec = 4,
 }
 
 /// Helper constant for versioning.

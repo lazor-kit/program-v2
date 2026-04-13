@@ -77,7 +77,7 @@ export const AddAuthorityStruct = new beet.BeetArgsStruct<AddAuthorityInstructio
      */
     export function createAddAuthorityInstruction(
       accounts: AddAuthorityInstructionAccounts, 
-args: AddAuthorityInstructionArgs , programId = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')
+args: AddAuthorityInstructionArgs , programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
     ) {
       const [data] = AddAuthorityStruct.serialize({
         instructionDiscriminator: addAuthorityInstructionDiscriminator,

@@ -42,3 +42,22 @@ export function findSessionPda(
     programId,
   );
 }
+
+export function findDeferredExecPda(
+  walletPda: PublicKey,
+  authorityPda: PublicKey,
+  counter: number,
+  programId: PublicKey = PROGRAM_ID,
+): [PublicKey, number] {
+  const counterBuf = Buffer.alloc(4);
+  counterBuf.writeUInt32LE(counter);
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('deferred'),
+      walletPda.toBuffer(),
+      authorityPda.toBuffer(),
+      counterBuf,
+    ],
+    programId,
+  );
+}

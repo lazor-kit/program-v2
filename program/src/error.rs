@@ -16,6 +16,11 @@ pub enum AuthError {
     InvalidAuthenticationKind = 3011,
     InvalidMessage = 3012,
     SelfReentrancyNotAllowed = 3013,
+    DeferredAuthorizationExpired = 3014,
+    DeferredHashMismatch = 3015,
+    InvalidExpiryWindow = 3016,
+    UnauthorizedReclaim = 3017,
+    DeferredAuthorizationNotExpired = 3018,
 }
 
 impl From<AuthError> for ProgramError {

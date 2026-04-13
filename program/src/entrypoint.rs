@@ -4,7 +4,8 @@ use pinocchio::{
 };
 
 use crate::processor::{
-    create_session, create_wallet, execute, manage_authority, transfer_ownership,
+    authorize, create_session, create_wallet, execute, execute_deferred, manage_authority,
+    reclaim_deferred, transfer_ownership,
 };
 
 entrypoint!(process_instruction);
@@ -27,6 +28,9 @@ pub fn process_instruction(
         3 => transfer_ownership::process(program_id, accounts, data),
         4 => execute::process(program_id, accounts, data),
         5 => create_session::process(program_id, accounts, data),
+        6 => authorize::process(program_id, accounts, data),
+        7 => execute_deferred::process(program_id, accounts, data),
+        8 => reclaim_deferred::process(program_id, accounts, data),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }

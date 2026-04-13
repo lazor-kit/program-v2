@@ -75,7 +75,7 @@ export const TransferOwnershipStruct = new beet.BeetArgsStruct<TransferOwnership
      */
     export function createTransferOwnershipInstruction(
       accounts: TransferOwnershipInstructionAccounts, 
-args: TransferOwnershipInstructionArgs , programId = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')
+args: TransferOwnershipInstructionArgs , programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
     ) {
       const [data] = TransferOwnershipStruct.serialize({
         instructionDiscriminator: transferOwnershipInstructionDiscriminator,

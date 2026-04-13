@@ -19,6 +19,9 @@ export const DISC_REMOVE_AUTHORITY = 2;
 export const DISC_TRANSFER_OWNERSHIP = 3;
 export const DISC_EXECUTE = 4;
 export const DISC_CREATE_SESSION = 5;
+export const DISC_AUTHORIZE = 6;
+export const DISC_EXECUTE_DEFERRED = 7;
+export const DISC_RECLAIM_DEFERRED = 8;
 
 // ─── Authority types ─────────────────────────────────────────────────
 export const AUTH_TYPE_ED25519 = 0;
@@ -356,6 +359,114 @@ export function createCreateSessionIx(params: {
     programId: pid,
     keys,
     data: Buffer.from(concatBytes(parts)),
+  });
+}
+
+// ─── Authorize (Deferred Execution tx1) ─────────────────────────────
+/**
+ * Instruction data layout (after discriminator):
+ *   [instructions_hash(32)][accounts_hash(32)][expiry_offset(2)][auth_payload(variable)]
+ */
+export function createAuthorizeIx(params: {
+  payer: PublicKey;
+  walletPda: PublicKey;
+  authorityPda: PublicKey;
+  deferredExecPda: PublicKey;
+  instructionsHash: Uint8Array;
+  accountsHash: Uint8Array;
+  expiryOffset: number;
+  authPayload: Uint8Array;
+  programId?: PublicKey;
+}): TransactionInstruction {
+  const pid = params.programId ?? PROGRAM_ID;
+  const expiryBuf = Buffer.alloc(2);
+  expiryBuf.writeUInt16LE(params.expiryOffset);
+
+  const parts: Uint8Array[] = [
+    new Uint8Array([DISC_AUTHORIZE]),
+    params.instructionsHash,
+    params.accountsHash,
+    new Uint8Array(expiryBuf),
+    params.authPayload,
+  ];
+
+  return new TransactionInstruction({
+    programId: pid,
+    keys: [
+      { pubkey: params.payer, isSigner: true, isWritable: true },
+      { pubkey: params.walletPda, isSigner: false, isWritable: false },
+      { pubkey: params.authorityPda, isSigner: false, isWritable: true },
+      { pubkey: params.deferredExecPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from(concatBytes(parts)),
+  });
+}
+
+// ─── ExecuteDeferred (Deferred Execution tx2) ───────────────────────
+/**
+ * Instruction data layout (after discriminator):
+ *   [compact_instructions(variable)]
+ */
+export function createExecuteDeferredIx(params: {
+  payer: PublicKey;
+  walletPda: PublicKey;
+  vaultPda: PublicKey;
+  deferredExecPda: PublicKey;
+  refundDestination: PublicKey;
+  packedInstructions: Uint8Array;
+  /** Additional account metas for the inner CPI instructions */
+  remainingAccounts?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
+  programId?: PublicKey;
+}): TransactionInstruction {
+  const pid = params.programId ?? PROGRAM_ID;
+  const parts: Uint8Array[] = [
+    new Uint8Array([DISC_EXECUTE_DEFERRED]),
+    params.packedInstructions,
+  ];
+
+  const keys = [
+    { pubkey: params.payer, isSigner: true, isWritable: true },
+    { pubkey: params.walletPda, isSigner: false, isWritable: false },
+    { pubkey: params.vaultPda, isSigner: false, isWritable: true },
+    { pubkey: params.deferredExecPda, isSigner: false, isWritable: true },
+    { pubkey: params.refundDestination, isSigner: false, isWritable: true },
+  ];
+
+  if (params.remainingAccounts) {
+    keys.push(...params.remainingAccounts);
+  }
+
+  return new TransactionInstruction({
+    programId: pid,
+    keys,
+    data: Buffer.from(concatBytes(parts)),
+  });
+}
+
+// ─── ReclaimDeferred ────────────────────────────────────────────────
+/**
+ * Closes an expired DeferredExec account and refunds rent.
+ * Instruction data: discriminator only (no payload).
+ */
+export function createReclaimDeferredIx(params: {
+  payer: PublicKey;
+  deferredExecPda: PublicKey;
+  refundDestination: PublicKey;
+  programId?: PublicKey;
+}): TransactionInstruction {
+  const pid = params.programId ?? PROGRAM_ID;
+
+  return new TransactionInstruction({
+    programId: pid,
+    keys: [
+      { pubkey: params.payer, isSigner: true, isWritable: false },
+      { pubkey: params.deferredExecPda, isSigner: false, isWritable: true },
+      { pubkey: params.refundDestination, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from([DISC_RECLAIM_DEFERRED]),
   });
 }
 

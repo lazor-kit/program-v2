@@ -54,6 +54,17 @@ export function computeAccountsHash(
   return new Uint8Array(createHash('sha256').update(data).digest());
 }
 
+/**
+ * Computes the SHA-256 hash of packed compact instructions.
+ * Used for deferred execution — the hash is signed in tx1 and verified in tx2.
+ */
+export function computeInstructionsHash(
+  instructions: CompactInstruction[],
+): Uint8Array {
+  const packed = packCompactInstructions(instructions);
+  return new Uint8Array(createHash('sha256').update(packed).digest());
+}
+
 function concatBytes(arrays: Uint8Array[]): Uint8Array {
   const totalLen = arrays.reduce((s, a) => s + a.length, 0);
   const out = new Uint8Array(totalLen);

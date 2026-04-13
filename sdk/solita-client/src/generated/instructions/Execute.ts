@@ -70,7 +70,7 @@ export const ExecuteStruct = new beet.FixableBeetArgsStruct<ExecuteInstructionAr
      */
     export function createExecuteInstruction(
       accounts: ExecuteInstructionAccounts, 
-args: ExecuteInstructionArgs , programId = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')
+args: ExecuteInstructionArgs , programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
     ) {
       const [data] = ExecuteStruct.serialize({
         instructionDiscriminator: executeInstructionDiscriminator,

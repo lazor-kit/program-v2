@@ -5,7 +5,7 @@ import {
 } from '@solana/web3.js';
 import { PROGRAM_ID } from '../generated';
 import { AuthorityAccount } from '../generated/accounts';
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from './pdas';
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda, findDeferredExecPda } from './pdas';
 import {
   readAuthorityCounter,
   buildAuthPayload,
@@ -13,7 +13,7 @@ import {
   type Secp256r1Signer,
 } from './secp256r1';
 import type { Ed25519Signer } from './ed25519';
-import { packCompactInstructions, computeAccountsHash, type CompactInstruction } from './packing';
+import { packCompactInstructions, computeAccountsHash, computeInstructionsHash, type CompactInstruction } from './packing';
 import {
   createCreateWalletIx,
   createAddAuthorityIx,
@@ -28,6 +28,10 @@ import {
   DISC_TRANSFER_OWNERSHIP,
   DISC_EXECUTE,
   DISC_CREATE_SESSION,
+  DISC_AUTHORIZE,
+  createAuthorizeIx,
+  createExecuteDeferredIx,
+  createReclaimDeferredIx,
 } from './instructions';
 
 export class LazorKitClient {
@@ -44,6 +48,9 @@ export class LazorKitClient {
   }
   findSession(walletPda: PublicKey, sessionKey: Uint8Array) {
     return findSessionPda(walletPda, sessionKey, this.programId);
+  }
+  findDeferredExec(walletPda: PublicKey, authorityPda: PublicKey, counter: number) {
+    return findDeferredExecPda(walletPda, authorityPda, counter, this.programId);
   }
 
   // ─── Account readers ─────────────────────────────────────────────
@@ -335,6 +342,126 @@ export class LazorKitClient {
     });
 
     return { ix, sessionPda };
+  }
+
+  // ─── Authorize (Deferred Execution tx1, Secp256r1) ───────────────
+  async authorizeSecp256r1(params: {
+    payer: PublicKey;
+    walletPda: PublicKey;
+    authorityPda: PublicKey;
+    signer: Secp256r1Signer;
+    slot: bigint;
+    sysvarIxIndex: number;
+    compactInstructions: CompactInstruction[];
+    /** Account metas for the tx2 (ExecuteDeferred) layout */
+    tx2AccountMetas: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
+    /** Expiry offset in slots (default 300 = ~2 minutes) */
+    expiryOffset?: number;
+  }): Promise<{
+    authorizeIx: TransactionInstruction;
+    precompileIx: TransactionInstruction;
+    deferredExecPda: PublicKey;
+    counter: number;
+  }> {
+    const counter = (await this.readCounter(params.authorityPda)) + 1;
+    const expiryOffset = params.expiryOffset ?? 300;
+
+    // Compute instruction hash and accounts hash for tx2
+    const instructionsHash = computeInstructionsHash(params.compactInstructions);
+    const accountsHash = computeAccountsHash(params.tx2AccountMetas, params.compactInstructions);
+
+    // signed_payload = instructions_hash || accounts_hash
+    const signedPayload = new Uint8Array(64);
+    signedPayload.set(instructionsHash, 0);
+    signedPayload.set(accountsHash, 32);
+
+    // Build challenge hash
+    const challenge = buildSecp256r1Challenge({
+      discriminator: new Uint8Array([DISC_AUTHORIZE]),
+      authPayload: new Uint8Array(0),
+      signedPayload,
+      slot: params.slot,
+      payer: params.payer,
+      counter,
+      programId: this.programId,
+    });
+
+    // Sign
+    const { signature, authenticatorData } = await params.signer.sign(challenge);
+
+    // Build auth payload
+    const authPayload = buildAuthPayload({
+      slot: params.slot,
+      counter,
+      sysvarIxIndex: params.sysvarIxIndex,
+      typeAndFlags: 0,
+      authenticatorData,
+    });
+
+    // Build precompile instruction
+    const precompileIx = buildSecp256r1PrecompileIx(
+      params.signer.publicKeyBytes,
+      challenge,
+      signature,
+    );
+
+    // Derive DeferredExec PDA using the counter value
+    const [deferredExecPda] = this.findDeferredExec(
+      params.walletPda,
+      params.authorityPda,
+      counter,
+    );
+
+    const authorizeIx = createAuthorizeIx({
+      payer: params.payer,
+      walletPda: params.walletPda,
+      authorityPda: params.authorityPda,
+      deferredExecPda,
+      instructionsHash,
+      accountsHash,
+      expiryOffset,
+      authPayload,
+      programId: this.programId,
+    });
+
+    return { authorizeIx, precompileIx, deferredExecPda, counter };
+  }
+
+  // ─── ExecuteDeferred (Deferred Execution tx2) ───────────────────
+  executeDeferredSecp256r1(params: {
+    payer: PublicKey;
+    walletPda: PublicKey;
+    vaultPda: PublicKey;
+    deferredExecPda: PublicKey;
+    refundDestination: PublicKey;
+    compactInstructions: CompactInstruction[];
+    remainingAccounts?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
+  }): TransactionInstruction {
+    const packed = packCompactInstructions(params.compactInstructions);
+    return createExecuteDeferredIx({
+      payer: params.payer,
+      walletPda: params.walletPda,
+      vaultPda: params.vaultPda,
+      deferredExecPda: params.deferredExecPda,
+      refundDestination: params.refundDestination,
+      packedInstructions: packed,
+      remainingAccounts: params.remainingAccounts,
+      programId: this.programId,
+    });
+  }
+
+  // ─── ReclaimDeferred ────────────────────────────────────────────
+  reclaimDeferred(params: {
+    payer: PublicKey;
+    deferredExecPda: PublicKey;
+    refundDestination: PublicKey;
+  }): TransactionInstruction {
+    return createReclaimDeferredIx({
+      payer: params.payer,
+      deferredExecPda: params.deferredExecPda,
+      refundDestination: params.refundDestination,
+      programId: this.programId,
+    });
   }
 
   // ─── TransferOwnership (Ed25519) ─────────────────────────────────

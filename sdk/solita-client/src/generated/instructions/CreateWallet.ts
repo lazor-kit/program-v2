@@ -72,7 +72,7 @@ export const CreateWalletStruct = new beet.FixableBeetArgsStruct<CreateWalletIns
      */
     export function createCreateWalletInstruction(
       accounts: CreateWalletInstructionAccounts, 
-args: CreateWalletInstructionArgs , programId = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')
+args: CreateWalletInstructionArgs , programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
     ) {
       const [data] = CreateWalletStruct.serialize({
         instructionDiscriminator: createWalletInstructionDiscriminator,

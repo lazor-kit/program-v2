@@ -2,7 +2,7 @@
 
 A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256r1) authentication, role-based access control, session keys, and replay-safe odometer counters. Built with [pinocchio](https://github.com/febo/pinocchio) for zero-copy serialization.
 
-**Program ID**: `2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT`
+**Program ID**: `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
 
 ---
 
@@ -15,6 +15,7 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 - **Clock-Based Slot Freshness**: 150-slot window via `Clock::get()` — no SlotHashes sysvar needed
 - **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead
 - **CompactInstructions**: Index-based instruction packing for multi-call payloads within Solana's 1,232-byte tx limit
+- **Deferred Execution**: 2-transaction flow for payloads exceeding the tx limit (e.g., Jupiter swaps) -- TX1 authorizes via signature, TX2 executes with full inner instruction space (~1,100 bytes)
 - **CPI Reentrancy Protection**: stack_height check prevents cross-program authentication attacks
 
 ---
@@ -23,13 +24,24 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 | Metric | Normal Transfer | LazorKit (Secp256r1) | LazorKit (Session) |
 |---|---|---|---|
-| Compute Units | 150 | 10,941 | 4,483 |
+| Compute Units | 150 | 12,441 | 8,983 |
 | Transaction Size | 215 bytes | 658 bytes | 452 bytes |
 | Accounts | 2 | 7 | 7 |
 | Instructions | 1 | 2 | 1 |
 | Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL |
 
-Session keys are ideal for frequent transactions — they skip the Secp256r1 precompile and use a simple Ed25519 signer, resulting in lower CU and smaller transactions.
+Session keys are ideal for frequent transactions -- they skip the Secp256r1 precompile and use a simple Ed25519 signer, resulting in lower CU and smaller transactions.
+
+### Deferred Execution (Large Payloads)
+
+For operations exceeding the ~574 bytes available in a single Secp256r1 Execute tx (e.g., Jupiter swaps):
+
+| Metric | Immediate Execute | Deferred (2 txs) |
+|---|---|---|
+| Total CU | 12,441 | 18,613 (11,709 + 6,904) |
+| Inner Ix Capacity | ~574 bytes | ~1,100 bytes (1.9x) |
+| Tx Fee | 0.000005 SOL | 0.00001 SOL |
+| Temp Rent | -- | 0.00212 SOL (refunded) |
 
 See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, and CU benchmarks for all instructions.
 
@@ -45,6 +57,7 @@ See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, an
 | Authority (Ed25519) | 80 bytes | 0.001448 |
 | Authority (Secp256r1) | ~125 bytes | 0.001761 |
 | Session | 80 bytes | 0.001448 |
+| DeferredExec | 176 bytes | 0.002116 (temporary, refunded) |
 
 ### Total Wallet Creation
 
@@ -72,6 +85,7 @@ Session rent is refundable after expiry. Ongoing Execute transactions cost only 
 | Vault PDA | `["vault", wallet]` | Holds SOL/tokens, program signs via PDA |
 | Authority PDA | `["authority", wallet, id_hash]` | Per-key auth with role + counter |
 | Session PDA | `["session", wallet, session_key]` | Ephemeral sub-key with expiry |
+| DeferredExec PDA | `["deferred", wallet, authority, counter]` | Temporary pre-authorized execution (176 bytes) |
 
 See [docs/Architecture.md](docs/Architecture.md) for struct definitions, security mechanisms, and instruction reference.
 
@@ -82,12 +96,12 @@ See [docs/Architecture.md](docs/Architecture.md) for struct definitions, securit
 ```
 program/src/           Rust smart contract (pinocchio, zero-copy)
   auth/                Ed25519 + Secp256r1/WebAuthn authentication
-  processor/           6 instruction handlers
+  processor/           9 instruction handlers
   state/               Account data structures (NoPadding)
 sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
   src/generated/       Auto-generated instructions, accounts, errors
   src/utils/           Instruction builders, PDA helpers, signing utils
-tests-sdk/             Integration tests (vitest, 28 tests)
+tests-sdk/             Integration tests (vitest, 35 tests)
 docs/                  Architecture, cost analysis
 audits/                Audit reports
 ```
@@ -138,14 +152,14 @@ See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API refe
 # Start local validator with program loaded
 cd tests-sdk && npm run validator:start
 
-# Run all 28 integration tests
+# Run all 35 integration tests
 npm test
 
 # Run CU benchmarks
 npm run benchmark
 ```
 
-Tests cover: wallet lifecycle, authority management, execute, sessions, replay protection, counter edge cases, and end-to-end workflows.
+Tests cover: wallet lifecycle, authority management, execute, deferred execution, sessions, replay protection, counter edge cases, and end-to-end workflows.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 

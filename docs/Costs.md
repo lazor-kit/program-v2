@@ -2,7 +2,7 @@
 
 This document provides comprehensive cost data for the LazorKit smart wallet program on Solana. All compute unit (CU) measurements are from real transactions against a local validator. Rent costs use Solana's standard formula.
 
-> Program ID: `2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT`
+> Program ID: `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
 
 ---
 
@@ -14,8 +14,8 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 | CreateWallet (Ed25519) | 15,187 | 408 | 73 | 6 | 1 |
 | CreateWallet (Secp256r1) | 13,687 | 453 | 118 | 6 | 1 |
 | AddAuthority (Ed25519 admin) | 5,846 | 473 | 41 | 7 | 1 |
-| Execute Secp256r1 (SOL transfer) | 10,941 | 658 | 254 | 7 | 2 |
-| Execute Session (SOL transfer) | 4,483 | 452 | 20 | 7 | 1 |
+| Execute Secp256r1 (SOL transfer) | 12,441 | 658 | 254 | 7 | 2 |
+| Execute Session (SOL transfer) | 8,983 | 452 | 20 | 7 | 1 |
 | CreateSession (Ed25519) | 6,015 | 473 | 41 | 7 | 1 |
 
 **Notes:**
@@ -24,6 +24,24 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 - Session Execute is cheaper -- only 1 instruction, no precompile, no auth payload
 - All operations fit well within Solana's 200,000 CU default budget
 - Transaction sizes are well within Solana's 1,232-byte limit
+
+### Deferred Execution (Large Payloads)
+
+For operations exceeding the ~574 bytes available in a single Secp256r1 Execute transaction:
+
+| Instruction | CU | Tx Size (bytes) | Accounts | Instructions |
+|---|---|---|---|---|
+| Authorize (TX1) | 11,709 | 705 | 7 | 2 |
+| ExecuteDeferred (TX2, 1 inner ix) | 6,904 | 356 | 7 | 1 |
+
+| Metric | Immediate Execute | Deferred (2 txs) |
+|---|---|---|
+| Total CU | 12,441 | 18,613 (11,709 + 6,904) |
+| Inner Ix Capacity | ~574 bytes | ~1,100 bytes (1.9x) |
+| Tx Fee | 0.000005 SOL | 0.00001 SOL |
+| Temp Rent | -- | 0.002116 SOL (refunded) |
+
+The deferred path trades ~50% more total CU and 2x the tx fee for 1.9x the inner instruction space. The DeferredExec account rent (0.002116 SOL) is temporary -- it is refunded when TX2 executes or when the payer reclaims an expired authorization.
 
 ---
 
@@ -45,7 +63,7 @@ The Secp256r1 Execute transaction was optimized from **708 bytes to 658 bytes** 
 
 | Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Session | Notes |
 |---|---|---|---|---|
-| Compute Units | 150 | 10,941 | 4,483 | Session uses Ed25519 signer (no precompile) |
+| Compute Units | 150 | 12,441 | 8,983 | Session uses Ed25519 signer (no precompile) |
 | Transaction Size | 215 bytes | 658 bytes | 452 bytes | Session tx is smaller (no precompile ix) |
 | Instruction Data | 12 bytes | 254 bytes | 20 bytes | Session has no auth payload |
 | Accounts | 2 | 7 | 7 | Secp256r1 uses sysvar_instructions only |
@@ -53,9 +71,10 @@ The Secp256r1 Execute transaction was optimized from **708 bytes to 658 bytes** 
 | Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |
 
 **Why the overhead is acceptable:**
-- 10,941 CU (Secp256r1) is only **5.5%** of the 200,000 CU default budget
-- 4,483 CU (Session) is only **2.2%** of the 200,000 CU default budget
+- 12,441 CU (Secp256r1) is only **6.2%** of the 200,000 CU default budget
+- 8,983 CU (Session) is only **4.5%** of the 200,000 CU default budget
 - 658 bytes (Secp256r1) is **53%** of the 1,232-byte transaction limit, leaving **574 bytes** for inner instructions
+- Deferred Execution provides ~1,100 bytes for inner instructions when needed (1.9x)
 - 452 bytes (Session) is only **37%** of the 1,232-byte limit
 - Transaction fee is identical (base fee is per-signature, not per-CU)
 - The overhead buys: passkey auth, RBAC, replay protection, session keys, multi-sig
@@ -74,10 +93,12 @@ Solana requires accounts to maintain a minimum balance (rent-exempt) based on da
 | Authority (Ed25519) | 80 | 0.001447680 | 1,447,680 |
 | Authority (Secp256r1) | ~125 | 0.001760880 | 1,760,880 |
 | Session | 80 | 0.001447680 | 1,447,680 |
+| DeferredExec | 176 | 0.002116320 | 2,116,320 |
 | Vault PDA | 0 | 0 | 0 |
 
 **Notes:**
 - Secp256r1 authority size is variable: 48 (header) + 32 (cred hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId). For `rpId = "example.com"` (11 bytes), total = 125 bytes.
+- **DeferredExec** rent is temporary -- refunded when ExecuteDeferred closes the account or when ReclaimDeferred reclaims an expired authorization.
 - **Vault PDA** is not initialized as a program-owned account. It simply receives SOL via transfer. No rent cost.
 
 ---
@@ -101,9 +122,11 @@ At $150/SOL, wallet creation costs approximately **$0.36 - $0.41 USD**.
 |---|---|
 | Execute (SOL transfer) | 0.000005 SOL (base fee only) |
 | Execute (token transfer) | 0.000005 SOL (base fee only) |
+| Deferred Execute (2 txs) | 0.00001 SOL (2x base fee) + 0.002116 SOL temp rent (refunded) |
 | Add Authority | 0.000005 SOL + authority rent |
 | Remove Authority | 0.000005 SOL (rent refunded) |
 | Create Session | 0.000005 SOL + session rent |
+| Reclaim Deferred | 0.000005 SOL (expired DeferredExec rent refunded) |
 
 **Key points:**
 - No per-transaction rent costs for Execute
@@ -138,6 +161,7 @@ At $150/SOL, session setup costs ~$0.22 USD. Each subsequent execute costs $0.00
 | Authority (Ed25519) | 48 bytes | 32 bytes (pubkey) | **80 bytes** |
 | Authority (Secp256r1) | 48 bytes | 32 (cred_hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId) | **114+ bytes** |
 | SessionAccount | 80 bytes | 0 | **80 bytes** |
+| DeferredExecAccount | 176 bytes | 0 | **176 bytes** |
 
 The compact data sizes are achieved through:
 - `#[repr(C, align(8))]` with `NoPadding` derive macro

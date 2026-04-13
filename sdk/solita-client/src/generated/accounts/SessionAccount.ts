@@ -97,7 +97,7 @@ export class SessionAccount implements SessionAccountArgs {
    *
    * @param programId - the program that owns the accounts we are filtering
    */
-  static gpaBuilder(programId: web3.PublicKey = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')) {
+  static gpaBuilder(programId: web3.PublicKey = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')) {
     return beetSolana.GpaBuilder.fromStruct(programId, sessionAccountBeet)
   }
 

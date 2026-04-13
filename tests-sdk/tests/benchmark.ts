@@ -34,10 +34,15 @@ import {
   computeAccountsHash,
   AUTH_TYPE_ED25519,
   AUTH_TYPE_SECP256R1,
+  findDeferredExecPda,
   DISC_ADD_AUTHORITY,
   DISC_EXECUTE,
+  DISC_AUTHORIZE,
   ROLE_ADMIN,
   PROGRAM_ID,
+  createAuthorizeIx,
+  createExecuteDeferredIx,
+  computeInstructionsHash,
 } from '../../sdk/solita-client/src';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 
@@ -458,6 +463,260 @@ async function benchExecuteSession(connection: Connection, payer: Keypair): Prom
   };
 }
 
+// ─── Deferred Execution Benchmarks ───────────────────────────────────────────
+
+async function benchDeferredExecution(
+  connection: Connection,
+  payer: Keypair,
+): Promise<{ authorize: BenchResult; executeDeferred: BenchResult }> {
+  // Setup: create Secp256r1 wallet
+  const key = await generateMockSecp256r1Key();
+  const userSeed = crypto.randomBytes(32);
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_SECP256R1,
+    authBump,
+    credentialOrPubkey: key.credentialIdHash,
+    secp256r1Pubkey: key.publicKeyBytes,
+    rpId: key.rpId,
+  })]);
+
+  // Fund vault
+  const airdropSig = await connection.requestAirdrop(vaultPda, 10 * LAMPORTS_PER_SOL);
+  await connection.confirmTransaction(airdropSig, 'confirmed');
+
+  const recipient = Keypair.generate().publicKey;
+  const slot = await getSlot(connection);
+
+  // Build SOL transfer as compact instruction
+  const transferData = Buffer.alloc(12);
+  transferData.writeUInt32LE(2, 0);
+  transferData.writeBigUInt64LE(BigInt(LAMPORTS_PER_SOL), 4);
+
+  // TX2 account layout:
+  //   0: payer, 1: wallet, 2: vault, 3: deferred, 4: refundDest
+  //   5: SystemProgram, 6: recipient
+  const compactIxs = [{
+    programIdIndex: 5,
+    accountIndexes: [2, 6],
+    data: new Uint8Array(transferData),
+  }];
+
+  // Compute hashes
+  const instructionsHash = computeInstructionsHash(compactIxs);
+  const tx2AccountMetas = [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+    { pubkey: walletPda, isSigner: false, isWritable: false },
+    { pubkey: vaultPda, isSigner: false, isWritable: true },
+    { pubkey: PublicKey.default, isSigner: false, isWritable: true }, // deferred placeholder
+    { pubkey: payer.publicKey, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: recipient, isSigner: false, isWritable: true },
+  ];
+  const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
+
+  const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+
+  const { authPayload, precompileIx } = await signSecp256r1({
+    key,
+    discriminator: new Uint8Array([DISC_AUTHORIZE]),
+    signedPayload,
+    slot,
+    counter: 1,
+    payer: payer.publicKey,
+    sysvarIxIndex: 6,
+  });
+
+  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1);
+
+  // === TX1: Authorize ===
+  const authorizeIx = createAuthorizeIx({
+    payer: payer.publicKey,
+    walletPda,
+    authorityPda: authPda,
+    deferredExecPda,
+    instructionsHash,
+    accountsHash,
+    expiryOffset: 300,
+    authPayload,
+  });
+
+  const authResult = await sendAndMeasure(connection, payer, [precompileIx, authorizeIx]);
+  const authorizeResult: BenchResult = {
+    name: 'Deferred: Authorize (TX1)',
+    cu: authResult.cu,
+    txSize: authResult.txSize,
+    ixData: authResult.ixDataSizes.reduce((a, b) => a + b, 0),
+    accounts: authResult.accountCounts[authResult.accountCounts.length - 1],
+    instructions: 2,
+  };
+
+  // === TX2: ExecuteDeferred ===
+  const packed = packCompactInstructions(compactIxs);
+  const executeDeferredIx = createExecuteDeferredIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    deferredExecPda,
+    refundDestination: payer.publicKey,
+    packedInstructions: packed,
+    remainingAccounts: [
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: recipient, isSigner: false, isWritable: true },
+    ],
+  });
+
+  const execResult = await sendAndMeasure(connection, payer, [executeDeferredIx]);
+  const executeDeferredResult: BenchResult = {
+    name: 'Deferred: ExecuteDeferred (TX2)',
+    cu: execResult.cu,
+    txSize: execResult.txSize,
+    ixData: execResult.ixDataSizes[0],
+    accounts: execResult.accountCounts[0],
+    instructions: 1,
+  };
+
+  return { authorize: authorizeResult, executeDeferred: executeDeferredResult };
+}
+
+async function benchDeferredMultiInstruction(
+  connection: Connection,
+  payer: Keypair,
+): Promise<{ authorize: BenchResult; executeDeferred: BenchResult }> {
+  // Setup: create Secp256r1 wallet
+  const key = await generateMockSecp256r1Key();
+  const userSeed = crypto.randomBytes(32);
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_SECP256R1,
+    authBump,
+    credentialOrPubkey: key.credentialIdHash,
+    secp256r1Pubkey: key.publicKeyBytes,
+    rpId: key.rpId,
+  })]);
+
+  // Fund vault
+  const airdropSig = await connection.requestAirdrop(vaultPda, 10 * LAMPORTS_PER_SOL);
+  await connection.confirmTransaction(airdropSig, 'confirmed');
+
+  const recipient1 = Keypair.generate().publicKey;
+  const recipient2 = Keypair.generate().publicKey;
+  const recipient3 = Keypair.generate().publicKey;
+  const slot = await getSlot(connection);
+
+  const makeTransferData = (amount: bigint) => {
+    const buf = Buffer.alloc(12);
+    buf.writeUInt32LE(2, 0);
+    buf.writeBigUInt64LE(amount, 4);
+    return new Uint8Array(buf);
+  };
+
+  // TX2 layout:
+  //   0: payer, 1: wallet, 2: vault, 3: deferred, 4: refundDest
+  //   5: SystemProgram, 6: recipient1, 7: recipient2, 8: recipient3
+  const compactIxs = [
+    { programIdIndex: 5, accountIndexes: [2, 6], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
+    { programIdIndex: 5, accountIndexes: [2, 7], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
+    { programIdIndex: 5, accountIndexes: [2, 8], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
+  ];
+
+  const instructionsHash = computeInstructionsHash(compactIxs);
+  const tx2AccountMetas = [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+    { pubkey: walletPda, isSigner: false, isWritable: false },
+    { pubkey: vaultPda, isSigner: false, isWritable: true },
+    { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+    { pubkey: payer.publicKey, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: recipient1, isSigner: false, isWritable: true },
+    { pubkey: recipient2, isSigner: false, isWritable: true },
+    { pubkey: recipient3, isSigner: false, isWritable: true },
+  ];
+  const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
+  const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+
+  const { authPayload, precompileIx } = await signSecp256r1({
+    key,
+    discriminator: new Uint8Array([DISC_AUTHORIZE]),
+    signedPayload,
+    slot,
+    counter: 1,
+    payer: payer.publicKey,
+    sysvarIxIndex: 6,
+  });
+
+  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1);
+
+  // TX1: Authorize
+  const authorizeIx = createAuthorizeIx({
+    payer: payer.publicKey,
+    walletPda,
+    authorityPda: authPda,
+    deferredExecPda,
+    instructionsHash,
+    accountsHash,
+    expiryOffset: 300,
+    authPayload,
+  });
+
+  const authResult = await sendAndMeasure(connection, payer, [precompileIx, authorizeIx]);
+  const authorizeResult: BenchResult = {
+    name: 'Deferred Multi-IX: Authorize (TX1)',
+    cu: authResult.cu,
+    txSize: authResult.txSize,
+    ixData: authResult.ixDataSizes.reduce((a, b) => a + b, 0),
+    accounts: authResult.accountCounts[authResult.accountCounts.length - 1],
+    instructions: 2,
+  };
+
+  // TX2: ExecuteDeferred (3 transfers)
+  const packed = packCompactInstructions(compactIxs);
+  const executeDeferredIx = createExecuteDeferredIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    deferredExecPda,
+    refundDestination: payer.publicKey,
+    packedInstructions: packed,
+    remainingAccounts: [
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: recipient1, isSigner: false, isWritable: true },
+      { pubkey: recipient2, isSigner: false, isWritable: true },
+      { pubkey: recipient3, isSigner: false, isWritable: true },
+    ],
+  });
+
+  const execResult = await sendAndMeasure(connection, payer, [executeDeferredIx]);
+  const executeDeferredResult: BenchResult = {
+    name: 'Deferred Multi-IX: ExecuteDeferred (TX2)',
+    cu: execResult.cu,
+    txSize: execResult.txSize,
+    ixData: execResult.ixDataSizes[0],
+    accounts: execResult.accountCounts[0],
+    instructions: 1,
+  };
+
+  return { authorize: authorizeResult, executeDeferred: executeDeferredResult };
+}
+
 // ─── Rent Calculations ────────────────────────────────────────────────────────
 
 function calculateRent(dataSize: number): number {
@@ -505,6 +764,30 @@ async function main() {
     }
   }
 
+  // Run deferred execution benchmarks (these return 2 results each)
+  let deferredSingle: { authorize: BenchResult; executeDeferred: BenchResult } | null = null;
+  let deferredMulti: { authorize: BenchResult; executeDeferred: BenchResult } | null = null;
+
+  try {
+    process.stdout.write('  Deferred Single (Authorize + Execute)... ');
+    deferredSingle = await benchDeferredExecution(connection, payer);
+    results.push(deferredSingle.authorize);
+    results.push(deferredSingle.executeDeferred);
+    console.log(`TX1: ${deferredSingle.authorize.cu} CU, TX2: ${deferredSingle.executeDeferred.cu} CU`);
+  } catch (err: any) {
+    console.log(`FAILED: ${err.message?.slice(0, 80)}`);
+  }
+
+  try {
+    process.stdout.write('  Deferred Multi-IX (3 transfers)... ');
+    deferredMulti = await benchDeferredMultiInstruction(connection, payer);
+    results.push(deferredMulti.authorize);
+    results.push(deferredMulti.executeDeferred);
+    console.log(`TX1: ${deferredMulti.authorize.cu} CU, TX2: ${deferredMulti.executeDeferred.cu} CU`);
+  } catch (err: any) {
+    console.log(`FAILED: ${err.message?.slice(0, 80)}`);
+  }
+
   // ─── Output Tables ────────────────────────────────────────────────────────
 
   console.log('\n\n## Compute Units & Transaction Size\n');
@@ -532,6 +815,32 @@ async function main() {
     console.log(`| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |`);
   }
 
+  // ─── Deferred vs Immediate Execute Comparison ─────────────────────────────
+
+  if (secp256r1Result && deferredSingle) {
+    const totalDeferredCU = deferredSingle.authorize.cu + deferredSingle.executeDeferred.cu;
+    const deferredRent = calculateRent(176);
+
+    console.log('\n\n## Deferred Execution vs Immediate Execute (Secp256r1)\n');
+    console.log('| Metric | Immediate Execute | Deferred TX1 (Authorize) | Deferred TX2 (Execute) | Deferred Total | Notes |');
+    console.log('|---|---|---|---|---|---|');
+    console.log(`| Compute Units | ${secp256r1Result.cu.toLocaleString()} | ${deferredSingle.authorize.cu.toLocaleString()} | ${deferredSingle.executeDeferred.cu.toLocaleString()} | ${totalDeferredCU.toLocaleString()} | Deferred splits CU across 2 txs |`);
+    console.log(`| Tx Size (bytes) | ${secp256r1Result.txSize} | ${deferredSingle.authorize.txSize} | ${deferredSingle.executeDeferred.txSize} | ${deferredSingle.authorize.txSize + deferredSingle.executeDeferred.txSize} | TX2 has no precompile overhead |`);
+    console.log(`| Inner Ix Capacity | ~574 bytes | N/A (hashes only) | ~1,100 bytes | ~1,100 bytes | 1.9x more space for inner instructions |`);
+    console.log(`| Tx Fees | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | 0.00001 SOL | 2x fee for 2 transactions |`);
+    console.log(`| Temp Rent (refunded) | — | ${(deferredRent / LAMPORTS_PER_SOL).toFixed(9)} SOL | refunded | 0 SOL net | DeferredExec rent refunded on close |`);
+    console.log(`| Accounts | ${secp256r1Result.accounts} | ${deferredSingle.authorize.accounts} | ${deferredSingle.executeDeferred.accounts} | — | TX2 doesn't need precompile sysvar |`);
+  }
+
+  if (deferredMulti) {
+    console.log('\n\n## Deferred Multi-Instruction (3 SOL Transfers)\n');
+    console.log('| Phase | CU | Tx Size (bytes) | Accounts | Notes |');
+    console.log('|---|---|---|---|---|');
+    console.log(`| TX1: Authorize | ${deferredMulti.authorize.cu.toLocaleString()} | ${deferredMulti.authorize.txSize} | ${deferredMulti.authorize.accounts} | Same cost regardless of inner ix count |`);
+    console.log(`| TX2: Execute 3 transfers | ${deferredMulti.executeDeferred.cu.toLocaleString()} | ${deferredMulti.executeDeferred.txSize} | ${deferredMulti.executeDeferred.accounts} | 3 CPIs + hash verification |`);
+    console.log(`| Total | ${(deferredMulti.authorize.cu + deferredMulti.executeDeferred.cu).toLocaleString()} | ${deferredMulti.authorize.txSize + deferredMulti.executeDeferred.txSize} | — | |`);
+  }
+
   // ─── Rent Costs ───────────────────────────────────────────────────────────
 
   const rentData = [
@@ -539,6 +848,7 @@ async function main() {
     { name: 'Authority (Ed25519)', dataSize: 80 },
     { name: 'Authority (Secp256r1)', dataSize: 125 }, // 48 header + 32 cred_hash + 33 pubkey + 1 rpIdLen + ~11 rpId
     { name: 'Session', dataSize: 80 },
+    { name: 'DeferredExec (temporary)', dataSize: 176 },
   ];
 
   console.log('\n\n## Rent-Exempt Costs\n');
