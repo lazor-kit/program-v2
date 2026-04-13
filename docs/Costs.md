@@ -11,19 +11,33 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 | Instruction | CU | Tx Size (bytes) | Ix Data (bytes) | Accounts | Instructions |
 |---|---|---|---|---|---|
 | Normal SOL Transfer (baseline) | 150 | 215 | 12 | 2 | 1 |
-| CreateWallet (Ed25519) | 13,687 | 408 | 73 | 6 | 1 |
-| CreateWallet (Secp256r1) | 12,185 | 441 | 106 | 6 | 1 |
-| AddAuthority (Ed25519 admin) | 7,342 | 473 | 41 | 7 | 1 |
-| Execute Secp256r1 (SOL transfer) | 9,316 | 708 | 271 | 8 | 2 |
-| Execute Session (SOL transfer) | 7,483 | 452 | 20 | 7 | 1 |
-| CreateSession (Ed25519) | 9,015 | 473 | 41 | 7 | 1 |
+| CreateWallet (Ed25519) | 15,187 | 408 | 73 | 6 | 1 |
+| CreateWallet (Secp256r1) | 13,687 | 453 | 118 | 6 | 1 |
+| AddAuthority (Ed25519 admin) | 5,846 | 473 | 41 | 7 | 1 |
+| Execute Secp256r1 (SOL transfer) | 10,941 | 658 | 254 | 7 | 2 |
+| Execute Session (SOL transfer) | 4,483 | 452 | 20 | 7 | 1 |
+| CreateSession (Ed25519) | 6,015 | 473 | 41 | 7 | 1 |
 
 **Notes:**
 - CU values are from real transactions on a local validator
 - Secp256r1 Execute requires 2 instructions (precompile verification + execute)
-- Session Execute is cheaper — only 1 instruction, no precompile, no auth payload
+- Session Execute is cheaper -- only 1 instruction, no precompile, no auth payload
 - All operations fit well within Solana's 200,000 CU default budget
 - Transaction sizes are well within Solana's 1,232-byte limit
+
+---
+
+## Transaction Size Optimization (v2)
+
+The Secp256r1 Execute transaction was optimized from **708 bytes to 658 bytes** (50 bytes saved) via three changes:
+
+| Optimization | Bytes Saved | Details |
+|---|---|---|
+| Drop SlotHashes sysvar | ~32 bytes | Use `Clock::get()` for slot freshness instead of SlotHashes sysvar lookup. Removes 1 account from the transaction. |
+| u32 counter (was u64) | ~4 bytes | 4 billion operations per authority is sufficient. Saves 4 bytes in auth payload + 4 bytes in challenge hash. |
+| rpId stored on-chain | ~14 bytes | rpId (e.g. "example.com") stored on authority account at creation time, no longer sent per-tx. |
+
+**Security impact:** None. The odometer counter remains the primary replay protection. Slot freshness via `Clock::get()` provides the same age check (150-slot window) without requiring the SlotHashes sysvar account.
 
 ---
 
@@ -31,22 +45,22 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 
 | Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Session | Notes |
 |---|---|---|---|---|
-| Compute Units | 150 | 9,316 | 7,483 | Session uses Ed25519 signer (no precompile) |
-| Transaction Size | 215 bytes | 708 bytes | 452 bytes | Session tx is smaller (no precompile ix) |
-| Instruction Data | 12 bytes | 271 bytes | 20 bytes | Session has no auth payload |
-| Accounts | 2 | 8 | 7 | Session skips sysvar accounts |
+| Compute Units | 150 | 10,941 | 4,483 | Session uses Ed25519 signer (no precompile) |
+| Transaction Size | 215 bytes | 658 bytes | 452 bytes | Session tx is smaller (no precompile ix) |
+| Instruction Data | 12 bytes | 254 bytes | 20 bytes | Session has no auth payload |
+| Accounts | 2 | 7 | 7 | Secp256r1 uses sysvar_instructions only |
 | Instructions per Tx | 1 | 2 | 1 | Session needs only 1 instruction |
 | Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |
 
 **Why the overhead is acceptable:**
-- 9,316 CU (Secp256r1) is only **4.7%** of the 200,000 CU default budget
-- 7,483 CU (Session) is only **3.7%** of the 200,000 CU default budget
-- 708 bytes (Secp256r1) is **57%** of the 1,232-byte transaction limit
+- 10,941 CU (Secp256r1) is only **5.5%** of the 200,000 CU default budget
+- 4,483 CU (Session) is only **2.2%** of the 200,000 CU default budget
+- 658 bytes (Secp256r1) is **53%** of the 1,232-byte transaction limit, leaving **574 bytes** for inner instructions
 - 452 bytes (Session) is only **37%** of the 1,232-byte limit
 - Transaction fee is identical (base fee is per-signature, not per-CU)
 - The overhead buys: passkey auth, RBAC, replay protection, session keys, multi-sig
 
-**Session keys** are ideal for frequent transactions (gaming, DeFi) — they're faster, cheaper, and only need a one-time setup cost.
+**Session keys** are ideal for frequent transactions (gaming, DeFi) -- they're faster, cheaper, and only need a one-time setup cost.
 
 ---
 
@@ -58,11 +72,13 @@ Solana requires accounts to maintain a minimum balance (rent-exempt) based on da
 |---|---|---|---|
 | Wallet PDA | 8 | 0.000946560 | 946,560 |
 | Authority (Ed25519) | 80 | 0.001447680 | 1,447,680 |
-| Authority (Secp256r1) | 113 | 0.001677360 | 1,677,360 |
+| Authority (Secp256r1) | ~125 | 0.001760880 | 1,760,880 |
 | Session | 80 | 0.001447680 | 1,447,680 |
 | Vault PDA | 0 | 0 | 0 |
 
-**Vault PDA** is not initialized as a program-owned account. It simply receives SOL via transfer. No rent cost.
+**Notes:**
+- Secp256r1 authority size is variable: 48 (header) + 32 (cred hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId). For `rpId = "example.com"` (11 bytes), total = 125 bytes.
+- **Vault PDA** is not initialized as a program-owned account. It simply receives SOL via transfer. No rent cost.
 
 ---
 
@@ -73,9 +89,9 @@ Creating a wallet involves allocating a Wallet PDA and the first Authority PDA.
 | Auth Type | Wallet Rent | Authority Rent | Tx Fee | Total |
 |---|---|---|---|---|
 | Ed25519 | 0.000947 SOL | 0.001448 SOL | 0.000005 SOL | **0.002399 SOL** |
-| Secp256r1 (Passkey) | 0.000947 SOL | 0.001677 SOL | 0.000005 SOL | **0.002629 SOL** |
+| Secp256r1 (Passkey) | 0.000947 SOL | 0.001761 SOL | 0.000005 SOL | **0.002713 SOL** |
 
-At $150/SOL, wallet creation costs approximately **$0.36 - $0.39 USD**.
+At $150/SOL, wallet creation costs approximately **$0.36 - $0.41 USD**.
 
 ---
 
@@ -120,13 +136,14 @@ At $150/SOL, session setup costs ~$0.22 USD. Each subsequent execute costs $0.00
 |---|---|---|---|
 | WalletAccount | 8 bytes | 0 | **8 bytes** |
 | Authority (Ed25519) | 48 bytes | 32 bytes (pubkey) | **80 bytes** |
-| Authority (Secp256r1) | 48 bytes | 65 bytes (cred_hash + compressed_pubkey) | **113 bytes** |
+| Authority (Secp256r1) | 48 bytes | 32 (cred_hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId) | **114+ bytes** |
 | SessionAccount | 80 bytes | 0 | **80 bytes** |
 
 The compact data sizes are achieved through:
 - `#[repr(C, align(8))]` with `NoPadding` derive macro
 - 33-byte compressed Secp256r1 public keys (not 64-byte uncompressed)
 - No Borsh serialization overhead
+- rpId stored on authority account (saves per-tx payload bytes)
 
 ---
 

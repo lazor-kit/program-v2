@@ -91,6 +91,7 @@ describe('Authority Management', () => {
         newRole: ROLE_SPENDER,
         credentialOrPubkey: key.credentialIdHash,
         secp256r1Pubkey: key.publicKeyBytes,
+        rpId: key.rpId,
         authorizerSigner: ownerKp.publicKey,
       });
 
@@ -180,6 +181,7 @@ describe('Authority Management', () => {
         authBump,
         credentialOrPubkey: ownerKey.credentialIdHash,
         secp256r1Pubkey: ownerKey.publicKeyBytes,
+        rpId: ownerKey.rpId,
       })]);
     });
 
@@ -201,16 +203,15 @@ describe('Authority Management', () => {
       // On-chain extends: extended_data_payload = data_payload + payer.key()
       const signedPayload = Buffer.concat([dataPayload, ctx.payer.publicKey.toBuffer()]);
 
-      // sysvar accounts are at indices 6 and 7 (after rent at 5)
+      // sysvar_instructions is at index 6 (after rent at 5)
       const { authPayload, precompileIx } = await signSecp256r1({
         key: ownerKey,
         discriminator: new Uint8Array([DISC_ADD_AUTHORITY]),
         signedPayload,
         slot,
-        counter: 1n, // first use, stored counter = 0
+        counter: 1, // first use, stored counter = 0
         payer: ctx.payer.publicKey,
         sysvarIxIndex: 6,
-        sysvarSlotHashesIndex: 7,
       });
 
       const ix = createAddAuthorityIx({

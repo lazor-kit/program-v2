@@ -69,7 +69,6 @@ export async function sendTxExpectError(
 
 export async function getSlot(ctx: TestContext): Promise<bigint> {
   const slot = await ctx.connection.getSlot('confirmed');
-  // SlotHashes sysvar's most recent entry is 1 behind the current slot.
-  // Submit slot-1 to avoid "future slot" rejection in nonce validation.
-  return BigInt(slot) - 1n;
+  // Use current slot directly; Clock::get() validates slot age (< 150 slots).
+  return BigInt(slot);
 }

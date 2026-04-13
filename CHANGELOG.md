@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Odometer counter replay protection for Secp256r1 (monotonic u64 per authority)
+- Odometer counter replay protection for Secp256r1 (monotonic u32 per authority)
 - program_id included in challenge hash (cross-program replay prevention)
+- rpId stored on authority account at creation (saves ~14 bytes per transaction)
 - TypeScript SDK (`sdk/solita-client`) with Solita code generation
 - Integration test suite (`tests-sdk/`) with 28 tests across 7 files
 - Benchmark script for CU and transaction size measurements
@@ -26,12 +27,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Secp256r1 replay protection: primary mechanism changed from WebAuthn hardware counter to program-controlled odometer
-- Auth payload layout: added 8-byte counter field at offset 8 (all subsequent fields shifted)
+- Auth payload layout: added 4-byte counter field at offset 8 (all subsequent fields shifted)
 - Challenge hash: 5 elements -> 7 elements (added counter + program_id)
-- AuthorityAccountHeader: added `counter` (u64) and `version` (u8) fields
+- AuthorityAccountHeader: added `counter` (u32) and `version` (u8) fields
 - Secp256r1 pubkey storage: verified as 33-byte compressed format
 - Authenticator trait: added `program_id` parameter
 - Counter write timing: moved to after full signature verification
+- Slot freshness: replaced SlotHashes sysvar with `Clock::get()` (removes 1 account from transaction)
+- Counter size: u64 -> u32 (4 billion operations per authority is sufficient)
+- Execute Secp256r1 transaction size: 708 -> 658 bytes (50 bytes saved)
+- Execute Secp256r1 accounts: 8 -> 7 (SlotHashes sysvar removed)
 
 ### Fixed
 
@@ -46,5 +51,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Role-Based Access Control (Owner, Admin, Spender)
 - Ephemeral session keys with slot-based expiry
 - CompactInstructions for Execute
-- SlotHashes nonce for signature freshness
+- SlotHashes nonce for signature freshness (replaced by Clock::get() in v2)
 - Zero-copy serialization via pinocchio

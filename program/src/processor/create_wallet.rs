@@ -85,13 +85,17 @@ pub fn process(
             (rest, rest)
         },
         1 => {
-            // [credential_id_hash(32)] [pubkey(33)] = 65 bytes total
-            if rest.len() < 65 {
+            // [credential_id_hash(32)] [pubkey(33)] [rpIdLen(1)] [rpId(N)]
+            if rest.len() < 66 {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            let (credential_id_hash, _rest_after_cred) = rest.split_at(32);
-            // We store credential_id_hash + pubkey for on-chain wallet discovery
-            let full_auth_data = &rest[..65];
+            let (credential_id_hash, rest_after_cred) = rest.split_at(32);
+            let rp_id_len = rest_after_cred[33] as usize;
+            let total_auth_data = 32 + 33 + 1 + rp_id_len;
+            if rest.len() < total_auth_data {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let full_auth_data = &rest[..total_auth_data];
             (credential_id_hash, full_auth_data)
         },
         _ => return Err(AuthError::InvalidAuthenticationKind.into()),
@@ -218,8 +222,9 @@ pub fn process(
         role: 0,
         bump: auth_bump,
         version: crate::state::CURRENT_ACCOUNT_VERSION,
-        _padding: [0; 3],
+        _padding1: [0; 3],
         counter: 0,
+        _padding2: [0; 4],
         wallet: *wallet_pda.key(),
     };
 

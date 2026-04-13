@@ -18,10 +18,13 @@ pub struct AuthorityAccountHeader {
     /// Account Version (for future upgrades).
     pub version: u8,
     /// Padding for 8-byte alignment.
-    pub _padding: [u8; 3],
+    pub _padding1: [u8; 3],
     /// Monotonically increasing counter to prevent replay attacks (Secp256r1 only).
-    pub counter: u64,
+    /// u32 supports ~4 billion operations per authority — more than sufficient.
+    pub counter: u32,
+    /// Alignment padding after u32 counter.
+    pub _padding2: [u8; 4],
     /// The wallet this authority belongs to.
     pub wallet: Pubkey,
 }
-// 4 + 4 + 8 + 32 = 48. 48 is divisible by 8.
+// 1+1+1+1+1+3+4+4+32 = 48. Divisible by 8. wallet stays at offset 16.

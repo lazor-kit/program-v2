@@ -51,7 +51,7 @@ export class LazorKitClient {
     return AuthorityAccount.fromAccountAddress(this.connection, authorityPda);
   }
 
-  async readCounter(authorityPda: PublicKey): Promise<bigint> {
+  async readCounter(authorityPda: PublicKey): Promise<number> {
     return readAuthorityCounter(this.connection, authorityPda);
   }
 
@@ -88,6 +88,7 @@ export class LazorKitClient {
     userSeed: Uint8Array;
     credentialIdHash: Uint8Array;
     compressedPubkey: Uint8Array;
+    rpId: string;
   }): { ix: TransactionInstruction; walletPda: PublicKey; vaultPda: PublicKey; authorityPda: PublicKey } {
     const [walletPda] = this.findWallet(params.userSeed);
     const [vaultPda] = this.findVault(walletPda);
@@ -103,6 +104,7 @@ export class LazorKitClient {
       authBump,
       credentialOrPubkey: params.credentialIdHash,
       secp256r1Pubkey: params.compressedPubkey,
+      rpId: params.rpId,
       programId: this.programId,
     });
 
@@ -149,16 +151,16 @@ export class LazorKitClient {
     adminSigner: Secp256r1Signer;
     slot: bigint;
     sysvarIxIndex: number;
-    sysvarSlotHashesIndex: number;
     newType: number;
     newRole: number;
     newCredentialOrPubkey: Uint8Array;
     newSecp256r1Pubkey?: Uint8Array;
+    newRpId?: string;
   }): Promise<{ ix: TransactionInstruction; newAuthorityPda: PublicKey; precompileIx: TransactionInstruction }> {
     const credHash = params.newCredentialOrPubkey;
     const [newAuthorityPda] = this.findAuthority(params.walletPda, credHash);
 
-    const counter = (await this.readCounter(params.adminAuthorityPda)) + 1n;
+    const counter = (await this.readCounter(params.adminAuthorityPda)) + 1;
 
     // Build the data payload (what's signed)
     const dataPayload = buildDataPayloadForAdd(
@@ -185,9 +187,7 @@ export class LazorKitClient {
       slot: params.slot,
       counter,
       sysvarIxIndex: params.sysvarIxIndex,
-      sysvarSlotHashesIndex: params.sysvarSlotHashesIndex,
       typeAndFlags: 0,
-      rpId: params.adminSigner.rpId,
       authenticatorData,
     });
 
@@ -207,6 +207,7 @@ export class LazorKitClient {
       newRole: params.newRole,
       credentialOrPubkey: params.newCredentialOrPubkey,
       secp256r1Pubkey: params.newSecp256r1Pubkey,
+      rpId: params.newRpId,
       authPayload,
       programId: this.programId,
     });
@@ -264,11 +265,10 @@ export class LazorKitClient {
     signer: Secp256r1Signer;
     slot: bigint;
     sysvarIxIndex: number;
-    sysvarSlotHashesIndex: number;
     compactInstructions: CompactInstruction[];
     remainingAccounts?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
   }): Promise<{ ix: TransactionInstruction; precompileIx: TransactionInstruction }> {
-    const counter = (await this.readCounter(params.authorityPda)) + 1n;
+    const counter = (await this.readCounter(params.authorityPda)) + 1;
     const packed = packCompactInstructions(params.compactInstructions);
 
     // Build challenge
@@ -288,9 +288,7 @@ export class LazorKitClient {
       slot: params.slot,
       counter,
       sysvarIxIndex: params.sysvarIxIndex,
-      sysvarSlotHashesIndex: params.sysvarSlotHashesIndex,
       typeAndFlags: 0,
-      rpId: params.signer.rpId,
       authenticatorData,
     });
 

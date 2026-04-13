@@ -16,7 +16,6 @@ import {
   sendAndConfirmTransaction,
   SystemProgram,
   SYSVAR_INSTRUCTIONS_PUBKEY,
-  SYSVAR_SLOT_HASHES_PUBKEY,
   Transaction,
   type TransactionInstruction,
   type Signer,
@@ -65,7 +64,7 @@ async function setup() {
 
 async function getSlot(connection: Connection): Promise<bigint> {
   const slot = await connection.getSlot('confirmed');
-  return BigInt(slot) - 1n;
+  return BigInt(slot);
 }
 
 async function sendAndMeasure(
@@ -173,6 +172,7 @@ async function benchCreateWalletSecp256r1(connection: Connection, payer: Keypair
     authBump,
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
+    rpId: key.rpId,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix]);
@@ -253,6 +253,7 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
     authBump,
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
+    rpId: key.rpId,
   })]);
 
   // Fund vault
@@ -267,9 +268,13 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
   transferData.writeUInt32LE(2, 0); // Transfer discriminator
   transferData.writeBigUInt64LE(1_000_000n, 4);
 
+  // Account layout (no slotHashes sysvar):
+  //   0: payer, 1: wallet, 2: authority, 3: vault
+  //   4: sysvar_instructions
+  //   5: SystemProgram, 6: recipient
   const compactIxs = [{
-    programIdIndex: 6,       // SystemProgram at index 6
-    accountIndexes: [3, 7],  // vault, recipient
+    programIdIndex: 5,       // SystemProgram at index 5
+    accountIndexes: [3, 6],  // vault, recipient
     data: new Uint8Array(transferData),
   }];
   const packed = packCompactInstructions(compactIxs);
@@ -281,7 +286,6 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
     { pubkey: authPda, isSigner: false, isWritable: true },
     { pubkey: vaultPda, isSigner: false, isWritable: true },
     { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
-    { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     { pubkey: recipient, isSigner: false, isWritable: true },
   ];
@@ -293,10 +297,9 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
     discriminator: new Uint8Array([DISC_EXECUTE]),
     signedPayload,
     slot,
-    counter: 1n,
+    counter: 1,
     payer: payer.publicKey,
     sysvarIxIndex: 4,
-    sysvarSlotHashesIndex: 5,
   });
 
   const ix = createExecuteIx({
@@ -534,7 +537,7 @@ async function main() {
   const rentData = [
     { name: 'Wallet PDA', dataSize: 8 },
     { name: 'Authority (Ed25519)', dataSize: 80 },
-    { name: 'Authority (Secp256r1)', dataSize: 113 },
+    { name: 'Authority (Secp256r1)', dataSize: 125 }, // 48 header + 32 cred_hash + 33 pubkey + 1 rpIdLen + ~11 rpId
     { name: 'Session', dataSize: 80 },
   ];
 
@@ -549,7 +552,7 @@ async function main() {
   // Total wallet creation cost
   const walletRent = calculateRent(8);
   const authEd25519Rent = calculateRent(80);
-  const authSecp256r1Rent = calculateRent(113);
+  const authSecp256r1Rent = calculateRent(125);
   const sessionRent = calculateRent(80);
   const txFee = 5000; // 0.000005 SOL
 

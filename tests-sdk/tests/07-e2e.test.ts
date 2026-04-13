@@ -80,6 +80,7 @@ describe('E2E Company Workflow', () => {
       authBump,
       credentialOrPubkey: ceoKey.credentialIdHash,
       secp256r1Pubkey: ceoKey.publicKeyBytes,
+      rpId: ceoKey.rpId,
     })]);
 
     // Fund the vault
@@ -109,10 +110,9 @@ describe('E2E Company Workflow', () => {
       discriminator: new Uint8Array([DISC_ADD_AUTHORITY]),
       signedPayload,
       slot,
-      counter: 1n, // CEO's first operation
+      counter: 1, // CEO's first operation
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 6,
-      sysvarSlotHashesIndex: 7,
     });
 
     await sendTx(ctx, [precompileIx, createAddAuthorityIx({
@@ -143,6 +143,7 @@ describe('E2E Company Workflow', () => {
       newRole: ROLE_SPENDER,
       credentialOrPubkey: spenderKey.credentialIdHash,
       secp256r1Pubkey: spenderKey.publicKeyBytes,
+      rpId: spenderKey.rpId,
       authorizerSigner: adminKp.publicKey,
     });
 
@@ -163,8 +164,8 @@ describe('E2E Company Workflow', () => {
     transferData.writeBigUInt64LE(1_000_000n, 4);
 
     const compactIxs = [{
-      programIdIndex: 6,
-      accountIndexes: [3, 7],
+      programIdIndex: 5,
+      accountIndexes: [3, 6],
       data: new Uint8Array(transferData),
     }];
     const packed = packCompactInstructions(compactIxs);
@@ -175,7 +176,6 @@ describe('E2E Company Workflow', () => {
       { pubkey: walletPda, isSigner: false, isWritable: false },
       { pubkey: spenderAuthPda, isSigner: false, isWritable: true },
       { pubkey: vaultPda, isSigner: false, isWritable: true },
-      { pubkey: PublicKey.default, isSigner: false, isWritable: false },
       { pubkey: PublicKey.default, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: true },
@@ -188,10 +188,9 @@ describe('E2E Company Workflow', () => {
       discriminator: new Uint8Array([DISC_EXECUTE]),
       signedPayload,
       slot,
-      counter: 1n, // Spender's first op
+      counter: 1, // Spender's first op
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 4,
-      sysvarSlotHashesIndex: 5,
     });
 
     const ix = createExecuteIx({
@@ -256,11 +255,14 @@ describe('E2E Company Workflow', () => {
     const [newOwnerAuthPda] = findAuthorityPda(walletPda, newCeoKey.credentialIdHash);
 
     const slot = await getSlot(ctx);
-    // On-chain: data_payload = auth_type(1) + full_auth_data(65) = 66 bytes
+    // On-chain: data_payload = auth_type(1) + credential_id_hash(32) + pubkey(33) + rpIdLen(1) + rpId(N)
+    const rpIdBytes = Buffer.from(newCeoKey.rpId, 'utf-8');
     const dataPayload = Buffer.concat([
       Buffer.from([AUTH_TYPE_SECP256R1]),
       newCeoKey.credentialIdHash,
       newCeoKey.publicKeyBytes,
+      Buffer.from([rpIdBytes.length]),
+      rpIdBytes,
     ]);
     // On-chain extends: extended_data_payload = data_payload + payer.key()
     const signedPayload = Buffer.concat([dataPayload, ctx.payer.publicKey.toBuffer()]);
@@ -270,10 +272,9 @@ describe('E2E Company Workflow', () => {
       discriminator: new Uint8Array([DISC_TRANSFER_OWNERSHIP]),
       signedPayload,
       slot,
-      counter: 2n, // CEO's second operation (1st was AddAuthority)
+      counter: 2, // CEO's second operation (1st was AddAuthority)
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 6,
-      sysvarSlotHashesIndex: 7,
     });
 
     const ix = createTransferOwnershipIx({
@@ -284,6 +285,7 @@ describe('E2E Company Workflow', () => {
       newType: AUTH_TYPE_SECP256R1,
       credentialOrPubkey: newCeoKey.credentialIdHash,
       secp256r1Pubkey: newCeoKey.publicKeyBytes,
+      rpId: newCeoKey.rpId,
       authPayload,
     });
 

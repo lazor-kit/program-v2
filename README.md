@@ -11,7 +11,8 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 - **Multi-Protocol Authentication**: Ed25519 (native Solana) + Secp256r1 (WebAuthn/Passkeys/Apple Secure Enclave)
 - **Role-Based Access Control**: Owner / Admin / Spender with strict permission hierarchy
 - **Ephemeral Session Keys**: Time-bound keys with absolute slot-based expiry (max 30 days)
-- **Odometer Replay Protection**: Monotonic u64 counter per authority — works reliably with synced passkeys (iCloud, Google)
+- **Odometer Replay Protection**: Monotonic u32 counter per authority — works reliably with synced passkeys (iCloud, Google)
+- **Clock-Based Slot Freshness**: 150-slot window via `Clock::get()` — no SlotHashes sysvar needed
 - **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead
 - **CompactInstructions**: Index-based instruction packing for multi-call payloads within Solana's 1,232-byte tx limit
 - **CPI Reentrancy Protection**: stack_height check prevents cross-program authentication attacks
@@ -22,9 +23,9 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 | Metric | Normal Transfer | LazorKit (Secp256r1) | LazorKit (Session) |
 |---|---|---|---|
-| Compute Units | 150 | 9,316 | 7,483 |
-| Transaction Size | 215 bytes | 708 bytes | 452 bytes |
-| Accounts | 2 | 8 | 7 |
+| Compute Units | 150 | 10,941 | 4,483 |
+| Transaction Size | 215 bytes | 658 bytes | 452 bytes |
+| Accounts | 2 | 7 | 7 |
 | Instructions | 1 | 2 | 1 |
 | Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL |
 
@@ -42,7 +43,7 @@ See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, an
 |---|---|---|
 | Wallet PDA | 8 bytes | 0.000947 |
 | Authority (Ed25519) | 80 bytes | 0.001448 |
-| Authority (Secp256r1) | 113 bytes | 0.001677 |
+| Authority (Secp256r1) | ~125 bytes | 0.001761 |
 | Session | 80 bytes | 0.001448 |
 
 ### Total Wallet Creation
@@ -50,7 +51,7 @@ See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, an
 | Auth Type | Total Cost | ~USD at $150/SOL |
 |---|---|---|
 | Ed25519 | 0.002399 SOL | $0.36 |
-| Secp256r1 (Passkey) | 0.002629 SOL | $0.39 |
+| Secp256r1 (Passkey) | 0.002713 SOL | $0.41 |
 
 ### Session Key Cost
 
@@ -157,12 +158,13 @@ LazorKit V2 has been audited by **Accretion** (Solana Foundation funded).
 **Status**: 17/17 security issues resolved
 
 Security features:
-- Odometer counter replay protection (per-authority monotonic u64)
-- SlotHashes liveness window (150 slots)
+- Odometer counter replay protection (per-authority monotonic u32)
+- Clock-based slot freshness window (150 slots via `Clock::get()`)
 - CPI reentrancy prevention (stack_height check)
 - Signature binding (payer, accounts hash, counter, program_id)
 - Self-removal and owner removal protection
 - Session expiry validation (future + 30-day max)
+- rpId stored on-chain (prevents cross-origin attacks)
 
 Report vulnerabilities via [SECURITY.md](SECURITY.md).
 

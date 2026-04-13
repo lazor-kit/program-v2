@@ -8,7 +8,6 @@ import {
   TransactionInstruction,
   SystemProgram,
   SYSVAR_INSTRUCTIONS_PUBKEY,
-  SYSVAR_SLOT_HASHES_PUBKEY,
   SYSVAR_RENT_PUBKEY,
 } from '@solana/web3.js';
 import { PROGRAM_ID } from '../generated';
@@ -35,7 +34,7 @@ export const ROLE_SPENDER = 2;
  * Instruction data layout (after discriminator):
  *   [user_seed(32)][auth_type(1)][auth_bump(1)][padding(6)]
  *   Ed25519:   [pubkey(32)]
- *   Secp256r1: [credential_id_hash(32)][pubkey(33)]
+ *   Secp256r1: [credential_id_hash(32)][pubkey(33)][rpIdLen(1)][rpId(N)]
  */
 export function createCreateWalletIx(params: {
   payer: PublicKey;
@@ -49,6 +48,8 @@ export function createCreateWalletIx(params: {
   credentialOrPubkey: Uint8Array;
   /** Secp256r1 only: 33-byte compressed pubkey */
   secp256r1Pubkey?: Uint8Array;
+  /** Secp256r1 only: RP ID string (stored on-chain for per-tx savings) */
+  rpId?: string;
   programId?: PublicKey;
 }): TransactionInstruction {
   const pid = params.programId ?? PROGRAM_ID;
@@ -61,6 +62,11 @@ export function createCreateWalletIx(params: {
   ];
   if (params.authType === AUTH_TYPE_SECP256R1 && params.secp256r1Pubkey) {
     parts.push(params.secp256r1Pubkey);
+    if (params.rpId) {
+      const rpIdBytes = Buffer.from(params.rpId, 'utf-8');
+      parts.push(new Uint8Array([rpIdBytes.length]));
+      parts.push(new Uint8Array(rpIdBytes));
+    }
   }
 
   return new TransactionInstruction({
@@ -82,7 +88,7 @@ export function createCreateWalletIx(params: {
  * Instruction data layout (after discriminator):
  *   [auth_type(1)][new_role(1)][padding(6)]
  *   Ed25519:   [pubkey(32)]
- *   Secp256r1: [credential_id_hash(32)][pubkey(33)] + [auth_payload(...)]
+ *   Secp256r1: [credential_id_hash(32)][pubkey(33)][rpIdLen(1)][rpId(N)] + [auth_payload(...)]
  */
 export function createAddAuthorityIx(params: {
   payer: PublicKey;
@@ -95,6 +101,8 @@ export function createAddAuthorityIx(params: {
   credentialOrPubkey: Uint8Array;
   /** Secp256r1 only: 33-byte compressed pubkey */
   secp256r1Pubkey?: Uint8Array;
+  /** Secp256r1 only: RP ID string for the new authority */
+  rpId?: string;
   /** Auth payload for Secp256r1 admin authentication */
   authPayload?: Uint8Array;
   /** For Ed25519 admin: the signer pubkey */
@@ -110,6 +118,11 @@ export function createAddAuthorityIx(params: {
   ];
   if (params.newType === AUTH_TYPE_SECP256R1 && params.secp256r1Pubkey) {
     parts.push(params.secp256r1Pubkey);
+    if (params.rpId) {
+      const rpIdBytes = Buffer.from(params.rpId, 'utf-8');
+      parts.push(new Uint8Array([rpIdBytes.length]));
+      parts.push(new Uint8Array(rpIdBytes));
+    }
   }
   if (params.authPayload) {
     parts.push(params.authPayload);
@@ -124,12 +137,11 @@ export function createAddAuthorityIx(params: {
     { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
   ];
 
-  // Secp256r1 auth needs sysvar accounts; Ed25519 needs the signer
+  // Secp256r1 auth needs sysvar instructions; Ed25519 needs the signer
   if (params.authorizerSigner) {
     keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
   } else if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
-    keys.push({ pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false });
   }
 
   return new TransactionInstruction({
@@ -173,7 +185,6 @@ export function createRemoveAuthorityIx(params: {
     keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
   } else if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
-    keys.push({ pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false });
   }
 
   return new TransactionInstruction({
@@ -188,7 +199,7 @@ export function createRemoveAuthorityIx(params: {
  * Instruction data layout (after discriminator):
  *   [auth_type(1)]
  *   Ed25519:   [pubkey(32)]
- *   Secp256r1: [credential_id_hash(32)][pubkey(33)] + [auth_payload(...)]
+ *   Secp256r1: [credential_id_hash(32)][pubkey(33)][rpIdLen(1)][rpId(N)] + [auth_payload(...)]
  */
 export function createTransferOwnershipIx(params: {
   payer: PublicKey;
@@ -200,6 +211,8 @@ export function createTransferOwnershipIx(params: {
   credentialOrPubkey: Uint8Array;
   /** Secp256r1 only: 33-byte compressed pubkey */
   secp256r1Pubkey?: Uint8Array;
+  /** Secp256r1 only: RP ID string for the new owner */
+  rpId?: string;
   authPayload?: Uint8Array;
   authorizerSigner?: PublicKey;
   programId?: PublicKey;
@@ -212,6 +225,11 @@ export function createTransferOwnershipIx(params: {
   ];
   if (params.newType === AUTH_TYPE_SECP256R1 && params.secp256r1Pubkey) {
     parts.push(params.secp256r1Pubkey);
+    if (params.rpId) {
+      const rpIdBytes = Buffer.from(params.rpId, 'utf-8');
+      parts.push(new Uint8Array([rpIdBytes.length]));
+      parts.push(new Uint8Array(rpIdBytes));
+    }
   }
   if (params.authPayload) {
     parts.push(params.authPayload);
@@ -230,7 +248,6 @@ export function createTransferOwnershipIx(params: {
     keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
   } else if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
-    keys.push({ pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false });
   }
 
   return new TransactionInstruction({
@@ -273,10 +290,9 @@ export function createExecuteIx(params: {
     { pubkey: params.vaultPda, isSigner: false, isWritable: true },
   ];
 
-  // Secp256r1 needs sysvar accounts
+  // Secp256r1 needs sysvar instructions for precompile introspection
   if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
-    keys.push({ pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false });
   }
 
   // Remaining accounts for CPI targets
@@ -334,7 +350,6 @@ export function createCreateSessionIx(params: {
     keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
   } else if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
-    keys.push({ pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false });
   }
 
   return new TransactionInstruction({

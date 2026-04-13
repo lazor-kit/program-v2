@@ -53,6 +53,7 @@ describe('Counter Edge Cases', () => {
       authBump,
       credentialOrPubkey: ownerKey.credentialIdHash,
       secp256r1Pubkey: ownerKey.publicKeyBytes,
+      rpId: ownerKey.rpId,
     })]);
 
     // Fund vault
@@ -80,10 +81,9 @@ describe('Counter Edge Cases', () => {
       discriminator: new Uint8Array([DISC_ADD_AUTHORITY]),
       signedPayload: signedPayload1,
       slot: slot1,
-      counter: 1n,
+      counter: 1,
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 6,
-      sysvarSlotHashesIndex: 7,
     });
 
     await sendTx(ctx, [pi1, createAddAuthorityIx({
@@ -108,8 +108,8 @@ describe('Counter Edge Cases', () => {
     transferData.writeBigUInt64LE(1_000_000n, 4);
 
     const compactIxs = [{
-      programIdIndex: 6,
-      accountIndexes: [3, 7],
+      programIdIndex: 5,
+      accountIndexes: [3, 6],
       data: new Uint8Array(transferData),
     }];
     const packed = packCompactInstructions(compactIxs);
@@ -122,7 +122,6 @@ describe('Counter Edge Cases', () => {
       { pubkey: ownerAuthPda, isSigner: false, isWritable: true },
       { pubkey: vaultPda, isSigner: false, isWritable: true },
       { pubkey: PublicKey.default, isSigner: false, isWritable: false },
-      { pubkey: PublicKey.default, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: execRecipient, isSigner: false, isWritable: true },
     ];
@@ -134,10 +133,9 @@ describe('Counter Edge Cases', () => {
       discriminator: new Uint8Array([DISC_EXECUTE]),
       signedPayload: signedPayload2,
       slot: slot2,
-      counter: 2n,
+      counter: 2,
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 4,
-      sysvarSlotHashesIndex: 5,
     });
 
     await sendTx(ctx, [pi2, createExecuteIx({
@@ -178,17 +176,21 @@ describe('Counter Edge Cases', () => {
       authBump: auth1Bump,
       credentialOrPubkey: key1.credentialIdHash,
       secp256r1Pubkey: key1.publicKeyBytes,
+      rpId: key1.rpId,
     })]);
 
     // Add key2 as spender via key1 (counter1 goes to 1)
     const [auth2Pda] = findAuthorityPda(walletPda, key2.credentialIdHash);
     const slot = await getSlot(ctx);
 
+    const rpIdBytes = Buffer.from(key2.rpId, 'utf-8');
     const dataPayload2 = Buffer.concat([
       Buffer.from([AUTH_TYPE_SECP256R1, ROLE_SPENDER]),
       Buffer.alloc(6),
       key2.credentialIdHash,
       key2.publicKeyBytes,
+      Buffer.from([rpIdBytes.length]),
+      rpIdBytes,
     ]);
     // On-chain extends: extended_data_payload = data_payload + payer.key()
     const signedPayloadAdd = Buffer.concat([dataPayload2, ctx.payer.publicKey.toBuffer()]);
@@ -198,10 +200,9 @@ describe('Counter Edge Cases', () => {
       discriminator: new Uint8Array([DISC_ADD_AUTHORITY]),
       signedPayload: signedPayloadAdd,
       slot,
-      counter: 1n,
+      counter: 1,
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 6,
-      sysvarSlotHashesIndex: 7,
     });
 
     await sendTx(ctx, [precompileIx, createAddAuthorityIx({
@@ -213,6 +214,7 @@ describe('Counter Edge Cases', () => {
       newRole: ROLE_SPENDER,
       credentialOrPubkey: key2.credentialIdHash,
       secp256r1Pubkey: key2.publicKeyBytes,
+      rpId: key2.rpId,
       authPayload,
     })]);
 

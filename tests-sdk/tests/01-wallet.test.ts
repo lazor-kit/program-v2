@@ -77,6 +77,7 @@ describe('CreateWallet', () => {
       authBump,
       credentialOrPubkey: key.credentialIdHash,
       secp256r1Pubkey: key.publicKeyBytes,
+      rpId: key.rpId,
     });
 
     await sendTx(ctx, [ix]);

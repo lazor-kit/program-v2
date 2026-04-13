@@ -81,10 +81,9 @@ export async function signSecp256r1(params: {
   discriminator: Uint8Array;
   signedPayload: Uint8Array;
   slot: bigint;
-  counter: bigint;
+  counter: number;
   payer: PublicKey;
   sysvarIxIndex: number;
-  sysvarSlotHashesIndex: number;
   programId?: PublicKey;
 }): Promise<{
   authPayload: Uint8Array;
@@ -93,14 +92,12 @@ export async function signSecp256r1(params: {
   const pid = params.programId ?? PROGRAM_ID;
   const authenticatorData = generateAuthenticatorData(params.key.rpId);
 
-  // Build auth payload
+  // Build auth payload (optimized: no rpId, no slotHashes index, u32 counter)
   const authPayload = buildAuthPayload({
     slot: params.slot,
     counter: params.counter,
     sysvarIxIndex: params.sysvarIxIndex,
-    sysvarSlotHashesIndex: params.sysvarSlotHashesIndex,
     typeAndFlags: 0x10, // webauthn.get + https
-    rpId: params.key.rpId,
     authenticatorData,
   });
 

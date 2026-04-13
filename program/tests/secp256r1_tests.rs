@@ -43,9 +43,12 @@ fn test_create_wallet_secp256r1_repro() {
     instruction_data.push(auth_bump); // Use correct bump
     instruction_data.extend_from_slice(&[0; 6]); // padding
 
-    // "rest" part for Secp256r1: credential_id_hash + pubkey
+    // "rest" part for Secp256r1: credential_id_hash + pubkey + rpIdLen + rpId
+    let rp_id = b"lazorkit.test";
     instruction_data.extend_from_slice(&credential_id_hash);
     instruction_data.extend_from_slice(&pubkey_bytes);
+    instruction_data.push(rp_id.len() as u8);
+    instruction_data.extend_from_slice(rp_id);
 
     let create_wallet_ix = Instruction {
         program_id: context.program_id,
@@ -145,6 +148,7 @@ fn test_add_multiple_secp256r1_authorities() {
     let mut rng = rand::thread_rng();
 
     // --- Add Passkey 1 ---
+    let rp_id = b"lazorkit.test";
     let credential_id_hash1 = [3u8; 32];
     let signing_key1 = SigningKey::random(&mut rng);
     let pubkey_bytes1 = VerifyingKey::from(&signing_key1)
@@ -169,6 +173,8 @@ fn test_add_multiple_secp256r1_authorities() {
         payload.extend_from_slice(&add_auth_args);
         payload.extend_from_slice(&credential_id_hash1);
         payload.extend_from_slice(&pubkey_bytes1);
+        payload.push(rp_id.len() as u8);
+        payload.extend_from_slice(rp_id);
         payload
     };
 
@@ -177,6 +183,8 @@ fn test_add_multiple_secp256r1_authorities() {
     add_auth_ix_data.extend_from_slice(&add_auth_args);
     add_auth_ix_data.extend_from_slice(&credential_id_hash1);
     add_auth_ix_data.extend_from_slice(&pubkey_bytes1);
+    add_auth_ix_data.push(rp_id.len() as u8);
+    add_auth_ix_data.extend_from_slice(rp_id);
     add_auth_ix_data.extend_from_slice(signature.as_ref());
 
     let add_auth_ix1 = Instruction {
@@ -232,6 +240,8 @@ fn test_add_multiple_secp256r1_authorities() {
         payload.extend_from_slice(&add_auth_args);
         payload.extend_from_slice(&credential_id_hash2);
         payload.extend_from_slice(&pubkey_bytes2);
+        payload.push(rp_id.len() as u8);
+        payload.extend_from_slice(rp_id);
         payload
     };
 
@@ -240,6 +250,8 @@ fn test_add_multiple_secp256r1_authorities() {
     add_auth_ix_data.extend_from_slice(&add_auth_args);
     add_auth_ix_data.extend_from_slice(&credential_id_hash2);
     add_auth_ix_data.extend_from_slice(&pubkey_bytes2);
+    add_auth_ix_data.push(rp_id.len() as u8);
+    add_auth_ix_data.extend_from_slice(rp_id);
     add_auth_ix_data.extend_from_slice(signature.as_ref());
 
     let add_auth_ix2 = Instruction {

@@ -143,6 +143,7 @@ describe('Execute', () => {
         authBump,
         credentialOrPubkey: ownerKey.credentialIdHash,
         secp256r1Pubkey: ownerKey.publicKeyBytes,
+        rpId: ownerKey.rpId,
       })]);
 
       // Fund the vault
@@ -159,13 +160,13 @@ describe('Execute', () => {
       transferData.writeUInt32LE(2, 0);
       transferData.writeBigUInt64LE(1_000_000n, 4);
 
-      // Account layout:
+      // Account layout (no slotHashes sysvar):
       //   0: payer, 1: wallet, 2: authority, 3: vault
-      //   4: sysvar_instructions, 5: sysvar_slothashes
-      //   6: SystemProgram, 7: recipient
+      //   4: sysvar_instructions
+      //   5: SystemProgram, 6: recipient
       const compactIxs = [{
-        programIdIndex: 6,
-        accountIndexes: [3, 7],
+        programIdIndex: 5,
+        accountIndexes: [3, 6],
         data: new Uint8Array(transferData),
       }];
       const packed = packCompactInstructions(compactIxs);
@@ -177,7 +178,6 @@ describe('Execute', () => {
         { pubkey: ownerAuthorityPda, isSigner: false, isWritable: true },
         { pubkey: vaultPda, isSigner: false, isWritable: true },
         { pubkey: PublicKey.default, isSigner: false, isWritable: false }, // sysvar_instructions placeholder
-        { pubkey: PublicKey.default, isSigner: false, isWritable: false }, // sysvar_slothashes placeholder
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: recipient, isSigner: false, isWritable: true },
       ];
@@ -189,10 +189,9 @@ describe('Execute', () => {
         discriminator: new Uint8Array([DISC_EXECUTE]),
         signedPayload,
         slot,
-        counter: 1n,
+        counter: 1,
         payer: ctx.payer.publicKey,
         sysvarIxIndex: 4,
-        sysvarSlotHashesIndex: 5,
       });
 
       const ix = createExecuteIx({
@@ -224,8 +223,8 @@ describe('Execute', () => {
       transferData.writeBigUInt64LE(1_000_000n, 4);
 
       const compactIxs = [{
-        programIdIndex: 6,
-        accountIndexes: [3, 7],
+        programIdIndex: 5,
+        accountIndexes: [3, 6],
         data: new Uint8Array(transferData),
       }];
       const packed = packCompactInstructions(compactIxs);
@@ -236,7 +235,6 @@ describe('Execute', () => {
         { pubkey: walletPda, isSigner: false, isWritable: false },
         { pubkey: ownerAuthorityPda, isSigner: false, isWritable: true },
         { pubkey: vaultPda, isSigner: false, isWritable: true },
-        { pubkey: PublicKey.default, isSigner: false, isWritable: false },
         { pubkey: PublicKey.default, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: recipient, isSigner: false, isWritable: true },
@@ -250,10 +248,9 @@ describe('Execute', () => {
         discriminator: new Uint8Array([DISC_EXECUTE]),
         signedPayload,
         slot,
-        counter: 2n,
+        counter: 2,
         payer: ctx.payer.publicKey,
         sysvarIxIndex: 4,
-        sysvarSlotHashesIndex: 5,
       });
 
       const ix = createExecuteIx({
@@ -271,11 +268,11 @@ describe('Execute', () => {
 
       await sendTx(ctx, [precompileIx, ix]);
 
-      // Verify counter is now 2
+      // Verify counter is now 2 (u32 at offset 8)
       const authority = await ctx.connection.getAccountInfo(ownerAuthorityPda);
       const view = new DataView(authority!.data.buffer, authority!.data.byteOffset);
-      const counter = view.getBigUint64(8, true);
-      expect(counter).toBe(2n);
+      const counter = view.getUint32(8, true);
+      expect(counter).toBe(2);
     });
   });
 });

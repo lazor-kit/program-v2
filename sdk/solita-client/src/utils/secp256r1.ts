@@ -27,55 +27,44 @@ export interface Secp256r1Signer {
 
 /**
  * Reads the current odometer counter from an on-chain authority account.
- * The counter is a u64 LE at offset 8 of the AuthorityAccountHeader.
+ * The counter is a u32 LE at offset 8 of the AuthorityAccountHeader.
  */
 export async function readAuthorityCounter(
   connection: Connection,
   authorityPda: PublicKey,
-): Promise<bigint> {
+): Promise<number> {
   const info = await connection.getAccountInfo(authorityPda);
   if (!info) throw new Error(`Authority account not found: ${authorityPda.toBase58()}`);
-  if (info.data.length < 16) throw new Error('Authority account data too short');
+  if (info.data.length < 12) throw new Error('Authority account data too short');
   const view = new DataView(info.data.buffer, info.data.byteOffset);
-  return view.getBigUint64(8, true); // offset 8, little-endian
+  return view.getUint32(8, true); // offset 8, little-endian, u32
 }
 
 /**
  * Builds the auth_payload bytes for a Secp256r1 operation.
  *
- * Layout:
- *   [slot(8)][counter(8)][sysvarIxIdx(1)][sysvarSlotIdx(1)]
- *   [typeAndFlags(1)][rpIdLen(1)][rpId(N)][authenticatorData(M)]
+ * Layout (optimized — rpId stored on-chain, counter is u32):
+ *   [slot(8)][counter(4)][sysvarIxIdx(1)][typeAndFlags(1)][authenticatorData(M)]
  */
 export function buildAuthPayload(params: {
   slot: bigint;
-  counter: bigint;
+  counter: number;
   sysvarIxIndex: number;
-  sysvarSlotHashesIndex: number;
   typeAndFlags: number;
-  rpId: string;
   authenticatorData: Uint8Array;
 }): Uint8Array {
-  const rpIdBytes = Buffer.from(params.rpId, 'utf-8');
-  const totalLen =
-    8 + 8 + 1 + 1 + 1 + 1 + rpIdBytes.length + params.authenticatorData.length;
+  const totalLen = 8 + 4 + 1 + 1 + params.authenticatorData.length;
   const buf = Buffer.alloc(totalLen);
   let offset = 0;
 
   buf.writeBigUInt64LE(params.slot, offset);
   offset += 8;
-  buf.writeBigUInt64LE(params.counter, offset);
-  offset += 8;
+  buf.writeUInt32LE(params.counter, offset);
+  offset += 4;
   buf.writeUInt8(params.sysvarIxIndex, offset);
-  offset += 1;
-  buf.writeUInt8(params.sysvarSlotHashesIndex, offset);
   offset += 1;
   buf.writeUInt8(params.typeAndFlags, offset);
   offset += 1;
-  buf.writeUInt8(rpIdBytes.length, offset);
-  offset += 1;
-  rpIdBytes.copy(buf, offset);
-  offset += rpIdBytes.length;
   Buffer.from(params.authenticatorData).copy(buf, offset);
 
   return new Uint8Array(buf);
@@ -84,7 +73,7 @@ export function buildAuthPayload(params: {
 /**
  * Computes the SHA-256 challenge hash that must be signed by the passkey.
  *
- * Hash = SHA256(discriminator || auth_payload || signed_payload || slot_le || payer || counter_le || program_id)
+ * Hash = SHA256(discriminator || auth_payload || signed_payload || slot_le || payer || counter_le(4) || program_id)
  *
  * This must exactly match the on-chain `sol_sha256` call in secp256r1/mod.rs.
  */
@@ -94,14 +83,14 @@ export function buildSecp256r1Challenge(params: {
   signedPayload: Uint8Array;
   slot: bigint;
   payer: PublicKey;
-  counter: bigint;
+  counter: number;
   programId?: PublicKey;
 }): Uint8Array {
   const pid = params.programId ?? PROGRAM_ID;
   const slotBuf = Buffer.alloc(8);
   slotBuf.writeBigUInt64LE(params.slot);
-  const counterBuf = Buffer.alloc(8);
-  counterBuf.writeBigUInt64LE(params.counter);
+  const counterBuf = Buffer.alloc(4);
+  counterBuf.writeUInt32LE(params.counter);
 
   const hash = createHash('sha256');
   hash.update(params.discriminator);

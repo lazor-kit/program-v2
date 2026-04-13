@@ -82,6 +82,7 @@ const ix = createCreateWalletIx({
   authBump: number,
   credentialOrPubkey: Uint8Array, // Ed25519: 32-byte pubkey | Secp256r1: 32-byte credential_id_hash
   secp256r1Pubkey?: Uint8Array,   // Secp256r1 only: 33-byte compressed pubkey
+  rpId?: string,                  // Secp256r1 only: relying party ID (e.g., "lazorkit.app")
 });
 ```
 
@@ -108,8 +109,8 @@ import { packCompactInstructions, computeAccountsHash } from '@lazorkit/solita-c
 
 // Define compact instructions with account indexes (not pubkeys)
 const packed = packCompactInstructions([{
-  programIdIndex: 6,        // Index of SystemProgram in accounts
-  accountIndexes: [3, 7],   // vault (from), recipient (to)
+  programIdIndex: 5,        // Index of SystemProgram in accounts
+  accountIndexes: [3, 6],   // vault (from), recipient (to)
   data: transferData,
 }]);
 
@@ -133,12 +134,10 @@ const counter = await readAuthorityCounter(connection, authorityPda);
 // Build auth payload for Secp256r1 signing
 const authPayload = buildAuthPayload({
   slot: BigInt(currentSlot),
-  counter: counter + 1n,
+  counter: counter + 1,          // number (u32), not bigint
   sysvarIxIndex: 4,
-  sysvarSlotHashesIndex: 5,
-  typeAndFlags: 0x10,          // webauthn.get + https
-  rpId: 'lazorkit.app',
-  authenticatorData: authData,
+  typeAndFlags: 0x10,            // webauthn.get + https
+  authenticatorData: authData,   // rpId is stored on-chain, not sent per-tx
 });
 
 // Build challenge hash (7 elements)
@@ -148,7 +147,7 @@ const challenge = buildSecp256r1Challenge({
   signedPayload,
   slot: BigInt(currentSlot),
   payer: payerPublicKey,
-  counter: counter + 1n,
+  counter: counter + 1,          // number (u32)
 });
 ```
 
@@ -183,9 +182,9 @@ const { ix, walletPda, vaultPda, authorityPda } = client.createWalletEd25519({
   payer, userSeed, ownerPubkey,
 });
 
-// Create wallet (Secp256r1)
+// Create wallet (Secp256r1) — rpId stored on-chain
 const { ix, walletPda, vaultPda, authorityPda } = client.createWalletSecp256r1({
-  payer, userSeed, credentialIdHash, compressedPubkey,
+  payer, userSeed, credentialIdHash, compressedPubkey, rpId: 'lazorkit.app',
 });
 
 // Execute (Ed25519)
@@ -196,7 +195,7 @@ const ix = client.executeEd25519({
 // Execute (Secp256r1) — includes precompile instruction
 const { ix, precompileIx } = await client.executeSecp256r1({
   payer, walletPda, authorityPda, vaultPda,
-  signer, slot, sysvarIxIndex, sysvarSlotHashesIndex,
+  signer, slot, sysvarIxIndex,
   compactInstructions, remainingAccounts,
 });
 ```
@@ -249,7 +248,7 @@ Error codes:
 | 3004 | InvalidPubkey | Public key mismatch |
 | 3005 | InvalidMessageHash | Challenge hash mismatch |
 | 3006 | SignatureReused | Counter mismatch (replay attempt) |
-| 3007 | InvalidSignatureAge | Slot outside SlotHashes window |
+| 3007 | InvalidSignatureAge | Slot too old (>150 slots from current) |
 | 3008 | InvalidSessionDuration | Session expiry out of range |
 | 3009 | SessionExpired | Session past expires_at slot |
 | 3010 | AuthorityDoesNotSupportSession | N/A |

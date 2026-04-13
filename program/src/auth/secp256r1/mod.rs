@@ -3,22 +3,27 @@ use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
     pubkey::Pubkey,
-    sysvars::instructions::{Instructions, INSTRUCTIONS_ID},
+    sysvars::{
+        clock::Clock,
+        instructions::{Instructions, INSTRUCTIONS_ID},
+        Sysvar,
+    },
 };
 use pinocchio_pubkey::pubkey;
 
 pub mod introspection;
-pub mod nonce;
-pub mod slothashes;
 pub mod webauthn;
 
 use self::introspection::verify_secp256r1_instruction_data;
-use self::nonce::validate_nonce;
 use self::webauthn::{
     reconstruct_client_data_json, AuthDataParser, ClientDataJsonReconstructionParams,
 };
 
 use crate::auth::traits::Authenticator;
+use crate::utils::get_stack_height;
+
+/// Maximum age (in slots) for a Secp256r1 signature to be considered valid (~60 seconds).
+const MAX_SLOT_AGE: u64 = 150;
 
 /// Authenticator implementation for Secp256r1 (WebAuthn).
 pub struct Secp256r1Authenticator;
@@ -27,10 +32,10 @@ impl Authenticator for Secp256r1Authenticator {
     /// Authenticates a Secp256r1 signature (WebAuthn/Passkeys).
     ///
     /// Auth payload layout:
-    ///   [slot(8)] [counter(8)] [sysvarIxIdx(1)] [sysvarSlotIdx(1)] [flags(1)] [rpIdLen(1)] [rpId(N)] [authenticatorData(M)]
+    ///   [slot(8)] [counter(4)] [sysvarIxIdx(1)] [flags(1)] [authenticatorData(M)]
     ///
-    /// Counter is a program-controlled odometer (swig-style). The client must submit
-    /// `on_chain_counter + 1`. The WebAuthn hardware counter is NOT used for replay protection.
+    /// rpId is stored on the authority account (not in the payload).
+    /// Counter is a program-controlled u32 odometer. Client must submit `on_chain_counter + 1`.
     fn authenticate(
         &self,
         accounts: &[AccountInfo],
@@ -40,31 +45,34 @@ impl Authenticator for Secp256r1Authenticator {
         discriminator: &[u8],
         program_id: &Pubkey,
     ) -> Result<(), ProgramError> {
-        // Minimum: slot(8) + counter(8) + sysvarIxIdx(1) + sysvarSlotIdx(1) + flags(1) + rpIdLen(1) = 20
-        if auth_payload.len() < 20 {
+        // Minimum: slot(8) + counter(4) + sysvarIxIdx(1) + flags(1) = 14
+        if auth_payload.len() < 14 {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
 
         let slot = u64::from_le_bytes(auth_payload[0..8].try_into().unwrap());
-        let submitted_counter = u64::from_le_bytes(auth_payload[8..16].try_into().unwrap());
-        let sysvar_ix_index = auth_payload[16] as usize;
-        let sysvar_slothashes_index = auth_payload[17] as usize;
+        let submitted_counter = u32::from_le_bytes(auth_payload[8..12].try_into().unwrap());
+        let sysvar_ix_index = auth_payload[12] as usize;
 
         let reconstruction_params = ClientDataJsonReconstructionParams {
-            type_and_flags: auth_payload[18],
+            type_and_flags: auth_payload[13],
         };
-        let rp_id_len = auth_payload[19] as usize;
-        if auth_payload.len() < 20 + rp_id_len {
-            return Err(AuthError::InvalidAuthorityPayload.into());
-        }
-        let rp_id = &auth_payload[20..20 + rp_id_len];
-        let authenticator_data_raw = &auth_payload[20 + rp_id_len..];
+        let authenticator_data_raw: &[u8] = &auth_payload[14..];
 
-        // Validate Nonce (SlotHashes) — ensures signature freshness within 150 slots
-        let slothashes_account = accounts
-            .get(sysvar_slothashes_index)
-            .ok_or(AuthError::InvalidAuthorityPayload)?;
-        let _slot_hash = validate_nonce(slothashes_account, slot)?;
+        // Anti-CPI check: prevent cross-program authentication attacks
+        if get_stack_height() > 1 {
+            return Err(AuthError::PermissionDenied.into());
+        }
+
+        // Validate slot freshness using Clock sysvar (replaces SlotHashes lookup)
+        let clock = Clock::get()?;
+        let current_slot = clock.slot;
+        if slot > current_slot {
+            return Err(AuthError::InvalidSignatureAge.into());
+        }
+        if current_slot - slot >= MAX_SLOT_AGE {
+            return Err(AuthError::InvalidSignatureAge.into());
+        }
 
         let header_size = std::mem::size_of::<AuthorityAccountHeader>();
         if auth_data.len() < header_size {
@@ -75,7 +83,7 @@ impl Authenticator for Secp256r1Authenticator {
             std::ptr::read_unaligned(auth_data.as_ptr() as *const AuthorityAccountHeader)
         };
 
-        // --- Odometer validation (swig-style) ---
+        // --- Odometer validation ---
         // The client must submit exactly `stored_counter + 1`.
         // This decouples replay protection from the WebAuthn hardware counter,
         // which is unreliable for synced passkeys (iCloud, Google).
@@ -85,11 +93,23 @@ impl Authenticator for Secp256r1Authenticator {
         }
 
         // Secp256r1 on-chain data layout:
-        //   [Header(48)] [credential_id_hash(32)] [Pubkey(33)]
+        //   [Header(48)] [credential_id_hash(32)] [Pubkey(33)] [rpIdLen(1)] [rpId(N)]
         let pubkey_offset = header_size + 32; // skip credential_id_hash
         if auth_data.len() < pubkey_offset + 33 {
             return Err(AuthError::InvalidAuthorityPayload.into());
         }
+
+        // Read rpId from authority account data (stored at creation time)
+        let rp_id_len_offset = pubkey_offset + 33;
+        if auth_data.len() < rp_id_len_offset + 1 {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
+        let rp_id_len = auth_data[rp_id_len_offset] as usize;
+        let rp_id_offset = rp_id_len_offset + 1;
+        if auth_data.len() < rp_id_offset + rp_id_len {
+            return Err(AuthError::InvalidAuthorityPayload.into());
+        }
+        let rp_id = &auth_data[rp_id_offset..rp_id_offset + rp_id_len];
 
         #[allow(unused_assignments)]
         let mut computed_rp_id_hash = [0u8; 32];
@@ -113,8 +133,6 @@ impl Authenticator for Secp256r1Authenticator {
 
         // Build challenge hash:
         //   SHA256(discriminator || auth_payload || signed_payload || slot || payer || counter || program_id)
-        // The counter is included both in auth_payload (bytes 8-16) AND as a separate element
-        // for belt-and-suspenders protection.
         let counter_bytes = expected_counter.to_le_bytes();
         #[allow(unused_assignments)]
         let mut hasher = [0u8; 32];
@@ -139,6 +157,8 @@ impl Authenticator for Secp256r1Authenticator {
         {
             let _ = signed_payload;
             let _ = discriminator;
+            let _ = counter_bytes;
+            let _ = program_id;
             hasher = [0u8; 32];
         }
 

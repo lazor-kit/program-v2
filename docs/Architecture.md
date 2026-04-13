@@ -16,8 +16,8 @@ LazorKit is a high-performance smart wallet on Solana with passkey (WebAuthn) au
 
 ### Replay Protection
 
-- **Secp256r1 (Primary: Odometer Counter)**: Program-controlled u64 counter per authority. Client submits `stored_counter + 1`. The WebAuthn hardware counter is intentionally NOT used -- synced passkeys (iCloud, Google) return unreliable values. Counter is committed only after successful signature verification.
-- **Secp256r1 (Secondary: SlotHashes Liveness)**: Slot from auth_payload must appear in SlotHashes sysvar (valid within 150 slots). Provides freshness without stateful nonces.
+- **Secp256r1 (Primary: Odometer Counter)**: Program-controlled u32 counter per authority. Client submits `stored_counter + 1`. The WebAuthn hardware counter is intentionally NOT used -- synced passkeys (iCloud, Google) return unreliable values. Counter is committed only after successful signature verification.
+- **Secp256r1 (Secondary: Clock-based Slot Freshness)**: Slot from auth_payload must be within 150 slots of `Clock::get()`. Provides freshness without stateful nonces or the SlotHashes sysvar.
 - **Secp256r1 (CPI Protection)**: stack_height check prevents authentication via CPI.
 - **Secp256r1 (Signature Binding)**: Challenge hash binds signature to specific instruction, payer, accounts, counter, and program_id.
 - **Ed25519**: Standard Solana runtime signer verification. No counter needed.
@@ -78,17 +78,18 @@ pub struct AuthorityAccountHeader {
     pub role: u8,            // 0=Owner, 1=Admin, 2=Spender
     pub bump: u8,
     pub version: u8,
-    pub _padding: [u8; 3],
-    pub counter: u64,        // Monotonic odometer for Secp256r1 replay protection
+    pub _padding1: [u8; 3],
+    pub counter: u32,        // Monotonic u32 odometer for Secp256r1 replay protection
+    pub _padding2: [u8; 4],  // Alignment padding (wallet stays at offset 16)
     pub wallet: Pubkey,      // 32 bytes
 }
-// Header: 1+1+1+1+1+3+8+32 = 48 bytes
+// Header: 1+1+1+1+1+3+4+4+32 = 48 bytes (same size, wallet at same offset)
 ```
 
 Variable data after header:
 
 - **Ed25519**: `[pubkey: [u8; 32]]` -- total 80 bytes.
-- **Secp256r1**: `[credential_id_hash: [u8; 32]] [compressed_pubkey: [u8; 33]]` -- total 113 bytes.
+- **Secp256r1**: `[credential_id_hash: [u8; 32]] [compressed_pubkey: [u8; 33]] [rpIdLen: u8] [rpId: [u8; N]]` -- total 114+ bytes (rpId stored on-chain to avoid per-tx transmission).
 
 ### C. SessionAccount (80 bytes)
 
@@ -127,7 +128,7 @@ No data allocated. Holds SOL. Program signs for it via PDA seeds during Execute.
 - Creates new Authority PDA.
 - Requires Admin or Owner authentication.
 - Owner can add any role; Admin can only add Spender.
-- Accounts: payer, wallet, admin_authority, new_authority, system_program, rent_sysvar [+ sysvar_instructions, sysvar_slothashes for Secp256r1].
+- Accounts: payer, wallet, admin_authority, new_authority, system_program, rent_sysvar [+ sysvar_instructions for Secp256r1].
 
 ### RemoveAuthority (discriminator: 2)
 
@@ -177,15 +178,17 @@ For Secp256r1 Execute, the signed payload includes a SHA256 hash of all account 
 ## 7. Auth Payload Layout (Secp256r1)
 
 ```
-[slot: u64 LE]              // 8 bytes  -- SlotHashes liveness
-[counter: u64 LE]           // 8 bytes  -- odometer value (stored + 1)
+[slot: u64 LE]              // 8 bytes  -- Clock-based slot freshness
+[counter: u32 LE]           // 4 bytes  -- odometer value (stored + 1)
 [sysvar_ix_index: u8]       // 1 byte   -- index of sysvar_instructions in accounts
-[sysvar_slothashes_index: u8] // 1 byte
 [type_and_flags: u8]        // 1 byte   -- WebAuthn type + flags
-[rp_id_len: u8]             // 1 byte
-[rp_id: u8[]]               // N bytes  -- e.g., "lazorkit.app"
 [authenticator_data: u8[]]  // M bytes  -- WebAuthn authenticator data (min 37 bytes)
 ```
+
+Compared to the previous layout, 3 optimizations reduce the per-transaction payload:
+- **Counter**: u64 -> u32 (saves 4 bytes; 4 billion ops per authority is sufficient)
+- **SlotHashes index**: removed (slot freshness via `Clock::get()` instead of sysvar lookup)
+- **rpId**: stored on the authority account at creation, not sent per-tx (saves ~12 bytes)
 
 ## 8. Project Structure
 
@@ -195,10 +198,8 @@ program/
     auth/
       ed25519.rs              Native signer verification
       secp256r1/
-        mod.rs                Passkey authenticator with odometer
+        mod.rs                Passkey authenticator with odometer + Clock-based slot check
         introspection.rs      Precompile instruction verification
-        nonce.rs              SlotHashes liveness validation
-        slothashes.rs         Sysvar memory parsing
         webauthn.rs           ClientDataJSON reconstruction + AuthDataParser
       traits.rs               Authenticator trait
     processor/

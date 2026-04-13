@@ -30,8 +30,8 @@ describe('Replay Prevention (Odometer)', () => {
 
   // Helper to build a simple transfer execute instruction
   const compactIxDef = [{
-    programIdIndex: 6,
-    accountIndexes: [3, 7],
+    programIdIndex: 5,
+    accountIndexes: [3, 6],
     data: new Uint8Array((() => {
       const d = Buffer.alloc(12);
       d.writeUInt32LE(2, 0);
@@ -44,7 +44,7 @@ describe('Replay Prevention (Odometer)', () => {
     return packCompactInstructions(compactIxDef);
   }
 
-  async function buildExecuteIx(counter: bigint, packed: Uint8Array) {
+  async function buildExecuteIx(counter: number, packed: Uint8Array) {
     const slot = await getSlot(ctx);
     const recipient = Keypair.generate().publicKey;
 
@@ -54,7 +54,6 @@ describe('Replay Prevention (Odometer)', () => {
       { pubkey: walletPda, isSigner: false, isWritable: false },
       { pubkey: ownerAuthorityPda, isSigner: false, isWritable: true },
       { pubkey: vaultPda, isSigner: false, isWritable: true },
-      { pubkey: PublicKey.default, isSigner: false, isWritable: false },
       { pubkey: PublicKey.default, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: true },
@@ -70,7 +69,6 @@ describe('Replay Prevention (Odometer)', () => {
       counter,
       payer: ctx.payer.publicKey,
       sysvarIxIndex: 4,
-      sysvarSlotHashesIndex: 5,
     });
 
     const ix = createExecuteIx({
@@ -110,6 +108,7 @@ describe('Replay Prevention (Odometer)', () => {
       authBump,
       credentialOrPubkey: ownerKey.credentialIdHash,
       secp256r1Pubkey: ownerKey.publicKeyBytes,
+      rpId: ownerKey.rpId,
     })]);
 
     // Fund vault
@@ -119,13 +118,13 @@ describe('Replay Prevention (Odometer)', () => {
 
   it('accepts counter=1 for fresh authority (stored=0)', async () => {
     const packed = buildTransferPacked();
-    const { precompileIx, ix } = await buildExecuteIx(1n, packed);
+    const { precompileIx, ix } = await buildExecuteIx(1, packed);
     await sendTx(ctx, [precompileIx, ix]);
 
     // Verify counter is now 1
     const info = await ctx.connection.getAccountInfo(ownerAuthorityPda);
     const view = new DataView(info!.data.buffer, info!.data.byteOffset);
-    expect(view.getBigUint64(8, true)).toBe(1n);
+    expect(view.getUint32(8, true)).toBe(1);
   });
 
   it('rejects same counter=1 replay (SignatureReused 3006)', async () => {
@@ -133,7 +132,7 @@ describe('Replay Prevention (Odometer)', () => {
     // Counter is now 1 on-chain, submitting 1 again should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(1n, packed)).precompileIx, (await buildExecuteIx(1n, packed)).ix],
+      [(await buildExecuteIx(1, packed)).precompileIx, (await buildExecuteIx(1, packed)).ix],
       [],
       3006, // SignatureReused
     );
@@ -143,7 +142,7 @@ describe('Replay Prevention (Odometer)', () => {
     const packed = buildTransferPacked();
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(0n, packed)).precompileIx, (await buildExecuteIx(0n, packed)).ix],
+      [(await buildExecuteIx(0, packed)).precompileIx, (await buildExecuteIx(0, packed)).ix],
       [],
       3006,
     );
@@ -154,14 +153,14 @@ describe('Replay Prevention (Odometer)', () => {
     // Stored counter is 1, expected next is 2, submitting 5 should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(5n, packed)).precompileIx, (await buildExecuteIx(5n, packed)).ix],
+      [(await buildExecuteIx(5, packed)).precompileIx, (await buildExecuteIx(5, packed)).ix],
       [],
       3006,
     );
   });
 
   it('accepts sequential counter 2, 3, 4', async () => {
-    for (const c of [2n, 3n, 4n]) {
+    for (const c of [2, 3, 4]) {
       const packed = buildTransferPacked();
       const { precompileIx, ix } = await buildExecuteIx(c, packed);
       await sendTx(ctx, [precompileIx, ix]);
@@ -170,7 +169,7 @@ describe('Replay Prevention (Odometer)', () => {
     // Verify counter is now 4
     const info = await ctx.connection.getAccountInfo(ownerAuthorityPda);
     const view = new DataView(info!.data.buffer, info!.data.byteOffset);
-    expect(view.getBigUint64(8, true)).toBe(4n);
+    expect(view.getUint32(8, true)).toBe(4);
   });
 
   it('rejects stale counter after sequential ops', async () => {
@@ -178,7 +177,7 @@ describe('Replay Prevention (Odometer)', () => {
     // Counter is 4, submitting 3 should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(3n, packed)).precompileIx, (await buildExecuteIx(3n, packed)).ix],
+      [(await buildExecuteIx(3, packed)).precompileIx, (await buildExecuteIx(3, packed)).ix],
       [],
       3006,
     );
