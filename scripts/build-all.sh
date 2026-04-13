@@ -4,7 +4,7 @@
 PROGRAM_ID=$1
 ROOT_DIR=$(pwd)
 PROGRAM_DIR="$ROOT_DIR/program"
-SDK_DIR="$ROOT_DIR/sdk/lazorkit-ts"
+SDK_DIR="$ROOT_DIR/sdk/solita-client"
 
 if [ -z "$PROGRAM_ID" ]; then
     echo "Usage: $0 <new_program_id>"
@@ -33,10 +33,10 @@ else
     exit 1
 fi
 
-# Step 4: Regenerate SDK with Codama
-echo "[4/4] Regenerating Codama SDK..."
+# Step 4: Regenerate SDK with Solita
+echo "[4/4] Regenerating Solita SDK..."
 cd "$SDK_DIR"
-npm run generate
+node generate.mjs
 
 echo "--- ✅ All Done! ---"
 echo "Next: Deploy your program using 'solana program deploy program/target/deploy/lazorkit_program.so -u d'"

@@ -27,18 +27,18 @@ echo "Syncing Program ID: $OLD_ID -> $NEW_ID"
 sed -i '' "s/$OLD_ID/$NEW_ID/g" assertions/src/lib.rs
 
 # 2. Update SDK generation script
-sed -i '' "s/$OLD_ID/$NEW_ID/g" sdk/lazorkit-ts/generate.mjs
+sed -i '' "s/$OLD_ID/$NEW_ID/g" sdk/solita-client/generate.mjs
 
-# 3. Update Real RPC tests common configuration
-sed -i '' "s/$OLD_ID/$NEW_ID/g" tests-real-rpc/tests/common.ts
+# 3. Update SDK tests common configuration
+sed -i '' "s/$OLD_ID/$NEW_ID/g" tests-sdk/tests/common.ts
 
-# 4. Update local test script
-sed -i '' "s/$OLD_ID/$NEW_ID/g" tests-real-rpc/scripts/test-local.sh
+# 4. Update validator start script in tests
+sed -i '' "s/$OLD_ID/$NEW_ID/g" tests-sdk/package.json
 
 # 5. Run SDK generation to update the TypeScript client
 echo "Regenerating SDK..."
-cd sdk/lazorkit-ts
-npm run generate
+cd sdk/solita-client
+node generate.mjs
 cd ../..
 
 echo "✓ Program ID synced across: Rust code, SDK, and Tests."
