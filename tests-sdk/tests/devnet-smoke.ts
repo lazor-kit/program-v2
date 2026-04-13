@@ -391,7 +391,41 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────────────────
-  // 7. DEFERRED EXECUTION (Authorize + ExecuteDeferred)
+  // 7. REVOKE SESSION
+  // ────────────────────────────────────────────────────────────
+  console.log('\n--- RevokeSession ---');
+
+  // Ed25519 owner revokes Ed25519 session
+  {
+    const balBefore = await connection.getBalance(payer.publicKey);
+    const { instructions } = await client.revokeSession({
+      payer: payer.publicKey, walletPda: ed25519WalletPda,
+      adminSigner: ed25519(ed25519OwnerKp.publicKey, ed25519OwnerAuthPda),
+      sessionPda: ed25519SessionPda,
+    });
+    const r = await sendAndMeasure(connection, payer, instructions, [ed25519OwnerKp]);
+    const balAfter = await connection.getBalance(payer.publicKey);
+    r.rentCost = balBefore - balAfter - 10000; // 2 signers = 10000 fee
+    record('RevokeSession (Ed25519 owner, Ed25519 wallet)', r);
+  }
+
+  // Secp256r1 owner revokes Secp256r1 session
+  {
+    const ownerSigner = createMockSigner(secpOwnerKey);
+    const balBefore = await connection.getBalance(payer.publicKey);
+    const { instructions } = await client.revokeSession({
+      payer: payer.publicKey, walletPda: secpWalletPda,
+      adminSigner: secp256r1(ownerSigner, { authorityPda: secpOwnerAuthPda }),
+      sessionPda: secpSessionPda,
+    });
+    const r = await sendAndMeasure(connection, payer, instructions);
+    const balAfter = await connection.getBalance(payer.publicKey);
+    r.rentCost = balBefore - balAfter - 5000;
+    record('RevokeSession (Secp256r1 owner, Secp256r1 wallet)', r);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // 8. DEFERRED EXECUTION (Authorize + ExecuteDeferred)
   // ────────────────────────────────────────────────────────────
   console.log('\n--- Deferred Execution ---');
 
@@ -424,7 +458,7 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────────────────
-  // 8. REMOVE AUTHORITY
+  // 9. REMOVE AUTHORITY
   // ────────────────────────────────────────────────────────────
   console.log('\n--- RemoveAuthority ---');
 
@@ -458,7 +492,7 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────────────────
-  // 9. TRANSFER OWNERSHIP
+  // 10. TRANSFER OWNERSHIP
   // ────────────────────────────────────────────────────────────
   console.log('\n--- TransferOwnership ---');
 
