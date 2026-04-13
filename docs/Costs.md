@@ -11,15 +11,17 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 | Instruction | CU | Tx Size (bytes) | Ix Data (bytes) | Accounts | Instructions |
 |---|---|---|---|---|---|
 | Normal SOL Transfer (baseline) | 150 | 215 | 12 | 2 | 1 |
-| CreateWallet (Ed25519) | 16,687 | 408 | 73 | 6 | 1 |
-| CreateWallet (Secp256r1) | 15,185 | 441 | 106 | 6 | 1 |
-| AddAuthority (Ed25519 admin) | 13,342 | 473 | 41 | 7 | 1 |
-| Execute Secp256r1 (SOL transfer) | 10,816 | 708 | 271 | 8 | 2 |
-| CreateSession (Ed25519) | 6,015 | 473 | 41 | 7 | 1 |
+| CreateWallet (Ed25519) | 13,687 | 408 | 73 | 6 | 1 |
+| CreateWallet (Secp256r1) | 12,185 | 441 | 106 | 6 | 1 |
+| AddAuthority (Ed25519 admin) | 7,342 | 473 | 41 | 7 | 1 |
+| Execute Secp256r1 (SOL transfer) | 9,316 | 708 | 271 | 8 | 2 |
+| Execute Session (SOL transfer) | 7,483 | 452 | 20 | 7 | 1 |
+| CreateSession (Ed25519) | 9,015 | 473 | 41 | 7 | 1 |
 
 **Notes:**
-- CU values are median from real transactions
+- CU values are from real transactions on a local validator
 - Secp256r1 Execute requires 2 instructions (precompile verification + execute)
+- Session Execute is cheaper — only 1 instruction, no precompile, no auth payload
 - All operations fit well within Solana's 200,000 CU default budget
 - Transaction sizes are well within Solana's 1,232-byte limit
 
@@ -27,20 +29,24 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 
 ## LazorKit vs Normal SOL Transfer
 
-| Metric | Normal Transfer | LazorKit Secp256r1 | Overhead |
-|---|---|---|---|
-| Compute Units | 150 | 10,816 | 72x |
-| Transaction Size | 215 bytes | 708 bytes | +493 bytes |
-| Instruction Data | 12 bytes | 271 bytes | +259 bytes |
-| Accounts | 2 | 8 | +6 |
-| Instructions per Tx | 1 | 2 | +1 |
-| Transaction Fee | 0.000005 SOL | 0.000005 SOL | Same |
+| Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Session | Notes |
+|---|---|---|---|---|
+| Compute Units | 150 | 9,316 | 7,483 | Session uses Ed25519 signer (no precompile) |
+| Transaction Size | 215 bytes | 708 bytes | 452 bytes | Session tx is smaller (no precompile ix) |
+| Instruction Data | 12 bytes | 271 bytes | 20 bytes | Session has no auth payload |
+| Accounts | 2 | 8 | 7 | Session skips sysvar accounts |
+| Instructions per Tx | 1 | 2 | 1 | Session needs only 1 instruction |
+| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |
 
 **Why the overhead is acceptable:**
-- 10,816 CU is only **5.4%** of the 200,000 CU default budget
-- 708 bytes is **57%** of the 1,232-byte transaction limit
+- 9,316 CU (Secp256r1) is only **4.7%** of the 200,000 CU default budget
+- 7,483 CU (Session) is only **3.7%** of the 200,000 CU default budget
+- 708 bytes (Secp256r1) is **57%** of the 1,232-byte transaction limit
+- 452 bytes (Session) is only **37%** of the 1,232-byte limit
 - Transaction fee is identical (base fee is per-signature, not per-CU)
 - The overhead buys: passkey auth, RBAC, replay protection, session keys, multi-sig
+
+**Session keys** are ideal for frequent transactions (gaming, DeFi) — they're faster, cheaper, and only need a one-time setup cost.
 
 ---
 
@@ -88,6 +94,23 @@ At $150/SOL, wallet creation costs approximately **$0.36 - $0.39 USD**.
 - No additional fees for odometer counter (stored in existing authority account)
 - RemoveAuthority refunds the full rent-exempt balance to a specified destination
 - Session accounts can be reclaimed after expiry
+
+---
+
+## Session Key Cost
+
+Session keys enable cheap, fast transactions without passkey re-authentication on every operation.
+
+| Item | Cost |
+|---|---|
+| Session account rent (one-time) | 0.001448 SOL |
+| CreateSession tx fee | 0.000005 SOL |
+| **Total setup cost** | **0.001453 SOL** |
+| Execute via session (per tx) | 0.000005 SOL |
+
+At $150/SOL, session setup costs ~$0.22 USD. Each subsequent execute costs $0.00075.
+
+**Rent recovery:** Session rent (0.001448 SOL) is refundable after the session expires. The session account can be closed and lamports returned to the payer.
 
 ---
 

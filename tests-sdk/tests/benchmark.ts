@@ -372,6 +372,89 @@ async function benchCreateSession(connection: Connection, payer: Keypair): Promi
   };
 }
 
+async function benchExecuteSession(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  // Setup: create Ed25519 wallet + session
+  const ownerKp = Keypair.generate();
+  const userSeed = crypto.randomBytes(32);
+  const pubkeyBytes = ownerKp.publicKey.toBytes();
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_ED25519,
+    authBump,
+    credentialOrPubkey: pubkeyBytes,
+  })]);
+
+  // Create session
+  const sessionKp = Keypair.generate();
+  const sessionKeyBytes = sessionKp.publicKey.toBytes();
+  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
+
+  const currentSlot = await getSlot(connection);
+  const expiresAt = currentSlot + 9000n;
+
+  await sendAndMeasure(connection, payer, [createCreateSessionIx({
+    payer: payer.publicKey,
+    walletPda,
+    adminAuthorityPda: authPda,
+    sessionPda,
+    sessionKey: sessionKeyBytes,
+    expiresAt,
+    authorizerSigner: ownerKp.publicKey,
+  })], [ownerKp]);
+
+  // Fund vault
+  const airdropSig = await connection.requestAirdrop(vaultPda, 5 * LAMPORTS_PER_SOL);
+  await connection.confirmTransaction(airdropSig, 'confirmed');
+
+  // Build SOL transfer compact instruction
+  // Account layout (no sysvars needed for session auth):
+  //   0: payer, 1: wallet, 2: sessionPda (as authority), 3: vault
+  //   4: sessionKey (signer), 5: SystemProgram, 6: recipient
+  const recipient = Keypair.generate().publicKey;
+  const transferData = Buffer.alloc(12);
+  transferData.writeUInt32LE(2, 0); // Transfer discriminator
+  transferData.writeBigUInt64LE(1_000_000n, 4);
+
+  const packed = packCompactInstructions([{
+    programIdIndex: 5,       // SystemProgram at index 5
+    accountIndexes: [3, 6],  // vault, recipient
+    data: new Uint8Array(transferData),
+  }]);
+
+  const ix = createExecuteIx({
+    payer: payer.publicKey,
+    walletPda,
+    authorityPda: sessionPda,  // Session PDA as authority
+    vaultPda,
+    packedInstructions: packed,
+    // No authPayload — session uses signer-based auth
+    remainingAccounts: [
+      { pubkey: sessionKp.publicKey, isSigner: true, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: recipient, isSigner: false, isWritable: true },
+    ],
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix], [sessionKp]);
+  return {
+    name: 'Execute Session (SOL transfer)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
 // ─── Rent Calculations ────────────────────────────────────────────────────────
 
 function calculateRent(dataSize: number): number {
@@ -404,6 +487,7 @@ async function main() {
     { name: 'CreateWallet Secp256r1', fn: () => benchCreateWalletSecp256r1(connection, payer) },
     { name: 'AddAuthority Ed25519', fn: () => benchAddAuthorityEd25519(connection, payer) },
     { name: 'Execute Secp256r1', fn: () => benchExecuteSecp256r1(connection, payer) },
+    { name: 'Execute Session', fn: () => benchExecuteSession(connection, payer) },
     { name: 'CreateSession', fn: () => benchCreateSession(connection, payer) },
   ];
 
@@ -431,17 +515,18 @@ async function main() {
 
   const normalResult = results.find(r => r.name === 'Normal SOL Transfer');
   const secp256r1Result = results.find(r => r.name === 'Execute Secp256r1 (SOL transfer)');
+  const sessionResult = results.find(r => r.name === 'Execute Session (SOL transfer)');
 
   if (normalResult && secp256r1Result) {
     console.log('\n\n## LazorKit vs Normal SOL Transfer\n');
-    console.log('| Metric | Normal Transfer | LazorKit Secp256r1 | Overhead |');
-    console.log('|---|---|---|---|');
-    console.log(`| Compute Units | ${normalResult.cu.toLocaleString()} | ${secp256r1Result.cu.toLocaleString()} | ${(secp256r1Result.cu / normalResult.cu).toFixed(1)}x |`);
-    console.log(`| Transaction Size | ${normalResult.txSize} bytes | ${secp256r1Result.txSize} bytes | +${secp256r1Result.txSize - normalResult.txSize} bytes |`);
-    console.log(`| Instruction Data | ${normalResult.ixData} bytes | ${secp256r1Result.ixData} bytes | +${secp256r1Result.ixData - normalResult.ixData} bytes |`);
-    console.log(`| Accounts | ${normalResult.accounts} | ${secp256r1Result.accounts} | +${secp256r1Result.accounts - normalResult.accounts} |`);
-    console.log(`| Instructions per Tx | ${normalResult.instructions} | ${secp256r1Result.instructions} | +${secp256r1Result.instructions - normalResult.instructions} |`);
-    console.log(`| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0 |`);
+    console.log('| Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Session | Notes |');
+    console.log('|---|---|---|---|---|');
+    console.log(`| Compute Units | ${normalResult.cu.toLocaleString()} | ${secp256r1Result.cu.toLocaleString()} | ${sessionResult ? sessionResult.cu.toLocaleString() : 'N/A'} | Session uses Ed25519 signer (no precompile) |`);
+    console.log(`| Transaction Size | ${normalResult.txSize} bytes | ${secp256r1Result.txSize} bytes | ${sessionResult ? sessionResult.txSize + ' bytes' : 'N/A'} | Session tx is smaller (no precompile ix) |`);
+    console.log(`| Instruction Data | ${normalResult.ixData} bytes | ${secp256r1Result.ixData} bytes | ${sessionResult ? sessionResult.ixData + ' bytes' : 'N/A'} | Session has no auth payload |`);
+    console.log(`| Accounts | ${normalResult.accounts} | ${secp256r1Result.accounts} | ${sessionResult ? sessionResult.accounts : 'N/A'} | Session skips sysvar accounts |`);
+    console.log(`| Instructions per Tx | ${normalResult.instructions} | ${secp256r1Result.instructions} | ${sessionResult ? sessionResult.instructions : 'N/A'} | Session needs only 1 ix |`);
+    console.log(`| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |`);
   }
 
   // ─── Rent Costs ───────────────────────────────────────────────────────────
@@ -465,6 +550,7 @@ async function main() {
   const walletRent = calculateRent(8);
   const authEd25519Rent = calculateRent(80);
   const authSecp256r1Rent = calculateRent(113);
+  const sessionRent = calculateRent(80);
   const txFee = 5000; // 0.000005 SOL
 
   console.log('\n\n## Total Wallet Creation Cost\n');
@@ -474,6 +560,17 @@ async function main() {
   const totalSecp256r1 = walletRent + authSecp256r1Rent + txFee;
   console.log(`| Ed25519 | ${(walletRent / LAMPORTS_PER_SOL).toFixed(9)} | ${(authEd25519Rent / LAMPORTS_PER_SOL).toFixed(9)} | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} | ${(totalEd25519 / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
   console.log(`| Secp256r1 | ${(walletRent / LAMPORTS_PER_SOL).toFixed(9)} | ${(authSecp256r1Rent / LAMPORTS_PER_SOL).toFixed(9)} | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} | ${(totalSecp256r1 / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+
+  // Session cost
+  console.log('\n\n## Session Key Cost\n');
+  console.log('| Item | Cost |');
+  console.log('|---|---|');
+  console.log(`| Session account rent | ${(sessionRent / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+  console.log(`| CreateSession tx fee | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+  console.log(`| Total (create session) | ${((sessionRent + txFee) / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+  console.log(`| Execute via session tx fee | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+  console.log('');
+  console.log('Session rent is refundable after expiry. Execute via session costs only the base tx fee.');
 
   console.log('\n\nBenchmark complete.');
 }

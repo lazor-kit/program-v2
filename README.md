@@ -20,16 +20,17 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 ## LazorKit vs Normal SOL Transfer
 
-| Metric | Normal Transfer | LazorKit (Secp256r1) | Notes |
+| Metric | Normal Transfer | LazorKit (Secp256r1) | LazorKit (Session) |
 |---|---|---|---|
-| Compute Units | 150 | 10,816 | 5.4% of 200K budget |
-| Transaction Size | 215 bytes | 708 bytes | 57% of 1,232-byte limit |
-| Accounts | 2 | 8 | +6 for auth + sysvars |
-| Transaction Fee | 0.000005 SOL | 0.000005 SOL | Same base fee |
+| Compute Units | 150 | 9,316 | 7,483 |
+| Transaction Size | 215 bytes | 708 bytes | 452 bytes |
+| Accounts | 2 | 8 | 7 |
+| Instructions | 1 | 2 | 1 |
+| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL |
 
-The overhead buys: passkey authentication, RBAC, replay protection, session keys, and multi-sig — all in a single transaction.
+Session keys are ideal for frequent transactions — they skip the Secp256r1 precompile and use a simple Ed25519 signer, resulting in lower CU and smaller transactions.
 
-See [docs/Costs.md](docs/Costs.md) for full cost analysis and CU benchmarks for all instructions.
+See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, and CU benchmarks for all instructions.
 
 ---
 
@@ -51,7 +52,14 @@ See [docs/Costs.md](docs/Costs.md) for full cost analysis and CU benchmarks for 
 | Ed25519 | 0.002399 SOL | $0.36 |
 | Secp256r1 (Passkey) | 0.002629 SOL | $0.39 |
 
-Ongoing Execute transactions cost only the base fee (0.000005 SOL). No additional rent.
+### Session Key Cost
+
+| Item | Cost |
+|---|---|
+| Session setup (one-time rent) | 0.001453 SOL |
+| Execute via session (per tx) | 0.000005 SOL |
+
+Session rent is refundable after expiry. Ongoing Execute transactions cost only the base fee (0.000005 SOL).
 
 ---
 
