@@ -10,8 +10,8 @@ import { setupTest, sendTx, type TestContext } from './common';
 import { generateMockSecp256r1Key, createMockSigner } from './secp256r1Utils';
 import {
   LazorKitClient,
-  AUTH_TYPE_ED25519,
-  AUTH_TYPE_SECP256R1,
+  ed25519,
+  secp256r1,
 } from '../../sdk/solita-client/src';
 
 describe('Execute', () => {
@@ -25,6 +25,7 @@ describe('Execute', () => {
 
   describe('Ed25519 Execute', () => {
     let walletPda: PublicKey;
+    let vaultPda: PublicKey;
     let ownerKp: Keypair;
     let ownerAuthorityPda: PublicKey;
 
@@ -32,15 +33,16 @@ describe('Execute', () => {
       ownerKp = Keypair.generate();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWalletEd25519({
+      const result = client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
-        ownerPubkey: ownerKp.publicKey,
+        owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
       });
       walletPda = result.walletPda;
+      vaultPda = result.vaultPda;
       ownerAuthorityPda = result.authorityPda;
 
-      await sendTx(ctx, [result.ix]);
+      await sendTx(ctx, result.instructions);
 
       // Fund the vault so it can transfer SOL
       const sig = await ctx.connection.requestAirdrop(
@@ -50,39 +52,27 @@ describe('Execute', () => {
       await ctx.connection.confirmTransaction(sig, 'confirmed');
     });
 
-    it('builds a valid Ed25519 execute instruction', async () => {
-      // System transfer: discriminator 2, then lamports u64 LE
-      const transferData = Buffer.alloc(12);
-      transferData.writeUInt32LE(2, 0); // Transfer
-      transferData.writeBigUInt64LE(100_000n, 4);
+    it('executes a SOL transfer via execute()', async () => {
+      const recipient = Keypair.generate().publicKey;
 
-      const ix = client.executeEd25519({
+      const { instructions } = await client.execute({
         payer: ctx.payer.publicKey,
         walletPda,
-        authorityPda: ownerAuthorityPda,
-        compactInstructions: [
-          {
-            programIdIndex: 4, // SystemProgram
-            accountIndexes: [3, 5], // vault (from), recipient (to)
-            data: new Uint8Array(transferData),
-          },
-        ],
-        remainingAccounts: [
-          {
-            pubkey: SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: Keypair.generate().publicKey,
-            isSigner: false,
-            isWritable: true,
-          },
+        signer: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+        instructions: [
+          SystemProgram.transfer({
+            fromPubkey: vaultPda,
+            toPubkey: recipient,
+            lamports: 1_000_000,
+          }),
         ],
       });
 
-      expect(ix.data.length).toBeGreaterThan(0);
-      expect(ix.keys.length).toBeGreaterThanOrEqual(4);
+      const balanceBefore = await ctx.connection.getBalance(recipient);
+      await sendTx(ctx, instructions, [ownerKp]);
+      const balanceAfter = await ctx.connection.getBalance(recipient);
+
+      expect(balanceAfter - balanceBefore).toBe(1_000_000);
     });
   });
 
@@ -96,18 +86,21 @@ describe('Execute', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWalletSecp256r1({
+      const result = client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
-        credentialIdHash: ownerKey.credentialIdHash,
-        compressedPubkey: ownerKey.publicKeyBytes,
-        rpId: ownerKey.rpId,
+        owner: {
+          type: 'secp256r1',
+          credentialIdHash: ownerKey.credentialIdHash,
+          compressedPubkey: ownerKey.publicKeyBytes,
+          rpId: ownerKey.rpId,
+        },
       });
       walletPda = result.walletPda;
       vaultPda = result.vaultPda;
       ownerAuthorityPda = result.authorityPda;
 
-      await sendTx(ctx, [result.ix]);
+      await sendTx(ctx, result.instructions);
 
       // Fund the vault
       const sig = await ctx.connection.requestAirdrop(
@@ -117,35 +110,25 @@ describe('Execute', () => {
       await ctx.connection.confirmTransaction(sig, 'confirmed');
     });
 
-    it('executes a SOL transfer with low-level executeSecp256r1()', async () => {
+    it('executes a SOL transfer via execute()', async () => {
       const recipient = Keypair.generate().publicKey;
       const signer = createMockSigner(ownerKey);
 
-      // System transfer: discriminator 2, then lamports u64 LE
-      const transferData = Buffer.alloc(12);
-      transferData.writeUInt32LE(2, 0);
-      transferData.writeBigUInt64LE(1_000_000n, 4);
-
-      const { ix, precompileIx } = await client.executeSecp256r1({
+      const { instructions } = await client.execute({
         payer: ctx.payer.publicKey,
         walletPda,
-        authorityPda: ownerAuthorityPda,
-        signer,
-        compactInstructions: [
-          {
-            programIdIndex: 5,
-            accountIndexes: [3, 6],
-            data: new Uint8Array(transferData),
-          },
-        ],
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient, isSigner: false, isWritable: true },
+        signer: secp256r1(signer, { authorityPda: ownerAuthorityPda }),
+        instructions: [
+          SystemProgram.transfer({
+            fromPubkey: vaultPda,
+            toPubkey: recipient,
+            lamports: 1_000_000,
+          }),
         ],
       });
 
       const balanceBefore = await ctx.connection.getBalance(recipient);
-      await sendTx(ctx, [precompileIx, ix]);
+      await sendTx(ctx, instructions);
       const balanceAfter = await ctx.connection.getBalance(recipient);
 
       expect(balanceAfter - balanceBefore).toBe(1_000_000);
@@ -155,16 +138,16 @@ describe('Execute', () => {
       const recipient = Keypair.generate().publicKey;
       const signer = createMockSigner(ownerKey);
 
-      const ixs = await client.transferSol({
+      const { instructions } = await client.transferSol({
         payer: ctx.payer.publicKey,
         walletPda,
-        signer,
+        signer: secp256r1(signer, { authorityPda: ownerAuthorityPda }),
         recipient,
         lamports: 1_000_000n,
       });
 
       const balanceBefore = await ctx.connection.getBalance(recipient);
-      await sendTx(ctx, ixs);
+      await sendTx(ctx, instructions);
       const balanceAfter = await ctx.connection.getBalance(recipient);
 
       expect(balanceAfter - balanceBefore).toBe(1_000_000);
@@ -173,15 +156,14 @@ describe('Execute', () => {
     it('executes arbitrary instructions with execute()', async () => {
       const recipient = Keypair.generate().publicKey;
       const signer = createMockSigner(ownerKey);
-      const [vault] = client.findVault(walletPda);
 
-      const ixs = await client.execute({
+      const { instructions } = await client.execute({
         payer: ctx.payer.publicKey,
         walletPda,
-        signer,
+        signer: secp256r1(signer, { authorityPda: ownerAuthorityPda }),
         instructions: [
           SystemProgram.transfer({
-            fromPubkey: vault,
+            fromPubkey: vaultPda,
             toPubkey: recipient,
             lamports: 1_000_000,
           }),
@@ -189,7 +171,7 @@ describe('Execute', () => {
       });
 
       const balanceBefore = await ctx.connection.getBalance(recipient);
-      await sendTx(ctx, ixs);
+      await sendTx(ctx, instructions);
       const balanceAfter = await ctx.connection.getBalance(recipient);
 
       expect(balanceAfter - balanceBefore).toBe(1_000_000);
@@ -199,15 +181,15 @@ describe('Execute', () => {
       const recipient = Keypair.generate().publicKey;
       const signer = createMockSigner(ownerKey);
 
-      const ixs = await client.transferSol({
+      const { instructions } = await client.transferSol({
         payer: ctx.payer.publicKey,
         walletPda,
-        signer,
+        signer: secp256r1(signer, { authorityPda: ownerAuthorityPda }),
         recipient,
         lamports: 1_000_000n,
       });
 
-      await sendTx(ctx, ixs);
+      await sendTx(ctx, instructions);
 
       // Verify counter is now 4 (three Secp256r1 executes above + this one)
       const authority = await ctx.connection.getAccountInfo(ownerAuthorityPda);

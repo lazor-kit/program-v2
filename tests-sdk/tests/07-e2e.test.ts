@@ -13,6 +13,8 @@ import {
   AUTH_TYPE_SECP256R1,
   ROLE_ADMIN,
   ROLE_SPENDER,
+  ed25519,
+  secp256r1,
 } from '../../sdk/solita-client/src';
 import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
 
@@ -51,18 +53,21 @@ describe('E2E Company Workflow', () => {
   it('Step 1: CEO creates wallet with passkey', async () => {
     const userSeed = crypto.randomBytes(32);
 
-    const result = client.createWalletSecp256r1({
+    const result = client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
-      credentialIdHash: ceoKey.credentialIdHash,
-      compressedPubkey: ceoKey.publicKeyBytes,
-      rpId: ceoKey.rpId,
+      owner: {
+        type: 'secp256r1',
+        credentialIdHash: ceoKey.credentialIdHash,
+        compressedPubkey: ceoKey.publicKeyBytes,
+        rpId: ceoKey.rpId,
+      },
     });
     walletPda = result.walletPda;
     vaultPda = result.vaultPda;
     ceoAuthPda = result.authorityPda;
 
-    await sendTx(ctx, [result.ix]);
+    await sendTx(ctx, result.instructions);
 
     // Fund the vault
     const sig = await ctx.connection.requestAirdrop(
@@ -82,19 +87,17 @@ describe('E2E Company Workflow', () => {
   it('Step 2: CEO adds Admin (Ed25519)', async () => {
     const ceoSigner = createMockSigner(ceoKey);
 
-    const { ix, newAuthorityPda, precompileIx } =
-      await client.addAuthoritySecp256r1({
+    const { instructions, newAuthorityPda } =
+      await client.addAuthority({
         payer: ctx.payer.publicKey,
         walletPda,
-        adminAuthorityPda: ceoAuthPda,
-        adminSigner: ceoSigner,
-        newType: AUTH_TYPE_ED25519,
-        newRole: ROLE_ADMIN,
-        newCredentialOrPubkey: adminKp.publicKey.toBytes(),
+        adminSigner: secp256r1(ceoSigner, { authorityPda: ceoAuthPda }),
+        newAuthority: { type: 'ed25519', publicKey: adminKp.publicKey },
+        role: ROLE_ADMIN,
       });
     adminAuthPda = newAuthorityPda;
 
-    await sendTx(ctx, [precompileIx, ix]);
+    await sendTx(ctx, instructions);
 
     const auth = await AuthorityAccount.fromAccountAddress(
       ctx.connection,
@@ -105,20 +108,21 @@ describe('E2E Company Workflow', () => {
   });
 
   it('Step 3: Admin adds Spender (Secp256r1)', async () => {
-    const { ix, newAuthorityPda } = client.addAuthorityEd25519({
+    const { instructions, newAuthorityPda } = await client.addAuthority({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: adminAuthPda,
-      adminSigner: adminKp.publicKey,
-      newType: AUTH_TYPE_SECP256R1,
-      newRole: ROLE_SPENDER,
-      newCredentialOrPubkey: spenderKey.credentialIdHash,
-      newSecp256r1Pubkey: spenderKey.publicKeyBytes,
-      newRpId: spenderKey.rpId,
+      adminSigner: ed25519(adminKp.publicKey, adminAuthPda),
+      newAuthority: {
+        type: 'secp256r1',
+        credentialIdHash: spenderKey.credentialIdHash,
+        compressedPubkey: spenderKey.publicKeyBytes,
+        rpId: spenderKey.rpId,
+      },
+      role: ROLE_SPENDER,
     });
     spenderAuthPda = newAuthorityPda;
 
-    await sendTx(ctx, [ix], [adminKp]);
+    await sendTx(ctx, instructions, [adminKp]);
 
     const auth = await AuthorityAccount.fromAccountAddress(
       ctx.connection,
@@ -133,16 +137,16 @@ describe('E2E Company Workflow', () => {
     const recipient = Keypair.generate().publicKey;
     const spenderSigner = createMockSigner(spenderKey);
 
-    const ixs = await client.transferSol({
+    const { instructions } = await client.transferSol({
       payer: ctx.payer.publicKey,
       walletPda,
-      signer: spenderSigner,
+      signer: secp256r1(spenderSigner, { authorityPda: spenderAuthPda }),
       recipient,
       lamports: 1_000_000n,
     });
 
     const balanceBefore = await ctx.connection.getBalance(recipient);
-    await sendTx(ctx, ixs);
+    await sendTx(ctx, instructions);
     const balanceAfter = await ctx.connection.getBalance(recipient);
 
     expect(balanceAfter - balanceBefore).toBe(1_000_000);
@@ -153,28 +157,26 @@ describe('E2E Company Workflow', () => {
     const currentSlot = await getSlot(ctx);
     const expiresAt = currentSlot + 9000n;
 
-    const { ix, sessionPda } = client.createSessionEd25519({
+    const { instructions } = await client.createSession({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: adminAuthPda,
-      adminSigner: adminKp.publicKey,
-      sessionKey: sessionKp.publicKey.toBytes(),
+      adminSigner: ed25519(adminKp.publicKey, adminAuthPda),
+      sessionKey: sessionKp.publicKey,
       expiresAt,
     });
 
-    await sendTx(ctx, [ix], [adminKp]);
+    await sendTx(ctx, instructions, [adminKp]);
   });
 
   it('Step 6: Admin removes Spender', async () => {
-    const ix = client.removeAuthorityEd25519({
+    const { instructions } = await client.removeAuthority({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: adminAuthPda,
-      adminSigner: adminKp.publicKey,
+      adminSigner: ed25519(adminKp.publicKey, adminAuthPda),
       targetAuthorityPda: spenderAuthPda,
     });
 
-    await sendTx(ctx, [ix], [adminKp]);
+    await sendTx(ctx, instructions, [adminKp]);
 
     // Verify spender account is closed
     const info = await ctx.connection.getAccountInfo(spenderAuthPda);
@@ -185,19 +187,20 @@ describe('E2E Company Workflow', () => {
     const newCeoKey = await generateMockSecp256r1Key('company.com');
     const ceoSigner = createMockSigner(ceoKey);
 
-    const { ix, newOwnerAuthorityPda, precompileIx } =
-      await client.transferOwnershipSecp256r1({
+    const { instructions, newOwnerAuthorityPda } =
+      await client.transferOwnership({
         payer: ctx.payer.publicKey,
         walletPda,
-        currentOwnerAuthorityPda: ceoAuthPda,
-        ownerSigner: ceoSigner,
-        newType: AUTH_TYPE_SECP256R1,
-        newCredentialOrPubkey: newCeoKey.credentialIdHash,
-        newSecp256r1Pubkey: newCeoKey.publicKeyBytes,
-        newRpId: newCeoKey.rpId,
+        ownerSigner: secp256r1(ceoSigner, { authorityPda: ceoAuthPda }),
+        newOwner: {
+          type: 'secp256r1',
+          credentialIdHash: newCeoKey.credentialIdHash,
+          compressedPubkey: newCeoKey.publicKeyBytes,
+          rpId: newCeoKey.rpId,
+        },
       });
 
-    await sendTx(ctx, [precompileIx, ix]);
+    await sendTx(ctx, instructions);
 
     // Old CEO authority should be closed
     const oldInfo = await ctx.connection.getAccountInfo(ceoAuthPda);

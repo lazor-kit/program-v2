@@ -14,6 +14,8 @@ import {
   AUTH_TYPE_SECP256R1,
   ROLE_ADMIN,
   ROLE_SPENDER,
+  ed25519,
+  secp256r1,
 } from '../../sdk/solita-client/src';
 import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
 
@@ -35,31 +37,29 @@ describe('Authority Management', () => {
       ownerKp = Keypair.generate();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWalletEd25519({
+      const result = client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
-        ownerPubkey: ownerKp.publicKey,
+        owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
       });
       walletPda = result.walletPda;
       ownerAuthorityPda = result.authorityPda;
 
-      await sendTx(ctx, [result.ix]);
+      await sendTx(ctx, result.instructions);
     });
 
     it('adds an Ed25519 admin authority', async () => {
       const adminKp = Keypair.generate();
 
-      const { ix, newAuthorityPda } = client.addAuthorityEd25519({
+      const { instructions, newAuthorityPda } = await client.addAuthority({
         payer: ctx.payer.publicKey,
         walletPda,
-        adminAuthorityPda: ownerAuthorityPda,
-        adminSigner: ownerKp.publicKey,
-        newType: AUTH_TYPE_ED25519,
-        newRole: ROLE_ADMIN,
-        newCredentialOrPubkey: adminKp.publicKey.toBytes(),
+        adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+        newAuthority: { type: 'ed25519', publicKey: adminKp.publicKey },
+        role: ROLE_ADMIN,
       });
 
-      await sendTx(ctx, [ix], [ownerKp]);
+      await sendTx(ctx, instructions, [ownerKp]);
 
       const authority = await AuthorityAccount.fromAccountAddress(
         ctx.connection,
@@ -73,19 +73,20 @@ describe('Authority Management', () => {
     it('adds a Secp256r1 spender authority', async () => {
       const key = await generateMockSecp256r1Key();
 
-      const { ix, newAuthorityPda } = client.addAuthorityEd25519({
+      const { instructions, newAuthorityPda } = await client.addAuthority({
         payer: ctx.payer.publicKey,
         walletPda,
-        adminAuthorityPda: ownerAuthorityPda,
-        adminSigner: ownerKp.publicKey,
-        newType: AUTH_TYPE_SECP256R1,
-        newRole: ROLE_SPENDER,
-        newCredentialOrPubkey: key.credentialIdHash,
-        newSecp256r1Pubkey: key.publicKeyBytes,
-        newRpId: key.rpId,
+        adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+        newAuthority: {
+          type: 'secp256r1',
+          credentialIdHash: key.credentialIdHash,
+          compressedPubkey: key.publicKeyBytes,
+          rpId: key.rpId,
+        },
+        role: ROLE_SPENDER,
       });
 
-      await sendTx(ctx, [ix], [ownerKp]);
+      await sendTx(ctx, instructions, [ownerKp]);
 
       const authority = await AuthorityAccount.fromAccountAddress(
         ctx.connection,
@@ -99,29 +100,26 @@ describe('Authority Management', () => {
       // First add an authority to remove
       const spenderKp = Keypair.generate();
 
-      const { ix: addIx, newAuthorityPda: spenderAuthPda } =
-        client.addAuthorityEd25519({
+      const { instructions: addIxs, newAuthorityPda: spenderAuthPda } =
+        await client.addAuthority({
           payer: ctx.payer.publicKey,
           walletPda,
-          adminAuthorityPda: ownerAuthorityPda,
-          adminSigner: ownerKp.publicKey,
-          newType: AUTH_TYPE_ED25519,
-          newRole: ROLE_SPENDER,
-          newCredentialOrPubkey: spenderKp.publicKey.toBytes(),
+          adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+          newAuthority: { type: 'ed25519', publicKey: spenderKp.publicKey },
+          role: ROLE_SPENDER,
         });
 
-      await sendTx(ctx, [addIx], [ownerKp]);
+      await sendTx(ctx, addIxs, [ownerKp]);
 
       // Now remove it
-      const removeIx = client.removeAuthorityEd25519({
+      const { instructions: removeIxs } = await client.removeAuthority({
         payer: ctx.payer.publicKey,
         walletPda,
-        adminAuthorityPda: ownerAuthorityPda,
-        adminSigner: ownerKp.publicKey,
+        adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
         targetAuthorityPda: spenderAuthPda,
       });
 
-      await sendTx(ctx, [removeIx], [ownerKp]);
+      await sendTx(ctx, removeIxs, [ownerKp]);
 
       // Verify account is closed
       const info = await ctx.connection.getAccountInfo(spenderAuthPda);
@@ -132,18 +130,16 @@ describe('Authority Management', () => {
       const randomKp = Keypair.generate();
       const newKp = Keypair.generate();
 
-      const { ix } = client.addAuthorityEd25519({
+      const { instructions } = await client.addAuthority({
         payer: ctx.payer.publicKey,
         walletPda,
-        adminAuthorityPda: ownerAuthorityPda,
-        adminSigner: randomKp.publicKey,
-        newType: AUTH_TYPE_ED25519,
-        newRole: ROLE_SPENDER,
-        newCredentialOrPubkey: newKp.publicKey.toBytes(),
+        adminSigner: ed25519(randomKp.publicKey, ownerAuthorityPda),
+        newAuthority: { type: 'ed25519', publicKey: newKp.publicKey },
+        role: ROLE_SPENDER,
       });
 
       // Use the random keypair as signer instead of owner — should fail
-      await sendTxExpectError(ctx, [ix], [randomKp]);
+      await sendTxExpectError(ctx, instructions, [randomKp]);
     });
   });
 
@@ -156,35 +152,35 @@ describe('Authority Management', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWalletSecp256r1({
+      const result = client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
-        credentialIdHash: ownerKey.credentialIdHash,
-        compressedPubkey: ownerKey.publicKeyBytes,
-        rpId: ownerKey.rpId,
+        owner: {
+          type: 'secp256r1',
+          credentialIdHash: ownerKey.credentialIdHash,
+          compressedPubkey: ownerKey.publicKeyBytes,
+          rpId: ownerKey.rpId,
+        },
       });
       walletPda = result.walletPda;
       ownerAuthorityPda = result.authorityPda;
 
-      await sendTx(ctx, [result.ix]);
+      await sendTx(ctx, result.instructions);
     });
 
     it('adds an Ed25519 admin via Secp256r1 owner', async () => {
       const adminKp = Keypair.generate();
       const signer = createMockSigner(ownerKey);
 
-      const { ix, newAuthorityPda, precompileIx } =
-        await client.addAuthoritySecp256r1({
-          payer: ctx.payer.publicKey,
-          walletPda,
-          adminAuthorityPda: ownerAuthorityPda,
-          adminSigner: signer,
-          newType: AUTH_TYPE_ED25519,
-          newRole: ROLE_ADMIN,
-          newCredentialOrPubkey: adminKp.publicKey.toBytes(),
-        });
+      const { instructions, newAuthorityPda } = await client.addAuthority({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        adminSigner: secp256r1(signer, { authorityPda: ownerAuthorityPda }),
+        newAuthority: { type: 'ed25519', publicKey: adminKp.publicKey },
+        role: ROLE_ADMIN,
+      });
 
-      await sendTx(ctx, [precompileIx, ix]);
+      await sendTx(ctx, instructions);
 
       const authority = await AuthorityAccount.fromAccountAddress(
         ctx.connection,

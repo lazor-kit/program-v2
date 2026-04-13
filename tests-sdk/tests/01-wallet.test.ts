@@ -24,13 +24,13 @@ describe('CreateWallet', () => {
     const ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const { ix, walletPda, authorityPda } = client.createWalletEd25519({
+    const { instructions, walletPda, authorityPda } = client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
-      ownerPubkey: ownerKp.publicKey,
+      owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
     });
 
-    await sendTx(ctx, [ix]);
+    await sendTx(ctx, instructions);
 
     // Verify wallet account exists
     const walletInfo = await ctx.connection.getAccountInfo(walletPda);
@@ -52,15 +52,18 @@ describe('CreateWallet', () => {
     const key = await generateMockSecp256r1Key();
     const userSeed = crypto.randomBytes(32);
 
-    const { ix, authorityPda } = client.createWalletSecp256r1({
+    const { instructions, authorityPda } = client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
-      credentialIdHash: key.credentialIdHash,
-      compressedPubkey: key.publicKeyBytes,
-      rpId: key.rpId,
+      owner: {
+        type: 'secp256r1',
+        credentialIdHash: key.credentialIdHash,
+        compressedPubkey: key.publicKeyBytes,
+        rpId: key.rpId,
+      },
     });
 
-    await sendTx(ctx, [ix]);
+    await sendTx(ctx, instructions);
 
     // Verify authority account
     const authority = await AuthorityAccount.fromAccountAddress(
@@ -76,18 +79,18 @@ describe('CreateWallet', () => {
     const ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const { ix } = client.createWalletEd25519({
+    const { instructions } = client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
-      ownerPubkey: ownerKp.publicKey,
+      owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
     });
 
     // First creation succeeds
-    await sendTx(ctx, [ix]);
+    await sendTx(ctx, instructions);
 
     // Second creation should fail
     try {
-      await sendTx(ctx, [ix]);
+      await sendTx(ctx, instructions);
       expect.unreachable('Should have failed');
     } catch (err: any) {
       expect(String(err)).toMatch(/already in use|0x0|uninitialized account/);

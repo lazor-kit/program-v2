@@ -8,7 +8,7 @@ import {
   getSlot,
   type TestContext,
 } from './common';
-import { LazorKitClient, AUTH_TYPE_ED25519 } from '../../sdk/solita-client/src';
+import { LazorKitClient, ed25519 } from '../../sdk/solita-client/src';
 import { SessionAccount } from '../../sdk/solita-client/src/generated/accounts';
 
 describe('CreateSession', () => {
@@ -25,35 +25,33 @@ describe('CreateSession', () => {
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const result = client.createWalletEd25519({
+    const result = client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
-      ownerPubkey: ownerKp.publicKey,
+      owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
     });
     walletPda = result.walletPda;
     ownerAuthorityPda = result.authorityPda;
 
-    await sendTx(ctx, [result.ix]);
+    await sendTx(ctx, result.instructions);
   });
 
   it('creates a session with Ed25519 admin', async () => {
     const sessionKp = Keypair.generate();
-    const sessionKeyBytes = sessionKp.publicKey.toBytes();
 
     // Expires ~1 hour from now in slots (~2.5 slots/sec * 3600 = 9000 slots)
     const currentSlot = await getSlot(ctx);
     const expiresAt = currentSlot + 9000n;
 
-    const { ix, sessionPda } = client.createSessionEd25519({
+    const { instructions, sessionPda } = await client.createSession({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: ownerAuthorityPda,
-      adminSigner: ownerKp.publicKey,
-      sessionKey: sessionKeyBytes,
+      adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+      sessionKey: sessionKp.publicKey,
       expiresAt,
     });
 
-    await sendTx(ctx, [ix], [ownerKp]);
+    await sendTx(ctx, instructions, [ownerKp]);
 
     // Verify session
     const session = await SessionAccount.fromAccountAddress(
@@ -71,15 +69,14 @@ describe('CreateSession', () => {
 
     const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-    const { ix } = client.createSessionEd25519({
+    const { instructions } = await client.createSession({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: ownerAuthorityPda,
-      adminSigner: randomKp.publicKey,
-      sessionKey: sessionKp.publicKey.toBytes(),
+      adminSigner: ed25519(randomKp.publicKey, ownerAuthorityPda),
+      sessionKey: sessionKp.publicKey,
       expiresAt,
     });
 
-    await sendTxExpectError(ctx, [ix], [randomKp]);
+    await sendTxExpectError(ctx, instructions, [randomKp]);
   });
 });

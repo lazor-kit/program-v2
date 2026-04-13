@@ -273,6 +273,8 @@ export function createExecuteIx(params: {
   vaultPda: PublicKey;
   packedInstructions: Uint8Array;
   authPayload?: Uint8Array;
+  /** For Ed25519 auth: the signer pubkey (placed at account index 4) */
+  authorizerSigner?: PublicKey;
   /** Additional account metas for the inner CPI instructions */
   remainingAccounts?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[];
   programId?: PublicKey;
@@ -293,8 +295,10 @@ export function createExecuteIx(params: {
     { pubkey: params.vaultPda, isSigner: false, isWritable: true },
   ];
 
-  // Secp256r1 needs sysvar instructions for precompile introspection
-  if (params.authPayload) {
+  // Ed25519 needs the signer at index 4; Secp256r1 needs sysvar instructions
+  if (params.authorizerSigner) {
+    keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
+  } else if (params.authPayload) {
     keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
   }
 

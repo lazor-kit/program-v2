@@ -4,4 +4,7 @@ export * from './ed25519';
 export * from './packing';
 export * from './errors';
 export * from './instructions';
-export * from './wrapper';
+export * from './types';
+export * from './signing';
+export * from './compact';
+export * from './client';
