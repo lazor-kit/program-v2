@@ -44,6 +44,14 @@
           "docs": [
             "System Program"
           ]
+        },
+        {
+          "name": "rentSysvar",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
         }
       ],
       "args": [
@@ -120,6 +128,14 @@
           "isSigner": false,
           "docs": [
             "System Program"
+          ]
+        },
+        {
+          "name": "rentSysvar",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
           ]
         },
         {
@@ -209,12 +225,12 @@
           ]
         },
         {
-          "name": "authorizerSigner",
+          "name": "authExtra",
           "isMut": false,
-          "isSigner": true,
+          "isSigner": false,
           "isOptional": true,
           "docs": [
-            "Optional signer for Ed25519 authentication"
+            "Ed25519: signer keypair | Secp256r1: sysvar_instructions"
           ]
         }
       ],
@@ -265,6 +281,14 @@
           "isSigner": false,
           "docs": [
             "System Program"
+          ]
+        },
+        {
+          "name": "rentSysvar",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
           ]
         },
         {
@@ -406,6 +430,14 @@
           ]
         },
         {
+          "name": "rentSysvar",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        },
+        {
           "name": "authorizerSigner",
           "isMut": false,
           "isSigner": true,
@@ -433,6 +465,184 @@
       "discriminant": {
         "type": "u8",
         "value": 5
+      }
+    },
+    {
+      "name": "Authorize",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Payer and rent contributor"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Authority PDA (counter incremented)"
+          ]
+        },
+        {
+          "name": "deferredExec",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "DeferredExec PDA to be created"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "System Program"
+          ]
+        },
+        {
+          "name": "rentSysvar",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Rent Sysvar"
+          ]
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Sysvar Instructions (for Secp256r1 precompile introspection)"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "instructionsHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "accountsHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expiryOffset",
+          "type": "u16"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 6
+      }
+    },
+    {
+      "name": "ExecuteDeferred",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Vault PDA (signer for CPI)"
+          ]
+        },
+        {
+          "name": "deferredExec",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "DeferredExec PDA (read and closed)"
+          ]
+        },
+        {
+          "name": "refundDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Account to receive rent refund from closed DeferredExec"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "instructions",
+          "type": "bytes"
+        }
+      ],
+      "discriminant": {
+        "type": "u8",
+        "value": 7
+      }
+    },
+    {
+      "name": "ReclaimDeferred",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Original payer (must match stored payer)"
+          ]
+        },
+        {
+          "name": "deferredExec",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Expired DeferredExec PDA to close"
+          ]
+        },
+        {
+          "name": "refundDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Account to receive rent refund"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 8
       }
     }
   ],

@@ -17,6 +17,7 @@ pub enum ProgramIx {
     #[account(2, writable, name = "vault", desc = "Vault PDA")]
     #[account(3, writable, name = "authority", desc = "Initial owner authority PDA")]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
     CreateWallet {
         user_seed: Vec<u8>,
         auth_type: u8,
@@ -40,8 +41,9 @@ pub enum ProgramIx {
         desc = "New authority PDA to be created"
     )]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
     #[account(
-        5,
+        6,
         signer,
         optional,
         name = "authorizer_signer",
@@ -77,10 +79,9 @@ pub enum ProgramIx {
     )]
     #[account(
         5,
-        signer,
         optional,
-        name = "authorizer_signer",
-        desc = "Optional signer for Ed25519 authentication"
+        name = "auth_extra",
+        desc = "Ed25519: signer keypair | Secp256r1: sysvar_instructions"
     )]
     RemoveAuthority,
 
@@ -100,8 +101,9 @@ pub enum ProgramIx {
         desc = "New owner authority PDA to be created"
     )]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
     #[account(
-        5,
+        6,
         signer,
         optional,
         name = "authorizer_signer",
@@ -146,8 +148,9 @@ pub enum ProgramIx {
     )]
     #[account(3, writable, name = "session", desc = "New session PDA to be created")]
     #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
     #[account(
-        5,
+        6,
         signer,
         optional,
         name = "authorizer_signer",
@@ -157,6 +160,95 @@ pub enum ProgramIx {
         session_key: [u8; 32],
         expires_at: i64,
     },
+
+    /// Authorize deferred execution (TX1 of 2-transaction flow)
+    ///
+    /// Verifies Secp256r1 signature over instruction/account hashes, then creates
+    /// a DeferredExec PDA storing the authorization for later execution.
+    #[account(
+        0,
+        signer,
+        writable,
+        name = "payer",
+        desc = "Payer and rent contributor"
+    )]
+    #[account(1, name = "wallet", desc = "Wallet PDA")]
+    #[account(
+        2,
+        writable,
+        name = "authority",
+        desc = "Authority PDA (counter incremented)"
+    )]
+    #[account(
+        3,
+        writable,
+        name = "deferred_exec",
+        desc = "DeferredExec PDA to be created"
+    )]
+    #[account(4, name = "system_program", desc = "System Program")]
+    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
+    #[account(
+        6,
+        name = "sysvar_instructions",
+        desc = "Sysvar Instructions (for Secp256r1 precompile introspection)"
+    )]
+    Authorize {
+        instructions_hash: [u8; 32],
+        accounts_hash: [u8; 32],
+        expiry_offset: u16,
+    },
+
+    /// Execute a previously authorized deferred execution (TX2 of 2-transaction flow)
+    ///
+    /// Verifies compact instructions against stored hashes, executes via CPI
+    /// with vault PDA signing, then closes the DeferredExec account.
+    #[account(
+        0,
+        signer,
+        writable,
+        name = "payer",
+        desc = "Transaction payer"
+    )]
+    #[account(1, name = "wallet", desc = "Wallet PDA")]
+    #[account(2, writable, name = "vault", desc = "Vault PDA (signer for CPI)")]
+    #[account(
+        3,
+        writable,
+        name = "deferred_exec",
+        desc = "DeferredExec PDA (read and closed)"
+    )]
+    #[account(
+        4,
+        writable,
+        name = "refund_destination",
+        desc = "Account to receive rent refund from closed DeferredExec"
+    )]
+    ExecuteDeferred {
+        instructions: Vec<u8>,
+    },
+
+    /// Reclaim an expired DeferredExec account and refund rent
+    ///
+    /// Only the original payer can reclaim, and only after the authorization has expired.
+    #[account(
+        0,
+        signer,
+        name = "payer",
+        desc = "Original payer (must match stored payer)"
+    )]
+    #[account(
+        1,
+        writable,
+        name = "deferred_exec",
+        desc = "Expired DeferredExec PDA to close"
+    )]
+    #[account(
+        2,
+        writable,
+        name = "refund_destination",
+        desc = "Account to receive rent refund"
+    )]
+    ReclaimDeferred,
 }
 
 #[repr(C)]

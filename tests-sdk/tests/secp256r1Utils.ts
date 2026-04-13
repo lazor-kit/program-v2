@@ -8,6 +8,7 @@ import {
 import {
   buildAuthPayload,
   buildSecp256r1Challenge,
+  generateAuthenticatorData,
   type Secp256r1Signer,
 } from '../../sdk/solita-client/src/utils/secp256r1';
 import { PROGRAM_ID } from './common';
@@ -42,16 +43,13 @@ export async function generateMockSecp256r1Key(
   };
 }
 
-export function generateAuthenticatorData(rpId: string): Uint8Array {
-  const rpIdHash = crypto.createHash('sha256').update(rpId).digest();
-  const data = new Uint8Array(37);
-  data.set(rpIdHash, 0);
-  data[32] = 0x01; // User Present flag
-  // Counter (4 bytes) stays 0 — we use odometer, not WebAuthn counter
-  return data;
-}
-
-function enforeLowS(rawSig: Uint8Array): Uint8Array {
+function enforceLowS(rawSig: Uint8Array): Uint8Array {
+  // Pad to 64 bytes if the library returned a shorter buffer
+  if (rawSig.length < 64) {
+    const padded = new Uint8Array(64);
+    padded.set(rawSig, 64 - rawSig.length);
+    rawSig = padded;
+  }
   const sBytes = rawSig.slice(32, 64);
   let s = 0n;
   for (let i = 0; i < 32; i++) s = (s << 8n) + BigInt(sBytes[i]);
@@ -72,9 +70,47 @@ function bytesToBase64UrlNoPad(bytes: Uint8Array): string {
 }
 
 /**
- * Full Secp256r1 signing flow for tests.
+ * Creates a Secp256r1Signer from a mock key, compatible with LazorKitClient.
+ *
+ * The signer implements the full WebAuthn-compatible signing flow:
+ * 1. Generates authenticatorData from rpId
+ * 2. Builds clientDataJSON with the challenge
+ * 3. Signs authenticatorData + SHA256(clientDataJSON)
+ * 4. Returns { signature (low-S), authenticatorData, clientDataJsonHash }
+ */
+export function createMockSigner(key: MockSecp256r1Key): Secp256r1Signer {
+  return {
+    publicKeyBytes: key.publicKeyBytes,
+    credentialIdHash: key.credentialIdHash,
+    rpId: key.rpId,
+    async sign(challenge: Uint8Array) {
+      const authenticatorData = generateAuthenticatorData(key.rpId);
+
+      const clientDataJson = JSON.stringify({
+        type: 'webauthn.get',
+        challenge: bytesToBase64UrlNoPad(challenge),
+        origin: `https://${key.rpId}`,
+        crossOrigin: false,
+      });
+      const clientDataJsonHash = new Uint8Array(
+        crypto.createHash('sha256').update(clientDataJson).digest(),
+      );
+
+      const messageToSign = Buffer.concat([authenticatorData, clientDataJsonHash]);
+      const signatureBase64 = await key.privateKey.sign(Buffer.from(messageToSign));
+      const signature = enforceLowS(new Uint8Array(Buffer.from(signatureBase64, 'base64')));
+
+      return { signature, authenticatorData, clientDataJsonHash };
+    },
+  };
+}
+
+/**
+ * Full Secp256r1 signing flow for low-level tests.
  * Builds auth payload, computes challenge hash, signs it via WebAuthn-compatible
  * flow, and returns the precompile instruction + auth payload bytes.
+ *
+ * Use `createMockSigner()` + `LazorKitClient` for simpler tests.
  */
 export async function signSecp256r1(params: {
   key: MockSecp256r1Key;
@@ -128,7 +164,7 @@ export async function signSecp256r1(params: {
 
   // Sign with ecdsa-secp256r1
   const signatureBase64 = await params.key.privateKey.sign(Buffer.from(messageToSign));
-  const rawSig = enforeLowS(new Uint8Array(Buffer.from(signatureBase64, 'base64')));
+  const rawSig = enforceLowS(new Uint8Array(Buffer.from(signatureBase64, 'base64')));
 
   // Build precompile instruction
   const precompileIx = buildPrecompileIx(

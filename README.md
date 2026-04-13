@@ -22,15 +22,15 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 ## LazorKit vs Normal SOL Transfer
 
-| Metric | Normal Transfer | LazorKit (Secp256r1) | LazorKit (Session) |
-|---|---|---|---|
-| Compute Units | 150 | 12,441 | 8,983 |
-| Transaction Size | 215 bytes | 658 bytes | 452 bytes |
-| Accounts | 2 | 7 | 7 |
-| Instructions | 1 | 2 | 1 |
-| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL |
+| Metric | Normal Transfer | LazorKit (Secp256r1) | LazorKit (Ed25519) | LazorKit (Session) |
+|---|---|---|---|---|
+| Compute Units | 150 | 9,441 | 5,864 | 4,483-5,983 |
+| Transaction Size | 215 bytes | 658 bytes | 452 bytes | 452 bytes |
+| Accounts | 2 | 7 | 7 | 7 |
+| Instructions | 1 | 2 | 1 | 1 |
+| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL |
 
-Session keys are ideal for frequent transactions -- they skip the Secp256r1 precompile and use a simple Ed25519 signer, resulting in lower CU and smaller transactions.
+Session keys are ideal for frequent transactions -- they skip the Secp256r1 precompile and use a simple Ed25519 signer, resulting in lower CU and smaller transactions. All CU measurements are from real devnet transactions.
 
 ### Deferred Execution (Large Payloads)
 
@@ -38,7 +38,7 @@ For operations exceeding the ~574 bytes available in a single Secp256r1 Execute 
 
 | Metric | Immediate Execute | Deferred (2 txs) |
 |---|---|---|
-| Total CU | 12,441 | 18,613 (11,709 + 6,904) |
+| Total CU | 9,441 | 15,613 (10,209 + 5,404) |
 | Inner Ix Capacity | ~574 bytes | ~1,100 bytes (1.9x) |
 | Tx Fee | 0.000005 SOL | 0.00001 SOL |
 | Temp Rent | -- | 0.00212 SOL (refunded) |
@@ -101,7 +101,7 @@ program/src/           Rust smart contract (pinocchio, zero-copy)
 sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
   src/generated/       Auto-generated instructions, accounts, errors
   src/utils/           Instruction builders, PDA helpers, signing utils
-tests-sdk/             Integration tests (vitest, 35 tests)
+tests-sdk/             Integration tests (vitest, 56 tests)
 docs/                  Architecture, cost analysis
 audits/                Audit reports
 ```
@@ -122,23 +122,54 @@ cargo build-sbf
 npm install @lazorkit/solita-client
 ```
 
-### Create a Wallet (Ed25519)
+### Create a Wallet
 
 ```typescript
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { LazorKitClient } from '@lazorkit/solita-client';
 import * as crypto from 'crypto';
 
 const connection = new Connection('https://api.devnet.solana.com');
 const client = new LazorKitClient(connection);
 
-const owner = Keypair.generate();
-const userSeed = crypto.randomBytes(32);
-
-const { ix, walletPda, vaultPda } = client.createWalletEd25519({
+const { instructions, walletPda, vaultPda } = client.createWallet({
   payer: payer.publicKey,
-  userSeed,
-  ownerPubkey: owner.publicKey,
+  userSeed: crypto.randomBytes(32),
+  owner: {
+    type: 'secp256r1',
+    credentialIdHash,       // 32-byte SHA256 of WebAuthn credential ID
+    compressedPubkey,       // 33-byte compressed Secp256r1 public key
+    rpId: 'your-app.com',
+  },
+});
+```
+
+### Transfer SOL
+
+```typescript
+import { secp256r1 } from '@lazorkit/solita-client';
+
+// Just payer, wallet, signer, recipient, amount -- nothing else
+const { instructions } = await client.transferSol({
+  payer: payer.publicKey,
+  walletPda,
+  signer: secp256r1(mySigner),  // or ed25519(kp.publicKey) or session(sessionPda, sessionKp.publicKey)
+  recipient,
+  lamports: 1_000_000n,
+});
+```
+
+### Execute Arbitrary Instructions
+
+```typescript
+const [vault] = client.findVault(walletPda);
+const { instructions } = await client.execute({
+  payer: payer.publicKey,
+  walletPda,
+  signer: secp256r1(mySigner),
+  instructions: [
+    SystemProgram.transfer({ fromPubkey: vault, toPubkey: recipient, lamports: 500_000 }),
+  ],
 });
 ```
 
@@ -152,14 +183,14 @@ See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API refe
 # Start local validator with program loaded
 cd tests-sdk && npm run validator:start
 
-# Run all 35 integration tests
+# Run all 56 tests (integration + security + permission + session)
 npm test
 
 # Run CU benchmarks
 npm run benchmark
 ```
 
-Tests cover: wallet lifecycle, authority management, execute, deferred execution, sessions, replay protection, counter edge cases, and end-to-end workflows.
+Tests cover: wallet lifecycle, authority management, execute, deferred execution, sessions, replay protection, counter edge cases, end-to-end workflows, permission boundaries, session-based execution, and security attack vectors (reentrancy, cross-wallet isolation, accounts hash binding).
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 

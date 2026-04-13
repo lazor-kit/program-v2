@@ -1,6 +1,6 @@
 # LazorKit Cost Analysis
 
-This document provides comprehensive cost data for the LazorKit smart wallet program on Solana. All compute unit (CU) measurements are from real transactions against a local validator. Rent costs use Solana's standard formula.
+This document provides comprehensive cost data for the LazorKit smart wallet program on Solana. All compute unit (CU) measurements are from real transactions on devnet. Rent costs use Solana's standard formula.
 
 > Program ID: `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
 
@@ -8,22 +8,40 @@ This document provides comprehensive cost data for the LazorKit smart wallet pro
 
 ## Compute Units & Transaction Size
 
-| Instruction | CU | Tx Size (bytes) | Ix Data (bytes) | Accounts | Instructions |
-|---|---|---|---|---|---|
-| Normal SOL Transfer (baseline) | 150 | 215 | 12 | 2 | 1 |
-| CreateWallet (Ed25519) | 15,187 | 408 | 73 | 6 | 1 |
-| CreateWallet (Secp256r1) | 13,687 | 453 | 118 | 6 | 1 |
-| AddAuthority (Ed25519 admin) | 5,846 | 473 | 41 | 7 | 1 |
-| Execute Secp256r1 (SOL transfer) | 12,441 | 658 | 254 | 7 | 2 |
-| Execute Session (SOL transfer) | 8,983 | 452 | 20 | 7 | 1 |
-| CreateSession (Ed25519) | 6,015 | 473 | 41 | 7 | 1 |
+| Instruction | CU | Tx Size (bytes) |
+|---|---|---|
+| Normal SOL Transfer (baseline) | 150 | 215 |
+| **CreateWallet** | | |
+| CreateWallet (Ed25519 owner) | 16,688 | 408 |
+| CreateWallet (Secp256r1 owner) | 13,688 | 454 |
+| **AddAuthority** | | |
+| AddAuthority (Ed25519 owner → Ed25519 admin) | 7,347 | 473 |
+| AddAuthority (Ed25519 admin → Ed25519 spender) | 5,853 | 473 |
+| AddAuthority (Secp256r1 owner → Ed25519 admin) | 11,621 | 679 |
+| AddAuthority (Secp256r1 owner → Secp256r1 spender) | 11,646 | 726 |
+| **Execute (SOL Transfer)** | | |
+| Execute (Ed25519 owner) | 5,864 | 452 |
+| Execute (Ed25519 spender) | 5,864 | 452 |
+| Execute (Secp256r1 owner) | 9,441 | 658 |
+| Execute (Secp256r1 spender) | 9,441 | 658 |
+| Execute (Session key) | 4,483–5,983 | 452 |
+| **CreateSession** | | |
+| CreateSession (Ed25519 admin) | 9,015 | 473 |
+| CreateSession (Secp256r1 admin) | 13,289 | 679 |
+| **RemoveAuthority** | | |
+| RemoveAuthority (Ed25519) | 621 | 368 |
+| RemoveAuthority (Secp256r1) | 4,691 | 574 |
+| **TransferOwnership** | | |
+| TransferOwnership (Ed25519 → Ed25519) | 5,872 | 466 |
+| TransferOwnership (Secp256r1 → Secp256r1) | 14,669 | 719 |
 
 **Notes:**
-- CU values are from real transactions on a local validator
-- Secp256r1 Execute requires 2 instructions (precompile verification + execute)
-- Session Execute is cheaper -- only 1 instruction, no precompile, no auth payload
+- CU values are from real transactions on devnet
+- Secp256r1 operations require 2 instructions (precompile verification + program ix), increasing TX size by ~200 bytes
+- Session Execute is the cheapest auth path -- only 1 instruction, no precompile, no auth payload
 - All operations fit well within Solana's 200,000 CU default budget
 - Transaction sizes are well within Solana's 1,232-byte limit
+- RemoveAuthority refunds rent to a specified destination
 
 ### Deferred Execution (Large Payloads)
 
@@ -31,17 +49,17 @@ For operations exceeding the ~574 bytes available in a single Secp256r1 Execute 
 
 | Instruction | CU | Tx Size (bytes) | Accounts | Instructions |
 |---|---|---|---|---|
-| Authorize (TX1) | 11,709 | 705 | 7 | 2 |
-| ExecuteDeferred (TX2, 1 inner ix) | 6,904 | 356 | 7 | 1 |
+| Authorize (TX1) | 10,209 | 705 | 7 | 2 |
+| ExecuteDeferred (TX2, 1 inner ix) | 5,404 | 356 | 7 | 1 |
 
 | Metric | Immediate Execute | Deferred (2 txs) |
 |---|---|---|
-| Total CU | 12,441 | 18,613 (11,709 + 6,904) |
+| Total CU | 9,441 | 15,613 (10,209 + 5,404) |
 | Inner Ix Capacity | ~574 bytes | ~1,100 bytes (1.9x) |
 | Tx Fee | 0.000005 SOL | 0.00001 SOL |
 | Temp Rent | -- | 0.002116 SOL (refunded) |
 
-The deferred path trades ~50% more total CU and 2x the tx fee for 1.9x the inner instruction space. The DeferredExec account rent (0.002116 SOL) is temporary -- it is refunded when TX2 executes or when the payer reclaims an expired authorization.
+The deferred path trades ~66% more total CU and 2x the tx fee for 1.9x the inner instruction space. The DeferredExec account rent (0.002116 SOL) is temporary -- it is refunded when TX2 executes or when the payer reclaims an expired authorization.
 
 ---
 
@@ -61,21 +79,22 @@ The Secp256r1 Execute transaction was optimized from **708 bytes to 658 bytes** 
 
 ## LazorKit vs Normal SOL Transfer
 
-| Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Session | Notes |
-|---|---|---|---|---|
-| Compute Units | 150 | 12,441 | 8,983 | Session uses Ed25519 signer (no precompile) |
-| Transaction Size | 215 bytes | 658 bytes | 452 bytes | Session tx is smaller (no precompile ix) |
-| Instruction Data | 12 bytes | 254 bytes | 20 bytes | Session has no auth payload |
-| Accounts | 2 | 7 | 7 | Secp256r1 uses sysvar_instructions only |
-| Instructions per Tx | 1 | 2 | 1 | Session needs only 1 instruction |
-| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |
+| Metric | Normal Transfer | LazorKit Secp256r1 | LazorKit Ed25519 | LazorKit Session | Notes |
+|---|---|---|---|---|---|
+| Compute Units | 150 | 9,441 | 5,864 | 4,483–5,983 | Session is cheapest auth path |
+| Transaction Size | 215 bytes | 658 bytes | 452 bytes | 452 bytes | Session tx is same as Ed25519 |
+| Instruction Data | 12 bytes | 254 bytes | 20 bytes | 20 bytes | Session has no auth payload |
+| Accounts | 2 | 7 | 7 | 7 | Secp256r1 uses sysvar_instructions |
+| Instructions per Tx | 1 | 2 | 1 | 1 | Only Secp256r1 needs precompile ix |
+| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | 0.000005 SOL | Same base fee |
 
 **Why the overhead is acceptable:**
-- 12,441 CU (Secp256r1) is only **6.2%** of the 200,000 CU default budget
-- 8,983 CU (Session) is only **4.5%** of the 200,000 CU default budget
+- 9,441 CU (Secp256r1) is only **4.7%** of the 200,000 CU default budget
+- 5,864 CU (Ed25519) is only **2.9%** of the budget
+- 4,483–5,983 CU (Session) is only **2.2–3.0%** of the budget
 - 658 bytes (Secp256r1) is **53%** of the 1,232-byte transaction limit, leaving **574 bytes** for inner instructions
 - Deferred Execution provides ~1,100 bytes for inner instructions when needed (1.9x)
-- 452 bytes (Session) is only **37%** of the 1,232-byte limit
+- 452 bytes (Ed25519/Session) is only **37%** of the 1,232-byte limit
 - Transaction fee is identical (base fee is per-signature, not per-CU)
 - The overhead buys: passkey auth, RBAC, replay protection, session keys, multi-sig
 
@@ -174,11 +193,8 @@ The compact data sizes are achieved through:
 ## Reproducing These Numbers
 
 ```bash
-# Start local validator
-cd tests-sdk && npm run validator:start
-
-# Run benchmarks
-npm run benchmark
+# Run devnet smoke test (all instructions, all auth types)
+cd tests-sdk && npx tsx tests/devnet-smoke.ts
 ```
 
-The benchmark script (`tests-sdk/tests/benchmark.ts`) sends real transactions and extracts CU consumption from transaction metadata.
+The devnet smoke test exercises all 9 instructions across all authority types (Ed25519, Secp256r1, Session) and roles (Owner, Admin, Spender), reporting CU consumption, TX size, and rent costs from real devnet transactions.

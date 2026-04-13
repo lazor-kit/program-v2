@@ -1,71 +1,63 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Keypair } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, sendTxExpectError, getSlot, type TestContext } from './common';
 import {
-  findWalletPda,
-  findVaultPda,
-  findAuthorityPda,
-  findSessionPda,
-  createCreateWalletIx,
-  createCreateSessionIx,
-  AUTH_TYPE_ED25519,
-} from '../../sdk/solita-client/src';
+  setupTest,
+  sendTx,
+  sendTxExpectError,
+  getSlot,
+  type TestContext,
+} from './common';
+import { LazorKitClient, ed25519 } from '../../sdk/solita-client/src';
 import { SessionAccount } from '../../sdk/solita-client/src/generated/accounts';
 
 describe('CreateSession', () => {
   let ctx: TestContext;
+  let client: LazorKitClient;
   let walletPda: any;
   let ownerKp: Keypair;
   let ownerAuthorityPda: any;
 
   beforeAll(async () => {
     ctx = await setupTest();
+    client = new LazorKitClient(ctx.connection);
 
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
-    const pubkeyBytes = ownerKp.publicKey.toBytes();
 
-    [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
-    const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
-    ownerAuthorityPda = authPda;
-
-    await sendTx(ctx, [createCreateWalletIx({
+    const result = client.createWallet({
       payer: ctx.payer.publicKey,
-      walletPda,
-      vaultPda,
-      authorityPda: authPda,
       userSeed,
-      authType: AUTH_TYPE_ED25519,
-      authBump,
-      credentialOrPubkey: pubkeyBytes,
-    })]);
+      owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
+    });
+    walletPda = result.walletPda;
+    ownerAuthorityPda = result.authorityPda;
+
+    await sendTx(ctx, result.instructions);
   });
 
   it('creates a session with Ed25519 admin', async () => {
     const sessionKp = Keypair.generate();
-    const sessionKeyBytes = sessionKp.publicKey.toBytes();
-    const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
 
     // Expires ~1 hour from now in slots (~2.5 slots/sec * 3600 = 9000 slots)
     const currentSlot = await getSlot(ctx);
     const expiresAt = currentSlot + 9000n;
 
-    const ix = createCreateSessionIx({
+    const { instructions, sessionPda } = await client.createSession({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: ownerAuthorityPda,
-      sessionPda,
-      sessionKey: sessionKeyBytes,
+      adminSigner: ed25519(ownerKp.publicKey, ownerAuthorityPda),
+      sessionKey: sessionKp.publicKey,
       expiresAt,
-      authorizerSigner: ownerKp.publicKey,
     });
 
-    await sendTx(ctx, [ix], [ownerKp]);
+    await sendTx(ctx, instructions, [ownerKp]);
 
     // Verify session
-    const session = await SessionAccount.fromAccountAddress(ctx.connection, sessionPda);
+    const session = await SessionAccount.fromAccountAddress(
+      ctx.connection,
+      sessionPda,
+    );
     expect(session.wallet.equals(walletPda)).toBe(true);
     expect(session.sessionKey.equals(sessionKp.publicKey)).toBe(true);
     expect(Number(session.expiresAt)).toBe(Number(expiresAt));
@@ -74,20 +66,17 @@ describe('CreateSession', () => {
   it('rejects session creation from unauthorized signer', async () => {
     const randomKp = Keypair.generate();
     const sessionKp = Keypair.generate();
-    const [sessionPda] = findSessionPda(walletPda, sessionKp.publicKey.toBytes());
 
     const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-    const ix = createCreateSessionIx({
+    const { instructions } = await client.createSession({
       payer: ctx.payer.publicKey,
       walletPda,
-      adminAuthorityPda: ownerAuthorityPda,
-      sessionPda,
-      sessionKey: sessionKp.publicKey.toBytes(),
+      adminSigner: ed25519(randomKp.publicKey, ownerAuthorityPda),
+      sessionKey: sessionKp.publicKey,
       expiresAt,
-      authorizerSigner: randomKp.publicKey,
     });
 
-    await sendTxExpectError(ctx, [ix], [randomKp]);
+    await sendTxExpectError(ctx, instructions, [randomKp]);
   });
 });
