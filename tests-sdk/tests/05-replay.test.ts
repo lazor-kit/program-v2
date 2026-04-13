@@ -7,7 +7,13 @@ import {
   type AccountMeta,
 } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, sendTxExpectError, getSlot, type TestContext } from './common';
+import {
+  setupTest,
+  sendTx,
+  sendTxExpectError,
+  getSlot,
+  type TestContext,
+} from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 import {
   findWalletPda,
@@ -29,16 +35,20 @@ describe('Replay Prevention (Odometer)', () => {
   let ownerAuthorityPda: PublicKey;
 
   // Helper to build a simple transfer execute instruction
-  const compactIxDef = [{
-    programIdIndex: 5,
-    accountIndexes: [3, 6],
-    data: new Uint8Array((() => {
-      const d = Buffer.alloc(12);
-      d.writeUInt32LE(2, 0);
-      d.writeBigUInt64LE(1_000_000n, 4);
-      return d;
-    })()),
-  }];
+  const compactIxDef = [
+    {
+      programIdIndex: 5,
+      accountIndexes: [3, 6],
+      data: new Uint8Array(
+        (() => {
+          const d = Buffer.alloc(12);
+          d.writeUInt32LE(2, 0);
+          d.writeBigUInt64LE(1_000_000n, 4);
+          return d;
+        })(),
+      ),
+    },
+  ];
 
   function buildTransferPacked() {
     return packCompactInstructions(compactIxDef);
@@ -95,24 +105,32 @@ describe('Replay Prevention (Odometer)', () => {
 
     [walletPda] = findWalletPda(userSeed);
     [vaultPda] = findVaultPda(walletPda);
-    const [authPda, authBump] = findAuthorityPda(walletPda, ownerKey.credentialIdHash);
+    const [authPda, authBump] = findAuthorityPda(
+      walletPda,
+      ownerKey.credentialIdHash,
+    );
     ownerAuthorityPda = authPda;
 
-    await sendTx(ctx, [createCreateWalletIx({
-      payer: ctx.payer.publicKey,
-      walletPda,
-      vaultPda,
-      authorityPda: authPda,
-      userSeed,
-      authType: AUTH_TYPE_SECP256R1,
-      authBump,
-      credentialOrPubkey: ownerKey.credentialIdHash,
-      secp256r1Pubkey: ownerKey.publicKeyBytes,
-      rpId: ownerKey.rpId,
-    })]);
+    await sendTx(ctx, [
+      createCreateWalletIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        vaultPda,
+        authorityPda: authPda,
+        userSeed,
+        authType: AUTH_TYPE_SECP256R1,
+        authBump,
+        credentialOrPubkey: ownerKey.credentialIdHash,
+        secp256r1Pubkey: ownerKey.publicKeyBytes,
+        rpId: ownerKey.rpId,
+      }),
+    ]);
 
     // Fund vault
-    const sig = await ctx.connection.requestAirdrop(vaultPda, 5 * LAMPORTS_PER_SOL);
+    const sig = await ctx.connection.requestAirdrop(
+      vaultPda,
+      5 * LAMPORTS_PER_SOL,
+    );
     await ctx.connection.confirmTransaction(sig, 'confirmed');
   });
 
@@ -132,7 +150,10 @@ describe('Replay Prevention (Odometer)', () => {
     // Counter is now 1 on-chain, submitting 1 again should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(1, packed)).precompileIx, (await buildExecuteIx(1, packed)).ix],
+      [
+        (await buildExecuteIx(1, packed)).precompileIx,
+        (await buildExecuteIx(1, packed)).ix,
+      ],
       [],
       3006, // SignatureReused
     );
@@ -142,7 +163,10 @@ describe('Replay Prevention (Odometer)', () => {
     const packed = buildTransferPacked();
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(0, packed)).precompileIx, (await buildExecuteIx(0, packed)).ix],
+      [
+        (await buildExecuteIx(0, packed)).precompileIx,
+        (await buildExecuteIx(0, packed)).ix,
+      ],
       [],
       3006,
     );
@@ -153,7 +177,10 @@ describe('Replay Prevention (Odometer)', () => {
     // Stored counter is 1, expected next is 2, submitting 5 should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(5, packed)).precompileIx, (await buildExecuteIx(5, packed)).ix],
+      [
+        (await buildExecuteIx(5, packed)).precompileIx,
+        (await buildExecuteIx(5, packed)).ix,
+      ],
       [],
       3006,
     );
@@ -177,7 +204,10 @@ describe('Replay Prevention (Odometer)', () => {
     // Counter is 4, submitting 3 should fail
     await sendTxExpectError(
       ctx,
-      [(await buildExecuteIx(3, packed)).precompileIx, (await buildExecuteIx(3, packed)).ix],
+      [
+        (await buildExecuteIx(3, packed)).precompileIx,
+        (await buildExecuteIx(3, packed)).ix,
+      ],
       [],
       3006,
     );

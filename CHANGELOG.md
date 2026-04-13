@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- High-level `transferSol()` method: transfer SOL with just payer, wallet, signer, recipient, and amount
+- High-level `execute()` method: execute arbitrary TransactionInstructions without manual compact encoding
+- Auto-derivation of authority PDAs from signer.credentialIdHash (authorityPda now optional in Secp256r1 methods)
 - Deferred Execution: 2-transaction flow for large payloads exceeding the ~574-byte limit of a single Secp256r1 Execute tx
 - Authorize instruction (disc=6): TX1 signs over instruction/account hashes, creates DeferredExec PDA
 - ExecuteDeferred instruction (disc=7): TX2 verifies hashes and executes via CPI with vault signing
@@ -18,12 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - SDK builders: `createAuthorizeIx`, `createExecuteDeferredIx`, `createReclaimDeferredIx`
 - SDK helpers: `findDeferredExecPda`, `computeInstructionsHash`
 - LazorKitClient methods: `authorizeSecp256r1`, `executeDeferredSecp256r1`, `reclaimDeferred`
-- 7 new integration tests for deferred execution (tests-sdk, total now 35)
+- 9 new integration tests for deferred execution and execute DX (tests-sdk, total now 37)
 - Odometer counter replay protection for Secp256r1 (monotonic u32 per authority)
 - program_id included in challenge hash (cross-program replay prevention)
 - rpId stored on authority account at creation (saves ~14 bytes per transaction)
 - TypeScript SDK (`sdk/solita-client`) with Solita code generation
-- Integration test suite (`tests-sdk/`) with 35 tests across 8 files
+- Integration test suite (`tests-sdk/`) with 37 tests across 8 files
 - Benchmark script for CU and transaction size measurements
 - CompactInstructions accounts hash for anti-reordering protection
 - Session expiry validation (future check + 30-day max duration)
@@ -51,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `PublicKey.default` collision with `SystemProgram.programId` in SDK execute methods: both are 32 zero bytes, causing `buildCompactLayout` to map SystemProgram to the sysvar slot (index 4) instead of adding it as a remaining account. Replaced with `SYSVAR_INSTRUCTIONS_PUBKEY`.
 - Synced passkey lockout: WebAuthn hardware counter=0 no longer causes rejection
 - 17/17 audit issues resolved (Accretion audit)
 

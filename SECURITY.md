@@ -39,8 +39,8 @@ Reports available in the `audits/` directory.
 
 ## Security Features
 
-- Odometer counter replay protection (monotonic u64 per authority)
-- SlotHashes liveness window (150 slots)
+- Odometer counter replay protection (monotonic u32 per authority)
+- Clock-based slot freshness window (150 slots via `Clock::get()`)
 - CPI stack_height reentrancy prevention
 - Signature binding to payer, accounts, counter, and program_id
 - Self-removal and owner removal protection

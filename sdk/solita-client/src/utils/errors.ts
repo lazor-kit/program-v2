@@ -35,6 +35,11 @@ export const ERROR_NAMES: Record<number, string> = {
   3011: 'InvalidAuthenticationKind',
   3012: 'InvalidMessage',
   3013: 'SelfReentrancyNotAllowed',
+  3014: 'DeferredAuthorizationExpired',
+  3015: 'DeferredHashMismatch',
+  3016: 'InvalidExpiryWindow',
+  3017: 'UnauthorizedReclaim',
+  3018: 'DeferredAuthorizationNotExpired',
 };
 
 /**

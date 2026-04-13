@@ -6,7 +6,13 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, sendTxExpectError, getSlot, type TestContext } from './common';
+import {
+  setupTest,
+  sendTx,
+  sendTxExpectError,
+  getSlot,
+  type TestContext,
+} from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 import {
   findWalletPda,
@@ -46,24 +52,32 @@ describe('Deferred Execution', () => {
 
       [walletPda] = findWalletPda(userSeed);
       [vaultPda] = findVaultPda(walletPda);
-      const [authPda, authBump] = findAuthorityPda(walletPda, ownerKey.credentialIdHash);
+      const [authPda, authBump] = findAuthorityPda(
+        walletPda,
+        ownerKey.credentialIdHash,
+      );
       ownerAuthorityPda = authPda;
 
-      await sendTx(ctx, [createCreateWalletIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        authorityPda: authPda,
-        userSeed,
-        authType: AUTH_TYPE_SECP256R1,
-        authBump,
-        credentialOrPubkey: ownerKey.credentialIdHash,
-        secp256r1Pubkey: ownerKey.publicKeyBytes,
-        rpId: ownerKey.rpId,
-      })]);
+      await sendTx(ctx, [
+        createCreateWalletIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          authorityPda: authPda,
+          userSeed,
+          authType: AUTH_TYPE_SECP256R1,
+          authBump,
+          credentialOrPubkey: ownerKey.credentialIdHash,
+          secp256r1Pubkey: ownerKey.publicKeyBytes,
+          rpId: ownerKey.rpId,
+        }),
+      ]);
 
       // Fund the vault
-      const sig = await ctx.connection.requestAirdrop(vaultPda, 5 * LAMPORTS_PER_SOL);
+      const sig = await ctx.connection.requestAirdrop(
+        vaultPda,
+        5 * LAMPORTS_PER_SOL,
+      );
       await ctx.connection.confirmTransaction(sig, 'confirmed');
     });
 
@@ -79,11 +93,13 @@ describe('Deferred Execution', () => {
       // Compact instruction indices are relative to tx2 account layout:
       //   0: payer, 1: wallet, 2: vault, 3: deferred, 4: refundDest
       //   5: SystemProgram, 6: recipient
-      const compactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6], // vault (from), recipient (to)
-        data: new Uint8Array(transferData),
-      }];
+      const compactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6], // vault (from), recipient (to)
+          data: new Uint8Array(transferData),
+        },
+      ];
 
       // Compute hashes
       const instructionsHash = computeInstructionsHash(compactIxs);
@@ -113,7 +129,11 @@ describe('Deferred Execution', () => {
       });
 
       // Derive deferred PDA (counter = 1)
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 1);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        1,
+      );
 
       // === TX1: Authorize ===
       const authorizeIx = createAuthorizeIx({
@@ -130,7 +150,8 @@ describe('Deferred Execution', () => {
       await sendTx(ctx, [precompileIx, authorizeIx]);
 
       // Verify DeferredExec account was created
-      const deferredAccount = await ctx.connection.getAccountInfo(deferredExecPda);
+      const deferredAccount =
+        await ctx.connection.getAccountInfo(deferredExecPda);
       expect(deferredAccount).not.toBeNull();
       expect(deferredAccount!.data.length).toBe(176);
       expect(deferredAccount!.data[0]).toBe(4); // DeferredExec discriminator
@@ -145,7 +166,11 @@ describe('Deferred Execution', () => {
         refundDestination: ctx.payer.publicKey,
         packedInstructions: packed,
         remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
           { pubkey: recipient, isSigner: false, isWritable: true },
         ],
       });
@@ -157,7 +182,8 @@ describe('Deferred Execution', () => {
       expect(balanceAfter - balanceBefore).toBe(LAMPORTS_PER_SOL);
 
       // Verify DeferredExec account was closed
-      const deferredAfter = await ctx.connection.getAccountInfo(deferredExecPda);
+      const deferredAfter =
+        await ctx.connection.getAccountInfo(deferredExecPda);
       expect(deferredAfter).toBeNull();
     });
 
@@ -179,9 +205,21 @@ describe('Deferred Execution', () => {
       //   0: payer, 1: wallet, 2: vault, 3: deferred, 4: refundDest
       //   5: SystemProgram, 6: recipient1, 7: recipient2, 8: recipient3
       const compactIxs = [
-        { programIdIndex: 5, accountIndexes: [2, 6], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
-        { programIdIndex: 5, accountIndexes: [2, 7], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
-        { programIdIndex: 5, accountIndexes: [2, 8], data: makeTransferData(BigInt(LAMPORTS_PER_SOL)) },
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: makeTransferData(BigInt(LAMPORTS_PER_SOL)),
+        },
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 7],
+          data: makeTransferData(BigInt(LAMPORTS_PER_SOL)),
+        },
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 8],
+          data: makeTransferData(BigInt(LAMPORTS_PER_SOL)),
+        },
       ];
 
       const instructionsHash = computeInstructionsHash(compactIxs);
@@ -210,36 +248,49 @@ describe('Deferred Execution', () => {
         sysvarIxIndex: 6,
       });
 
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 2);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        2,
+      );
 
       // TX1: Authorize
-      await sendTx(ctx, [precompileIx, createAuthorizeIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        authorityPda: ownerAuthorityPda,
-        deferredExecPda,
-        instructionsHash,
-        accountsHash,
-        expiryOffset: 300,
-        authPayload,
-      })]);
+      await sendTx(ctx, [
+        precompileIx,
+        createAuthorizeIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          authorityPda: ownerAuthorityPda,
+          deferredExecPda,
+          instructionsHash,
+          accountsHash,
+          expiryOffset: 300,
+          authPayload,
+        }),
+      ]);
 
       // TX2: ExecuteDeferred
       const packed = packCompactInstructions(compactIxs);
-      await sendTx(ctx, [createExecuteDeferredIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-        packedInstructions: packed,
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient1, isSigner: false, isWritable: true },
-          { pubkey: recipient2, isSigner: false, isWritable: true },
-          { pubkey: recipient3, isSigner: false, isWritable: true },
-        ],
-      })]);
+      await sendTx(ctx, [
+        createExecuteDeferredIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          deferredExecPda,
+          refundDestination: ctx.payer.publicKey,
+          packedInstructions: packed,
+          remainingAccounts: [
+            {
+              pubkey: SystemProgram.programId,
+              isSigner: false,
+              isWritable: false,
+            },
+            { pubkey: recipient1, isSigner: false, isWritable: true },
+            { pubkey: recipient2, isSigner: false, isWritable: true },
+            { pubkey: recipient3, isSigner: false, isWritable: true },
+          ],
+        }),
+      ]);
 
       // Verify all transfers
       const bal1 = await ctx.connection.getBalance(recipient1);
@@ -263,23 +314,31 @@ describe('Deferred Execution', () => {
 
       [walletPda] = findWalletPda(userSeed);
       [vaultPda] = findVaultPda(walletPda);
-      const [authPda, authBump] = findAuthorityPda(walletPda, ownerKey.credentialIdHash);
+      const [authPda, authBump] = findAuthorityPda(
+        walletPda,
+        ownerKey.credentialIdHash,
+      );
       ownerAuthorityPda = authPda;
 
-      await sendTx(ctx, [createCreateWalletIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        authorityPda: authPda,
-        userSeed,
-        authType: AUTH_TYPE_SECP256R1,
-        authBump,
-        credentialOrPubkey: ownerKey.credentialIdHash,
-        secp256r1Pubkey: ownerKey.publicKeyBytes,
-        rpId: ownerKey.rpId,
-      })]);
+      await sendTx(ctx, [
+        createCreateWalletIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          authorityPda: authPda,
+          userSeed,
+          authType: AUTH_TYPE_SECP256R1,
+          authBump,
+          credentialOrPubkey: ownerKey.credentialIdHash,
+          secp256r1Pubkey: ownerKey.publicKeyBytes,
+          rpId: ownerKey.rpId,
+        }),
+      ]);
 
-      const sig = await ctx.connection.requestAirdrop(vaultPda, 5 * LAMPORTS_PER_SOL);
+      const sig = await ctx.connection.requestAirdrop(
+        vaultPda,
+        5 * LAMPORTS_PER_SOL,
+      );
       await ctx.connection.confirmTransaction(sig, 'confirmed');
     });
 
@@ -292,11 +351,13 @@ describe('Deferred Execution', () => {
       transferData.writeBigUInt64LE(BigInt(LAMPORTS_PER_SOL), 4);
 
       // Authorize with 100k transfer
-      const compactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6],
-        data: new Uint8Array(transferData),
-      }];
+      const compactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: new Uint8Array(transferData),
+        },
+      ];
 
       const instructionsHash = computeInstructionsHash(compactIxs);
       const tx2AccountMetas = [
@@ -321,59 +382,85 @@ describe('Deferred Execution', () => {
         sysvarIxIndex: 6,
       });
 
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 1);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        1,
+      );
 
       // TX1: Authorize
-      await sendTx(ctx, [precompileIx, createAuthorizeIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        authorityPda: ownerAuthorityPda,
-        deferredExecPda,
-        instructionsHash,
-        accountsHash,
-        expiryOffset: 300,
-        authPayload,
-      })]);
+      await sendTx(ctx, [
+        precompileIx,
+        createAuthorizeIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          authorityPda: ownerAuthorityPda,
+          deferredExecPda,
+          instructionsHash,
+          accountsHash,
+          expiryOffset: 300,
+          authPayload,
+        }),
+      ]);
 
       // TX2: Try to execute with DIFFERENT instructions (1M instead of 100k)
       const wrongTransferData = Buffer.alloc(12);
       wrongTransferData.writeUInt32LE(2, 0);
       wrongTransferData.writeBigUInt64LE(BigInt(2 * LAMPORTS_PER_SOL), 4); // 2 SOL instead of 1 SOL
 
-      const wrongCompactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6],
-        data: new Uint8Array(wrongTransferData),
-      }];
+      const wrongCompactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: new Uint8Array(wrongTransferData),
+        },
+      ];
       const wrongPacked = packCompactInstructions(wrongCompactIxs);
 
-      await sendTxExpectError(ctx, [createExecuteDeferredIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-        packedInstructions: wrongPacked,
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient, isSigner: false, isWritable: true },
+      await sendTxExpectError(
+        ctx,
+        [
+          createExecuteDeferredIx({
+            payer: ctx.payer.publicKey,
+            walletPda,
+            vaultPda,
+            deferredExecPda,
+            refundDestination: ctx.payer.publicKey,
+            packedInstructions: wrongPacked,
+            remainingAccounts: [
+              {
+                pubkey: SystemProgram.programId,
+                isSigner: false,
+                isWritable: false,
+              },
+              { pubkey: recipient, isSigner: false, isWritable: true },
+            ],
+          }),
         ],
-      })], [], 3015); // DeferredHashMismatch
+        [],
+        3015,
+      ); // DeferredHashMismatch
 
       // Now execute with correct instructions to clean up
       const correctPacked = packCompactInstructions(compactIxs);
-      await sendTx(ctx, [createExecuteDeferredIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-        packedInstructions: correctPacked,
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient, isSigner: false, isWritable: true },
-        ],
-      })]);
+      await sendTx(ctx, [
+        createExecuteDeferredIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          deferredExecPda,
+          refundDestination: ctx.payer.publicKey,
+          packedInstructions: correctPacked,
+          remainingAccounts: [
+            {
+              pubkey: SystemProgram.programId,
+              isSigner: false,
+              isWritable: false,
+            },
+            { pubkey: recipient, isSigner: false, isWritable: true },
+          ],
+        }),
+      ]);
     });
 
     it('rejects double execution (account closed after first execute)', async () => {
@@ -384,11 +471,13 @@ describe('Deferred Execution', () => {
       transferData.writeUInt32LE(2, 0);
       transferData.writeBigUInt64LE(BigInt(LAMPORTS_PER_SOL), 4);
 
-      const compactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6],
-        data: new Uint8Array(transferData),
-      }];
+      const compactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: new Uint8Array(transferData),
+        },
+      ];
 
       const instructionsHash = computeInstructionsHash(compactIxs);
       const tx2AccountMetas = [
@@ -413,19 +502,26 @@ describe('Deferred Execution', () => {
         sysvarIxIndex: 6,
       });
 
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 2);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        2,
+      );
 
       // TX1: Authorize
-      await sendTx(ctx, [precompileIx, createAuthorizeIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        authorityPda: ownerAuthorityPda,
-        deferredExecPda,
-        instructionsHash,
-        accountsHash,
-        expiryOffset: 300,
-        authPayload,
-      })]);
+      await sendTx(ctx, [
+        precompileIx,
+        createAuthorizeIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          authorityPda: ownerAuthorityPda,
+          deferredExecPda,
+          instructionsHash,
+          accountsHash,
+          expiryOffset: 300,
+          authPayload,
+        }),
+      ]);
 
       // TX2: Execute (should succeed)
       const packed = packCompactInstructions(compactIxs);
@@ -437,7 +533,11 @@ describe('Deferred Execution', () => {
         refundDestination: ctx.payer.publicKey,
         packedInstructions: packed,
         remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
           { pubkey: recipient, isSigner: false, isWritable: true },
         ],
       });
@@ -445,18 +545,24 @@ describe('Deferred Execution', () => {
       await sendTx(ctx, [executeDeferredIx]);
 
       // TX2 again: should fail (account closed)
-      await sendTxExpectError(ctx, [createExecuteDeferredIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-        packedInstructions: packed,
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient, isSigner: false, isWritable: true },
-        ],
-      })]);
+      await sendTxExpectError(ctx, [
+        createExecuteDeferredIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          deferredExecPda,
+          refundDestination: ctx.payer.publicKey,
+          packedInstructions: packed,
+          remainingAccounts: [
+            {
+              pubkey: SystemProgram.programId,
+              isSigner: false,
+              isWritable: false,
+            },
+            { pubkey: recipient, isSigner: false, isWritable: true },
+          ],
+        }),
+      ]);
     });
 
     it('rejects reclaim before expiry', async () => {
@@ -467,11 +573,13 @@ describe('Deferred Execution', () => {
       transferData.writeUInt32LE(2, 0);
       transferData.writeBigUInt64LE(BigInt(LAMPORTS_PER_SOL), 4);
 
-      const compactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6],
-        data: new Uint8Array(transferData),
-      }];
+      const compactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: new Uint8Array(transferData),
+        },
+      ];
 
       const instructionsHash = computeInstructionsHash(compactIxs);
       const tx2AccountMetas = [
@@ -496,41 +604,61 @@ describe('Deferred Execution', () => {
         sysvarIxIndex: 6,
       });
 
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 3);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        3,
+      );
 
       // TX1: Authorize with max expiry
-      await sendTx(ctx, [precompileIx, createAuthorizeIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        authorityPda: ownerAuthorityPda,
-        deferredExecPda,
-        instructionsHash,
-        accountsHash,
-        expiryOffset: 9000, // ~1 hour
-        authPayload,
-      })]);
+      await sendTx(ctx, [
+        precompileIx,
+        createAuthorizeIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          authorityPda: ownerAuthorityPda,
+          deferredExecPda,
+          instructionsHash,
+          accountsHash,
+          expiryOffset: 9000, // ~1 hour
+          authPayload,
+        }),
+      ]);
 
       // Try to reclaim immediately (should fail — not expired yet)
-      await sendTxExpectError(ctx, [createReclaimDeferredIx({
-        payer: ctx.payer.publicKey,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-      })], [], 3018); // DeferredAuthorizationNotExpired
+      await sendTxExpectError(
+        ctx,
+        [
+          createReclaimDeferredIx({
+            payer: ctx.payer.publicKey,
+            deferredExecPda,
+            refundDestination: ctx.payer.publicKey,
+          }),
+        ],
+        [],
+        3018,
+      ); // DeferredAuthorizationNotExpired
 
       // Clean up: execute it
       const packed = packCompactInstructions(compactIxs);
-      await sendTx(ctx, [createExecuteDeferredIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        vaultPda,
-        deferredExecPda,
-        refundDestination: ctx.payer.publicKey,
-        packedInstructions: packed,
-        remainingAccounts: [
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: recipient, isSigner: false, isWritable: true },
-        ],
-      })]);
+      await sendTx(ctx, [
+        createExecuteDeferredIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          vaultPda,
+          deferredExecPda,
+          refundDestination: ctx.payer.publicKey,
+          packedInstructions: packed,
+          remainingAccounts: [
+            {
+              pubkey: SystemProgram.programId,
+              isSigner: false,
+              isWritable: false,
+            },
+            { pubkey: recipient, isSigner: false, isWritable: true },
+          ],
+        }),
+      ]);
     });
 
     it('rejects reclaim from wrong payer', async () => {
@@ -541,11 +669,13 @@ describe('Deferred Execution', () => {
       transferData.writeUInt32LE(2, 0);
       transferData.writeBigUInt64LE(BigInt(LAMPORTS_PER_SOL), 4);
 
-      const compactIxs = [{
-        programIdIndex: 5,
-        accountIndexes: [2, 6],
-        data: new Uint8Array(transferData),
-      }];
+      const compactIxs = [
+        {
+          programIdIndex: 5,
+          accountIndexes: [2, 6],
+          data: new Uint8Array(transferData),
+        },
+      ];
 
       const instructionsHash = computeInstructionsHash(compactIxs);
       const tx2AccountMetas = [
@@ -570,23 +700,33 @@ describe('Deferred Execution', () => {
         sysvarIxIndex: 6,
       });
 
-      const [deferredExecPda] = findDeferredExecPda(walletPda, ownerAuthorityPda, 4);
+      const [deferredExecPda] = findDeferredExecPda(
+        walletPda,
+        ownerAuthorityPda,
+        4,
+      );
 
       // TX1: Authorize with short expiry
-      await sendTx(ctx, [precompileIx, createAuthorizeIx({
-        payer: ctx.payer.publicKey,
-        walletPda,
-        authorityPda: ownerAuthorityPda,
-        deferredExecPda,
-        instructionsHash,
-        accountsHash,
-        expiryOffset: 10, // minimum expiry
-        authPayload,
-      })]);
+      await sendTx(ctx, [
+        precompileIx,
+        createAuthorizeIx({
+          payer: ctx.payer.publicKey,
+          walletPda,
+          authorityPda: ownerAuthorityPda,
+          deferredExecPda,
+          instructionsHash,
+          accountsHash,
+          expiryOffset: 10, // minimum expiry
+          authPayload,
+        }),
+      ]);
 
       // Create a different payer and try to reclaim
       const wrongPayer = Keypair.generate();
-      const airdropSig = await ctx.connection.requestAirdrop(wrongPayer.publicKey, LAMPORTS_PER_SOL);
+      const airdropSig = await ctx.connection.requestAirdrop(
+        wrongPayer.publicKey,
+        LAMPORTS_PER_SOL,
+      );
       await ctx.connection.confirmTransaction(airdropSig, 'confirmed');
 
       // Even if expired, wrong payer should fail
@@ -595,43 +735,61 @@ describe('Deferred Execution', () => {
         await ctx.connection.requestAirdrop(Keypair.generate().publicKey, 1000);
       }
 
-      await sendTxExpectError(ctx, [createReclaimDeferredIx({
-        payer: wrongPayer.publicKey,
-        deferredExecPda,
-        refundDestination: wrongPayer.publicKey,
-      })], [wrongPayer], 3017); // UnauthorizedReclaim
+      await sendTxExpectError(
+        ctx,
+        [
+          createReclaimDeferredIx({
+            payer: wrongPayer.publicKey,
+            deferredExecPda,
+            refundDestination: wrongPayer.publicKey,
+          }),
+        ],
+        [wrongPayer],
+        3017,
+      ); // UnauthorizedReclaim
 
       // Clean up: execute with correct payer
       const packed = packCompactInstructions(compactIxs);
       // Wait for more slots just in case expiry hasn't passed
       // If expired, this will fail too — but it's fine since we proved the wrong payer was rejected
       try {
-        await sendTx(ctx, [createExecuteDeferredIx({
-          payer: ctx.payer.publicKey,
-          walletPda,
-          vaultPda,
-          deferredExecPda,
-          refundDestination: ctx.payer.publicKey,
-          packedInstructions: packed,
-          remainingAccounts: [
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: recipient, isSigner: false, isWritable: true },
-          ],
-        })]);
+        await sendTx(ctx, [
+          createExecuteDeferredIx({
+            payer: ctx.payer.publicKey,
+            walletPda,
+            vaultPda,
+            deferredExecPda,
+            refundDestination: ctx.payer.publicKey,
+            packedInstructions: packed,
+            remainingAccounts: [
+              {
+                pubkey: SystemProgram.programId,
+                isSigner: false,
+                isWritable: false,
+              },
+              { pubkey: recipient, isSigner: false, isWritable: true },
+            ],
+          }),
+        ]);
       } catch {
         // May have expired — that's fine, reclaim with correct payer
-        await sendTx(ctx, [createReclaimDeferredIx({
-          payer: ctx.payer.publicKey,
-          deferredExecPda,
-          refundDestination: ctx.payer.publicKey,
-        })]);
+        await sendTx(ctx, [
+          createReclaimDeferredIx({
+            payer: ctx.payer.publicKey,
+            deferredExecPda,
+            refundDestination: ctx.payer.publicKey,
+          }),
+        ]);
       }
     });
 
     it('counter increments correctly across deferred and regular execute', async () => {
       // After 4 deferred authorizations, counter should be 4
       const authority = await ctx.connection.getAccountInfo(ownerAuthorityPda);
-      const view = new DataView(authority!.data.buffer, authority!.data.byteOffset);
+      const view = new DataView(
+        authority!.data.buffer,
+        authority!.data.byteOffset,
+      );
       const counter = view.getUint32(8, true);
       expect(counter).toBe(4);
     });

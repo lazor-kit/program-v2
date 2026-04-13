@@ -101,7 +101,7 @@ program/src/           Rust smart contract (pinocchio, zero-copy)
 sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
   src/generated/       Auto-generated instructions, accounts, errors
   src/utils/           Instruction builders, PDA helpers, signing utils
-tests-sdk/             Integration tests (vitest, 35 tests)
+tests-sdk/             Integration tests (vitest, 37 tests)
 docs/                  Architecture, cost analysis
 audits/                Audit reports
 ```
@@ -122,23 +122,49 @@ cargo build-sbf
 npm install @lazorkit/solita-client
 ```
 
-### Create a Wallet (Ed25519)
+### Create a Wallet
 
 ```typescript
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { LazorKitClient } from '@lazorkit/solita-client';
 import * as crypto from 'crypto';
 
 const connection = new Connection('https://api.devnet.solana.com');
 const client = new LazorKitClient(connection);
 
-const owner = Keypair.generate();
-const userSeed = crypto.randomBytes(32);
-
-const { ix, walletPda, vaultPda } = client.createWalletEd25519({
+const { ix, walletPda, vaultPda } = client.createWalletSecp256r1({
   payer: payer.publicKey,
-  userSeed,
-  ownerPubkey: owner.publicKey,
+  userSeed: crypto.randomBytes(32),
+  credentialIdHash,       // 32-byte SHA256 of WebAuthn credential ID
+  compressedPubkey,       // 33-byte compressed Secp256r1 public key
+  rpId: 'your-app.com',
+});
+```
+
+### Transfer SOL
+
+```typescript
+// Just payer, wallet, signer, recipient, amount -- nothing else
+const ixs = await client.transferSol({
+  payer: payer.publicKey,
+  walletPda,
+  signer,            // Secp256r1Signer from your WebAuthn flow
+  recipient,
+  lamports: 1_000_000n,
+});
+```
+
+### Execute Arbitrary Instructions
+
+```typescript
+const [vault] = client.findVault(walletPda);
+const ixs = await client.execute({
+  payer: payer.publicKey,
+  walletPda,
+  signer,
+  instructions: [
+    SystemProgram.transfer({ fromPubkey: vault, toPubkey: recipient, lamports: 500_000 }),
+  ],
 });
 ```
 
@@ -152,7 +178,7 @@ See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API refe
 # Start local validator with program loaded
 cd tests-sdk && npm run validator:start
 
-# Run all 35 integration tests
+# Run all 37 integration tests
 npm test
 
 # Run CU benchmarks

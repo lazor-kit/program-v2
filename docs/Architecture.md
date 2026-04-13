@@ -308,5 +308,5 @@ sdk/solita-client/
       secp256r1.ts            Challenge hash + auth payload builders
       packing.ts              CompactInstruction packing
       errors.ts               Error code mapping
-tests-sdk/                    Integration tests (vitest, 35 tests)
+tests-sdk/                    Integration tests (vitest, 37 tests)
 ```

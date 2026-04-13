@@ -3,8 +3,30 @@ import { createHash } from 'crypto';
 import { PROGRAM_ID } from '../generated';
 
 /**
+ * Generates WebAuthn authenticator data for a given RP ID.
+ *
+ * Format: rpIdHash(32) + flags(1) + counter(4) = 37 bytes
+ * - Flags: 0x01 (User Present)
+ * - Counter: 0 (LazorKit uses its own odometer counter, not WebAuthn counter)
+ */
+export function generateAuthenticatorData(rpId: string): Uint8Array {
+  const rpIdHash = createHash('sha256').update(rpId).digest();
+  const data = new Uint8Array(37);
+  data.set(rpIdHash, 0);
+  data[32] = 0x01; // User Present flag
+  // Counter bytes (33-36) stay 0
+  return data;
+}
+
+/**
  * Callback interface for Secp256r1 (passkey/WebAuthn) signing.
  * The SDK never touches private keys.
+ *
+ * The sign() method receives a SHA-256 challenge and must:
+ * 1. Build clientDataJSON: `{ type: "webauthn.get", challenge: base64url(challenge), origin: "https://<rpId>", crossOrigin: false }`
+ * 2. Compute clientDataJsonHash = SHA256(clientDataJSON)
+ * 3. Sign: signature = ECDSA_SIGN(authenticatorData || clientDataJsonHash)
+ * 4. Return { signature (64-byte raw r||s, low-S normalized), authenticatorData, clientDataJsonHash }
  */
 export interface Secp256r1Signer {
   /** Compressed public key (33 bytes) */
@@ -15,13 +37,15 @@ export interface Secp256r1Signer {
   rpId: string;
   /**
    * Signs the SHA-256 challenge with the passkey.
-   * Returns { signature, authenticatorData } from the WebAuthn assertion.
-   * `signature` is the raw DER-encoded ECDSA signature.
-   * `authenticatorData` is the raw authenticator data bytes.
+   * Returns { signature, authenticatorData, clientDataJsonHash }.
    */
   sign(challenge: Uint8Array): Promise<{
+    /** 64-byte raw ECDSA signature (r || s), low-S normalized */
     signature: Uint8Array;
+    /** WebAuthn authenticator data bytes */
     authenticatorData: Uint8Array;
+    /** SHA256 of the clientDataJSON */
+    clientDataJsonHash: Uint8Array;
   }>;
 }
 

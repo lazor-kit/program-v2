@@ -41,23 +41,31 @@ describe('Counter Edge Cases', () => {
 
     const [walletPda] = findWalletPda(userSeed);
     const [vaultPda] = findVaultPda(walletPda);
-    const [ownerAuthPda, authBump] = findAuthorityPda(walletPda, ownerKey.credentialIdHash);
-
-    await sendTx(ctx, [createCreateWalletIx({
-      payer: ctx.payer.publicKey,
+    const [ownerAuthPda, authBump] = findAuthorityPda(
       walletPda,
-      vaultPda,
-      authorityPda: ownerAuthPda,
-      userSeed,
-      authType: AUTH_TYPE_SECP256R1,
-      authBump,
-      credentialOrPubkey: ownerKey.credentialIdHash,
-      secp256r1Pubkey: ownerKey.publicKeyBytes,
-      rpId: ownerKey.rpId,
-    })]);
+      ownerKey.credentialIdHash,
+    );
+
+    await sendTx(ctx, [
+      createCreateWalletIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        vaultPda,
+        authorityPda: ownerAuthPda,
+        userSeed,
+        authType: AUTH_TYPE_SECP256R1,
+        authBump,
+        credentialOrPubkey: ownerKey.credentialIdHash,
+        secp256r1Pubkey: ownerKey.publicKeyBytes,
+        rpId: ownerKey.rpId,
+      }),
+    ]);
 
     // Fund vault
-    const airdropSig = await ctx.connection.requestAirdrop(vaultPda, 2 * LAMPORTS_PER_SOL);
+    const airdropSig = await ctx.connection.requestAirdrop(
+      vaultPda,
+      2 * LAMPORTS_PER_SOL,
+    );
     await ctx.connection.confirmTransaction(airdropSig, 'confirmed');
 
     // Counter = 0 initially
@@ -74,7 +82,10 @@ describe('Counter Edge Cases', () => {
       adminPubkey,
     ]);
     // On-chain extends: extended_data_payload = data_payload + payer.key()
-    const signedPayload1 = Buffer.concat([dataPayload, ctx.payer.publicKey.toBuffer()]);
+    const signedPayload1 = Buffer.concat([
+      dataPayload,
+      ctx.payer.publicKey.toBuffer(),
+    ]);
 
     const { authPayload: ap1, precompileIx: pi1 } = await signSecp256r1({
       key: ownerKey,
@@ -86,19 +97,25 @@ describe('Counter Edge Cases', () => {
       sysvarIxIndex: 6,
     });
 
-    await sendTx(ctx, [pi1, createAddAuthorityIx({
-      payer: ctx.payer.publicKey,
-      walletPda,
-      adminAuthorityPda: ownerAuthPda,
-      newAuthorityPda: adminAuthPda,
-      newType: AUTH_TYPE_ED25519,
-      newRole: ROLE_ADMIN,
-      credentialOrPubkey: adminPubkey,
-      authPayload: ap1,
-    })]);
+    await sendTx(ctx, [
+      pi1,
+      createAddAuthorityIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        adminAuthorityPda: ownerAuthPda,
+        newAuthorityPda: adminAuthPda,
+        newType: AUTH_TYPE_ED25519,
+        newRole: ROLE_ADMIN,
+        credentialOrPubkey: adminPubkey,
+        authPayload: ap1,
+      }),
+    ]);
 
     // Verify counter = 1
-    let auth = await AuthorityAccount.fromAccountAddress(ctx.connection, ownerAuthPda);
+    let auth = await AuthorityAccount.fromAccountAddress(
+      ctx.connection,
+      ownerAuthPda,
+    );
     expect(Number(auth.counter)).toBe(1);
 
     // 2. Execute (counter becomes 2) — using same authority
@@ -107,11 +124,13 @@ describe('Counter Edge Cases', () => {
     transferData.writeUInt32LE(2, 0);
     transferData.writeBigUInt64LE(1_000_000n, 4);
 
-    const compactIxs = [{
-      programIdIndex: 5,
-      accountIndexes: [3, 6],
-      data: new Uint8Array(transferData),
-    }];
+    const compactIxs = [
+      {
+        programIdIndex: 5,
+        accountIndexes: [3, 6],
+        data: new Uint8Array(transferData),
+      },
+    ];
     const packed = packCompactInstructions(compactIxs);
 
     const execRecipient = Keypair.generate().publicKey;
@@ -138,21 +157,31 @@ describe('Counter Edge Cases', () => {
       sysvarIxIndex: 4,
     });
 
-    await sendTx(ctx, [pi2, createExecuteIx({
-      payer: ctx.payer.publicKey,
-      walletPda,
-      authorityPda: ownerAuthPda,
-      vaultPda,
-      packedInstructions: packed,
-      authPayload: ap2,
-      remainingAccounts: [
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: execRecipient, isSigner: false, isWritable: true },
-      ],
-    })]);
+    await sendTx(ctx, [
+      pi2,
+      createExecuteIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        authorityPda: ownerAuthPda,
+        vaultPda,
+        packedInstructions: packed,
+        authPayload: ap2,
+        remainingAccounts: [
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          { pubkey: execRecipient, isSigner: false, isWritable: true },
+        ],
+      }),
+    ]);
 
     // Verify counter = 2
-    auth = await AuthorityAccount.fromAccountAddress(ctx.connection, ownerAuthPda);
+    auth = await AuthorityAccount.fromAccountAddress(
+      ctx.connection,
+      ownerAuthPda,
+    );
     expect(Number(auth.counter)).toBe(2);
   });
 
@@ -163,21 +192,26 @@ describe('Counter Edge Cases', () => {
 
     const [walletPda] = findWalletPda(userSeed);
     const [vaultPda] = findVaultPda(walletPda);
-    const [auth1Pda, auth1Bump] = findAuthorityPda(walletPda, key1.credentialIdHash);
+    const [auth1Pda, auth1Bump] = findAuthorityPda(
+      walletPda,
+      key1.credentialIdHash,
+    );
 
     // Create wallet with key1 as owner
-    await sendTx(ctx, [createCreateWalletIx({
-      payer: ctx.payer.publicKey,
-      walletPda,
-      vaultPda,
-      authorityPda: auth1Pda,
-      userSeed,
-      authType: AUTH_TYPE_SECP256R1,
-      authBump: auth1Bump,
-      credentialOrPubkey: key1.credentialIdHash,
-      secp256r1Pubkey: key1.publicKeyBytes,
-      rpId: key1.rpId,
-    })]);
+    await sendTx(ctx, [
+      createCreateWalletIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        vaultPda,
+        authorityPda: auth1Pda,
+        userSeed,
+        authType: AUTH_TYPE_SECP256R1,
+        authBump: auth1Bump,
+        credentialOrPubkey: key1.credentialIdHash,
+        secp256r1Pubkey: key1.publicKeyBytes,
+        rpId: key1.rpId,
+      }),
+    ]);
 
     // Add key2 as spender via key1 (counter1 goes to 1)
     const [auth2Pda] = findAuthorityPda(walletPda, key2.credentialIdHash);
@@ -193,7 +227,10 @@ describe('Counter Edge Cases', () => {
       rpIdBytes,
     ]);
     // On-chain extends: extended_data_payload = data_payload + payer.key()
-    const signedPayloadAdd = Buffer.concat([dataPayload2, ctx.payer.publicKey.toBuffer()]);
+    const signedPayloadAdd = Buffer.concat([
+      dataPayload2,
+      ctx.payer.publicKey.toBuffer(),
+    ]);
 
     const { authPayload, precompileIx } = await signSecp256r1({
       key: key1,
@@ -205,22 +242,31 @@ describe('Counter Edge Cases', () => {
       sysvarIxIndex: 6,
     });
 
-    await sendTx(ctx, [precompileIx, createAddAuthorityIx({
-      payer: ctx.payer.publicKey,
-      walletPda,
-      adminAuthorityPda: auth1Pda,
-      newAuthorityPda: auth2Pda,
-      newType: AUTH_TYPE_SECP256R1,
-      newRole: ROLE_SPENDER,
-      credentialOrPubkey: key2.credentialIdHash,
-      secp256r1Pubkey: key2.publicKeyBytes,
-      rpId: key2.rpId,
-      authPayload,
-    })]);
+    await sendTx(ctx, [
+      precompileIx,
+      createAddAuthorityIx({
+        payer: ctx.payer.publicKey,
+        walletPda,
+        adminAuthorityPda: auth1Pda,
+        newAuthorityPda: auth2Pda,
+        newType: AUTH_TYPE_SECP256R1,
+        newRole: ROLE_SPENDER,
+        credentialOrPubkey: key2.credentialIdHash,
+        secp256r1Pubkey: key2.publicKeyBytes,
+        rpId: key2.rpId,
+        authPayload,
+      }),
+    ]);
 
     // Verify: auth1 counter=1, auth2 counter=0
-    const a1 = await AuthorityAccount.fromAccountAddress(ctx.connection, auth1Pda);
-    const a2 = await AuthorityAccount.fromAccountAddress(ctx.connection, auth2Pda);
+    const a1 = await AuthorityAccount.fromAccountAddress(
+      ctx.connection,
+      auth1Pda,
+    );
+    const a2 = await AuthorityAccount.fromAccountAddress(
+      ctx.connection,
+      auth2Pda,
+    );
     expect(Number(a1.counter)).toBe(1);
     expect(Number(a2.counter)).toBe(0);
   });
