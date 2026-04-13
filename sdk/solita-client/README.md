@@ -11,27 +11,33 @@ npm install @lazorkit/solita-client
 ## Quick Start
 
 ```typescript
-import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { LazorKitClient, AUTH_TYPE_ED25519 } from '@lazorkit/solita-client';
+import { Connection, Keypair, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import { LazorKitClient, ed25519, secp256r1, session, ROLE_ADMIN } from '@lazorkit/solita-client';
 import * as crypto from 'crypto';
 
 const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
 const client = new LazorKitClient(connection);
 
-// Create a wallet with Ed25519 authentication
-const payer = Keypair.generate();
+// Create a wallet with Ed25519 owner
 const owner = Keypair.generate();
-const userSeed = crypto.randomBytes(32);
-
-const { ix, walletPda, vaultPda, authorityPda } = client.createWalletEd25519({
+const { instructions, walletPda, vaultPda, authorityPda } = client.createWallet({
   payer: payer.publicKey,
-  userSeed,
-  ownerPubkey: owner.publicKey,
+  userSeed: crypto.randomBytes(32),
+  owner: { type: 'ed25519', publicKey: owner.publicKey },
 });
+await sendAndConfirmTransaction(connection, new Transaction().add(...instructions), [payer]);
 
-// Send the transaction
-const tx = new Transaction().add(ix);
-await sendAndConfirmTransaction(connection, tx, [payer]);
+// Or with Secp256r1 (passkey) owner
+const { instructions: ixs2 } = client.createWallet({
+  payer: payer.publicKey,
+  userSeed: crypto.randomBytes(32),
+  owner: {
+    type: 'secp256r1',
+    credentialIdHash,      // 32-byte SHA256 of WebAuthn credential ID
+    compressedPubkey,      // 33-byte compressed public key
+    rpId: 'your-app.com',
+  },
+});
 ```
 
 ## API Reference
@@ -218,129 +224,128 @@ interface Secp256r1Signer {
 }
 ```
 
-### High-Level Methods (Simplified DX)
+### Signer Types (Discriminated Unions)
 
-The simplest way to use LazorKit -- no compact instructions, no account indexes, no remaining accounts:
+The SDK uses discriminated union types for signers. Helper constructors make creation concise:
 
 ```typescript
-import { LazorKitClient } from '@lazorkit/solita-client';
+import { ed25519, secp256r1, session } from '@lazorkit/solita-client';
 
-const client = new LazorKitClient(connection);
+// Ed25519 — Keypair signs at transaction level
+const signer = ed25519(ownerKp.publicKey, authorityPda);  // authorityPda optional (auto-derived)
 
-// Transfer SOL -- just pass payer, wallet, signer, recipient, amount
-const ixs = await client.transferSol({
-  payer: payer.publicKey,
-  walletPda,
-  signer,          // Secp256r1Signer from your WebAuthn flow
-  recipient,       // destination PublicKey
-  lamports: 1_000_000n,
-});
-await sendAndConfirmTransaction(connection, new Transaction().add(...ixs), [payer]);
+// Secp256r1 — passkey/WebAuthn
+const signer = secp256r1(myPasskeySigner, { authorityPda, slotOverride });  // both optional
 
-// Execute arbitrary instructions -- pass standard TransactionInstructions
-const [vault] = client.findVault(walletPda);
-const ixs = await client.execute({
-  payer: payer.publicKey,
-  walletPda,
-  signer,
-  instructions: [
-    SystemProgram.transfer({ fromPubkey: vault, toPubkey: recipient, lamports: 1_000_000 }),
-    // ... any other instructions
-  ],
-});
-await sendAndConfirmTransaction(connection, new Transaction().add(...ixs), [payer]);
+// Session — ephemeral key
+const signer = session(sessionPda, sessionKp.publicKey);
 ```
 
-Both methods auto-derive PDAs, auto-fetch the current slot, auto-read the counter, auto-pack compact instructions, and auto-compute the accounts hash. The returned array includes the Secp256r1 precompile instruction followed by the Execute instruction.
+**Type unions:**
+- `AdminSigner` = `Ed25519SignerConfig | Secp256r1SignerConfig` -- for admin operations (addAuthority, removeAuthority, transferOwnership, createSession)
+- `ExecuteSigner` = above + `SessionSignerConfig` -- for execute/transferSol
 
-### Full Client API
+### High-Level Client API
 
-`LazorKitClient` auto-derives PDAs (vaultPda from walletPda), auto-fetches slot from connection, and auto-computes sysvar instruction indexes. Only pass what's truly required:
+Every method returns `{ instructions: TransactionInstruction[]; ...extraPdas }`. The client auto-derives PDAs, auto-fetches slots, auto-reads counters, auto-packs compact instructions, and auto-computes accounts hashes.
 
 ```typescript
-import { LazorKitClient } from '@lazorkit/solita-client';
+import { LazorKitClient, ed25519, secp256r1, session, ROLE_ADMIN, ROLE_SPENDER } from '@lazorkit/solita-client';
 
 const client = new LazorKitClient(connection);
 
-// Read counter
+// ── Read counter ──
 const counter = await client.readCounter(authorityPda);
 
-// Create wallet (Ed25519)
-const { ix, walletPda, vaultPda, authorityPda } = client.createWalletEd25519({
-  payer, userSeed, ownerPubkey,
+// ── Create wallet (unified for both auth types) ──
+const { instructions, walletPda, vaultPda, authorityPda } = client.createWallet({
+  payer: payer.publicKey,
+  userSeed,
+  owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
+  // or: owner: { type: 'secp256r1', credentialIdHash, compressedPubkey, rpId: 'app.com' },
 });
 
-// Create wallet (Secp256r1) — rpId stored on-chain
-const { ix, walletPda, vaultPda, authorityPda } = client.createWalletSecp256r1({
-  payer, userSeed, credentialIdHash, compressedPubkey, rpId: 'lazorkit.app',
+// ── Add authority (unified — works with any admin signer) ──
+const { instructions, newAuthorityPda } = await client.addAuthority({
+  payer: payer.publicKey,
+  walletPda,
+  adminSigner: ed25519(ownerKp.publicKey, ownerAuthPda),  // or secp256r1(signer)
+  newAuthority: { type: 'ed25519', publicKey: adminKp.publicKey },
+  role: ROLE_ADMIN,
 });
 
-// Add authority (Secp256r1 admin) — slot auto-fetched, sysvarIxIndex auto-computed
-const { ix, newAuthorityPda, precompileIx } = await client.addAuthoritySecp256r1({
-  payer, walletPda, adminAuthorityPda, adminSigner: signer,
-  newType: AUTH_TYPE_ED25519, newRole: ROLE_SPENDER,
-  newCredentialOrPubkey: newPubkeyBytes,
-});
-
-// Remove authority (Secp256r1 admin)
-const { ix, precompileIx } = await client.removeAuthoritySecp256r1({
-  payer, walletPda, adminAuthorityPda, adminSigner: signer,
-  targetAuthorityPda,
+// ── Remove authority ──
+const { instructions } = await client.removeAuthority({
+  payer: payer.publicKey,
+  walletPda,
+  adminSigner: ed25519(adminKp.publicKey, adminAuthPda),
+  targetAuthorityPda: spenderAuthPda,
   // refundDestination defaults to payer
 });
 
-// Execute (Ed25519) — vaultPda auto-derived
-const ix = client.executeEd25519({
-  payer, walletPda, authorityPda, compactInstructions, remainingAccounts,
+// ── Transfer ownership ──
+const { instructions, newOwnerAuthorityPda } = await client.transferOwnership({
+  payer: payer.publicKey,
+  walletPda,
+  ownerSigner: secp256r1(ceoSigner),
+  newOwner: { type: 'secp256r1', credentialIdHash, compressedPubkey, rpId },
 });
 
-// Execute (Secp256r1) — vaultPda, slot, sysvarIxIndex all auto-derived
-const { ix, precompileIx } = await client.executeSecp256r1({
-  payer, walletPda, authorityPda, signer,
-  compactInstructions, remainingAccounts,
+// ── Execute (unified — Ed25519, Secp256r1, or Session) ──
+const [vault] = client.findVault(walletPda);
+const { instructions } = await client.execute({
+  payer: payer.publicKey,
+  walletPda,
+  signer: secp256r1(mySigner),  // or ed25519(kp.publicKey) or session(sessionPda, sessionKp.publicKey)
+  instructions: [
+    SystemProgram.transfer({ fromPubkey: vault, toPubkey: recipient, lamports: 1_000_000 }),
+  ],
+});
+// Note: for Ed25519 add ownerKp to tx signers, for Session add sessionKp
+
+// ── Transfer SOL (convenience) ──
+const { instructions } = await client.transferSol({
+  payer: payer.publicKey,
+  walletPda,
+  signer: secp256r1(mySigner),
+  recipient,
+  lamports: 1_000_000n,
 });
 
-// Execute (Session key) — vaultPda auto-derived, session key as signer
-const ix = client.executeSession({
-  payer, walletPda, sessionPda, sessionKeyPubkey,
-  compactInstructions, remainingAccounts,
-});
-// Note: sessionKeypair must be added as tx signer: [payer, sessionKeypair]
-
-// Create session (Secp256r1 admin)
-const { ix, sessionPda, precompileIx } = await client.createSessionSecp256r1({
-  payer, walletPda, adminAuthorityPda, adminSigner: signer,
-  sessionKey, expiresAt,
+// ── Create session ──
+const { instructions, sessionPda } = await client.createSession({
+  payer: payer.publicKey,
+  walletPda,
+  adminSigner: ed25519(ownerKp.publicKey, ownerAuthPda),
+  sessionKey: sessionKp.publicKey,
+  expiresAt: currentSlot + 9000n,
 });
 
-// Transfer ownership (Secp256r1)
-const { ix, newOwnerAuthorityPda, precompileIx } = await client.transferOwnershipSecp256r1({
-  payer, walletPda, currentOwnerAuthorityPda, ownerSigner: signer,
-  newType: AUTH_TYPE_ED25519, newCredentialOrPubkey,
+// ── Deferred Execution — TX1 (Authorize) ──
+const { instructions, deferredExecPda, deferredPayload } = await client.authorize({
+  payer: payer.publicKey,
+  walletPda,
+  signer: secp256r1(mySigner),  // Secp256r1 only
+  instructions: [jupiterSwapIx],
+  expiryOffset: 300, // ~2 minutes in slots
 });
 
-// Deferred Execution — TX1 (Authorize)
-const { authorizeIx, precompileIx, deferredExecPda } = await client.authorizeSecp256r1({
-  payer, walletPda, authorityPda, signer,
-  compactInstructions, tx2AccountMetas,
-  expiryOffset: 300, // ~2 minutes
-});
-
-// Deferred Execution — TX2 (ExecuteDeferred) — vaultPda auto-derived
-const ix = client.executeDeferred({
-  payer, walletPda, deferredExecPda,
-  compactInstructions, remainingAccounts,
+// ── Deferred Execution — TX2 (ExecuteDeferred) ──
+const { instructions: tx2Ixs } = client.executeDeferredFromPayload({
+  payer: payer.publicKey,
+  deferredPayload,  // returned from authorize()
   // refundDestination defaults to payer
 });
 
-// Reclaim expired DeferredExec (refund rent)
-const ix = client.reclaimDeferred({
-  payer, deferredExecPda,
+// ── Reclaim expired DeferredExec (refund rent) ──
+const { instructions } = client.reclaimDeferred({
+  payer: payer.publicKey,
+  deferredExecPda,
   // refundDestination defaults to payer
 });
 ```
 
-All Secp256r1 methods accept an optional `slotOverride` param for batching scenarios where you want to control the slot value.
+All Secp256r1 signers accept an optional `slotOverride` for batching scenarios.
 
 ### Constants
 
