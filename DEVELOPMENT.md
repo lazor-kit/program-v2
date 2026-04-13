@@ -2,71 +2,87 @@
 
 This document outlines the standard procedures for building, deploying, and testing the LazorKit program and its associated SDK.
 
-## 1. Prerequisites
-- [Solana Tool Suite](https://docs.solanalabs.com/cli/install) (latest stable)
-- [Rust](https://www.rust-lang.org/tools/install)
-- [Node.js & npm](https://nodejs.org/)
-- [Shank CLI](https://github.com/metaplex-foundation/shank) (for IDL generation)
-- [Codama CLI](https://github.com/metaplex-foundation/codama) (for SDK generation)
+## Prerequisites
 
-## 2. Project Structure
-- `/program`: Rust smart contract (Pinocchio-based)
-  - Highly optimized, zero-copy architecture (`NoPadding`).
-- `/sdk/lazorkit-ts`: TypeScript SDK generated via Codama.
-  - Contains generated instructions for interaction with the contract.
-- `/tests-real-rpc`: Integration tests running against a live RPC (Devnet/Localhost).
-- `/scripts`: Automation utility scripts (e.g., syncing program IDs).
+- [Solana Tool Suite](https://docs.solanalabs.com/cli/install) (v2.x+)
+- [Rust](https://www.rust-lang.org/tools/install) (via rustup)
+- [Node.js 18+](https://nodejs.org/) & npm
+- [shank-cli](https://github.com/metaplex-foundation/shank): `cargo install shank-cli`
 
-## 3. Core Workflows
+## Project Structure
 
-### A. Program ID Synchronization
-Whenever you redeploy the program to a new address, run the sync script to update all references across Rust, the SDK generator, and your tests:
-```bash
-./scripts/sync-program-id.sh <YOUR_NEW_PROGRAM_ID>
 ```
-*Note: This script will update hardcoded IDs and typically trigger SDK regeneration automatically.*
+/program           Rust smart contract (pinocchio, zero-copy)
+/sdk/solita-client  TypeScript SDK (Solita-generated + hand-written utils)
+/tests-sdk          Integration tests (vitest, @solana/web3.js v1)
+/scripts            Build/deploy automation
+/audits             Audit reports
+/no-padding         Custom NoPadding derive macro
+/assertions         Custom assertion helpers
+```
 
-### B. IDL & SDK Generation
-If you modify instruction parameters or account structures in the Rust program, you must regenerate both the IDL and the SDK:
-1. **Update IDL** (using Shank):
-   ```bash
-   cd program && shank idl -o . --out-filename idl.json -p <YOUR_PROGRAM_ID>
-   ```
-2. **Regenerate SDK** (using Codama):
-   ```bash
-   cd sdk/lazorkit-ts && npm run generate
-   ```
+## Core Workflows
 
-### C. Testing & Validation
-Tests are built to run against an actual RPC node (`tests-real-rpc`), ensuring realistic validation of behaviors like `SlotHashes` nonce verification and resource limits.
+### A. Build Program
 
-1. **Setup Env**: Ensure `.env` in `tests-real-rpc/` has your `PRIVATE_KEY`, `RPC_URL`, and `WS_URL`.
-2. **Run All Tests**:
-   ```bash
-   cd tests-real-rpc && npm run test:devnet
-   ```
-3. **Run Single Test File** (Recommended for debugging):
-   ```bash
-   cd tests-real-rpc && npm run test:devnet:file tests/instructions/create_wallet.test.ts
-   ```
+```bash
+cargo build-sbf
+```
 
-### D. Deployment & IDL Publishing
-1. **Build the Program**:
-   ```bash
-   cargo build-sbf
-   ```
-2. **Deploy Program**:
-   ```bash
-   solana program deploy target/deploy/lazorkit_program.so -u d
-   ```
-3. **Publish IDL to Blockchain** (So block explorers can decode your contract interactions):
-   ```bash
-   # Run from root directory
-   npx --force @solana-program/program-metadata write idl <YOUR_PROGRAM_ID> ./program/idl.json
-   ```
+### B. Run Rust Tests
 
-## 4. Troubleshooting
-- **429 Too Many Requests**: The test suite handles this automatically with a retry loop. If failures persist, check your RPC provider credits or increase the sleep delay in `tests/common.ts`.
-- **Simulation Failed (Already Initialized)**: Devnet accounts persist. Change the `userSeed` in your test file or use a fresh `getRandomSeed()` to create new wallet instances.
-- **BigInt Serialization Error**: Always use the provided `tryProcessInstruction` helper in `common.ts` for catching errors, as it automatically handles `BigInt` conversion for logging.
-- **InvalidSeeds / auth_payload errors**: Ensure your generated `auth_payload` respects the exact `Codama` layout and is correctly appended to instruction data.
+```bash
+cargo test
+```
+
+### C. IDL Generation (using Shank)
+
+```bash
+cd program && shank idl -o . --out-filename idl.json -p 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT
+```
+
+### D. SDK Generation (using Solita)
+
+```bash
+cd sdk/solita-client && node generate.mjs
+```
+
+The generate.mjs script reads the Shank IDL, enriches it with accounts/errors/types, and runs Solita to produce TypeScript code in `src/generated/`.
+
+### E. Running Integration Tests
+
+```bash
+# Terminal 1: Start local validator with program loaded
+cd tests-sdk && npm run validator:start
+
+# Terminal 2: Run all 28 tests
+cd tests-sdk && npm test
+```
+
+### F. Running Benchmarks
+
+```bash
+cd tests-sdk && npm run benchmark
+```
+
+Measures CU usage and transaction sizes for all instructions.
+
+### G. Program ID Sync
+
+```bash
+./scripts/sync-program-id.sh <NEW_PROGRAM_ID>
+```
+
+### H. Deploy to Devnet
+
+```bash
+cargo build-sbf
+solana program deploy target/deploy/lazorkit_program.so -u d
+```
+
+## Troubleshooting
+
+- **429 Too Many Requests**: Check RPC credits or use local validator.
+- **Already Initialized**: Use fresh userSeed or reset validator with `--reset`.
+- **InvalidSeeds**: Verify PDA derivation matches on-chain seeds.
+- **0xbc0 (InvalidSessionDuration)**: expires_at must be a future slot, not Unix timestamp.

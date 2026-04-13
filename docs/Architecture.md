@@ -1,38 +1,47 @@
 # LazorKit Architecture
 
 ## 1. Overview
-LazorKit is a high-performance, secure smart wallet on Solana designed for distinct Authority storage and modern authentication (Passkeys). It uses `pinocchio` for efficient zero-copy state management and optimized syscalls.
+
+LazorKit is a high-performance smart wallet on Solana with passkey (WebAuthn) authentication, role-based access control, and session keys. Built with pinocchio for zero-copy serialization.
 
 ## 2. Core Principles
-*   **Zero-Copy Executions**: We strictly use `pinocchio` to cast raw bytes into Rust structs. This bypasses Borsh serialization overhead for maximum performance.
-    *   *Requirement*: All state structs must implement `NoPadding` (via `#[derive(NoPadding)]`) to ensure memory safety and perfect packing.
-*   **Separated Storage (PDAs)**: Uses a deterministic PDA for *each* Authority.
-    *   *Benefit*: Unlimited distinct authorities per wallet without resizing costs or hitting `10KiB` limits limits inside a single account.
-*   **Strict RBAC**: Hardcoded Permission Roles (Owner, Admin, Spender) for predictability and secure delegation.
-*   **Transaction Compression**: Uses `CompactInstructions` (Index-based referencing) to fit complex multi-call payloads into standard Solana transaction limits (~1232 bytes).
+
+- **Zero-Copy**: pinocchio casts raw bytes to Rust structs, no Borsh.
+- **NoPadding**: custom derive ensures memory safety and tight packing.
+- **Separated Storage**: each authority gets its own PDA (unlimited per wallet, no resize).
+- **Strict RBAC**: Owner (0), Admin (1), Spender (2).
+- **CompactInstructions**: index-based instruction referencing for Execute.
 
 ## 3. Security Mechanisms
 
 ### Replay Protection
-*   **Ed25519**: Relies on standard Solana runtime signature verification.
-*   **Secp256r1 (WebAuthn)**:
-    *   **SlotHashes Nonce**: Uses the `SlotHashes` sysvar to verify that the signed payload references a recent slot (within 150 slots). This acts as a highly efficient "Proof of Liveness" without requiring stateful on-chain nonces or counters.
-    *   **CPI Protection**: Explicit `stack_height` check prevents the authentication instruction from being called maliciously via CPI (`invoke`), defending against cross-program attack vectors.
-    *   **Signature Binding**: The `auth_payload` ensures signatures are tightly bound to the specific target account and instruction data, mitigating cross-wallet and cross-instruction replays.
-*   **Session Keys**:
-    *   **Absolute Expiry**: Sessions are valid until a strict absolute slot height `expires_at` (u64).
 
-### WebAuthn "Passkey" Support
-*   **Modules**: `program/src/auth/secp256r1`
-*   **Mechanism**:
-    *   Reconstructs `clientDataJson` on-chain dynamically based on the current context (`challenge` and `origin`).
-    *   Verifies `authenticatorData` flags (User Presence/User Verification).
-    *   Uses `Secp256r1SigVerify` precompile via Sysvar Introspection (`load_current_index_param`).
-    *   *Abstraction*: Implements the `Authority` trait for unified verification logic across both key types.
+- **Secp256r1 (Primary: Odometer Counter)**: Program-controlled u64 counter per authority. Client submits `stored_counter + 1`. The WebAuthn hardware counter is intentionally NOT used -- synced passkeys (iCloud, Google) return unreliable values. Counter is committed only after successful signature verification.
+- **Secp256r1 (Secondary: SlotHashes Liveness)**: Slot from auth_payload must appear in SlotHashes sysvar (valid within 150 slots). Provides freshness without stateful nonces.
+- **Secp256r1 (CPI Protection)**: stack_height check prevents authentication via CPI.
+- **Secp256r1 (Signature Binding)**: Challenge hash binds signature to specific instruction, payer, accounts, counter, and program_id.
+- **Ed25519**: Standard Solana runtime signer verification. No counter needed.
+- **Sessions**: Absolute slot-based expiry. Max duration ~30 days.
+
+### Challenge Hash (Secp256r1)
+
+```
+SHA256(discriminator || auth_payload || signed_payload || slot || payer || counter || program_id)
+```
+
+7 elements, computed on-chain via `sol_sha256` syscall.
+
+### WebAuthn Passkey Support
+
+- Reconstructs clientDataJSON on-chain from packed flags.
+- Verifies authenticatorData flags (User Presence / User Verification).
+- Uses Secp256r1SigVerify precompile via sysvar introspection.
+- Stores 33-byte compressed public keys (not 64-byte uncompressed).
 
 ## 4. Account Structure (PDAs)
 
 ### Discriminators
+
 ```rust
 #[repr(u8)]
 pub enum AccountDiscriminator {
@@ -42,79 +51,179 @@ pub enum AccountDiscriminator {
 }
 ```
 
-### A. Wallet Account
-Anchor for the identity.
-*   **Seeds**: `[b"wallet", user_seed]`
+### A. WalletAccount (8 bytes)
 
-### B. Authority Account
-Represents a single authorized user (Owner, Admin, or Spender). Multi-signature schemas allow deploying multiple Authority PDAs per Wallet.
-*   **Seeds**: `[b"authority", wallet_pubkey, id_hash]`
-*   **Data Structure**:
-    ```rust
-    #[repr(C)]
-    #[derive(NoPadding)]
-    pub struct AuthorityAccountHeader {
-        pub discriminator: u8,
-        pub authority_type: u8, // 0=Ed25519, 1=Secp256r1
-        pub role: u8,           // 0=Owner, 1=Admin, 2=Spender
-        pub bump: u8,
-        pub wallet: Pubkey,
-    }
-    ```
-    *   **Type 1 (Secp256r1)** adds padding to reach 8-byte alignment: `[ u32 padding ] + [ credential_id_hash (32) ] + [ pubkey (64) ]`.
+Seeds: `["wallet", user_seed]`
 
-### C. Session Account (Ephemeral)
-Temporary sub-key for automated agents (like a session token).
-*   **Seeds**: `[b"session", wallet_pubkey, session_key]`
-*   **Data Structure**:
-    ```rust
-    #[repr(C, align(8))]
-    #[derive(NoPadding)]
-    pub struct SessionAccount {
-        pub discriminator: u8,
-        pub bump: u8,
-        pub _padding: [u8; 6],
-        pub wallet: Pubkey,
-        pub session_key: Pubkey,
-        pub expires_at: u64, // Absolute Slot Height
-    }
-    ```
+```rust
+#[repr(C, align(8))]
+pub struct WalletAccount {
+    pub discriminator: u8,   // 1 = Wallet
+    pub bump: u8,
+    pub version: u8,
+    pub _padding: [u8; 5],
+}
+// Total: 8 bytes
+```
 
-## 5. Instruction Flow & Logic
+### B. AuthorityAccountHeader (48 bytes) + Variable Data
 
-### `CreateWallet`
-*   Initializes `WalletAccount`, `Vault`, and the first `Authority` (Owner).
-*   Follows the Transfer-Allocate-Assign pattern to prevent pre-funding DoS attacks.
+Seeds: `["authority", wallet_pubkey, id_hash]`
 
-### `Execute`
-*   **Authentication**:
-    *   **Ed25519**: Standard Instruction Introspection.
-    *   **Secp256r1**:
-        1.  Verify `SlotHashes` history to ensure the signed `current_slot` is within 150 blocks of the exact current network slot.
-        2.  Reconstruct `clientDataJson` using that `current_slot`.
-        3.  Verify Signature against `sha256(clientDataJson + authData)`.
-    *   **Session**:
-        1.  Verify `session.wallet == wallet`.
-        2.  Verify `current_slot <= session.expires_at`.
-        3.  Verify `session_key` is a valid Ed25519 signer on the transaction.
-*   **Decompression**: Expands `CompactInstructions` and calls `invoke_signed` with Vault seeds across all requested target programs.
+```rust
+#[repr(C, align(8))]
+pub struct AuthorityAccountHeader {
+    pub discriminator: u8,   // 2 = Authority
+    pub authority_type: u8,  // 0=Ed25519, 1=Secp256r1
+    pub role: u8,            // 0=Owner, 1=Admin, 2=Spender
+    pub bump: u8,
+    pub version: u8,
+    pub _padding: [u8; 3],
+    pub counter: u64,        // Monotonic odometer for Secp256r1 replay protection
+    pub wallet: Pubkey,      // 32 bytes
+}
+// Header: 1+1+1+1+1+3+8+32 = 48 bytes
+```
 
-### `CreateSession`
-*   **Auth**: Requires `Role::Admin` or `Role::Owner`.
-*   **Action**: Derives the correct Session PDA and sets `expires_at` to a future slot height (u64).
+Variable data after header:
 
-## 6. Project Structure
-```text
-program/src/
-├── auth/
-│   ├── ed25519.rs       # Native signer verification
-│   ├── secp256r1/
-│   │   ├── mod.rs       # Passkey entrypoint
-│   │   ├── nonce.rs     # SlotHashes verification logic
-│   │   ├── slothashes.rs# Sysvar memory-parsing
-│   │   └── webauthn.rs  # ClientDataJSON reconstruction
-├── processor/           # Handlers: create_wallet, manage_authority, etc.
-├── state/               # NoPadding definitions (Wallet, Authority, Session)
-├── utils.rs             # Protections (stack_height, dos_prevention)
-└── lib.rs               # Entrypoint & routing
+- **Ed25519**: `[pubkey: [u8; 32]]` -- total 80 bytes.
+- **Secp256r1**: `[credential_id_hash: [u8; 32]] [compressed_pubkey: [u8; 33]]` -- total 113 bytes.
+
+### C. SessionAccount (80 bytes)
+
+Seeds: `["session", wallet_pubkey, session_key]`
+
+```rust
+#[repr(C, align(8))]
+pub struct SessionAccount {
+    pub discriminator: u8,   // 3 = Session
+    pub bump: u8,
+    pub version: u8,
+    pub _padding: [u8; 5],
+    pub wallet: Pubkey,      // 32 bytes
+    pub session_key: Pubkey, // 32 bytes
+    pub expires_at: u64,     // Absolute slot height
+}
+// Total: 1+1+1+5+32+32+8 = 80 bytes
+```
+
+### D. Vault PDA
+
+Seeds: `["vault", wallet_pubkey]`
+
+No data allocated. Holds SOL. Program signs for it via PDA seeds during Execute.
+
+## 5. Instructions (6 total)
+
+### CreateWallet (discriminator: 0)
+
+- Creates Wallet PDA, Vault PDA (derived only), and first Authority PDA.
+- Transfer-Allocate-Assign pattern to prevent pre-funding DoS.
+- Accounts: payer, wallet, vault, authority, system_program, rent_sysvar.
+
+### AddAuthority (discriminator: 1)
+
+- Creates new Authority PDA.
+- Requires Admin or Owner authentication.
+- Owner can add any role; Admin can only add Spender.
+- Accounts: payer, wallet, admin_authority, new_authority, system_program, rent_sysvar [+ sysvar_instructions, sysvar_slothashes for Secp256r1].
+
+### RemoveAuthority (discriminator: 2)
+
+- Closes Authority PDA, refunds rent to specified destination.
+- Prevents self-removal and owner removal (ownership must be transferred).
+- Accounts: payer, wallet, admin_authority, target_authority, refund_destination.
+
+### TransferOwnership (discriminator: 3)
+
+- Atomically closes old owner and creates new owner.
+- Accounts: payer, wallet, current_owner, new_owner_authority, system_program, rent_sysvar.
+
+### Execute (discriminator: 4)
+
+- Executes CompactInstructions via CPI with vault PDA signing.
+- Supports 3 auth modes: Ed25519 signer, Secp256r1 (with precompile), Session key.
+- Self-reentrancy protection: rejects CPI back into this program.
+- Accounts: payer, wallet, authority/session, vault, [remaining accounts...].
+
+### CreateSession (discriminator: 5)
+
+- Creates ephemeral Session PDA with slot-based expiry.
+- Requires Admin or Owner.
+- Validates expires_at: must be in future, max ~30 days.
+- Accounts: payer, wallet, authorizer, session, system_program, rent_sysvar.
+
+## 6. CompactInstructions Format
+
+Binary format for packing multiple instructions into Execute:
+
+```
+[num_instructions: u8]
+For each instruction:
+  [program_id_index: u8]      // Index into transaction accounts
+  [num_accounts: u8]
+  [account_indexes: u8[]]     // Indexes into transaction accounts
+  [data_len: u16 LE]
+  [instruction_data: u8[]]
+```
+
+Overhead per instruction: 4 bytes + num_accounts. Replaces 32-byte pubkeys with 1-byte indexes.
+
+### Accounts Hash (Anti-Reordering)
+
+For Secp256r1 Execute, the signed payload includes a SHA256 hash of all account pubkeys referenced by the compact instructions. This prevents account reordering attacks where an attacker could swap recipient addresses while keeping the signature valid.
+
+## 7. Auth Payload Layout (Secp256r1)
+
+```
+[slot: u64 LE]              // 8 bytes  -- SlotHashes liveness
+[counter: u64 LE]           // 8 bytes  -- odometer value (stored + 1)
+[sysvar_ix_index: u8]       // 1 byte   -- index of sysvar_instructions in accounts
+[sysvar_slothashes_index: u8] // 1 byte
+[type_and_flags: u8]        // 1 byte   -- WebAuthn type + flags
+[rp_id_len: u8]             // 1 byte
+[rp_id: u8[]]               // N bytes  -- e.g., "lazorkit.app"
+[authenticator_data: u8[]]  // M bytes  -- WebAuthn authenticator data (min 37 bytes)
+```
+
+## 8. Project Structure
+
+```
+program/
+  src/
+    auth/
+      ed25519.rs              Native signer verification
+      secp256r1/
+        mod.rs                Passkey authenticator with odometer
+        introspection.rs      Precompile instruction verification
+        nonce.rs              SlotHashes liveness validation
+        slothashes.rs         Sysvar memory parsing
+        webauthn.rs           ClientDataJSON reconstruction + AuthDataParser
+      traits.rs               Authenticator trait
+    processor/
+      create_wallet.rs
+      manage_authority.rs     AddAuthority + RemoveAuthority
+      execute.rs              CompactInstruction execution
+      create_session.rs
+      transfer_ownership.rs
+    state/
+      wallet.rs               WalletAccount (8 bytes)
+      authority.rs            AuthorityAccountHeader (48 bytes)
+      session.rs              SessionAccount (80 bytes)
+    compact.rs                CompactInstruction serialization
+    utils.rs                  PDA initialization, stack_height check
+    error.rs                  AuthError enum (3001-3013)
+    entrypoint.rs             Instruction routing
+sdk/solita-client/
+  src/
+    generated/                Solita-generated instructions, accounts, errors
+    utils/
+      instructions.ts         Low-level instruction builders
+      wrapper.ts              LazorKitClient high-level API
+      pdas.ts                 PDA derivation helpers
+      secp256r1.ts            Challenge hash + auth payload builders
+      packing.ts              CompactInstruction packing
+      errors.ts               Error code mapping
+tests-sdk/                    Integration tests (vitest, 28+ tests)
 ```

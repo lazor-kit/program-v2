@@ -1,0 +1,484 @@
+/**
+ * LazorKit Benchmark Script
+ *
+ * Measures real Compute Unit (CU) usage and transaction sizes for every
+ * LazorKit instruction, compared against a normal SOL transfer baseline.
+ *
+ * Usage:
+ *   1. Start local validator: npm run validator:start
+ *   2. Run benchmarks:        npx tsx tests/benchmark.ts
+ */
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_SLOT_HASHES_PUBKEY,
+  Transaction,
+  type TransactionInstruction,
+  type Signer,
+} from '@solana/web3.js';
+import * as crypto from 'crypto';
+import {
+  findWalletPda,
+  findVaultPda,
+  findAuthorityPda,
+  findSessionPda,
+  createCreateWalletIx,
+  createAddAuthorityIx,
+  createExecuteIx,
+  createCreateSessionIx,
+  packCompactInstructions,
+  computeAccountsHash,
+  AUTH_TYPE_ED25519,
+  AUTH_TYPE_SECP256R1,
+  DISC_ADD_AUTHORITY,
+  DISC_EXECUTE,
+  ROLE_ADMIN,
+  PROGRAM_ID,
+} from '../../sdk/solita-client/src';
+import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
+
+const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8899';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+interface BenchResult {
+  name: string;
+  cu: number;
+  txSize: number;
+  ixData: number;
+  accounts: number;
+  instructions: number;
+}
+
+async function setup() {
+  const connection = new Connection(RPC_URL, 'confirmed');
+  const payer = Keypair.generate();
+  const sig = await connection.requestAirdrop(payer.publicKey, 100 * LAMPORTS_PER_SOL);
+  await connection.confirmTransaction(sig, 'confirmed');
+  return { connection, payer };
+}
+
+async function getSlot(connection: Connection): Promise<bigint> {
+  const slot = await connection.getSlot('confirmed');
+  return BigInt(slot) - 1n;
+}
+
+async function sendAndMeasure(
+  connection: Connection,
+  payer: Keypair,
+  instructions: TransactionInstruction[],
+  extraSigners: Signer[] = [],
+): Promise<{ cu: number; txSize: number; ixDataSizes: number[]; accountCounts: number[] }> {
+  const tx = new Transaction();
+  for (const ix of instructions) tx.add(ix);
+
+  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = payer.publicKey;
+
+  const allSigners = [payer, ...extraSigners];
+  tx.sign(...allSigners);
+  const serialized = tx.serialize();
+  const txSize = serialized.length;
+
+  const sig = await sendAndConfirmTransaction(connection, tx, allSigners, {
+    commitment: 'confirmed',
+  });
+
+  // Wait briefly then fetch transaction details for CU
+  const txInfo = await connection.getTransaction(sig, {
+    commitment: 'confirmed',
+    maxSupportedTransactionVersion: 0,
+  });
+
+  const cu = txInfo?.meta?.computeUnitsConsumed ?? 0;
+  const ixDataSizes = instructions.map(ix => ix.data.length);
+  const accountCounts = instructions.map(ix => ix.keys.length);
+
+  return { cu, txSize, ixDataSizes, accountCounts };
+}
+
+// ─── Benchmarks ───────────────────────────────────────────────────────────────
+
+async function benchNormalTransfer(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  const recipient = Keypair.generate().publicKey;
+  const ix = SystemProgram.transfer({
+    fromPubkey: payer.publicKey,
+    toPubkey: recipient,
+    lamports: 1_000_000,
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix]);
+  return {
+    name: 'Normal SOL Transfer',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
+async function benchCreateWalletEd25519(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  const ownerKp = Keypair.generate();
+  const userSeed = crypto.randomBytes(32);
+  const pubkeyBytes = ownerKp.publicKey.toBytes();
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+
+  const ix = createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_ED25519,
+    authBump,
+    credentialOrPubkey: pubkeyBytes,
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix]);
+  return {
+    name: 'CreateWallet (Ed25519)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
+async function benchCreateWalletSecp256r1(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  const key = await generateMockSecp256r1Key();
+  const userSeed = crypto.randomBytes(32);
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+
+  const ix = createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_SECP256R1,
+    authBump,
+    credentialOrPubkey: key.credentialIdHash,
+    secp256r1Pubkey: key.publicKeyBytes,
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix]);
+  return {
+    name: 'CreateWallet (Secp256r1)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
+async function benchAddAuthorityEd25519(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  // Setup: create wallet first
+  const ownerKp = Keypair.generate();
+  const userSeed = crypto.randomBytes(32);
+  const pubkeyBytes = ownerKp.publicKey.toBytes();
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_ED25519,
+    authBump,
+    credentialOrPubkey: pubkeyBytes,
+  })]);
+
+  // Now add a new Ed25519 authority (admin adds spender)
+  const newKp = Keypair.generate();
+  const newPubkey = newKp.publicKey.toBytes();
+  const [newAuthPda] = findAuthorityPda(walletPda, newPubkey);
+
+  const ix = createAddAuthorityIx({
+    payer: payer.publicKey,
+    walletPda,
+    adminAuthorityPda: authPda,
+    newAuthorityPda: newAuthPda,
+    newType: AUTH_TYPE_ED25519,
+    newRole: ROLE_ADMIN,
+    credentialOrPubkey: newPubkey,
+    authorizerSigner: ownerKp.publicKey,
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix], [ownerKp]);
+  return {
+    name: 'AddAuthority (Ed25519 admin)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
+async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  // Setup: create Secp256r1 wallet
+  const key = await generateMockSecp256r1Key();
+  const userSeed = crypto.randomBytes(32);
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_SECP256R1,
+    authBump,
+    credentialOrPubkey: key.credentialIdHash,
+    secp256r1Pubkey: key.publicKeyBytes,
+  })]);
+
+  // Fund vault
+  const airdropSig = await connection.requestAirdrop(vaultPda, 5 * LAMPORTS_PER_SOL);
+  await connection.confirmTransaction(airdropSig, 'confirmed');
+
+  const recipient = Keypair.generate().publicKey;
+  const slot = await getSlot(connection);
+
+  // Build SOL transfer compact instruction
+  const transferData = Buffer.alloc(12);
+  transferData.writeUInt32LE(2, 0); // Transfer discriminator
+  transferData.writeBigUInt64LE(1_000_000n, 4);
+
+  const compactIxs = [{
+    programIdIndex: 6,       // SystemProgram at index 6
+    accountIndexes: [3, 7],  // vault, recipient
+    data: new Uint8Array(transferData),
+  }];
+  const packed = packCompactInstructions(compactIxs);
+
+  // Compute accounts hash for signature binding
+  const allAccountMetas = [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+    { pubkey: walletPda, isSigner: false, isWritable: false },
+    { pubkey: authPda, isSigner: false, isWritable: true },
+    { pubkey: vaultPda, isSigner: false, isWritable: true },
+    { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_SLOT_HASHES_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: recipient, isSigner: false, isWritable: true },
+  ];
+  const accountsHash = computeAccountsHash(allAccountMetas, compactIxs);
+  const signedPayload = Buffer.concat([packed, accountsHash]);
+
+  const { authPayload, precompileIx } = await signSecp256r1({
+    key,
+    discriminator: new Uint8Array([DISC_EXECUTE]),
+    signedPayload,
+    slot,
+    counter: 1n,
+    payer: payer.publicKey,
+    sysvarIxIndex: 4,
+    sysvarSlotHashesIndex: 5,
+  });
+
+  const ix = createExecuteIx({
+    payer: payer.publicKey,
+    walletPda,
+    authorityPda: authPda,
+    vaultPda,
+    packedInstructions: packed,
+    authPayload,
+    remainingAccounts: [
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: recipient, isSigner: false, isWritable: true },
+    ],
+  });
+
+  const result = await sendAndMeasure(connection, payer, [precompileIx, ix]);
+  return {
+    name: 'Execute Secp256r1 (SOL transfer)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes.reduce((a, b) => a + b, 0),
+    accounts: result.accountCounts[result.accountCounts.length - 1], // Execute ix accounts
+    instructions: 2,
+  };
+}
+
+async function benchCreateSession(connection: Connection, payer: Keypair): Promise<BenchResult> {
+  // Setup: create Ed25519 wallet
+  const ownerKp = Keypair.generate();
+  const userSeed = crypto.randomBytes(32);
+  const pubkeyBytes = ownerKp.publicKey.toBytes();
+
+  const [walletPda] = findWalletPda(userSeed);
+  const [vaultPda] = findVaultPda(walletPda);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+
+  await sendAndMeasure(connection, payer, [createCreateWalletIx({
+    payer: payer.publicKey,
+    walletPda,
+    vaultPda,
+    authorityPda: authPda,
+    userSeed,
+    authType: AUTH_TYPE_ED25519,
+    authBump,
+    credentialOrPubkey: pubkeyBytes,
+  })]);
+
+  const sessionKp = Keypair.generate();
+  const sessionKeyBytes = sessionKp.publicKey.toBytes();
+  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
+
+  const currentSlot = await getSlot(connection);
+  const expiresAt = currentSlot + 9000n;
+
+  const ix = createCreateSessionIx({
+    payer: payer.publicKey,
+    walletPda,
+    adminAuthorityPda: authPda,
+    sessionPda,
+    sessionKey: sessionKeyBytes,
+    expiresAt,
+    authorizerSigner: ownerKp.publicKey,
+  });
+
+  const result = await sendAndMeasure(connection, payer, [ix], [ownerKp]);
+  return {
+    name: 'CreateSession (Ed25519)',
+    cu: result.cu,
+    txSize: result.txSize,
+    ixData: result.ixDataSizes[0],
+    accounts: result.accountCounts[0],
+    instructions: 1,
+  };
+}
+
+// ─── Rent Calculations ────────────────────────────────────────────────────────
+
+function calculateRent(dataSize: number): number {
+  // Solana rent formula: (128 + dataSize) * 6.96 SOL/byte/year * 2 years exemption
+  // Actual formula: (128 + dataSize) * 3480 / 1_000_000_000 * 2 (approx)
+  // More precisely, we use the known constant: 1 byte-year costs 0.00000348 SOL
+  // Rent-exempt = (128 + dataSize) * 0.00000348 * 2
+  const LAMPORTS_PER_BYTE_YEAR = 3480;
+  const EXEMPTION_YEARS = 2;
+  return (128 + dataSize) * LAMPORTS_PER_BYTE_YEAR * EXEMPTION_YEARS;
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  console.log('LazorKit Benchmark Suite');
+  console.log('========================\n');
+  console.log(`RPC: ${RPC_URL}\n`);
+
+  const { connection, payer } = await setup();
+
+  const results: BenchResult[] = [];
+
+  // Run benchmarks sequentially
+  console.log('Running benchmarks...\n');
+
+  const benchmarks = [
+    { name: 'Normal SOL Transfer', fn: () => benchNormalTransfer(connection, payer) },
+    { name: 'CreateWallet Ed25519', fn: () => benchCreateWalletEd25519(connection, payer) },
+    { name: 'CreateWallet Secp256r1', fn: () => benchCreateWalletSecp256r1(connection, payer) },
+    { name: 'AddAuthority Ed25519', fn: () => benchAddAuthorityEd25519(connection, payer) },
+    { name: 'Execute Secp256r1', fn: () => benchExecuteSecp256r1(connection, payer) },
+    { name: 'CreateSession', fn: () => benchCreateSession(connection, payer) },
+  ];
+
+  for (const bench of benchmarks) {
+    try {
+      process.stdout.write(`  ${bench.name}... `);
+      const result = await bench.fn();
+      results.push(result);
+      console.log(`${result.cu} CU, ${result.txSize} bytes`);
+    } catch (err: any) {
+      console.log(`FAILED: ${err.message?.slice(0, 80)}`);
+    }
+  }
+
+  // ─── Output Tables ────────────────────────────────────────────────────────
+
+  console.log('\n\n## Compute Units & Transaction Size\n');
+  console.log('| Instruction | CU | Tx Size (bytes) | Ix Data (bytes) | Accounts | Instructions |');
+  console.log('|---|---|---|---|---|---|');
+  for (const r of results) {
+    console.log(`| ${r.name} | ${r.cu.toLocaleString()} | ${r.txSize} | ${r.ixData} | ${r.accounts} | ${r.instructions} |`);
+  }
+
+  // ─── Comparison Table ─────────────────────────────────────────────────────
+
+  const normalResult = results.find(r => r.name === 'Normal SOL Transfer');
+  const secp256r1Result = results.find(r => r.name === 'Execute Secp256r1 (SOL transfer)');
+
+  if (normalResult && secp256r1Result) {
+    console.log('\n\n## LazorKit vs Normal SOL Transfer\n');
+    console.log('| Metric | Normal Transfer | LazorKit Secp256r1 | Overhead |');
+    console.log('|---|---|---|---|');
+    console.log(`| Compute Units | ${normalResult.cu.toLocaleString()} | ${secp256r1Result.cu.toLocaleString()} | ${(secp256r1Result.cu / normalResult.cu).toFixed(1)}x |`);
+    console.log(`| Transaction Size | ${normalResult.txSize} bytes | ${secp256r1Result.txSize} bytes | +${secp256r1Result.txSize - normalResult.txSize} bytes |`);
+    console.log(`| Instruction Data | ${normalResult.ixData} bytes | ${secp256r1Result.ixData} bytes | +${secp256r1Result.ixData - normalResult.ixData} bytes |`);
+    console.log(`| Accounts | ${normalResult.accounts} | ${secp256r1Result.accounts} | +${secp256r1Result.accounts - normalResult.accounts} |`);
+    console.log(`| Instructions per Tx | ${normalResult.instructions} | ${secp256r1Result.instructions} | +${secp256r1Result.instructions - normalResult.instructions} |`);
+    console.log(`| Transaction Fee | 0.000005 SOL | 0.000005 SOL | 0 |`);
+  }
+
+  // ─── Rent Costs ───────────────────────────────────────────────────────────
+
+  const rentData = [
+    { name: 'Wallet PDA', dataSize: 8 },
+    { name: 'Authority (Ed25519)', dataSize: 80 },
+    { name: 'Authority (Secp256r1)', dataSize: 113 },
+    { name: 'Session', dataSize: 80 },
+  ];
+
+  console.log('\n\n## Rent-Exempt Costs\n');
+  console.log('| Account | Data (bytes) | Rent-Exempt (SOL) | Rent-Exempt (lamports) |');
+  console.log('|---|---|---|---|');
+  for (const r of rentData) {
+    const lamports = calculateRent(r.dataSize);
+    console.log(`| ${r.name} | ${r.dataSize} | ${(lamports / LAMPORTS_PER_SOL).toFixed(9)} | ${lamports.toLocaleString()} |`);
+  }
+
+  // Total wallet creation cost
+  const walletRent = calculateRent(8);
+  const authEd25519Rent = calculateRent(80);
+  const authSecp256r1Rent = calculateRent(113);
+  const txFee = 5000; // 0.000005 SOL
+
+  console.log('\n\n## Total Wallet Creation Cost\n');
+  console.log('| Auth Type | Wallet Rent | Authority Rent | Tx Fee | Total |');
+  console.log('|---|---|---|---|---|');
+  const totalEd25519 = walletRent + authEd25519Rent + txFee;
+  const totalSecp256r1 = walletRent + authSecp256r1Rent + txFee;
+  console.log(`| Ed25519 | ${(walletRent / LAMPORTS_PER_SOL).toFixed(9)} | ${(authEd25519Rent / LAMPORTS_PER_SOL).toFixed(9)} | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} | ${(totalEd25519 / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+  console.log(`| Secp256r1 | ${(walletRent / LAMPORTS_PER_SOL).toFixed(9)} | ${(authSecp256r1Rent / LAMPORTS_PER_SOL).toFixed(9)} | ${(txFee / LAMPORTS_PER_SOL).toFixed(9)} | ${(totalSecp256r1 / LAMPORTS_PER_SOL).toFixed(9)} SOL |`);
+
+  console.log('\n\nBenchmark complete.');
+}
+
+main().catch((err) => {
+  console.error('Benchmark failed:', err);
+  process.exit(1);
+});

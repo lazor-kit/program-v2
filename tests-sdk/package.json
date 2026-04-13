@@ -7,6 +7,7 @@
     "test": "vitest run --fileParallelism=false",
     "test:watch": "vitest --fileParallelism=false",
     "validator:start": "solana-test-validator --bpf-program 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT ../target/deploy/lazorkit_program.so --reset",
+    "benchmark": "npx tsx tests/benchmark.ts",
     "pretest": "echo 'Ensure solana-test-validator is running with the program loaded'"
   },
   "dependencies": {

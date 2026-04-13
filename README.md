@@ -1,95 +1,179 @@
-# ⚡ LazorKit Smart Wallet (V2)
+# LazorKit Smart Wallet (V2)
 
-**LazorKit** is a high-performance, security-focused Smart Wallet contract on Solana. It enables advanced account abstraction features like multi-signature support, session keys, and role-based access control (RBAC) with minimal on-chain overhead.
+A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256r1) authentication, role-based access control, session keys, and replay-safe odometer counters. Built with [pinocchio](https://github.com/febo/pinocchio) for zero-copy serialization.
 
----
-
-## 🌟 Key Features
-
-### 🔐 Multi-Protocol Authentication
-- **Ed25519**: Native Solana key support for standard wallets.
-- **Secp256r1 (P-256)**: Native support for **Passkeys (WebAuthn)** and **Apple Secure Enclave**, enabling biometric signing directly on-chain.
-
-### 🛡️ Role-Based Access Control (RBAC)
-Granular permission management for every key with strictly separated PDAs:
-- **Owner (Role 0)**: Full control. Can add/remove authorities and transfer ownership.
-- **Admin (Role 1)**: Can create Sessions and add Spenders. Cannot remove Owners.
-- **Spender (Role 2)**: Limited to executing transactions. Ideal for hot wallets or automated bots.
-
-### ⏱️ Ephemeral Session Keys
-- Create temporary, time-bound keys with specific expiry (`expires_at` defined by absolute slot height).
-- Great for dApps (games, social) to offer "Log in once, act multiple times" UX without exposing the main key.
-
-### 🚀 High Performance & Replay Protection
-- **Zero-Copy Serialization**: Built on `pinocchio` casting raw bytes to Rust structs for maximum CU efficiency.
-- **No-Padding Layout**: Optimized data structures (`NoPadding`) to reduce rent costs and ensure memory safety.
-- **SlotHashes Nonce**: Secp256r1 replay protection uses the `SlotHashes` sysvar as a "Proof of Liveness" (valid within 150 slots) instead of expensive on-chain counters.
-- **Transaction Compression**: Uses `CompactInstructions` to fit complex multi-call payloads into standard Solana transaction limits.
+**Program ID**: `2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT`
 
 ---
 
-## 🏗️ Architecture
+## Key Features
 
-The contract uses a highly modular PDA (Program Derived Address) architecture for separated storage and deterministic validation:
-
-| Account Type | Description |
-| :--- | :--- |
-| **Wallet PDA** | The main identity anchor. Derived from `["wallet", user_seed]`. |
-| **Vault PDA** | Holds assets (SOL/SPL Tokens). Only the Wallet PDA can sign for it. |
-| **Authority PDA** | Separate PDA for each authorized key (unlimited distinct authorities). Stores role. Derived from `["authority", wallet_pda, id_hash]`. |
-| **Session PDA** | Temporary authority (sub-key) with absolute slot-based expiry. Derived from `["session", wallet_pda, session_key]`. |
-
-*See [`docs/Architecture.md`](docs/Architecture.md) for deeper technical details.*
+- **Multi-Protocol Authentication**: Ed25519 (native Solana) + Secp256r1 (WebAuthn/Passkeys/Apple Secure Enclave)
+- **Role-Based Access Control**: Owner / Admin / Spender with strict permission hierarchy
+- **Ephemeral Session Keys**: Time-bound keys with absolute slot-based expiry (max 30 days)
+- **Odometer Replay Protection**: Monotonic u64 counter per authority — works reliably with synced passkeys (iCloud, Google)
+- **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead
+- **CompactInstructions**: Index-based instruction packing for multi-call payloads within Solana's 1,232-byte tx limit
+- **CPI Reentrancy Protection**: stack_height check prevents cross-program authentication attacks
 
 ---
 
-## 📂 Project Structure
+## LazorKit vs Normal SOL Transfer
 
-- `program/src/`: Main contract source code.
-  - `processor/`: Instruction handlers (`create_wallet`, `execute`, `manage_authority`, etc.).
-  - `auth/`: Authentication logic for Ed25519 and Secp256r1 (with `slothashes` nonce).
-  - `state/`: Account data structures (`Wallet`, `Authority`, `Session`).
-- `tests-e2e/`: Comprehensive End-to-End Test Suite.
-  - `scenarios/`: Test scenarios covering Happy Path, Failures, and Audit Retro.
-  - `scenarios/audit/`: Dedicated regression tests for security vulnerabilities.
+| Metric | Normal Transfer | LazorKit (Secp256r1) | Notes |
+|---|---|---|---|
+| Compute Units | 150 | 10,816 | 5.4% of 200K budget |
+| Transaction Size | 215 bytes | 708 bytes | 57% of 1,232-byte limit |
+| Accounts | 2 | 8 | +6 for auth + sysvars |
+| Transaction Fee | 0.000005 SOL | 0.000005 SOL | Same base fee |
+
+The overhead buys: passkey authentication, RBAC, replay protection, session keys, and multi-sig — all in a single transaction.
+
+See [docs/Costs.md](docs/Costs.md) for full cost analysis and CU benchmarks for all instructions.
 
 ---
 
-## 🛠️ Usage
+## Cost Overview
+
+### Rent-Exempt Costs
+
+| Account | Data Size | Rent (SOL) |
+|---|---|---|
+| Wallet PDA | 8 bytes | 0.000947 |
+| Authority (Ed25519) | 80 bytes | 0.001448 |
+| Authority (Secp256r1) | 113 bytes | 0.001677 |
+| Session | 80 bytes | 0.001448 |
+
+### Total Wallet Creation
+
+| Auth Type | Total Cost | ~USD at $150/SOL |
+|---|---|---|
+| Ed25519 | 0.002399 SOL | $0.36 |
+| Secp256r1 (Passkey) | 0.002629 SOL | $0.39 |
+
+Ongoing Execute transactions cost only the base fee (0.000005 SOL). No additional rent.
+
+---
+
+## Architecture
+
+| Account | Seeds | Description |
+|---|---|---|
+| Wallet PDA | `["wallet", user_seed]` | Identity anchor (8 bytes) |
+| Vault PDA | `["vault", wallet]` | Holds SOL/tokens, program signs via PDA |
+| Authority PDA | `["authority", wallet, id_hash]` | Per-key auth with role + counter |
+| Session PDA | `["session", wallet, session_key]` | Ephemeral sub-key with expiry |
+
+See [docs/Architecture.md](docs/Architecture.md) for struct definitions, security mechanisms, and instruction reference.
+
+---
+
+## Project Structure
+
+```
+program/src/           Rust smart contract (pinocchio, zero-copy)
+  auth/                Ed25519 + Secp256r1/WebAuthn authentication
+  processor/           6 instruction handlers
+  state/               Account data structures (NoPadding)
+sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
+  src/generated/       Auto-generated instructions, accounts, errors
+  src/utils/           Instruction builders, PDA helpers, signing utils
+tests-sdk/             Integration tests (vitest, 28 tests)
+docs/                  Architecture, cost analysis
+audits/                Audit reports
+```
+
+---
+
+## Quick Start
 
 ### Build
+
 ```bash
-# Build SBF program
 cargo build-sbf
 ```
 
-### Test
-Run the comprehensive E2E test suite (LiteSVM-based):
+### Install SDK
+
 ```bash
-cd tests-e2e
-cargo run --bin lazorkit-tests-e2e
+npm install @lazorkit/solita-client
 ```
 
+### Create a Wallet (Ed25519)
+
+```typescript
+import { Connection, Keypair } from '@solana/web3.js';
+import { LazorKitClient } from '@lazorkit/solita-client';
+import * as crypto from 'crypto';
+
+const connection = new Connection('https://api.devnet.solana.com');
+const client = new LazorKitClient(connection);
+
+const owner = Keypair.generate();
+const userSeed = crypto.randomBytes(32);
+
+const { ix, walletPda, vaultPda } = client.createWalletEd25519({
+  payer: payer.publicKey,
+  userSeed,
+  ownerPubkey: owner.publicKey,
+});
+```
+
+See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API reference.
+
 ---
 
-## 🔒 Security & Audit
+## Testing
 
-LazorKit V2 has undergone a rigorous internal audit and security review. 
+```bash
+# Start local validator with program loaded
+cd tests-sdk && npm run validator:start
 
-**Status**: ✅ **17/17 Security Issues Resolved**
+# Run all 28 integration tests
+npm test
 
-We have fixed and verified vulnerabilities including:
-- **Critical**: Cross-Wallet Authority Deletion.
-- **High**: Signature Replay, DoS prevention, OOB Reads.
-- **Medium**: Rent Theft protections and Signature Binding.
-- **CPI Protection**: Explicit `stack_height` checks prevent authentication instructions from being called maliciously via CPI.
+# Run CU benchmarks
+npm run benchmark
+```
 
-### Security Features
-- **Discriminator Checks**: All PDAs are strictly validated by type constant.
-- **Signature Binding**: Payloads are strictly bound to target accounts and instructions to prevent replay/swapping attacks.
-- **Reentrancy Guards**: Initialized to prevent CPI reentrancy.
+Tests cover: wallet lifecycle, authority management, execute, sessions, replay protection, counter edge cases, and end-to-end workflows.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 
 ---
 
-## 📜 License
-MIT
+## Security
+
+LazorKit V2 has been audited by **Accretion** (Solana Foundation funded).
+
+**Status**: 17/17 security issues resolved
+
+Security features:
+- Odometer counter replay protection (per-authority monotonic u64)
+- SlotHashes liveness window (150 slots)
+- CPI reentrancy prevention (stack_height check)
+- Signature binding (payer, accounts hash, counter, program_id)
+- Self-removal and owner removal protection
+- Session expiry validation (future + 30-day max)
+
+Report vulnerabilities via [SECURITY.md](SECURITY.md).
+
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [Architecture](docs/Architecture.md) | Account structures, security mechanisms, instruction reference |
+| [Costs](docs/Costs.md) | CU benchmarks, rent costs, transaction size analysis |
+| [SDK API](sdk/solita-client/README.md) | TypeScript SDK reference |
+| [Development](DEVELOPMENT.md) | Build, test, deploy workflow |
+| [Contributing](CONTRIBUTING.md) | How to contribute |
+| [Security](SECURITY.md) | Vulnerability reporting |
+| [Changelog](CHANGELOG.md) | Version history |
+
+---
+
+## License
+
+[MIT](LICENSE)
