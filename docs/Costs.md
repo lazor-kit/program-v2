@@ -102,6 +102,20 @@ The Secp256r1 Execute transaction was optimized from **708 bytes to 658 bytes** 
 
 ---
 
+## Parallel Execution
+
+Different authorities on the same wallet can execute transactions **in parallel** on Solana's runtime. This is possible because each authority has its own PDA -- the only writable account during Execute is the authority PDA (counter increment), while wallet and vault are read-only.
+
+| Scenario | Parallel? |
+|---|---|
+| Authority A + Authority B (same wallet) | Yes -- different writable PDAs |
+| Session key + Secp256r1 authority | Yes -- different writable PDAs |
+| Same authority, 2 transactions | No -- counter conflict on same PDA |
+
+This means a wallet can have multiple session keys, spenders, and admins operating concurrently without blocking each other. See [Architecture.md](Architecture.md) for the full account access analysis.
+
+---
+
 ## Rent-Exempt Costs
 
 Solana requires accounts to maintain a minimum balance (rent-exempt) based on data size. The formula is `(128 + data_size) * 3,480 * 2` lamports.

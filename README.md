@@ -16,6 +16,7 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 - **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead
 - **CompactInstructions**: Index-based instruction packing for multi-call payloads within Solana's 1,232-byte tx limit
 - **Deferred Execution**: 2-transaction flow for payloads exceeding the tx limit (e.g., Jupiter swaps) -- TX1 authorizes via signature, TX2 executes with full inner instruction space (~1,100 bytes)
+- **Parallel Execution**: Different authorities on the same wallet execute concurrently -- per-authority PDA means no shared write locks
 - **CPI Reentrancy Protection**: stack_height check prevents cross-program authentication attacks
 
 ---
