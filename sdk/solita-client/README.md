@@ -39,7 +39,7 @@ await sendAndConfirmTransaction(connection, tx, [payer]);
 ### PDA Helpers
 
 ```typescript
-import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda } from '@lazorkit/solita-client';
+import { findWalletPda, findVaultPda, findAuthorityPda, findSessionPda, findDeferredExecPda } from '@lazorkit/solita-client';
 
 // Derive wallet PDA from user seed
 const [walletPda, walletBump] = findWalletPda(userSeed);
@@ -52,6 +52,9 @@ const [authorityPda, authBump] = findAuthorityPda(walletPda, credentialIdHash);
 
 // Derive session PDA from wallet + session key
 const [sessionPda, sessionBump] = findSessionPda(walletPda, sessionKeyBytes);
+
+// Derive deferred execution PDA from wallet + authority + counter
+const [deferredPda, deferredBump] = findDeferredExecPda(walletPda, authorityPda, counter);
 ```
 
 ### Instruction Builders
@@ -66,6 +69,9 @@ import {
   createTransferOwnershipIx,
   createExecuteIx,
   createCreateSessionIx,
+  createAuthorizeIx,
+  createExecuteDeferredIx,
+  createReclaimDeferredIx,
 } from '@lazorkit/solita-client';
 ```
 
@@ -100,12 +106,51 @@ const ix = createExecuteIx({
 });
 ```
 
+#### createAuthorizeIx (Deferred Execution TX1)
+
+```typescript
+const ix = createAuthorizeIx({
+  payer: PublicKey,
+  walletPda: PublicKey,
+  authorityPda: PublicKey,
+  deferredExecPda: PublicKey,
+  instructionsHash: Uint8Array,  // 32 bytes — SHA256 of packed compact instructions
+  accountsHash: Uint8Array,      // 32 bytes — SHA256 of all referenced account pubkeys
+  expiryOffset: number,          // Slots until expiry (10-9000)
+  authPayload: Uint8Array,       // Secp256r1 auth payload
+});
+```
+
+#### createExecuteDeferredIx (Deferred Execution TX2)
+
+```typescript
+const ix = createExecuteDeferredIx({
+  payer: PublicKey,
+  walletPda: PublicKey,
+  vaultPda: PublicKey,
+  deferredExecPda: PublicKey,
+  refundDestination: PublicKey,
+  packedInstructions: Uint8Array,   // From packCompactInstructions()
+  remainingAccounts?: AccountMeta[], // Inner accounts referenced by instructions
+});
+```
+
+#### createReclaimDeferredIx
+
+```typescript
+const ix = createReclaimDeferredIx({
+  payer: PublicKey,
+  deferredExecPda: PublicKey,
+  refundDestination: PublicKey,
+});
+```
+
 ### Compact Instruction Packing
 
 Pack multiple instructions for Execute:
 
 ```typescript
-import { packCompactInstructions, computeAccountsHash } from '@lazorkit/solita-client';
+import { packCompactInstructions, computeAccountsHash, computeInstructionsHash } from '@lazorkit/solita-client';
 
 // Define compact instructions with account indexes (not pubkeys)
 const packed = packCompactInstructions([{
@@ -116,6 +161,9 @@ const packed = packCompactInstructions([{
 
 // For Secp256r1: compute accounts hash for signature binding
 const accountsHash = computeAccountsHash(accountMetas, compactInstructions);
+
+// For deferred execution: compute instructions hash (signed in TX1, verified in TX2)
+const instructionsHash = computeInstructionsHash(compactInstructions);
 ```
 
 ### Secp256r1 (Passkey) Utilities
@@ -198,6 +246,25 @@ const { ix, precompileIx } = await client.executeSecp256r1({
   signer, slot, sysvarIxIndex,
   compactInstructions, remainingAccounts,
 });
+
+// Deferred Execution — TX1 (Authorize)
+const { ix, precompileIx, deferredExecPda } = await client.authorizeSecp256r1({
+  payer, walletPda, authorityPda,
+  signer, slot, sysvarIxIndex,
+  compactInstructions, accountMetas,
+  expiryOffset: 300, // ~2 minutes
+});
+
+// Deferred Execution — TX2 (ExecuteDeferred)
+const ix = client.executeDeferredSecp256r1({
+  payer, walletPda, vaultPda, deferredExecPda,
+  refundDestination, packedInstructions, remainingAccounts,
+});
+
+// Reclaim expired DeferredExec (refund rent)
+const ix = client.reclaimDeferred({
+  payer, deferredExecPda, refundDestination,
+});
 ```
 
 ### Constants
@@ -210,6 +277,9 @@ DISC_REMOVE_AUTHORITY // 2
 DISC_TRANSFER_OWNERSHIP // 3
 DISC_EXECUTE          // 4
 DISC_CREATE_SESSION   // 5
+DISC_AUTHORIZE        // 6
+DISC_EXECUTE_DEFERRED // 7
+DISC_RECLAIM_DEFERRED // 8
 
 // Auth types
 AUTH_TYPE_ED25519     // 0
@@ -221,7 +291,7 @@ ROLE_ADMIN   // 1
 ROLE_SPENDER // 2
 
 // Program ID
-PROGRAM_ID   // 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT
+PROGRAM_ID   // FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao
 ```
 
 ### Error Handling
@@ -255,6 +325,11 @@ Error codes:
 | 3011 | InvalidAuthenticationKind | Unknown authority_type |
 | 3012 | InvalidMessage | N/A |
 | 3013 | SelfReentrancyNotAllowed | CPI back into program rejected |
+| 3014 | DeferredAuthorizationExpired | DeferredExec past expires_at slot |
+| 3015 | DeferredHashMismatch | Instructions or accounts hash mismatch |
+| 3016 | InvalidExpiryWindow | Expiry offset out of range (10-9000 slots) |
+| 3017 | UnauthorizedReclaim | Only original payer can reclaim |
+| 3018 | DeferredAuthorizationNotExpired | Cannot reclaim before expiry |
 
 ### Generated Accounts
 
@@ -274,7 +349,7 @@ After modifying program instructions:
 
 ```bash
 # 1. Regenerate IDL
-cd program && shank idl -o . --out-filename idl.json -p 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT
+cd program && shank idl -o . --out-filename idl.json -p FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao
 
 # 2. Regenerate SDK
 cd sdk/solita-client && node generate.mjs

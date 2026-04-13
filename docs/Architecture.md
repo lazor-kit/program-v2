@@ -48,6 +48,7 @@ pub enum AccountDiscriminator {
     Wallet = 1,
     Authority = 2,
     Session = 3,
+    DeferredExec = 4,
 }
 ```
 
@@ -109,13 +110,36 @@ pub struct SessionAccount {
 // Total: 1+1+1+5+32+32+8 = 80 bytes
 ```
 
-### D. Vault PDA
+### D. DeferredExecAccount (176 bytes)
+
+Seeds: `["deferred", wallet_pubkey, authority_pubkey, counter_le(4)]`
+
+```rust
+#[repr(C, align(8))]
+pub struct DeferredExecAccount {
+    pub discriminator: u8,           // 4 = DeferredExec
+    pub version: u8,
+    pub bump: u8,
+    pub _padding: [u8; 5],
+    pub instructions_hash: [u8; 32], // SHA256 of serialized compact instructions
+    pub accounts_hash: [u8; 32],     // SHA256 of all account pubkeys referenced
+    pub wallet: Pubkey,              // 32 bytes
+    pub authority: Pubkey,           // 32 bytes — the authority that authorized
+    pub payer: Pubkey,               // 32 bytes — receives rent refund on close
+    pub expires_at: u64,             // Absolute slot at which this expires
+}
+// Total: 1+1+1+5+32+32+32+32+32+8 = 176 bytes
+```
+
+Temporary account created during `Authorize` (tx1) and closed during `ExecuteDeferred` (tx2). Uses the authority's odometer counter as a seed nonce, ensuring unique PDAs per authorization. Expired accounts can be reclaimed via `ReclaimDeferred`.
+
+### E. Vault PDA
 
 Seeds: `["vault", wallet_pubkey]`
 
 No data allocated. Holds SOL. Program signs for it via PDA seeds during Execute.
 
-## 5. Instructions (6 total)
+## 5. Instructions (9 total)
 
 ### CreateWallet (discriminator: 0)
 
@@ -155,6 +179,35 @@ No data allocated. Holds SOL. Program signs for it via PDA seeds during Execute.
 - Validates expires_at: must be in future, max ~30 days.
 - Accounts: payer, wallet, authorizer, session, system_program, rent_sysvar.
 
+### Authorize (discriminator: 6) — Deferred Execution TX1
+
+- Creates a DeferredExec PDA storing pre-authorized instruction/account hashes.
+- Only Secp256r1 Owner/Admin can authorize (not Ed25519, not Spender).
+- Signed payload: `instructions_hash || accounts_hash` (64 bytes).
+- Expiry offset bounded to 10-9,000 slots (~4 seconds to ~1 hour).
+- Uses the authority's odometer counter (post-increment) as PDA seed nonce.
+- Instruction data: `[instructions_hash(32)][accounts_hash(32)][expiry_offset(2)][auth_payload(variable)]`.
+- Accounts: payer, wallet, authority, deferred_exec, system_program, rent_sysvar, sysvar_instructions.
+
+### ExecuteDeferred (discriminator: 7) — Deferred Execution TX2
+
+- Verifies compact instructions against stored hashes, executes via CPI with vault PDA signing.
+- Closes the DeferredExec account before CPI (close-before-execute pattern).
+- Verifies both instructions_hash and accounts_hash match stored values.
+- Checks expiry (must not be past `expires_at` slot).
+- Refunds rent to the original payer (stored in DeferredExec).
+- Self-reentrancy protection: rejects CPI back into this program.
+- Instruction data: `[compact_instructions(variable)]`.
+- Accounts: payer, wallet, vault, deferred_exec, refund_destination, [remaining accounts...].
+
+### ReclaimDeferred (discriminator: 8)
+
+- Closes an expired DeferredExec account and refunds rent to the original payer.
+- Only the original payer (stored in `deferred.payer`) can reclaim.
+- Can only be called after `expires_at` has passed.
+- No instruction data (discriminator only).
+- Accounts: payer, deferred_exec, refund_destination.
+
 ## 6. CompactInstructions Format
 
 Binary format for packing multiple instructions into Execute:
@@ -175,7 +228,32 @@ Overhead per instruction: 4 bytes + num_accounts. Replaces 32-byte pubkeys with 
 
 For Secp256r1 Execute, the signed payload includes a SHA256 hash of all account pubkeys referenced by the compact instructions. This prevents account reordering attacks where an attacker could swap recipient addresses while keeping the signature valid.
 
-## 7. Auth Payload Layout (Secp256r1)
+## 7. Deferred Execution
+
+2-transaction flow for payloads exceeding the ~574 bytes available in a single Secp256r1 Execute transaction (e.g., Jupiter swaps with complex routing).
+
+### Flow
+
+1. **TX1 (Authorize)**: Client computes `instructions_hash = SHA256(packed_compact_instructions)` and `accounts_hash = SHA256(all_referenced_pubkeys)`. These hashes are signed via Secp256r1 and stored in a DeferredExec PDA. The authority's odometer counter is incremented.
+2. **TX2 (ExecuteDeferred)**: Any signer submits the full compact instructions. The program verifies both hashes match, checks expiry, closes the DeferredExec account, and executes via CPI with vault signing.
+
+### Capacity
+
+| Path | Inner Ix Capacity | Total CU | Tx Fee |
+|---|---|---|---|
+| Immediate Execute | ~574 bytes | 12,441 | 0.000005 SOL |
+| Deferred (2 txs) | ~1,100 bytes (1.9x) | 18,613 | 0.00001 SOL |
+
+### Security Properties
+
+- **Hash binding**: Both instruction content and account ordering are hash-verified.
+- **Replay protection**: Odometer counter used as PDA seed nonce — each authorization gets a unique PDA.
+- **Expiry**: 10-9,000 slot window (~4s to ~1h). Prevents stale authorizations.
+- **Role gating**: Only Secp256r1 Owner/Admin can authorize.
+- **Close-before-CPI**: DeferredExec account is closed before CPI execution, avoiding stale-pointer issues with `invoke_signed_unchecked`. Transaction reverts atomically if any CPI fails.
+- **Rent recovery**: `ReclaimDeferred` allows original payer to reclaim rent from expired, unexecuted authorizations.
+
+## 8. Auth Payload Layout (Secp256r1)
 
 ```
 [slot: u64 LE]              // 8 bytes  -- Clock-based slot freshness
@@ -190,7 +268,7 @@ Compared to the previous layout, 3 optimizations reduce the per-transaction payl
 - **SlotHashes index**: removed (slot freshness via `Clock::get()` instead of sysvar lookup)
 - **rpId**: stored on the authority account at creation, not sent per-tx (saves ~12 bytes)
 
-## 8. Project Structure
+## 9. Project Structure
 
 ```
 program/
@@ -205,16 +283,20 @@ program/
     processor/
       create_wallet.rs
       manage_authority.rs     AddAuthority + RemoveAuthority
-      execute.rs              CompactInstruction execution
+      execute.rs              CompactInstruction execution (immediate)
+      authorize.rs            Deferred execution TX1 (creates DeferredExec PDA)
+      execute_deferred.rs     Deferred execution TX2 (verifies + executes)
+      reclaim_deferred.rs     Closes expired DeferredExec accounts
       create_session.rs
       transfer_ownership.rs
     state/
       wallet.rs               WalletAccount (8 bytes)
       authority.rs            AuthorityAccountHeader (48 bytes)
       session.rs              SessionAccount (80 bytes)
+      deferred.rs             DeferredExecAccount (176 bytes)
     compact.rs                CompactInstruction serialization
     utils.rs                  PDA initialization, stack_height check
-    error.rs                  AuthError enum (3001-3013)
+    error.rs                  AuthError enum (3001-3018)
     entrypoint.rs             Instruction routing
 sdk/solita-client/
   src/
@@ -226,5 +308,5 @@ sdk/solita-client/
       secp256r1.ts            Challenge hash + auth payload builders
       packing.ts              CompactInstruction packing
       errors.ts               Error code mapping
-tests-sdk/                    Integration tests (vitest, 28+ tests)
+tests-sdk/                    Integration tests (vitest, 35 tests)
 ```

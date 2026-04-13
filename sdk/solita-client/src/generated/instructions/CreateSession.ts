@@ -73,7 +73,7 @@ export const CreateSessionStruct = new beet.BeetArgsStruct<CreateSessionInstruct
      */
     export function createCreateSessionInstruction(
       accounts: CreateSessionInstructionAccounts, 
-args: CreateSessionInstructionArgs , programId = new web3.PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT')
+args: CreateSessionInstructionArgs , programId = new web3.PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao')
     ) {
       const [data] = CreateSessionStruct.serialize({
         instructionDiscriminator: createSessionInstructionDiscriminator,

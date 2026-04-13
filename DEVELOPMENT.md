@@ -38,7 +38,7 @@ cargo test
 ### C. IDL Generation (using Shank)
 
 ```bash
-cd program && shank idl -o . --out-filename idl.json -p 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT
+cd program && shank idl -o . --out-filename idl.json -p FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao
 ```
 
 ### D. SDK Generation (using Solita)
@@ -55,7 +55,7 @@ The generate.mjs script reads the Shank IDL, enriches it with accounts/errors/ty
 # Terminal 1: Start local validator with program loaded
 cd tests-sdk && npm run validator:start
 
-# Terminal 2: Run all 28 tests
+# Terminal 2: Run all 35 tests
 cd tests-sdk && npm test
 ```
 
@@ -65,7 +65,7 @@ cd tests-sdk && npm test
 cd tests-sdk && npm run benchmark
 ```
 
-Measures CU usage and transaction sizes for all instructions.
+Measures CU usage and transaction sizes for all instructions, including deferred execution (Authorize TX1 + ExecuteDeferred TX2).
 
 ### G. Program ID Sync
 

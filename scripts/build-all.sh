@@ -8,7 +8,7 @@ SDK_DIR="$ROOT_DIR/sdk/solita-client"
 
 if [ -z "$PROGRAM_ID" ]; then
     echo "Usage: $0 <new_program_id>"
-    echo "Example: $0 2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT"
+    echo "Example: $0 FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao"
     exit 1
 fi
 

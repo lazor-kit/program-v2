@@ -9,7 +9,7 @@ import {
   type Signer,
 } from '@solana/web3.js';
 
-export const PROGRAM_ID = new PublicKey('2m47smrvCRpuqAyX2dLqPxpAC1658n1BAQga1wRCsQiT');
+export const PROGRAM_ID = new PublicKey('FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao');
 export const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8899';
 
 export interface TestContext {
