@@ -139,6 +139,35 @@ Seeds: `["vault", wallet_pubkey]`
 
 No data allocated. Holds SOL. Program signs for it via PDA seeds during Execute.
 
+## Parallel Execution
+
+A key design property: **different authorities on the same wallet can execute transactions in parallel** on Solana's runtime.
+
+### Why it works
+
+During Execute, the only account written to is the **authority PDA** (odometer counter increment). The wallet PDA and vault PDA are read-only:
+
+| Account | Access | Shared across authorities? |
+|---|---|---|
+| Authority PDA | **Writable** (counter++) | No -- each authority has its own PDA |
+| Wallet PDA | Read-only | Yes, but no write lock |
+| Vault PDA | Signer-only (CPI) | Yes, but no write lock |
+
+Since each authority is a separate PDA, Solana's scheduler sees no writable overlap and runs them concurrently.
+
+### Parallelism matrix
+
+| Scenario | Parallel? | Reason |
+|---|---|---|
+| Authority A + Authority B (same wallet) | Yes | Different writable PDAs |
+| Session key + Secp256r1 authority (same wallet) | Yes | Different writable PDAs |
+| Same authority, 2 transactions | No | Same writable PDA + counter conflict |
+| Authority A (wallet 1) + Authority B (wallet 2) | Yes | Entirely separate accounts |
+
+### Design implication
+
+This enables high-throughput wallets where multiple authorized parties (e.g., an admin managing permissions while a spender sends payments, or multiple session keys operating concurrently) never block each other. The per-authority odometer counter provides replay protection without creating a shared bottleneck.
+
 ## 5. Instructions (9 total)
 
 ### CreateWallet (discriminator: 0)
