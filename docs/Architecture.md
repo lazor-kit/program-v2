@@ -168,7 +168,7 @@ Since each authority is a separate PDA, Solana's scheduler sees no writable over
 
 This enables high-throughput wallets where multiple authorized parties (e.g., an admin managing permissions while a spender sends payments, or multiple session keys operating concurrently) never block each other. The per-authority odometer counter provides replay protection without creating a shared bottleneck.
 
-## 5. Instructions (9 total)
+## 5. Instructions (10 total)
 
 ### CreateWallet (discriminator: 0)
 
@@ -212,7 +212,7 @@ This enables high-throughput wallets where multiple authorized parties (e.g., an
 
 - Creates a DeferredExec PDA storing pre-authorized instruction/account hashes.
 - Only Secp256r1 Owner/Admin can authorize (not Ed25519, not Spender).
-- Signed payload: `instructions_hash || accounts_hash` (64 bytes).
+- Signed payload: `instructions_hash || accounts_hash || expiry_offset` (66 bytes).
 - Expiry offset bounded to 10-9,000 slots (~4 seconds to ~1 hour).
 - Uses the authority's odometer counter (post-increment) as PDA seed nonce.
 - Instruction data: `[instructions_hash(32)][accounts_hash(32)][expiry_offset(2)][auth_payload(variable)]`.
@@ -236,6 +236,14 @@ This enables high-throughput wallets where multiple authorized parties (e.g., an
 - Can only be called after `expires_at` has passed.
 - No instruction data (discriminator only).
 - Accounts: payer, deferred_exec, refund_destination.
+
+### RevokeSession (discriminator: 9)
+
+- Closes a session account early (before expiry), refunding rent.
+- Only Owner or Admin can revoke (Spender cannot).
+- Session can be revoked regardless of whether it is expired or active.
+- Signature bound to specific session PDA + refund destination (prevents replay).
+- Accounts: payer, wallet, admin_authority, session, refund_destination [+ auth_extra].
 
 ## 6. CompactInstructions Format
 

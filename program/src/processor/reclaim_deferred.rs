@@ -78,9 +78,12 @@ pub fn process(
     }
 
     let deferred_lamports = deferred_pda.lamports();
+    let refund_lamports = unsafe { *refund_dest.borrow_mut_lamports_unchecked() };
     unsafe {
+        *refund_dest.borrow_mut_lamports_unchecked() = refund_lamports
+            .checked_add(deferred_lamports)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
         *deferred_pda.borrow_mut_lamports_unchecked() = 0;
-        *refund_dest.borrow_mut_lamports_unchecked() += deferred_lamports;
     }
 
     Ok(())

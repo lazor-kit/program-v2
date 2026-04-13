@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - ExecuteDeferred instruction (disc=7): TX2 verifies hashes and executes via CPI with vault signing
 - ReclaimDeferred instruction (disc=8): closes expired DeferredExec accounts, refunds rent to original payer
 - DeferredExecAccount (176 bytes): stores instruction/account hashes, wallet, authority, payer, expiry
+- RevokeSession instruction (disc=9): Owner/Admin can close session accounts early, refunding rent to specified destination
+- Error code 3019 (InvalidSessionAccount) for invalid session PDA during revocation
 - Devnet smoke test (`tests-sdk/tests/devnet-smoke.ts`): exercises all 9 instructions across Ed25519/Secp256r1/Session auth types and Owner/Admin/Spender roles, reporting CU/TX size/rent
 - Deferred execution benchmarks (CU + tx size measurements for TX1/TX2)
 - Error codes 3014-3018 for deferred execution (expired, hash mismatch, invalid expiry, unauthorized reclaim)
@@ -69,6 +71,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Authorize signed payload now includes `expiry_offset` (66 bytes total), preventing relayers from modifying the expiry window
+- `sol_assert_bytes_eq` now uses the `len` parameter instead of `left.len()` (latent OOB read on-chain)
+- `reclaim_deferred` uses `checked_add` for lamports (consistent with `execute_deferred` and `manage_authority`)
 - `PublicKey.default` collision with `SystemProgram.programId` in SDK execute methods: both are 32 zero bytes, causing `buildCompactLayout` to map SystemProgram to the sysvar slot (index 4) instead of adding it as a remaining account. Replaced with `SYSVAR_INSTRUCTIONS_PUBKEY`.
 - Synced passkey lockout: WebAuthn hardware counter=0 no longer causes rejection
 - 17/17 audit issues resolved (Accretion audit)

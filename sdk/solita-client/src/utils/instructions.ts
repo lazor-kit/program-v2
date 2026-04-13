@@ -22,6 +22,7 @@ export const DISC_CREATE_SESSION = 5;
 export const DISC_AUTHORIZE = 6;
 export const DISC_EXECUTE_DEFERRED = 7;
 export const DISC_RECLAIM_DEFERRED = 8;
+export const DISC_REVOKE_SESSION = 9;
 
 // ─── Authority types ─────────────────────────────────────────────────
 export const AUTH_TYPE_ED25519 = 0;
@@ -471,6 +472,49 @@ export function createReclaimDeferredIx(params: {
       { pubkey: params.refundDestination, isSigner: false, isWritable: true },
     ],
     data: Buffer.from([DISC_RECLAIM_DEFERRED]),
+  });
+}
+
+// ─── RevokeSession ──────────────────────────────────────────────────
+/**
+ * Revoke a session key early (before expiry).
+ * Only Owner or Admin can revoke.
+ * Instruction data: [discriminator(1)][auth_payload(...) for Secp256r1 | empty for Ed25519]
+ */
+export function createRevokeSessionIx(params: {
+  payer: PublicKey;
+  walletPda: PublicKey;
+  adminAuthorityPda: PublicKey;
+  sessionPda: PublicKey;
+  refundDestination: PublicKey;
+  authPayload?: Uint8Array;
+  authorizerSigner?: PublicKey;
+  programId?: PublicKey;
+}): TransactionInstruction {
+  const pid = params.programId ?? PROGRAM_ID;
+  const parts: Uint8Array[] = [new Uint8Array([DISC_REVOKE_SESSION])];
+  if (params.authPayload) {
+    parts.push(params.authPayload);
+  }
+
+  const keys = [
+    { pubkey: params.payer, isSigner: true, isWritable: false },
+    { pubkey: params.walletPda, isSigner: false, isWritable: false },
+    { pubkey: params.adminAuthorityPda, isSigner: false, isWritable: true },
+    { pubkey: params.sessionPda, isSigner: false, isWritable: true },
+    { pubkey: params.refundDestination, isSigner: false, isWritable: true },
+  ];
+
+  if (params.authorizerSigner) {
+    keys.push({ pubkey: params.authorizerSigner, isSigner: true, isWritable: false });
+  } else if (params.authPayload) {
+    keys.push({ pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false });
+  }
+
+  return new TransactionInstruction({
+    programId: pid,
+    keys,
+    data: Buffer.from(concatBytes(parts)),
   });
 }
 

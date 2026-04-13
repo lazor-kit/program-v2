@@ -128,10 +128,11 @@ pub fn process(
         return Err(AuthError::PermissionDenied.into());
     }
 
-    // The signed_payload for Authorize is: instructions_hash || accounts_hash
-    let mut signed_payload = Vec::with_capacity(64);
+    // The signed_payload for Authorize is: instructions_hash || accounts_hash || expiry_offset
+    let mut signed_payload = Vec::with_capacity(66);
     signed_payload.extend_from_slice(&instructions_hash);
     signed_payload.extend_from_slice(&accounts_hash);
+    signed_payload.extend_from_slice(&expiry_offset.to_le_bytes());
 
     // Authenticate — this verifies the Secp256r1 signature and increments the counter
     Secp256r1Authenticator.authenticate(
