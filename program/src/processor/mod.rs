@@ -9,4 +9,5 @@ pub mod execute;
 pub mod execute_deferred;
 pub mod manage_authority;
 pub mod reclaim_deferred;
+pub mod revoke_session;
 pub mod transfer_ownership;

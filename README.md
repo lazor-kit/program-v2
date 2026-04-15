@@ -10,7 +10,7 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 - **Multi-Protocol Authentication**: Ed25519 (native Solana) + Secp256r1 (WebAuthn/Passkeys/Apple Secure Enclave)
 - **Role-Based Access Control**: Owner / Admin / Spender with strict permission hierarchy
-- **Ephemeral Session Keys**: Time-bound keys with absolute slot-based expiry (max 30 days)
+- **Ephemeral Session Keys**: Time-bound keys with absolute slot-based expiry (max 30 days), revocable by Owner/Admin
 - **Odometer Replay Protection**: Monotonic u32 counter per authority — works reliably with synced passkeys (iCloud, Google)
 - **Clock-Based Slot Freshness**: 150-slot window via `Clock::get()` — no SlotHashes sysvar needed
 - **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead

@@ -1,3 +1,6 @@
+# Claude Code
+.claude/
+
 # Build outputs
 ts-sdk/dist
 target

@@ -249,6 +249,46 @@ pub enum ProgramIx {
         desc = "Account to receive rent refund"
     )]
     ReclaimDeferred,
+
+    /// Revoke a session key early (before expiry)
+    ///
+    /// Only Owner or Admin can revoke. Closes the session account and refunds rent.
+    #[account(
+        0,
+        signer,
+        name = "payer",
+        desc = "Transaction payer"
+    )]
+    #[account(
+        1,
+        name = "wallet",
+        desc = "Wallet PDA"
+    )]
+    #[account(
+        2,
+        writable,
+        name = "admin_authority",
+        desc = "Owner/Admin authority PDA (counter incremented for Secp256r1)"
+    )]
+    #[account(
+        3,
+        writable,
+        name = "session",
+        desc = "Session PDA to revoke"
+    )]
+    #[account(
+        4,
+        writable,
+        name = "refund_destination",
+        desc = "Account to receive rent refund"
+    )]
+    #[account(
+        5,
+        optional,
+        name = "auth_extra",
+        desc = "Ed25519: signer keypair | Secp256r1: sysvar_instructions"
+    )]
+    RevokeSession,
 }
 
 #[repr(C)]

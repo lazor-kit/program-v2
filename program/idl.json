@@ -644,6 +644,65 @@
         "type": "u8",
         "value": 8
       }
+    },
+    {
+      "name": "RevokeSession",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Transaction payer"
+          ]
+        },
+        {
+          "name": "wallet",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Wallet PDA"
+          ]
+        },
+        {
+          "name": "adminAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Owner/Admin authority PDA (counter incremented for Secp256r1)"
+          ]
+        },
+        {
+          "name": "session",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Session PDA to revoke"
+          ]
+        },
+        {
+          "name": "refundDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Account to receive rent refund"
+          ]
+        },
+        {
+          "name": "authExtra",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true,
+          "docs": [
+            "Ed25519: signer keypair | Secp256r1: sysvar_instructions"
+          ]
+        }
+      ],
+      "args": [],
+      "discriminant": {
+        "type": "u8",
+        "value": 9
+      }
     }
   ],
   "metadata": {

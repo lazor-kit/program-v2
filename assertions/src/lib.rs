@@ -24,7 +24,7 @@ pub fn sol_assert_bytes_eq(left: &[u8], right: &[u8], len: usize) -> bool {
         sol_memcmp_(
             left.as_ptr(),
             right.as_ptr(),
-            left.len() as u64,
+            len as u64,
             result.as_mut_ptr() as *mut i32,
         );
         result.assume_init() == 0
@@ -33,7 +33,7 @@ pub fn sol_assert_bytes_eq(left: &[u8], right: &[u8], len: usize) -> bool {
 
 #[cfg(not(target_os = "solana"))]
 pub fn sol_assert_bytes_eq(left: &[u8], right: &[u8], len: usize) -> bool {
-    (left.len() == len || right.len() != len) && right == left
+    left.len() >= len && right.len() >= len && left[..len] == right[..len]
 }
 
 macro_rules! sol_assert {

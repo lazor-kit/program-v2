@@ -151,6 +151,20 @@ const ix = createReclaimDeferredIx({
 });
 ```
 
+#### createRevokeSessionIx
+
+```typescript
+const ix = createRevokeSessionIx({
+  payer: PublicKey,
+  walletPda: PublicKey,
+  adminAuthorityPda: PublicKey,
+  sessionPda: PublicKey,
+  refundDestination: PublicKey,
+  authPayload?: Uint8Array,        // Secp256r1 only
+  authorizerSigner?: PublicKey,    // Ed25519 only
+});
+```
+
 ### Compact Instruction Packing
 
 Pack multiple instructions for Execute:
@@ -242,7 +256,7 @@ const signer = session(sessionPda, sessionKp.publicKey);
 ```
 
 **Type unions:**
-- `AdminSigner` = `Ed25519SignerConfig | Secp256r1SignerConfig` -- for admin operations (addAuthority, removeAuthority, transferOwnership, createSession)
+- `AdminSigner` = `Ed25519SignerConfig | Secp256r1SignerConfig` -- for admin operations (addAuthority, removeAuthority, transferOwnership, createSession, revokeSession)
 - `ExecuteSigner` = above + `SessionSignerConfig` -- for execute/transferSol
 
 ### High-Level Client API
@@ -343,6 +357,15 @@ const { instructions } = client.reclaimDeferred({
   deferredExecPda,
   // refundDestination defaults to payer
 });
+
+// ── Revoke session (close early, refund rent) ──
+const { instructions } = await client.revokeSession({
+  payer: payer.publicKey,
+  walletPda,
+  adminSigner: ed25519(ownerKp.publicKey, ownerAuthPda),  // or secp256r1(signer)
+  sessionPda,
+  // refundDestination defaults to payer
+});
 ```
 
 All Secp256r1 signers accept an optional `slotOverride` for batching scenarios.
@@ -360,6 +383,7 @@ DISC_CREATE_SESSION   // 5
 DISC_AUTHORIZE        // 6
 DISC_EXECUTE_DEFERRED // 7
 DISC_RECLAIM_DEFERRED // 8
+DISC_REVOKE_SESSION   // 9
 
 // Auth types
 AUTH_TYPE_ED25519     // 0
@@ -410,6 +434,7 @@ Error codes:
 | 3016 | InvalidExpiryWindow | Expiry offset out of range (10-9000 slots) |
 | 3017 | UnauthorizedReclaim | Only original payer can reclaim |
 | 3018 | DeferredAuthorizationNotExpired | Cannot reclaim before expiry |
+| 3019 | InvalidSessionAccount | Invalid session PDA during revocation |
 
 ### Generated Accounts
 

@@ -21,6 +21,7 @@ pub enum AuthError {
     InvalidExpiryWindow = 3016,
     UnauthorizedReclaim = 3017,
     DeferredAuthorizationNotExpired = 3018,
+    InvalidSessionAccount = 3019,
 }
 
 impl From<AuthError> for ProgramError {

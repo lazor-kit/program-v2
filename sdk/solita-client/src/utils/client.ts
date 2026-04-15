@@ -20,6 +20,7 @@ import {
   createAuthorizeIx,
   createExecuteDeferredIx,
   createReclaimDeferredIx,
+  createRevokeSessionIx,
   AUTH_TYPE_ED25519,
   AUTH_TYPE_SECP256R1,
   DISC_ADD_AUTHORITY,
@@ -28,6 +29,7 @@ import {
   DISC_EXECUTE,
   DISC_CREATE_SESSION,
   DISC_AUTHORIZE,
+  DISC_REVOKE_SESSION,
 } from './instructions';
 import { signWithSecp256r1, buildDataPayloadForAdd, buildDataPayloadForTransfer, buildDataPayloadForSession, concatParts } from './signing';
 import { buildCompactLayout } from './compact';
@@ -41,6 +43,7 @@ const SYSVAR_IX_INDEX_TRANSFER_OWNERSHIP = 6;
 const SYSVAR_IX_INDEX_EXECUTE = 4;
 const SYSVAR_IX_INDEX_CREATE_SESSION = 6;
 const SYSVAR_IX_INDEX_AUTHORIZE = 6;
+const SYSVAR_IX_INDEX_REVOKE_SESSION = 5;
 
 // ─── Internal helpers ─────────────────────────────────────────────────
 
@@ -566,7 +569,10 @@ export class LazorKitClient {
       ...remainingAccounts,
     ];
     const accountsHash = computeAccountsHash(tx2AccountMetas, compactInstructions);
-    const signedPayload = concatParts([instructionsHash, accountsHash]);
+    const expiryOffsetBuf = new Uint8Array(2);
+    expiryOffsetBuf[0] = expiryOffset & 0xff;
+    expiryOffsetBuf[1] = (expiryOffset >> 8) & 0xff;
+    const signedPayload = concatParts([instructionsHash, accountsHash, expiryOffsetBuf]);
 
     const { authPayload, precompileIx } = await signWithSecp256r1({
       signer: s.signer, discriminator: new Uint8Array([DISC_AUTHORIZE]),
@@ -625,5 +631,64 @@ export class LazorKitClient {
       programId: this.programId,
     });
     return { instructions: [ix] };
+  }
+
+  // ─── RevokeSession ─────────────────────────────────────────────
+
+  /**
+   * Revoke a session key early (before expiry).
+   * Only Owner or Admin can revoke. Refunds session rent.
+   *
+   * @example Revoke with Ed25519 admin
+   * ```typescript
+   * const { instructions } = await client.revokeSession({
+   *   payer: payer.publicKey,
+   *   walletPda,
+   *   adminSigner: ed25519(adminKp.publicKey, adminAuthorityPda),
+   *   sessionPda,
+   * });
+   * ```
+   */
+  async revokeSession(params: {
+    payer: PublicKey;
+    walletPda: PublicKey;
+    adminSigner: AdminSigner;
+    sessionPda: PublicKey;
+    refundDestination?: PublicKey;
+  }): Promise<{ instructions: TransactionInstruction[] }> {
+    const refundDest = params.refundDestination ?? params.payer;
+    const s = params.adminSigner;
+
+    if (s.type === 'ed25519') {
+      const ix = createRevokeSessionIx({
+        payer: params.payer, walletPda: params.walletPda,
+        adminAuthorityPda: s.authorityPda ?? this.findAuthority(params.walletPda, s.publicKey.toBytes())[0],
+        sessionPda: params.sessionPda, refundDestination: refundDest,
+        authorizerSigner: s.publicKey, programId: this.programId,
+      });
+      return { instructions: [ix] };
+    }
+
+    const adminAuthorityPda = s.authorityPda
+      ?? this.findAuthority(params.walletPda, s.signer.credentialIdHash)[0];
+    const slot = s.slotOverride ?? BigInt(await this.connection.getSlot());
+    const counter = (await this.readCounter(adminAuthorityPda)) + 1;
+
+    const signedPayload = concatParts([
+      params.sessionPda.toBytes(), refundDest.toBytes(),
+    ]);
+
+    const { authPayload, precompileIx } = await signWithSecp256r1({
+      signer: s.signer, discriminator: new Uint8Array([DISC_REVOKE_SESSION]),
+      signedPayload, sysvarIxIndex: SYSVAR_IX_INDEX_REVOKE_SESSION,
+      slot, counter, payer: params.payer, programId: this.programId,
+    });
+
+    const ix = createRevokeSessionIx({
+      payer: params.payer, walletPda: params.walletPda, adminAuthorityPda,
+      sessionPda: params.sessionPda, refundDestination: refundDest,
+      authPayload, programId: this.programId,
+    });
+    return { instructions: [precompileIx, ix] };
   }
 }
