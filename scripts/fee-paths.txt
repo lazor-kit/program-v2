@@ -1,0 +1,51 @@
+# ============================================================================
+# Fee surface declaration — must NEVER exist in program-v2.
+#
+# Read by:
+#   scripts/check-no-fee.sh   — fails CI if any rule below matches
+#   scripts/strip-fee.sh      — auto-deletes PATH entries after cherry-pick
+#
+# Format (one rule per line, prefix-tagged):
+#   PATH <repo-relative path or directory>
+#       Fails if the file or directory exists.
+#       strip-fee.sh removes it via `git rm -rf`.
+#   SYMBOL <ERE regex>
+#       Fails if the regex matches in any tracked .rs file under program/src/.
+#       strip-fee.sh DOES NOT auto-edit source — the user must hand-resolve.
+#
+# Lines starting with `#` and blank lines are ignored.
+#
+# Why this file exists:
+#   program-v2 is the "no-profit" foundation clone of lazorkit-protocol.
+#   When cherry-picking feature commits from lazorkit-protocol, the fee/admin
+#   paths must be excluded. This file is the single source of truth for what
+#   counts as "fee surface".
+# ============================================================================
+
+# --- State accounts (fee/admin storage) -------------------------------------
+PATH program/src/state/protocol_config.rs
+PATH program/src/state/treasury_shard.rs
+PATH program/src/state/integrator_record.rs
+
+# --- Processor module (admin-only instructions) ----------------------------
+PATH program/src/processor/protocol
+
+# --- Type names (fee state structs) ----------------------------------------
+SYMBOL \bProtocolConfig\b
+SYMBOL \bTreasuryShard\b
+SYMBOL \bFeeRecord\b
+SYMBOL \bIntegratorRecord\b
+
+# --- Function names (fee collection internals) -----------------------------
+SYMBOL \btry_collect_fee\b
+
+# --- Field names (fee config) ----------------------------------------------
+SYMBOL \bcreation_fee\b
+SYMBOL \bexecution_fee\b
+
+# --- Instruction handler module paths (admin-only) -------------------------
+SYMBOL \binitialize_protocol\b
+SYMBOL \bupdate_protocol\b
+SYMBOL \bregister_integrator\b
+SYMBOL \bwithdraw_treasury\b
+SYMBOL \binitialize_treasury_shard\b
