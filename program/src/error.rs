@@ -33,6 +33,10 @@ pub enum AuthError {
     ActionTokenRecurringLimitExceeded = 3027,
     ActionWhitelistBlacklistConflict = 3028,
     ActionTokenMaxPerTxExceeded = 3029,
+    // Session vault + token invariants (defense against System::Assign / SetAuthority escapes)
+    SessionVaultOwnerChanged = 3030,
+    SessionVaultDataLenChanged = 3031,
+    SessionTokenAuthorityChanged = 3032,
 }
 
 impl From<AuthError> for ProgramError {
