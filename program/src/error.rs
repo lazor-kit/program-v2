@@ -22,6 +22,17 @@ pub enum AuthError {
     UnauthorizedReclaim = 3017,
     DeferredAuthorizationNotExpired = 3018,
     InvalidSessionAccount = 3019,
+    // Session action errors (codes aligned with lazorkit-protocol for unified SDK error decoding)
+    ActionBufferInvalid = 3020,
+    ActionProgramNotWhitelisted = 3021,
+    ActionProgramBlacklisted = 3022,
+    ActionSolMaxPerTxExceeded = 3023,
+    ActionSolLimitExceeded = 3024,
+    ActionSolRecurringLimitExceeded = 3025,
+    ActionTokenLimitExceeded = 3026,
+    ActionTokenRecurringLimitExceeded = 3027,
+    ActionWhitelistBlacklistConflict = 3028,
+    ActionTokenMaxPerTxExceeded = 3029,
 }
 
 impl From<AuthError> for ProgramError {
