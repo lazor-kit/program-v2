@@ -7,3 +7,9 @@ edition = "2021"
 pinocchio = { workspace = true }
 pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }
+
+# Cluster selection for the embedded program ID. Exactly one must be set
+# at build time; lib.rs emits a compile_error! otherwise.
+[features]
+mainnet = []
+devnet  = []
