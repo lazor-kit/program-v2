@@ -1,0 +1,122 @@
+name: SBF cluster feature check
+
+# Verifies the Pattern D feature-flag mechanism in `assertions/src/lib.rs`:
+#
+#   1. `cargo build-sbf --features mainnet`  succeeds and produces a binary
+#      embedding the mainnet vanity ID.
+#   2. `cargo build-sbf --features devnet`   succeeds and produces a binary
+#      embedding the devnet ID.
+#   3. The two binaries differ (otherwise the feature flag has been
+#      neutralised by a refactor and Pattern D no longer protects against
+#      cross-cluster deploys).
+#   4. `cargo build-sbf` with no feature flag fails with the expected
+#      `compile_error!` (otherwise nothing prevents an unflagged build
+#      from silently embedding whichever ID happens to be the default).
+#
+# Runs on every PR touching the program / assertions crate or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - 'program/**'
+      - 'assertions/**'
+      - '.github/workflows/sbf-cluster-check.yml'
+  push:
+    branches: [main]
+
+jobs:
+  cluster-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: sbf-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build mainnet binary
+        working-directory: program
+        run: cargo build-sbf --features mainnet
+
+      - name: Record mainnet hash
+        id: mainnet
+        run: |
+          M=$(shasum -a 256 target/deploy/lazorkit_program.so | awk '{print $1}')
+          echo "sha=$M" >> "$GITHUB_OUTPUT"
+          echo "mainnet SBF: $M"
+
+      - name: Build devnet binary
+        working-directory: program
+        run: cargo build-sbf --features devnet
+
+      - name: Record devnet hash
+        id: devnet
+        run: |
+          D=$(shasum -a 256 target/deploy/lazorkit_program.so | awk '{print $1}')
+          echo "sha=$D" >> "$GITHUB_OUTPUT"
+          echo "devnet SBF: $D"
+
+      - name: Verify binaries differ
+        run: |
+          if [ "${{ steps.mainnet.outputs.sha }}" = "${{ steps.devnet.outputs.sha }}" ]; then
+            echo "ERROR: mainnet + devnet SBF binaries are identical."
+            echo "       Pattern D's compile-time cluster switch has been"
+            echo "       neutralised — likely a refactor removed the cfg gate"
+            echo "       on declare_id! in assertions/src/lib.rs."
+            exit 1
+          fi
+          echo "✓ binaries differ as expected"
+
+      - name: Verify no-feature build fails with compile_error!
+        working-directory: program
+        run: |
+          # Capture exit code separately — `cmd | tee` returns tee's exit
+          # (always 0), masking cargo's failure. `set -o pipefail` would
+          # also work, but capturing to a file gives us the log to search
+          # afterwards regardless of pipeline state.
+          set +e
+          cargo build-sbf > /tmp/build.log 2>&1
+          BUILD_EXIT=$?
+          set -e
+          cat /tmp/build.log
+          if [ "$BUILD_EXIT" -eq 0 ]; then
+            echo "ERROR: cargo build-sbf without --features mainnet/devnet succeeded."
+            echo "       The compile_error! in assertions/src/lib.rs is no longer firing."
+            exit 1
+          fi
+          if ! grep -q "pick exactly one cluster" /tmp/build.log; then
+            echo "ERROR: build failed but not with the expected compile_error message."
+            echo "       Expected: 'pick exactly one cluster — --features mainnet OR --features devnet'"
+            exit 1
+          fi
+          echo "✓ no-feature build correctly rejected by compile_error!"
+
+      - name: Verify both-features build fails
+        working-directory: program
+        run: |
+          set +e
+          cargo build-sbf --features mainnet --features devnet > /tmp/build-both.log 2>&1
+          BUILD_EXIT=$?
+          set -e
+          cat /tmp/build-both.log
+          if [ "$BUILD_EXIT" -eq 0 ]; then
+            echo "ERROR: cargo build-sbf with BOTH features succeeded."
+            echo "       The compile_error! mutual-exclusion guard is broken."
+            exit 1
+          fi
+          if ! grep -q "pick exactly one cluster" /tmp/build-both.log; then
+            echo "ERROR: build failed but not with the expected compile_error message."
+            exit 1
+          fi
+          echo "✓ both-features build correctly rejected"
