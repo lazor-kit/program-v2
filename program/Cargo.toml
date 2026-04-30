@@ -21,6 +21,8 @@ pinocchio-system = { workspace = true }
 no-padding = { workspace = true }
 assertions = { workspace = true }
 shank = { version = "0.4.2", git = "https://github.com/anagrambuild/shank.git" }
+solana-security-txt = "1.1.2"
+default-env = "0.1"
 
 [dev-dependencies]
 solana-sdk = "2.1"
