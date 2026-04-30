@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Session action permissions: 8 immutable permission rules attachable at session creation — `SolLimit`, `SolRecurringLimit`, `SolMaxPerTx`, `TokenLimit`, `TokenRecurringLimit`, `TokenMaxPerTx`, `ProgramWhitelist`, `ProgramBlacklist`. Action discriminators (1, 2, 3, 4, 5, 6, 10, 11) and the 11-byte header layout match `lazorkit-protocol` so the unified SDK can encode actions identically for both builds.
+- `SessionAccount` is now variable-size: a session can carry a trailing action buffer (max 16 actions, ≤ 2048 bytes) validated at creation time.
+- `CreateSession` instruction data accepts the new `[actions_len: u16][actions: N]` extension after the legacy 40-byte args; old 40-byte clients continue to work via the legacy parser branch.
+- Pre-CPI action enforcement at `Execute` time: program whitelist/blacklist checks against each CPI target.
+- Post-CPI action enforcement: SOL/token spending caps with saturating arithmetic; recurring-window resets aligned to slot boundaries; per-execute SOL outflow tracked across all CPIs for `SolMaxPerTx`.
+- Vault-invariant defenses against `System::Assign` / `SetAuthority` / `Approve` escapes: vault owner + data-length snapshotted pre-CPI and verified unchanged post-CPI; vault-owned token accounts on listed mints have their owner / delegate / close_authority fields snapshotted and verified.
+- Anti-CPI guard for session-authenticated `Execute`: stack-height must be 1 (rejects wrapper programs chaining through `Execute`).
+- Error codes 3020–3029 (action validation + enforcement) and 3030–3032 (`SessionVaultOwnerChanged`, `SessionVaultDataLenChanged`, `SessionTokenAuthorityChanged`).
+- Dual-cluster Cargo features (`mainnet`, `devnet`): the embedded program ID is chosen at compile time via a feature flag with a `compile_error!` if neither / both is set. The `mainnet` feature embeds `LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi` (same slot as `lazorkit-protocol`) for the foundation deployment; `devnet` keeps `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`.
+- `security.txt` block embedded via `solana-security-txt` macro: links to SECURITY.md, contact email, source repo, source revision (from `GITHUB_SHA`), and the Accretion audit PDF.
+- Zero-copy `CompactInstructionRef` parser (`parse_compact_instructions_ref_with_len`) used by the Execute hot path — no per-instruction `Vec<u8>` allocations for account-index bytes or instruction data.
+- Cherry-pick guardrails: `scripts/fee-paths.txt` declares forbidden fee-surface paths and symbols, `scripts/check-no-fee.sh` verifies the working tree (used by CI), `scripts/strip-fee.sh` auto-removes fee files post-cherry-pick.
+- CI workflow `check-no-fee` runs the verifier on every PR.
+- CI workflow `sbf-cluster-check` builds both mainnet and devnet SBF binaries, verifies their hashes differ, and asserts that an unflagged `cargo build-sbf` fails with the expected `compile_error!`.
+- `scripts/build-all.sh <devnet|mainnet>` now drives a feature-flagged build + IDL regen + SDK regen in one step. The previous `scripts/sync-program-id.sh` is removed (program ID is now a compile-time feature, not a sed target).
+- `solana-security-txt` and `default-env` dependencies, `[workspace.metadata.cli]` pinning Solana CLI 3.0.4 for verified builds.
 - Unified SDK API with discriminated union signer types (`ed25519()`, `secp256r1()`, `session()` helper constructors)
 - `CreateWalletOwner` union type: single `createWallet()` method for both Ed25519 and Secp256r1
 - `AdminSigner` union type for admin operations (addAuthority, removeAuthority, transferOwnership, createSession)
