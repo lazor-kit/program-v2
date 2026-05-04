@@ -16,8 +16,8 @@ import {
   ROLE_SPENDER,
   ed25519,
   secp256r1,
-} from '../../sdk/solita-client/src';
-import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
+} from '@lazorkit/sdk-legacy';
+import { AuthorityAccount } from '@lazorkit/sdk-legacy';
 
 describe('Authority Management', () => {
   let ctx: TestContext;
@@ -37,7 +37,7 @@ describe('Authority Management', () => {
       ownerKp = Keypair.generate();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
@@ -152,7 +152,7 @@ describe('Authority Management', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: {

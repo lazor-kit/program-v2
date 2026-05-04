@@ -15,8 +15,8 @@ import {
   ROLE_SPENDER,
   ed25519,
   secp256r1,
-} from '../../sdk/solita-client/src';
-import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
+} from '@lazorkit/sdk-legacy';
+import { AuthorityAccount } from '@lazorkit/sdk-legacy';
 
 /**
  * E2E Company Workflow:
@@ -53,7 +53,7 @@ describe('E2E Company Workflow', () => {
   it('Step 1: CEO creates wallet with passkey', async () => {
     const userSeed = crypto.randomBytes(32);
 
-    const result = client.createWallet({
+    const result = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: {

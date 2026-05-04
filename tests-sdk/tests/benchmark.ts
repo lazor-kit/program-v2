@@ -43,7 +43,7 @@ import {
   createAuthorizeIx,
   createExecuteDeferredIx,
   computeInstructionsHash,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 
 const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8899';

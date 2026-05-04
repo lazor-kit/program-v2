@@ -24,7 +24,7 @@ import {
   session,
   ROLE_ADMIN,
   ROLE_SPENDER,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 import { generateMockSecp256r1Key, createMockSigner } from './secp256r1Utils';
 
 const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';
@@ -125,7 +125,7 @@ async function main() {
   {
     ed25519OwnerKp = Keypair.generate();
     const balBefore = await connection.getBalance(payer.publicKey);
-    const { instructions, walletPda, vaultPda, authorityPda } = client.createWallet({
+    const { instructions, walletPda, vaultPda, authorityPda } = await client.createWallet({
       payer: payer.publicKey,
       userSeed: crypto.randomBytes(32),
       owner: { type: 'ed25519', publicKey: ed25519OwnerKp.publicKey },
@@ -144,7 +144,7 @@ async function main() {
   {
     secpOwnerKey = await generateMockSecp256r1Key('lazorkit.app');
     const balBefore = await connection.getBalance(payer.publicKey);
-    const { instructions, walletPda, vaultPda, authorityPda } = client.createWallet({
+    const { instructions, walletPda, vaultPda, authorityPda } = await client.createWallet({
       payer: payer.publicKey,
       userSeed: crypto.randomBytes(32),
       owner: {

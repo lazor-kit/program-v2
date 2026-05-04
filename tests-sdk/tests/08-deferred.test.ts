@@ -11,6 +11,7 @@ import {
   sendTx,
   sendTxExpectError,
   getSlot,
+  PROGRAM_ID,
   type TestContext,
 } from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
@@ -30,8 +31,7 @@ import {
   buildSecp256r1Challenge,
   AUTH_TYPE_SECP256R1,
   DISC_AUTHORIZE,
-  PROGRAM_ID,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Deferred Execution', () => {
   let ctx: TestContext;

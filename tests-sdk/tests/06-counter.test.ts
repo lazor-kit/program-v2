@@ -24,8 +24,8 @@ import {
   ROLE_SPENDER,
   DISC_ADD_AUTHORITY,
   DISC_EXECUTE,
-} from '../../sdk/solita-client/src';
-import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
+} from '@lazorkit/sdk-legacy';
+import { AuthorityAccount } from '@lazorkit/sdk-legacy';
 
 describe('Counter Edge Cases', () => {
   let ctx: TestContext;

@@ -25,7 +25,7 @@ import {
   computeAccountsHash,
   AUTH_TYPE_SECP256R1,
   DISC_EXECUTE,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Replay Prevention (Odometer)', () => {
   let ctx: TestContext;

@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["tests/**/*", "../sdk/solita-client/src/**/*"]
+  "include": ["tests/**/*"]
 }

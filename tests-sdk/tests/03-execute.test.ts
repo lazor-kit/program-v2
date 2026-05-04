@@ -12,7 +12,7 @@ import {
   LazorKitClient,
   ed25519,
   secp256r1,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Execute', () => {
   let ctx: TestContext;
@@ -33,7 +33,7 @@ describe('Execute', () => {
       ownerKp = Keypair.generate();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
@@ -86,7 +86,7 @@ describe('Execute', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: {

@@ -10,7 +10,7 @@ import {
   buildSecp256r1Challenge,
   generateAuthenticatorData,
   type Secp256r1Signer,
-} from '../../sdk/solita-client/src/utils/secp256r1';
+} from '@lazorkit/sdk-legacy';
 import { PROGRAM_ID } from './common';
 
 const SECP256R1_PROGRAM_ID = new PublicKey('Secp256r1SigVerify1111111111111111111111111');

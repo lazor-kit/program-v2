@@ -8,8 +8,8 @@ import {
   getSlot,
   type TestContext,
 } from './common';
-import { LazorKitClient, ed25519 } from '../../sdk/solita-client/src';
-import { SessionAccount } from '../../sdk/solita-client/src/generated/accounts';
+import { LazorKitClient, ed25519 } from '@lazorkit/sdk-legacy';
+import { SessionAccount } from '@lazorkit/sdk-legacy';
 
 describe('CreateSession', () => {
   let ctx: TestContext;
@@ -25,7 +25,7 @@ describe('CreateSession', () => {
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const result = client.createWallet({
+    const result = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: { type: 'ed25519', publicKey: ownerKp.publicKey },

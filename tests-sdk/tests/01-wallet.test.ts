@@ -1,15 +1,14 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Keypair } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, type TestContext } from './common';
+import { setupTest, sendTx, PROGRAM_ID, type TestContext } from './common';
 import { generateMockSecp256r1Key } from './secp256r1Utils';
 import {
   LazorKitClient,
   AUTH_TYPE_ED25519,
   AUTH_TYPE_SECP256R1,
-  PROGRAM_ID,
-} from '../../sdk/solita-client/src';
-import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
+  AuthorityAccount,
+} from '@lazorkit/sdk-legacy';
 
 describe('CreateWallet', () => {
   let ctx: TestContext;
@@ -24,7 +23,7 @@ describe('CreateWallet', () => {
     const ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const { instructions, walletPda, authorityPda } = client.createWallet({
+    const { instructions, walletPda, authorityPda } = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
@@ -52,7 +51,7 @@ describe('CreateWallet', () => {
     const key = await generateMockSecp256r1Key();
     const userSeed = crypto.randomBytes(32);
 
-    const { instructions, authorityPda } = client.createWallet({
+    const { instructions, authorityPda } = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: {
@@ -79,7 +78,7 @@ describe('CreateWallet', () => {
     const ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const { instructions } = client.createWallet({
+    const { instructions } = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
