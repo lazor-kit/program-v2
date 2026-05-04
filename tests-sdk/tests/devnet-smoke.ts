@@ -449,7 +449,7 @@ async function main() {
     record('Authorize (Deferred TX1, Secp256r1)', r1);
 
     // TX2: ExecuteDeferred
-    const { instructions: execIxs } = client.executeDeferredFromPayload({
+    const { instructions: execIxs } = await client.executeDeferredFromPayload({
       payer: payer.publicKey,
       deferredPayload,
     });

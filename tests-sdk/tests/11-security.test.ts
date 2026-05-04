@@ -336,6 +336,7 @@ describe('Security', () => {
         packedInstructions: packed,
         authPayload,
         remainingAccounts: tamperedRemaining,
+      programId: PROGRAM_ID,
       });
 
       // Should fail — accounts hash won't match

@@ -2,7 +2,7 @@
   "name": "lazorkit-tests-sdk",
   "version": "1.0.0",
   "private": true,
-  "description": "LazorKit SDK integration tests (solita-client + @solana/web3.js v1)",
+  "description": "LazorKit SDK integration tests (@lazorkit/sdk-legacy + @solana/web3.js v1)",
   "scripts": {
     "test": "vitest run --fileParallelism=false",
     "test:watch": "vitest --fileParallelism=false",
