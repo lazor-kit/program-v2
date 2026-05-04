@@ -5,7 +5,7 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, getSlot, type TestContext } from './common';
+import { setupTest, sendTx, PROGRAM_ID, getSlot, type TestContext } from './common';
 import { generateMockSecp256r1Key, createMockSigner } from './secp256r1Utils';
 import {
   LazorKitClient,
@@ -44,7 +44,7 @@ describe('E2E Company Workflow', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
     ceoKey = await generateMockSecp256r1Key('company.com');
     adminKp = Keypair.generate();
     spenderKey = await generateMockSecp256r1Key('company.com');

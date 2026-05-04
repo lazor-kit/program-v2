@@ -13,6 +13,7 @@ import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import * as crypto from 'crypto';
 import {
   setupTest,
+  PROGRAM_ID,
   sendTx,
   sendTxExpectError,
   getSlot,
@@ -44,7 +45,7 @@ describe('Permission Boundaries', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
 
     // Create wallet with Ed25519 owner
     ownerKp = Keypair.generate();

@@ -49,7 +49,7 @@ describe('Security', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
   });
 
   // ─── Counter increment verification ─────────────────────────────

@@ -5,6 +5,7 @@ import {
   setupTest,
   sendTx,
   sendTxExpectError,
+  PROGRAM_ID,
   type TestContext,
 } from './common';
 import { generateMockSecp256r1Key, createMockSigner } from './secp256r1Utils';
@@ -25,7 +26,7 @@ describe('Authority Management', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
   });
 
   describe('Ed25519 admin flow', () => {

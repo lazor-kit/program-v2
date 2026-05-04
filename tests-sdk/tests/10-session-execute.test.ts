@@ -16,6 +16,7 @@ import {
 import * as crypto from 'crypto';
 import {
   setupTest,
+  PROGRAM_ID,
   sendTx,
   sendTxExpectError,
   getSlot,
@@ -38,7 +39,7 @@ describe('Session Execute', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
 
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
