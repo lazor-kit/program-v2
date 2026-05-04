@@ -13,12 +13,17 @@ This document outlines the standard procedures for building, deploying, and test
 
 ```
 /program           Rust smart contract (pinocchio, zero-copy)
-/sdk/solita-client  TypeScript SDK (Solita-generated + hand-written utils)
-/tests-sdk          Integration tests (vitest, @solana/web3.js v1)
+/tests-sdk          Integration tests (vitest, @lazorkit/sdk-legacy)
 /scripts            Build/deploy automation
 /audits             Audit reports
 /no-padding         Custom NoPadding derive macro
 /assertions         Custom assertion helpers
+
+The TypeScript SDK lives in the sibling `lazorkit-protocol` repo at
+`sdk/sdk-legacy/` and is published to npm as `@lazorkit/sdk-legacy`. The
+same SDK transparently handles both this build (program-v2, no fees) and
+the commercial build — it probes ProtocolConfig on first use and
+conditionally appends fee accounts.
 ```
 
 ## Core Workflows
@@ -38,8 +43,9 @@ cargo build-sbf --features devnet
 cargo build-sbf --features mainnet
 ```
 
-The convenience script `./scripts/build-all.sh <devnet|mainnet>` builds, generates
-the IDL, and regenerates the SDK in one shot.
+The convenience script `./scripts/build-all.sh <devnet|mainnet>` builds and
+regenerates the IDL in one shot. SDK regeneration is no longer needed —
+`@lazorkit/sdk-legacy` is hand-written and lives in the sibling repo.
 
 ### B. Run Rust Tests
 
@@ -60,13 +66,20 @@ PROGRAM_ID=$(solana-keygen pubkey ../target/deploy/lazorkit_program-keypair.json
 shank idl -o . --out-filename idl.json -p "$PROGRAM_ID"
 ```
 
-### D. SDK Generation (using Solita)
+### D. SDK
+
+`@lazorkit/sdk-legacy` is hand-written (no codegen) and lives in the
+sibling `lazorkit-protocol` repo at `sdk/sdk-legacy/`. To use it locally:
 
 ```bash
-cd sdk/solita-client && node generate.mjs
+# In a sibling checkout: /Users/.../lazorkit-protocol/sdk/sdk-legacy
+npm install && npm run build
+
+# Then in this repo's tests-sdk (already configured via `file:` link):
+cd tests-sdk && npm install
 ```
 
-The generate.mjs script reads the Shank IDL, enriches it with accounts/errors/types, and runs Solita to produce TypeScript code in `src/generated/`.
+Once published to npm, consumers do `npm install @lazorkit/sdk-legacy`.
 
 ### E. Running Integration Tests
 
