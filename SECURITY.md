@@ -31,7 +31,7 @@ The following are out of scope:
 
 ## Audit Status
 
-LazorKit V2 has been audited by Accretion (Solana Foundation funded).
+LazorKit V2 has been audited by Accretion.
 
 **Status**: 17/17 security issues resolved
 

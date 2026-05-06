@@ -1,7 +1,7 @@
 # Accretion Audit Delta Brief — `program-v2` `audit-baseline-2026-02-accretion` → `audit-pending-v1`
 
 **Repository:** `lazor-kit/program-v2`
-**Previous audit:** Accretion Labs, Solana Foundation, February 2026, A26SFR1
+**Previous audit:** Accretion Labs, February 2026, A26SFR1
 ([audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf](../../audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf))
 **Previous baseline tag:** `audit-baseline-2026-02-accretion` → commit `d1eaaeb` (Merge PR #49 fix/audit-hardening, 17/17 findings resolved)
 **Delta tag:** `audit-pending-v1` → commit `9c97fe2`

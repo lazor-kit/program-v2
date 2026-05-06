@@ -1850,7 +1850,7 @@ index 21742cc..0c970f0 100644
          new_type: u8,
          new_pubkey: [u8; 33],
 diff --git a/program/src/lib.rs b/program/src/lib.rs
-index aad119c..2a41038 100644
+index aad119c..0017e02 100644
 --- a/program/src/lib.rs
 +++ b/program/src/lib.rs
 @@ -1,5 +1,22 @@
@@ -1870,7 +1870,7 @@ index aad119c..2a41038 100644
 +    source_code: "https://github.com/lazor-kit/program-v2",
 +    source_revision: default_env!("GITHUB_SHA", ""),
 +    source_release: default_env!("GITHUB_REF_NAME", ""),
-+    auditors: "Accretion Labs (Solana Foundation) — https://github.com/lazor-kit/program-v2/blob/main/audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf"
++    auditors: "Accretion Labs — https://github.com/lazor-kit/program-v2/blob/main/audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf"
 +}
 +
  pub mod auth;

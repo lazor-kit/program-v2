@@ -14,7 +14,7 @@ security_txt! {
     source_code: "https://github.com/lazor-kit/program-v2",
     source_revision: default_env!("GITHUB_SHA", ""),
     source_release: default_env!("GITHUB_REF_NAME", ""),
-    auditors: "Accretion Labs (Solana Foundation) — https://github.com/lazor-kit/program-v2/blob/main/audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf"
+    auditors: "Accretion Labs — https://github.com/lazor-kit/program-v2/blob/main/audits/2026-accretion-solana-foundation-lazorkit-audit-A26SFR1.pdf"
 }
 
 pub mod auth;
