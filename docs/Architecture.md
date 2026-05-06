@@ -33,8 +33,9 @@ SHA256(discriminator || auth_payload || signed_payload || slot || payer || count
 
 ### WebAuthn Passkey Support
 
-- Reconstructs clientDataJSON on-chain from packed flags.
+- Embeds raw `clientDataJSON` directly in the auth payload; the program parses the JSON on-chain (extracts `type` + `challenge` fields, validates `webauthn.get`, base64url-compares challenge against the recomputed digest).
 - Verifies authenticatorData flags (User Presence / User Verification).
+- Verifies `rpIdHash` against the precomputed digest stored on the authority account at registration (saves one `sol_sha256` syscall per Execute).
 - Uses Secp256r1SigVerify precompile via sysvar introspection.
 - Stores 33-byte compressed public keys (not 64-byte uncompressed).
 
@@ -90,9 +91,9 @@ pub struct AuthorityAccountHeader {
 Variable data after header:
 
 - **Ed25519**: `[pubkey: [u8; 32]]` -- total 80 bytes.
-- **Secp256r1**: `[credential_id_hash: [u8; 32]] [compressed_pubkey: [u8; 33]] [rpIdLen: u8] [rpId: [u8; N]]` -- total 114+ bytes (rpId stored on-chain to avoid per-tx transmission).
+- **Secp256r1**: `[credential_id_hash: [u8; 32]] [compressed_pubkey: [u8; 33]] [rpIdHash: [u8; 32]]` -- total 145 bytes. The rpId is hashed once at creation and the digest stored on-chain so every subsequent `Execute` saves one `sol_sha256` syscall.
 
-### C. SessionAccount (80 bytes)
+### C. SessionAccount (80-byte fixed header + optional action buffer)
 
 Seeds: `["session", wallet_pubkey, session_key]`
 
@@ -107,8 +108,25 @@ pub struct SessionAccount {
     pub session_key: Pubkey, // 32 bytes
     pub expires_at: u64,     // Absolute slot height
 }
-// Total: 1+1+1+5+32+32+8 = 80 bytes
+// Header: 1+1+1+5+32+32+8 = 80 bytes
 ```
+
+Optional **actions buffer** appended after the 80-byte header (max 16 actions, ≤ 2048 bytes). Each action: `[type: u8][data_len: u16 LE][expires_at: u64 LE][data: N]`.
+
+Action types (must match `state/action.rs::ActionType`):
+
+| Discriminator | Type | Data |
+|---|---|---|
+| 1 | `SolLimit` | `remaining: u64` (lifetime SOL spending cap) |
+| 2 | `SolRecurringLimit` | `limit: u64, spent: u64, window: u64, last_reset: u64` |
+| 3 | `SolMaxPerTx` | `max: u64` (per-execute SOL ceiling) |
+| 4 | `TokenLimit` | `mint: [u8;32], remaining: u64` |
+| 5 | `TokenRecurringLimit` | `mint: [u8;32], limit, spent, window, last_reset` |
+| 6 | `TokenMaxPerTx` | `mint: [u8;32], max: u64` |
+| 10 | `ProgramWhitelist` (repeatable) | `program_id: [u8;32]` |
+| 11 | `ProgramBlacklist` (repeatable) | `program_id: [u8;32]` |
+
+Enforcement runs in `processor/execute_actions.rs`: pre-CPI program whitelist/blacklist checks + token-balance + token-authority snapshots; post-CPI delta computation, SOL/token cap enforcement with saturating arithmetic, recurring-window resets aligned to slot boundaries, and vault-invariant defenses against `System::Assign` / `SetAuthority` / `Approve` escapes (errors 3030–3032).
 
 ### D. DeferredExecAccount (176 bytes)
 
@@ -315,27 +333,30 @@ program/
       secp256r1/
         mod.rs                Passkey authenticator with odometer + Clock-based slot check
         introspection.rs      Precompile instruction verification
-        webauthn.rs           ClientDataJSON reconstruction + AuthDataParser
+        webauthn.rs           Raw clientDataJSON validation + AuthDataParser
       traits.rs               Authenticator trait
     processor/
       create_wallet.rs
       manage_authority.rs     AddAuthority + RemoveAuthority
       execute.rs              CompactInstruction execution (immediate)
+      execute_actions.rs      Pre/post action enforcement engine (token snapshots, vault invariants)
       authorize.rs            Deferred execution TX1 (creates DeferredExec PDA)
       execute_deferred.rs     Deferred execution TX2 (verifies + executes)
       reclaim_deferred.rs     Closes expired DeferredExec accounts
-      create_session.rs
+      create_session.rs       Session creation with optional action buffer
+      revoke_session.rs       Owner/Admin can close session early, refund rent
       transfer_ownership.rs
     state/
       wallet.rs               WalletAccount (8 bytes)
       authority.rs            AuthorityAccountHeader (48 bytes)
-      session.rs              SessionAccount (80 bytes)
+      session.rs              SessionAccount (80-byte header + optional actions buffer)
       deferred.rs             DeferredExecAccount (176 bytes)
-    compact.rs                CompactInstruction serialization
+      action.rs               Session action types + parser + validator (8 types, 11-byte header)
+    compact.rs                CompactInstruction serialization (owned + zero-copy ref variants)
     utils.rs                  PDA initialization, stack_height check
-    error.rs                  AuthError enum (3001-3018)
-    entrypoint.rs             Instruction routing
-tests-sdk/                    Integration + security tests (vitest, 56 tests)
+    error.rs                  AuthError enum (3001-3032)
+    entrypoint.rs             Instruction routing (disc 0–9)
+tests-sdk/                    Integration + security tests (vitest, 65 tests)
 ```
 
 The TypeScript SDK lives outside this repo: `@lazorkit/sdk-legacy` (in

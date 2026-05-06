@@ -2,7 +2,7 @@
 
 This document provides comprehensive cost data for the LazorKit smart wallet program on Solana. All compute unit (CU) measurements are from real transactions on devnet. Rent costs use Solana's standard formula.
 
-> Program ID: `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
+> Program IDs: `LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi` (mainnet, slot shared with `lazorkit-protocol`) / `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao` (devnet)
 
 ---
 
@@ -130,7 +130,7 @@ Solana requires accounts to maintain a minimum balance (rent-exempt) based on da
 | Vault PDA | 0 | 0 | 0 |
 
 **Notes:**
-- Secp256r1 authority size is variable: 48 (header) + 32 (cred hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId). For `rpId = "example.com"` (11 bytes), total = 125 bytes.
+- Secp256r1 authority is 145 bytes: 48 (header) + 32 (cred hash) + 33 (pubkey) + 32 (rpIdHash, precomputed SHA256 of rpId).
 - **DeferredExec** rent is temporary -- refunded when ExecuteDeferred closes the account or when ReclaimDeferred reclaims an expired authorization.
 - **Vault PDA** is not initialized as a program-owned account. It simply receives SOL via transfer. No rent cost.
 
@@ -192,7 +192,7 @@ At $150/SOL, session setup costs ~$0.22 USD. Each subsequent execute costs $0.00
 |---|---|---|---|
 | WalletAccount | 8 bytes | 0 | **8 bytes** |
 | Authority (Ed25519) | 48 bytes | 32 bytes (pubkey) | **80 bytes** |
-| Authority (Secp256r1) | 48 bytes | 32 (cred_hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId) | **114+ bytes** |
+| Authority (Secp256r1) | 48 bytes | 32 (cred_hash) + 33 (pubkey) + 1 (rpIdLen) + N (rpId) | **145 bytes** |
 | SessionAccount | 80 bytes | 0 | **80 bytes** |
 | DeferredExecAccount | 176 bytes | 0 | **176 bytes** |
 
@@ -211,4 +211,4 @@ The compact data sizes are achieved through:
 cd tests-sdk && npx tsx tests/devnet-smoke.ts
 ```
 
-The devnet smoke test exercises all 9 instructions across all authority types (Ed25519, Secp256r1, Session) and roles (Owner, Admin, Spender), reporting CU consumption, TX size, and rent costs from real devnet transactions.
+The devnet smoke test exercises all 10 instructions across all authority types (Ed25519, Secp256r1, Session) and roles (Owner, Admin, Spender), reporting CU consumption, TX size, and rent costs from real devnet transactions.
