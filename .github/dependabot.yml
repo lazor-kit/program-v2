@@ -1,0 +1,42 @@
+# Dependabot config — keep noise low, group updates, monthly cadence.
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # Cargo workspace (program + assertions + no-padding)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      cargo-deps:
+        applies-to: version-updates
+        patterns: ["*"]
+      cargo-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Test harness (uses @lazorkit/sdk-legacy from npm)
+  - package-ecosystem: "npm"
+    directory: "/tests-sdk"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      tests-deps:
+        applies-to: version-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps-dev)"
+      include: "scope"
+
+  # GitHub Actions used in workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "ci(deps)"

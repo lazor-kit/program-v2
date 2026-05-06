@@ -1,0 +1,19 @@
+# Code owners for lazor-kit/program-v2
+#
+# Order matters — the LAST matching pattern wins. Use specific
+# overrides below the catch-all when you want to scope ownership.
+#
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: any change requires review from one of the maintainers
+*                       @onspeedhp @chauanhtuan185 @metasal1
+
+# Audit-sensitive paths — additional eyes on changes that affect on-chain
+# behavior or release artifacts
+/program/               @onspeedhp @chauanhtuan185 @metasal1
+/assertions/            @onspeedhp @chauanhtuan185 @metasal1
+/.github/workflows/     @onspeedhp @chauanhtuan185 @metasal1
+/audits/                @onspeedhp @chauanhtuan185 @metasal1
+/scripts/fee-paths.txt  @onspeedhp @chauanhtuan185 @metasal1
+/scripts/strip-fee.sh   @onspeedhp @chauanhtuan185 @metasal1
+/scripts/check-no-fee.sh @onspeedhp @chauanhtuan185 @metasal1
