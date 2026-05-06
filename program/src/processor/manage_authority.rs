@@ -91,6 +91,9 @@ pub fn process_add_authority(
             }
             let (credential_id_hash, rest_after_cred) = rest.split_at(32);
             let rp_id_len = rest_after_cred[33] as usize;
+            if rp_id_len == 0 || rp_id_len > 253 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
             let total_auth_data = 32 + 33 + 1 + rp_id_len;
             if rest.len() < total_auth_data {
                 return Err(ProgramError::InvalidInstructionData);
@@ -198,6 +201,12 @@ pub fn process_add_authority(
     }
 
     // Authorization
+    // Validate new_role is a known value (0=Owner, 1=Admin, 2=Spender).
+    // Without this check an Owner could create a role-255 authority that can
+    // execute but cannot be revoked by any Admin.
+    if args.new_role > 2 {
+        return Err(AuthError::PermissionDenied.into());
+    }
     if admin_header.role != 0 && (admin_header.role != 1 || args.new_role != 2) {
         return Err(AuthError::PermissionDenied.into());
     }
@@ -212,9 +221,13 @@ pub fn process_add_authority(
     }
     check_zero_data(new_auth_pda, ProgramError::AccountAlreadyInitialized)?;
 
+    // Fixed sizes per auth type (see wallet/create.rs for layout).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = full_auth_data.len();
-    let space = header_size + variable_size;
+    let space = match args.authority_type {
+        0 => header_size + 32,                // Ed25519: pubkey
+        1 => header_size + 32 + 33 + 32,      // Secp256r1: cred ∥ pubkey ∥ rpIdHash
+        _ => return Err(AuthError::InvalidAuthenticationKind.into()),
+    };
     let rent_lamports = rent.minimum_balance(space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
@@ -252,8 +265,35 @@ pub fn process_add_authority(
         *(data.as_mut_ptr() as *mut AuthorityAccountHeader) = header;
     }
 
-    let variable_target = &mut data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    // Write variable data. For Secp256r1 hash rpId once here so every Execute
+    // saves a sol_sha256 syscall.
+    match args.authority_type {
+        0 => {
+            data[header_size..header_size + 32].copy_from_slice(&full_auth_data[..32]);
+        }
+        1 => {
+            data[header_size..header_size + 32].copy_from_slice(&full_auth_data[..32]);
+            data[header_size + 32..header_size + 32 + 33]
+                .copy_from_slice(&full_auth_data[32..32 + 33]);
+            let rp_id_len = full_auth_data[32 + 33] as usize;
+            let rp_id = &full_auth_data[32 + 33 + 1..32 + 33 + 1 + rp_id_len];
+            let rp_id_hash_offset = header_size + 32 + 33;
+            #[cfg(target_os = "solana")]
+            unsafe {
+                let _ = pinocchio::syscalls::sol_sha256(
+                    [rp_id].as_ptr() as *const u8,
+                    1,
+                    data[rp_id_hash_offset..rp_id_hash_offset + 32].as_mut_ptr(),
+                );
+            }
+            #[cfg(not(target_os = "solana"))]
+            {
+                let _ = rp_id;
+                data[rp_id_hash_offset..rp_id_hash_offset + 32].fill(0);
+            }
+        }
+        _ => unreachable!(),
+    }
 
     Ok(())
 }
@@ -396,6 +436,12 @@ pub fn process_remove_authority(
         if admin_header.role != 1 || target_header.role != 2 {
             return Err(AuthError::PermissionDenied.into());
         }
+    }
+
+    // Guard: if target == refund_dest the double-write would burn lamports and
+    // trigger a Solana lamport conservation error, aborting after doing work.
+    if target_auth_pda.key() == refund_dest.key() {
+        return Err(ProgramError::InvalidAccountData);
     }
 
     let target_lamports = unsafe { *target_auth_pda.borrow_mut_lamports_unchecked() };

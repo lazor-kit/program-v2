@@ -136,6 +136,11 @@ pub fn process(
         return Err(ProgramError::InvalidAccountData);
     }
 
+    // Guard: session_pda == refund_dest would burn lamports.
+    if session_pda.key() == refund_dest.key() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     // Close the session account — zero data and drain lamports
     session_data.fill(0);
 
