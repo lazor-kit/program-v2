@@ -1,0 +1,66 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  clippy:
+    name: clippy (rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: lint-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+      # Allow-list explained:
+      # - op_ref / needless_borrow / manual_range_contains / too_many_arguments:
+      #   stylistic lints that fire in audited code byte-identical with
+      #   lazorkit-protocol. Touching them changes audited bytes and
+      #   triggers an unnecessary delta audit on cosmetic refactors.
+      # - unused_mut: same — appears in a test closure in state/action.rs.
+      # When the audit baseline rolls over, revisit and tighten this list.
+      - name: cargo clippy (devnet features)
+        run: |
+          cargo clippy --features devnet --all-targets -- \
+            -D warnings \
+            -A clippy::op_ref \
+            -A clippy::needless_borrow \
+            -A clippy::manual_range_contains \
+            -A clippy::too_many_arguments \
+            -A unused_mut
+
+  tsc:
+    name: tsc (tests-sdk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tests-sdk/package-lock.json
+
+      - name: install
+        working-directory: tests-sdk
+        run: npm ci || npm install
+
+      - name: tsc --noEmit
+        working-directory: tests-sdk
+        run: npx tsc --noEmit
