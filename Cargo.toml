@@ -9,6 +9,6 @@ solana = "3.0.4"
 [workspace.dependencies]
 pinocchio = { version = "0.9", features = ["std"] }
 pinocchio-pubkey = { version = "0.3" }
-pinocchio-system = { version = "0.3" }
+pinocchio-system = { version = "0.6" }
 no-padding = { path = "./no-padding" }
 assertions = { path = "./assertions" }
