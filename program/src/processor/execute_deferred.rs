@@ -1,5 +1,5 @@
 use crate::{
-    compact::parse_compact_instructions,
+    compact::{parse_compact_instructions_ref_with_len, CompactInstructionRef},
     error::AuthError,
     state::{deferred::DeferredExecAccount, AccountDiscriminator},
 };
@@ -99,14 +99,14 @@ pub fn process(
         return Err(AuthError::DeferredAuthorizationExpired.into());
     }
 
-    // Parse compact instructions
-    let compact_instructions = parse_compact_instructions(instruction_data)?;
+    // Parse compact instructions and track consumed length. We hash the
+    // raw instruction_data[..consumed] directly — the parse/encode format
+    // is byte-identical, so there's no need to re-serialize.
+    let (compact_instructions, compact_len) =
+        parse_compact_instructions_ref_with_len(instruction_data)?;
 
-    // Serialize compact instructions to compute hash
-    let compact_bytes = crate::compact::serialize_compact_instructions(&compact_instructions);
-
-    // Verify instructions hash
-    let instructions_hash = compute_sha256(&compact_bytes);
+    // Verify instructions hash against the exact bytes we parsed from
+    let instructions_hash = compute_sha256(&instruction_data[..compact_len]);
     if instructions_hash != deferred.instructions_hash {
         return Err(AuthError::DeferredHashMismatch.into());
     }
@@ -140,45 +140,46 @@ pub fn process(
     let close_data = unsafe { deferred_pda.borrow_mut_data_unchecked() };
     close_data.fill(0);
 
+    // Reuse Vecs across inner CPI iterations — allocated once, cleared +
+    // repushed each iteration. Same optimisation as execute::immediate.
+    const MAX_INNER_ACCOUNTS: usize = 32;
+    let mut account_metas: Vec<AccountMeta> = Vec::with_capacity(MAX_INNER_ACCOUNTS);
+    let mut cpi_accounts: Vec<Account> = Vec::with_capacity(MAX_INNER_ACCOUNTS);
+
+    let vault_bump_arr = [vault_bump];
+    let seeds = [
+        Seed::from(b"vault"),
+        Seed::from(wallet_pda.key().as_ref()),
+        Seed::from(&vault_bump_arr),
+    ];
+
     // Execute each compact instruction via CPI with vault PDA signing
     for compact_ix in &compact_instructions {
         let decompressed = compact_ix.decompress(accounts)?;
-
-        // Build AccountMeta array
-        let account_metas: Vec<AccountMeta> = decompressed
-            .accounts
-            .iter()
-            .map(|acc| AccountMeta {
-                pubkey: acc.key(),
-                is_signer: acc.is_signer() || acc.key() == vault_pda.key(),
-                is_writable: acc.is_writable(),
-            })
-            .collect();
 
         // Prevent self-reentrancy
         if decompressed.program_id.as_ref() == program_id.as_ref() {
             return Err(AuthError::SelfReentrancyNotAllowed.into());
         }
 
+        account_metas.clear();
+        cpi_accounts.clear();
+        for &acc in &decompressed.accounts {
+            account_metas.push(AccountMeta {
+                pubkey: acc.key(),
+                is_signer: acc.is_signer() || acc.key() == vault_pda.key(),
+                is_writable: acc.is_writable(),
+            });
+            cpi_accounts.push(Account::from(acc));
+        }
+
         let ix = Instruction {
             program_id: decompressed.program_id,
             accounts: &account_metas,
-            data: &decompressed.data,
+            data: decompressed.data,
         };
 
-        let vault_bump_arr = [vault_bump];
-        let seeds = [
-            Seed::from(b"vault"),
-            Seed::from(wallet_pda.key().as_ref()),
-            Seed::from(&vault_bump_arr),
-        ];
         let signer: Signer = (&seeds).into();
-
-        let cpi_accounts: Vec<Account> = decompressed
-            .accounts
-            .iter()
-            .map(|acc| Account::from(*acc))
-            .collect();
 
         unsafe {
             invoke_signed_unchecked(&ix, &cpi_accounts, &[signer]);
@@ -209,26 +210,26 @@ fn compute_sha256(data: &[u8]) -> [u8; 32] {
 }
 
 /// Compute SHA256 hash of all account pubkeys referenced by compact instructions.
-/// Same logic as execute.rs::compute_accounts_hash.
+/// Matches execute::immediate::compute_accounts_hash.
 fn compute_accounts_hash(
     accounts: &[AccountInfo],
-    compact_instructions: &[crate::compact::CompactInstruction],
+    compact_instructions: &[CompactInstructionRef<'_>],
 ) -> Result<[u8; 32], ProgramError> {
-    let mut pubkeys_data = Vec::new();
+    let mut refs: Vec<&[u8]> = Vec::with_capacity(compact_instructions.len() * 4);
 
     for ix in compact_instructions {
         let program_idx = ix.program_id_index as usize;
         if program_idx >= accounts.len() {
             return Err(ProgramError::InvalidInstructionData);
         }
-        pubkeys_data.extend_from_slice(accounts[program_idx].key().as_ref());
+        refs.push(accounts[program_idx].key().as_ref());
 
-        for &acc_idx in &ix.accounts {
+        for &acc_idx in ix.accounts {
             let idx = acc_idx as usize;
             if idx >= accounts.len() {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            pubkeys_data.extend_from_slice(accounts[idx].key().as_ref());
+            refs.push(accounts[idx].key().as_ref());
         }
     }
 
@@ -237,15 +238,15 @@ fn compute_accounts_hash(
     #[cfg(target_os = "solana")]
     unsafe {
         pinocchio::syscalls::sol_sha256(
-            [pubkeys_data.as_slice()].as_ptr() as *const u8,
-            1,
+            refs.as_ptr() as *const u8,
+            refs.len() as u64,
             hash.as_mut_ptr(),
         );
     }
     #[cfg(not(target_os = "solana"))]
     {
         hash = [0xAA; 32];
-        let _ = pubkeys_data;
+        let _ = refs;
     }
 
     Ok(hash)

@@ -19,7 +19,7 @@ If you discover a security vulnerability in LazorKit, please report it responsib
 The following are in scope:
 
 - On-chain Solana program (`program/src/`)
-- TypeScript SDK (`sdk/solita-client/`)
+- TypeScript SDK (`@lazorkit/sdk-legacy`, lives in sibling `lazorkit-protocol` repo)
 - PDA derivation and signature verification logic
 - Replay protection mechanisms
 
@@ -31,7 +31,7 @@ The following are out of scope:
 
 ## Audit Status
 
-LazorKit V2 has been audited by Accretion (Solana Foundation funded).
+LazorKit V2 has been audited by Accretion.
 
 **Status**: 17/17 security issues resolved
 

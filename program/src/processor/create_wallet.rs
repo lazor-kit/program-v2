@@ -79,10 +79,13 @@ pub fn process(
 
     let (id_seed, full_auth_data) = match args.authority_type {
         0 => {
-            if rest.len() != 32 {
+            // Use minimum-length check (consistent with AddAuthority / TransferOwnership).
+            // Exact-length check would reject clients that append trailing context bytes.
+            if rest.len() < 32 {
                 return Err(ProgramError::InvalidInstructionData);
             }
-            (rest, rest)
+            let (pubkey, _) = rest.split_at(32);
+            (pubkey, pubkey)
         },
         1 => {
             // [credential_id_hash(32)] [pubkey(33)] [rpIdLen(1)] [rpId(N)]
@@ -91,6 +94,12 @@ pub fn process(
             }
             let (credential_id_hash, rest_after_cred) = rest.split_at(32);
             let rp_id_len = rest_after_cred[33] as usize;
+            // Enforce a sane upper bound: max valid domain name is 253 chars.
+            // Without this an attacker-controlled payer could create a 369-byte
+            // authority account with 255 bytes of arbitrary rpId data.
+            if rp_id_len == 0 || rp_id_len > 253 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
             let total_auth_data = 32 + 33 + 1 + rp_id_len;
             if rest.len() < total_auth_data {
                 return Err(ProgramError::InvalidInstructionData);
@@ -188,11 +197,18 @@ pub fn process(
     }
 
     // --- 2. Initialize Authority Account ---
-    // Authority accounts have a variable size depending on the authority type (e.g., Secp256r1 keys are larger).
+    // Fixed sizes per auth type:
+    //   Ed25519   = header(48) + pubkey(32) = 80 bytes
+    //   Secp256r1 = header(48) + cred_hash(32) + pubkey(33) + rpIdHash(32) = 145 bytes
+    //
+    // For Secp256r1 we hash rpId once at creation and store the digest, so
+    // every subsequent Execute saves one sol_sha256 syscall.
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = full_auth_data.len();
-
-    let auth_space = header_size + variable_size;
+    let auth_space = match args.authority_type {
+        0 => header_size + 32,              // Ed25519
+        1 => header_size + 32 + 33 + 32,    // Secp256r1 fixed
+        _ => return Err(AuthError::InvalidAuthenticationKind.into()),
+    };
     let auth_rent = rent.minimum_balance(auth_space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
@@ -228,18 +244,50 @@ pub fn process(
         wallet: *wallet_pda.key(),
     };
 
-    // safe write
+    // safe write of header
     let header_bytes = unsafe {
         std::slice::from_raw_parts(
             &header as *const AuthorityAccountHeader as *const u8,
-            std::mem::size_of::<AuthorityAccountHeader>(),
+            header_size,
         )
     };
-    auth_account_data[0..std::mem::size_of::<AuthorityAccountHeader>()]
-        .copy_from_slice(header_bytes);
+    auth_account_data[0..header_size].copy_from_slice(header_bytes);
 
-    let variable_target = &mut auth_account_data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    // Write variable data
+    match args.authority_type {
+        0 => {
+            // Ed25519: pubkey(32) — full_auth_data is exactly 32 bytes
+            auth_account_data[header_size..header_size + 32]
+                .copy_from_slice(&full_auth_data[..32]);
+        }
+        1 => {
+            // Secp256r1: cred_hash(32) ∥ pubkey(33) ∥ rpIdHash(32).
+            // full_auth_data layout as parsed above:
+            //   [cred_hash(32)] [pubkey(33)] [rpIdLen(1)] [rpId(N)]
+            auth_account_data[header_size..header_size + 32]
+                .copy_from_slice(&full_auth_data[..32]);
+            auth_account_data[header_size + 32..header_size + 32 + 33]
+                .copy_from_slice(&full_auth_data[32..32 + 33]);
+            // Compute rpIdHash from rpId
+            let rp_id_len = full_auth_data[32 + 33] as usize;
+            let rp_id = &full_auth_data[32 + 33 + 1..32 + 33 + 1 + rp_id_len];
+            let rp_id_hash_offset = header_size + 32 + 33;
+            #[cfg(target_os = "solana")]
+            unsafe {
+                let _ = pinocchio::syscalls::sol_sha256(
+                    [rp_id].as_ptr() as *const u8,
+                    1,
+                    auth_account_data[rp_id_hash_offset..rp_id_hash_offset + 32].as_mut_ptr(),
+                );
+            }
+            #[cfg(not(target_os = "solana"))]
+            {
+                let _ = rp_id;
+                auth_account_data[rp_id_hash_offset..rp_id_hash_offset + 32].fill(0);
+            }
+        }
+        _ => unreachable!(),
+    }
 
     Ok(())
 }

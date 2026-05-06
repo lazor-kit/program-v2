@@ -27,14 +27,16 @@ use crate::{
 /// 2. **Authorization**: strictly enforced to only work if `current_owner` has `Role::Owner` (0).
 /// 3. **Atomic Swap**:
 ///    - Creates the `new_owner` account.
-///    - Closes the `current_owner` account and refunds rent to payer.
+///    - Closes the `current_owner` account and refunds rent to `refund_dest`.
 ///
 /// # Accounts:
 /// 1. `[signer, writable]` Payer.
 /// 2. `[]` Wallet PDA.
 /// 3. `[signer, writable]` Current Owner Authority.
 /// 4. `[writable]` New Owner Authority.
-/// 5. `[]` System Program.
+/// 5. `[writable]` Refund Destination (receives closed current_owner rent).
+/// 6. `[]` System Program.
+/// 7. `[]` Rent Sysvar.
 ///
 /// Arguments for the `TransferOwnership` instruction.
 ///
@@ -80,6 +82,9 @@ pub fn process(
             }
             let (hash, rest_after_hash) = rest.split_at(32);
             let rp_id_len = rest_after_hash[33] as usize;
+            if rp_id_len == 0 || rp_id_len > 253 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
             let total_auth_data = 32 + 33 + 1 + rp_id_len;
             if rest.len() < total_auth_data {
                 return Err(ProgramError::InvalidInstructionData);
@@ -115,6 +120,9 @@ pub fn process(
     let new_owner = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let refund_dest = account_info_iter
+        .next()
+        .ok_or(ProgramError::NotEnoughAccountKeys)?;
     let system_program = account_info_iter
         .next()
         .ok_or(ProgramError::NotEnoughAccountKeys)?;
@@ -125,6 +133,11 @@ pub fn process(
 
     if wallet_pda.owner() != program_id || current_owner.owner() != program_id {
         return Err(ProgramError::IllegalOwner);
+    }
+
+    // Guard: closing current_owner to itself would burn lamports.
+    if current_owner.key() == refund_dest.key() {
+        return Err(ProgramError::InvalidAccountData);
     }
     // Validate Wallet Discriminator (Issue #7)
     let wallet_data = unsafe { wallet_pda.borrow_data_unchecked() };
@@ -155,15 +168,16 @@ pub fn process(
             return Err(AuthError::PermissionDenied.into());
         }
 
-        // Authenticate Current Owner
-        // Issue: Include payer + new_owner to prevent rent theft via payer swap
-        let mut ed25519_payload = Vec::with_capacity(64);
+        // Authenticate Current Owner.
+        // Sign over payer + new_owner + refund_dest to prevent substitution attacks.
+        let mut ed25519_payload = Vec::with_capacity(96);
         ed25519_payload.extend_from_slice(payer.key().as_ref());
         ed25519_payload.extend_from_slice(new_owner.key().as_ref());
+        ed25519_payload.extend_from_slice(refund_dest.key().as_ref());
 
         match auth.authority_type {
             0 => {
-                // Ed25519: Include payer + new_owner in signed payload
+                // Ed25519: sign over payer + new_owner + refund_dest
                 Ed25519Authenticator.authenticate(accounts, data, &[], &ed25519_payload, &[3], program_id)?;
             },
             1 => {
@@ -171,10 +185,11 @@ pub fn process(
                 if !current_owner.is_writable() {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                // Secp256r1: Include payer in signed payload to prevent rent theft
-                let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 32);
+                // Sign over data_payload + payer + refund_dest
+                let mut extended_data_payload = Vec::with_capacity(data_payload.len() + 64);
                 extended_data_payload.extend_from_slice(data_payload);
                 extended_data_payload.extend_from_slice(payer.key().as_ref());
+                extended_data_payload.extend_from_slice(refund_dest.key().as_ref());
 
                 Secp256r1Authenticator.authenticate(
                     accounts,
@@ -198,9 +213,13 @@ pub fn process(
     }
     check_zero_data(new_owner, ProgramError::AccountAlreadyInitialized)?;
 
+    // Fixed sizes per auth type (see wallet/create.rs for layout).
     let header_size = std::mem::size_of::<AuthorityAccountHeader>();
-    let variable_size = full_auth_data.len();
-    let space = header_size + variable_size;
+    let space = match args.auth_type {
+        0 => header_size + 32,                // Ed25519: pubkey
+        1 => header_size + 32 + 33 + 32,      // Secp256r1: cred ∥ pubkey ∥ rpIdHash
+        _ => return Err(AuthError::InvalidAuthenticationKind.into()),
+    };
     let rent = rent_obj.minimum_balance(space);
 
     // Use secure transfer-allocate-assign pattern to prevent DoS (Issue #4)
@@ -241,13 +260,40 @@ pub fn process(
         std::ptr::write_unaligned(data.as_mut_ptr() as *mut AuthorityAccountHeader, header);
     }
 
-    let variable_target = &mut data[header_size..];
-    variable_target.copy_from_slice(full_auth_data);
+    // Write variable data. For Secp256r1 hash rpId once here so every Execute
+    // saves a sol_sha256 syscall.
+    match args.auth_type {
+        0 => {
+            data[header_size..header_size + 32].copy_from_slice(&full_auth_data[..32]);
+        }
+        1 => {
+            data[header_size..header_size + 32].copy_from_slice(&full_auth_data[..32]);
+            data[header_size + 32..header_size + 32 + 33]
+                .copy_from_slice(&full_auth_data[32..32 + 33]);
+            let rp_id_len = full_auth_data[32 + 33] as usize;
+            let rp_id = &full_auth_data[32 + 33 + 1..32 + 33 + 1 + rp_id_len];
+            let rp_id_hash_offset = header_size + 32 + 33;
+            #[cfg(target_os = "solana")]
+            unsafe {
+                let _ = pinocchio::syscalls::sol_sha256(
+                    [rp_id].as_ptr() as *const u8,
+                    1,
+                    data[rp_id_hash_offset..rp_id_hash_offset + 32].as_mut_ptr(),
+                );
+            }
+            #[cfg(not(target_os = "solana"))]
+            {
+                let _ = rp_id;
+                data[rp_id_hash_offset..rp_id_hash_offset + 32].fill(0);
+            }
+        }
+        _ => unreachable!(),
+    }
 
     let current_lamports = unsafe { *current_owner.borrow_mut_lamports_unchecked() };
-    let payer_lamports = unsafe { *payer.borrow_mut_lamports_unchecked() };
+    let refund_lamports = unsafe { *refund_dest.borrow_mut_lamports_unchecked() };
     unsafe {
-        *payer.borrow_mut_lamports_unchecked() = payer_lamports
+        *refund_dest.borrow_mut_lamports_unchecked() = refund_lamports
             .checked_add(current_lamports)
             .ok_or(ProgramError::ArithmeticOverflow)?;
         *current_owner.borrow_mut_lamports_unchecked() = 0;

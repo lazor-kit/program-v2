@@ -11,6 +11,7 @@ import {
   sendTx,
   sendTxExpectError,
   getSlot,
+  PROGRAM_ID,
   type TestContext,
 } from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
@@ -30,8 +31,7 @@ import {
   buildSecp256r1Challenge,
   AUTH_TYPE_SECP256R1,
   DISC_AUTHORIZE,
-  PROGRAM_ID,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Deferred Execution', () => {
   let ctx: TestContext;
@@ -50,12 +50,13 @@ describe('Deferred Execution', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      [walletPda] = findWalletPda(userSeed);
-      [vaultPda] = findVaultPda(walletPda);
+      [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+      [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
       const [authPda, authBump] = findAuthorityPda(
         walletPda,
         ownerKey.credentialIdHash,
-      );
+      PROGRAM_ID,
+    );
       ownerAuthorityPda = authPda;
 
       await sendTx(ctx, [
@@ -70,6 +71,7 @@ describe('Deferred Execution', () => {
           credentialOrPubkey: ownerKey.credentialIdHash,
           secp256r1Pubkey: ownerKey.publicKeyBytes,
           rpId: ownerKey.rpId,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -114,8 +116,10 @@ describe('Deferred Execution', () => {
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
 
-      // Build signed_payload = instructions_hash || accounts_hash
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      // Build signed_payload = instructions_hash || accounts_hash || expiry_offset (u16 LE)
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(300);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       // Sign with Secp256r1
       const { authPayload, precompileIx } = await signSecp256r1({
@@ -133,7 +137,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         1,
-      );
+      PROGRAM_ID,
+    );
 
       // === TX1: Authorize ===
       const authorizeIx = createAuthorizeIx({
@@ -145,6 +150,7 @@ describe('Deferred Execution', () => {
         accountsHash,
         expiryOffset: 300,
         authPayload,
+      programId: PROGRAM_ID,
       });
 
       await sendTx(ctx, [precompileIx, authorizeIx]);
@@ -173,6 +179,7 @@ describe('Deferred Execution', () => {
           },
           { pubkey: recipient, isSigner: false, isWritable: true },
         ],
+      programId: PROGRAM_ID,
       });
 
       const balanceBefore = await ctx.connection.getBalance(recipient);
@@ -235,7 +242,9 @@ describe('Deferred Execution', () => {
         { pubkey: recipient3, isSigner: false, isWritable: true },
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(300);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       // Counter is now 2 (after first test incremented to 1)
       const { authPayload, precompileIx } = await signSecp256r1({
@@ -252,7 +261,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         2,
-      );
+      PROGRAM_ID,
+    );
 
       // TX1: Authorize
       await sendTx(ctx, [
@@ -266,6 +276,7 @@ describe('Deferred Execution', () => {
           accountsHash,
           expiryOffset: 300,
           authPayload,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -289,6 +300,7 @@ describe('Deferred Execution', () => {
             { pubkey: recipient2, isSigner: false, isWritable: true },
             { pubkey: recipient3, isSigner: false, isWritable: true },
           ],
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -312,12 +324,13 @@ describe('Deferred Execution', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      [walletPda] = findWalletPda(userSeed);
-      [vaultPda] = findVaultPda(walletPda);
+      [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+      [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
       const [authPda, authBump] = findAuthorityPda(
         walletPda,
         ownerKey.credentialIdHash,
-      );
+      PROGRAM_ID,
+    );
       ownerAuthorityPda = authPda;
 
       await sendTx(ctx, [
@@ -332,6 +345,7 @@ describe('Deferred Execution', () => {
           credentialOrPubkey: ownerKey.credentialIdHash,
           secp256r1Pubkey: ownerKey.publicKeyBytes,
           rpId: ownerKey.rpId,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -370,7 +384,9 @@ describe('Deferred Execution', () => {
         { pubkey: recipient, isSigner: false, isWritable: true },
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(300);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       const { authPayload, precompileIx } = await signSecp256r1({
         key: ownerKey,
@@ -386,7 +402,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         1,
-      );
+      PROGRAM_ID,
+    );
 
       // TX1: Authorize
       await sendTx(ctx, [
@@ -400,6 +417,7 @@ describe('Deferred Execution', () => {
           accountsHash,
           expiryOffset: 300,
           authPayload,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -435,6 +453,7 @@ describe('Deferred Execution', () => {
               },
               { pubkey: recipient, isSigner: false, isWritable: true },
             ],
+      programId: PROGRAM_ID,
           }),
         ],
         [],
@@ -459,6 +478,7 @@ describe('Deferred Execution', () => {
             },
             { pubkey: recipient, isSigner: false, isWritable: true },
           ],
+      programId: PROGRAM_ID,
         }),
       ]);
     });
@@ -490,7 +510,9 @@ describe('Deferred Execution', () => {
         { pubkey: recipient, isSigner: false, isWritable: true },
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(300);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       const { authPayload, precompileIx } = await signSecp256r1({
         key: ownerKey,
@@ -506,7 +528,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         2,
-      );
+      PROGRAM_ID,
+    );
 
       // TX1: Authorize
       await sendTx(ctx, [
@@ -520,6 +543,7 @@ describe('Deferred Execution', () => {
           accountsHash,
           expiryOffset: 300,
           authPayload,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -540,6 +564,7 @@ describe('Deferred Execution', () => {
           },
           { pubkey: recipient, isSigner: false, isWritable: true },
         ],
+      programId: PROGRAM_ID,
       });
 
       await sendTx(ctx, [executeDeferredIx]);
@@ -561,6 +586,7 @@ describe('Deferred Execution', () => {
             },
             { pubkey: recipient, isSigner: false, isWritable: true },
           ],
+      programId: PROGRAM_ID,
         }),
       ]);
     });
@@ -592,7 +618,9 @@ describe('Deferred Execution', () => {
         { pubkey: recipient, isSigner: false, isWritable: true },
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(9000);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       const { authPayload, precompileIx } = await signSecp256r1({
         key: ownerKey,
@@ -608,7 +636,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         3,
-      );
+      PROGRAM_ID,
+    );
 
       // TX1: Authorize with max expiry
       await sendTx(ctx, [
@@ -622,6 +651,7 @@ describe('Deferred Execution', () => {
           accountsHash,
           expiryOffset: 9000, // ~1 hour
           authPayload,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -633,6 +663,7 @@ describe('Deferred Execution', () => {
             payer: ctx.payer.publicKey,
             deferredExecPda,
             refundDestination: ctx.payer.publicKey,
+      programId: PROGRAM_ID,
           }),
         ],
         [],
@@ -657,6 +688,7 @@ describe('Deferred Execution', () => {
             },
             { pubkey: recipient, isSigner: false, isWritable: true },
           ],
+      programId: PROGRAM_ID,
         }),
       ]);
     });
@@ -688,7 +720,9 @@ describe('Deferred Execution', () => {
         { pubkey: recipient, isSigner: false, isWritable: true },
       ];
       const accountsHash = computeAccountsHash(tx2AccountMetas, compactIxs);
-      const signedPayload = Buffer.concat([instructionsHash, accountsHash]);
+      const expiryBuf = Buffer.alloc(2);
+      expiryBuf.writeUInt16LE(10);
+      const signedPayload = Buffer.concat([instructionsHash, accountsHash, expiryBuf]);
 
       const { authPayload, precompileIx } = await signSecp256r1({
         key: ownerKey,
@@ -704,7 +738,8 @@ describe('Deferred Execution', () => {
         walletPda,
         ownerAuthorityPda,
         4,
-      );
+      PROGRAM_ID,
+    );
 
       // TX1: Authorize with short expiry
       await sendTx(ctx, [
@@ -718,6 +753,7 @@ describe('Deferred Execution', () => {
           accountsHash,
           expiryOffset: 10, // minimum expiry
           authPayload,
+      programId: PROGRAM_ID,
         }),
       ]);
 
@@ -742,6 +778,7 @@ describe('Deferred Execution', () => {
             payer: wrongPayer.publicKey,
             deferredExecPda,
             refundDestination: wrongPayer.publicKey,
+      programId: PROGRAM_ID,
           }),
         ],
         [wrongPayer],
@@ -769,6 +806,7 @@ describe('Deferred Execution', () => {
               },
               { pubkey: recipient, isSigner: false, isWritable: true },
             ],
+      programId: PROGRAM_ID,
           }),
         ]);
       } catch {
@@ -778,6 +816,7 @@ describe('Deferred Execution', () => {
             payer: ctx.payer.publicKey,
             deferredExecPda,
             refundDestination: ctx.payer.publicKey,
+      programId: PROGRAM_ID,
           }),
         ]);
       }

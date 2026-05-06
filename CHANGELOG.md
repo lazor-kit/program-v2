@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- End-to-end vitest tests for session-action enforcement (`tests-sdk/tests/12-actions.test.ts`, 9 cases): `programWhitelist` allow + reject (3021), `programBlacklist` allow + reject (3022), `solMaxPerTx` allow at-cap + reject over-cap (3023), `solLimit` lifetime budget exhaustion (3024), and combined-rules enforcement. Runs against a live `solana-test-validator` with the foundation binary loaded and uses `@lazorkit/sdk-legacy`'s `Actions` builder to dogfood the full encode → on-chain enforce path.
+- `docs/audit/` artifacts for an Accretion delta-audit follow-up: `DELTA_BRIEF.md` summarises the changes from the previous audited baseline by phase with explicit audit asks; `program-src.diff` is the full unified diff of `program/`; `program-src.diff.stat` is a per-file changed-line summary; `upstream-parity.txt` reports byte-identity vs the already-audited `lazorkit-protocol` per file (13/19 changed files identical).
+- Local git tags `audit-baseline-2026-02-accretion` (previous Accretion-audited state, commit `d1eaaeb`) and `audit-pending-v1` (the current consolidated state ready for delta review).
 - Session action permissions: 8 immutable permission rules attachable at session creation — `SolLimit`, `SolRecurringLimit`, `SolMaxPerTx`, `TokenLimit`, `TokenRecurringLimit`, `TokenMaxPerTx`, `ProgramWhitelist`, `ProgramBlacklist`. Action discriminators (1, 2, 3, 4, 5, 6, 10, 11) and the 11-byte header layout match `lazorkit-protocol` so the unified SDK can encode actions identically for both builds.
 - `SessionAccount` is now variable-size: a session can carry a trailing action buffer (max 16 actions, ≤ 2048 bytes) validated at creation time.
 - `CreateSession` instruction data accepts the new `[actions_len: u16][actions: N]` extension after the legacy 40-byte args; old 40-byte clients continue to work via the legacy parser branch.
@@ -52,7 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Odometer counter replay protection for Secp256r1 (monotonic u32 per authority)
 - program_id included in challenge hash (cross-program replay prevention)
 - rpId stored on authority account at creation (saves ~14 bytes per transaction)
-- TypeScript SDK (`sdk/solita-client`) with Solita code generation
+- TypeScript SDK: standardised on `@lazorkit/sdk-legacy` (lives in sibling `lazorkit-protocol` repo); the in-tree `sdk/solita-client` has been removed
 - Integration + security test suite (`tests-sdk/`) with 56 tests across 11 files
 - Benchmark script for CU and transaction size measurements
 - CompactInstructions accounts hash for anti-reordering protection
@@ -67,6 +70,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Secp256r1 auth payload format: replaces the older `typeAndFlags` byte at `auth_payload[13]` with full raw `clientDataJSON` embedded in the payload. The on-chain auth verifier now parses the JSON directly rather than reconstructing it from `typeAndFlags + rpId`. Aligns with `lazorkit-protocol` byte-for-byte and is required for binary-swap compatibility at the shared mainnet slot.
+- Secp256r1 authority on-chain layout: replaces the previously stored variable-length raw `rpId` with a precomputed 32-byte `rpIdHash` (SHA-256 digest computed at registration). New layout: `header(48) + cred_hash(32) + pubkey(33) + rpIdHash(32) = 145 bytes`. Saves one `sol_sha256` syscall per `Execute`. Existing wallets created on the upstream commercial binary remain readable after binary swap.
+- Shank IDL declarations on the `ProgramIx` enum (account metadata: `writable` modifiers, account positions, descriptions) resynced with `lazorkit-protocol`. Five fee-related variants (disc 10–14: `InitializeProtocol`, `UpdateProtocol`, `RegisterPayer`, `WithdrawTreasury`, `InitializeTreasuryShard`) stripped — `program-v2` keeps disc 0–9 only. Runtime not affected (`@lazorkit/sdk-legacy` uses hand-written builders rather than the generated IDL).
 - SDK API: unified all methods via discriminated unions (breaking: removed `createWalletEd25519`, `createWalletSecp256r1`, `addAuthoritySecp256r1`, `removeAuthoritySecp256r1`, `executeEd25519`, `executeSecp256r1`, `executeSession`, `createSessionSecp256r1`, `transferOwnershipSecp256r1`, `authorizeSecp256r1`)
 - SDK API: all methods now return `{ instructions: TransactionInstruction[]; ...extraPdas }` consistently
 - SDK API: `createSession` now takes `sessionKey: PublicKey` instead of `Uint8Array`
@@ -87,6 +93,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `tests-sdk` integration tests now pass `PROGRAM_ID` explicitly to the `LazorKitClient` constructor. `@lazorkit/sdk-legacy`'s URL-based program-ID inference defaulted localhost to the commercial devnet ID (`4h3X…`); against a local validator loading the foundation binary at the keypair's pubkey this caused all txs to fail with "Attempt to load a program that does not exist". `tests/common.ts` now resolves `PROGRAM_ID` from (1) `PROGRAM_ID` env override, (2) the keypair file at `target/deploy/lazorkit_program-keypair.json`, or (3) the foundation devnet fallback `FLb7…`.
+- `tests-sdk/tests/08-deferred.test.ts` builds the `Authorize` `signed_payload` as `instructions_hash || accounts_hash || expiry_offset (u16 LE)` to match what the on-chain verifier hashes. The test code was missing the 2-byte expiry buffer at all 6 sign sites, causing all 7 deferred tests to fail with `InvalidMessageHash` (3005). After the fix, all 65 vitest E2E tests pass against a live validator.
 - Authorize signed payload now includes `expiry_offset` (66 bytes total), preventing relayers from modifying the expiry window
 - `sol_assert_bytes_eq` now uses the `len` parameter instead of `left.len()` (latent OOB read on-chain)
 - `reclaim_deferred` uses `checked_add` for lamports (consistent with `execute_deferred` and `manage_authority`)

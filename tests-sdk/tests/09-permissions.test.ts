@@ -13,6 +13,7 @@ import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import * as crypto from 'crypto';
 import {
   setupTest,
+  PROGRAM_ID,
   sendTx,
   sendTxExpectError,
   getSlot,
@@ -26,7 +27,7 @@ import {
   ROLE_SPENDER,
   ed25519,
   secp256r1,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Permission Boundaries', () => {
   let ctx: TestContext;
@@ -44,13 +45,13 @@ describe('Permission Boundaries', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
 
     // Create wallet with Ed25519 owner
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const walletResult = client.createWallet({
+    const walletResult = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
@@ -220,7 +221,7 @@ describe('Permission Boundaries', () => {
       secpOwnerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: {

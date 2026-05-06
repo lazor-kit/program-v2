@@ -99,10 +99,7 @@ program/src/           Rust smart contract (pinocchio, zero-copy)
   auth/                Ed25519 + Secp256r1/WebAuthn authentication
   processor/           9 instruction handlers
   state/               Account data structures (NoPadding)
-sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
-  src/generated/       Auto-generated instructions, accounts, errors
-  src/utils/           Instruction builders, PDA helpers, signing utils
-tests-sdk/             Integration tests (vitest, 56 tests)
+tests-sdk/             Integration tests (vitest, 56 tests, uses @lazorkit/sdk-legacy)
 docs/                  Architecture, cost analysis
 audits/                Audit reports
 ```
@@ -120,14 +117,14 @@ cargo build-sbf
 ### Install SDK
 
 ```bash
-npm install @lazorkit/solita-client
+npm install @lazorkit/sdk-legacy
 ```
 
 ### Create a Wallet
 
 ```typescript
 import { Connection } from '@solana/web3.js';
-import { LazorKitClient } from '@lazorkit/solita-client';
+import { LazorKitClient } from '@lazorkit/sdk-legacy';
 import * as crypto from 'crypto';
 
 const connection = new Connection('https://api.devnet.solana.com');
@@ -148,7 +145,7 @@ const { instructions, walletPda, vaultPda } = client.createWallet({
 ### Transfer SOL
 
 ```typescript
-import { secp256r1 } from '@lazorkit/solita-client';
+import { secp256r1 } from '@lazorkit/sdk-legacy';
 
 // Just payer, wallet, signer, recipient, amount -- nothing else
 const { instructions } = await client.transferSol({
@@ -174,7 +171,7 @@ const { instructions } = await client.execute({
 });
 ```
 
-See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API reference.
+See the [@lazorkit/sdk-legacy README](https://github.com/lazor-kit/lazorkit-protocol/tree/main/sdk/sdk-legacy) for full API reference. The same SDK transparently handles both this build (program-v2, no fees) and the commercial build (lazorkit-protocol, with fees) — it probes ProtocolConfig on first use and conditionally appends fee accounts.
 
 ---
 
@@ -199,7 +196,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 
 ## Security
 
-LazorKit V2 has been audited by **Accretion** (Solana Foundation funded).
+LazorKit V2 has been audited by **Accretion**.
 
 **Status**: 17/17 security issues resolved
 
@@ -222,7 +219,7 @@ Report vulnerabilities via [SECURITY.md](SECURITY.md).
 |---|---|
 | [Architecture](docs/Architecture.md) | Account structures, security mechanisms, instruction reference |
 | [Costs](docs/Costs.md) | CU benchmarks, rent costs, transaction size analysis |
-| [SDK API](sdk/solita-client/README.md) | TypeScript SDK reference |
+| [@lazorkit/sdk-legacy](https://github.com/lazor-kit/lazorkit-protocol/tree/main/sdk/sdk-legacy) | TypeScript SDK reference |
 | [Development](DEVELOPMENT.md) | Build, test, deploy workflow |
 | [Contributing](CONTRIBUTING.md) | How to contribute |
 | [Security](SECURITY.md) | Vulnerability reporting |

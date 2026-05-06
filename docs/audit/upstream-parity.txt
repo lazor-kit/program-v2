@@ -1,0 +1,26 @@
+Generating byte-identity report vs upstream lazorkit-protocol...
+
+For each file changed in program-v2 between audit-baseline-2026-02-accretion
+and audit-pending-v1, indicate whether the post-state is byte-identical to
+the equivalent file in lazorkit-protocol (which Accretion has audited as the
+shared upstream). Identical → audit can defer to existing review.
+
+  ✓ identical: program/src/auth/secp256r1/mod.rs
+  ✓ identical: program/src/auth/secp256r1/webauthn.rs
+  ✓ identical: program/src/auth/secp256r1/introspection.rs
+  ✓ identical: program/src/compact.rs
+  ⚠ differs (14 diff lines): program/src/lib.rs vs program/src/lib.rs
+  ⚠ differs (23 diff lines): program/src/error.rs vs program/src/error.rs
+  ⚠ differs (68 diff lines): program/src/instruction.rs vs program/src/instruction.rs
+  ✓ identical: program/src/state/action.rs
+  ✓ identical: program/src/state/session.rs
+  ⚠ differs (12 diff lines): program/src/state/mod.rs vs program/src/state/mod.rs
+  ⚠ differs (26 diff lines): program/src/processor/mod.rs vs program/src/processor/mod.rs
+  ✓ identical: program/src/processor/create_session.rs
+  ✓ identical: program/src/processor/create_wallet.rs
+  ⚠ differs (4 diff lines): program/src/processor/execute.rs vs program/src/processor/execute/immediate.rs
+  ✓ identical: program/src/processor/execute_actions.rs
+  ✓ identical: program/src/processor/execute_deferred.rs
+  ✓ identical: program/src/processor/manage_authority.rs
+  ✓ identical: program/src/processor/revoke_session.rs
+  ✓ identical: program/src/processor/transfer_ownership.rs

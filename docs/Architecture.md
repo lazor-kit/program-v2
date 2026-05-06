@@ -335,18 +335,10 @@ program/
     utils.rs                  PDA initialization, stack_height check
     error.rs                  AuthError enum (3001-3018)
     entrypoint.rs             Instruction routing
-sdk/solita-client/
-  src/
-    generated/                Solita-generated instructions, accounts, errors
-    utils/
-      instructions.ts         Low-level instruction builders
-      client.ts               LazorKitClient high-level API (unified)
-      types.ts                Discriminated union signer types + helper constructors
-      signing.ts              Secp256r1 signing utilities
-      compact.ts              CompactInstruction layout builder
-      pdas.ts                 PDA derivation helpers
-      secp256r1.ts            Challenge hash + auth payload builders
-      packing.ts              CompactInstruction packing
-      errors.ts               Error code mapping
 tests-sdk/                    Integration + security tests (vitest, 56 tests)
 ```
+
+The TypeScript SDK lives outside this repo: `@lazorkit/sdk-legacy` (in
+sibling `lazorkit-protocol` repo at `sdk/sdk-legacy/`). Same SDK works
+against this build (foundation, no fee) and the commercial build —
+probes ProtocolConfig at runtime and conditionally appends fee accounts.
