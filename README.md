@@ -1,8 +1,15 @@
 # LazorKit Smart Wallet (V2)
 
-A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256r1) authentication, role-based access control, session keys, and replay-safe odometer counters. Built with [pinocchio](https://github.com/febo/pinocchio) for zero-copy serialization.
+A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256r1) authentication, role-based access control, session keys with action permissions, and replay-safe odometer counters. Built with [pinocchio](https://github.com/febo/pinocchio) for zero-copy serialization.
 
-**Program ID**: `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
+**Program IDs** (chosen at compile time via `--features mainnet` / `--features devnet`):
+
+| Cluster | Program ID |
+|---|---|
+| Mainnet | `LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi` |
+| Devnet  | `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao` |
+
+The mainnet slot is shared with [`lazorkit-protocol`](https://github.com/lazor-kit/lazorkit-protocol) (the commercial sibling build with protocol fees). dApp integrators use the same mainnet program ID for both — `@lazorkit/sdk-legacy` probes the on-chain `ProtocolConfig` PDA on first use and transparently appends fee accounts only when present. See [DEVELOPMENT.md → Mainnet Deploy Strategy](DEVELOPMENT.md#h-mainnet-deploy-strategy-foundation-build).
 
 ---
 
@@ -10,7 +17,7 @@ A high-performance smart wallet program on Solana with passkey (WebAuthn/Secp256
 
 - **Multi-Protocol Authentication**: Ed25519 (native Solana) + Secp256r1 (WebAuthn/Passkeys/Apple Secure Enclave)
 - **Role-Based Access Control**: Owner / Admin / Spender with strict permission hierarchy
-- **Ephemeral Session Keys**: Time-bound keys with absolute slot-based expiry (max 30 days), revocable by Owner/Admin
+- **Ephemeral Session Keys with Action Permissions**: Time-bound keys with absolute slot-based expiry (max 30 days), revocable by Owner/Admin. Each session can carry up to 16 immutable permission rules — SOL/token spending caps (lifetime, recurring window, per-tx), per-mint caps, and program whitelists/blacklists for CPI targets. Enforced atomically around each `Execute` with vault-invariant defenses against `System::Assign` / `SetAuthority` / `Approve` escapes.
 - **Odometer Replay Protection**: Monotonic u32 counter per authority — works reliably with synced passkeys (iCloud, Google)
 - **Clock-Based Slot Freshness**: 150-slot window via `Clock::get()` — no SlotHashes sysvar needed
 - **Zero-Copy Serialization**: Raw byte casting via pinocchio, no Borsh overhead
@@ -56,8 +63,9 @@ See [docs/Costs.md](docs/Costs.md) for full cost analysis, session key costs, an
 |---|---|---|
 | Wallet PDA | 8 bytes | 0.000947 |
 | Authority (Ed25519) | 80 bytes | 0.001448 |
-| Authority (Secp256r1) | ~125 bytes | 0.001761 |
-| Session | 80 bytes | 0.001448 |
+| Authority (Secp256r1) | 145 bytes | 0.001893 |
+| Session (no actions) | 80 bytes | 0.001448 |
+| Session (with actions, e.g. 3 rules) | up to 192 bytes | up to 0.002227 |
 | DeferredExec | 176 bytes | 0.002116 (temporary, refunded) |
 
 ### Total Wallet Creation
@@ -97,13 +105,11 @@ See [docs/Architecture.md](docs/Architecture.md) for struct definitions, securit
 ```
 program/src/           Rust smart contract (pinocchio, zero-copy)
   auth/                Ed25519 + Secp256r1/WebAuthn authentication
-  processor/           9 instruction handlers
+  processor/           10 instruction handlers (disc 0–9) + execute_actions enforcement engine
   state/               Account data structures (NoPadding)
-sdk/solita-client/     TypeScript SDK (Solita-generated + hand-written utils)
-  src/generated/       Auto-generated instructions, accounts, errors
-  src/utils/           Instruction builders, PDA helpers, signing utils
-tests-sdk/             Integration tests (vitest, 56 tests)
-docs/                  Architecture, cost analysis
+tests-sdk/             Integration tests (vitest, 65 tests, uses @lazorkit/sdk-legacy)
+scripts/               Build helpers + cherry-pick guardrails (strip-fee.sh, check-no-fee.sh)
+docs/                  Architecture, cost analysis, audit delta brief, deploy runbook
 audits/                Audit reports
 ```
 
@@ -114,20 +120,26 @@ audits/                Audit reports
 ### Build
 
 ```bash
-cargo build-sbf
+# Devnet build — embeds FLb7…
+cargo build-sbf --features devnet
+
+# Mainnet build — embeds LazorjRF… (slot shared with lazorkit-protocol)
+cargo build-sbf --features mainnet
 ```
+
+Building with neither, or both, fails with a clear `compile_error!` — Pattern D feature flags prevent accidental cross-cluster deploys.
 
 ### Install SDK
 
 ```bash
-npm install @lazorkit/solita-client
+npm install @lazorkit/sdk-legacy
 ```
 
 ### Create a Wallet
 
 ```typescript
 import { Connection } from '@solana/web3.js';
-import { LazorKitClient } from '@lazorkit/solita-client';
+import { LazorKitClient } from '@lazorkit/sdk-legacy';
 import * as crypto from 'crypto';
 
 const connection = new Connection('https://api.devnet.solana.com');
@@ -148,7 +160,7 @@ const { instructions, walletPda, vaultPda } = client.createWallet({
 ### Transfer SOL
 
 ```typescript
-import { secp256r1 } from '@lazorkit/solita-client';
+import { secp256r1 } from '@lazorkit/sdk-legacy';
 
 // Just payer, wallet, signer, recipient, amount -- nothing else
 const { instructions } = await client.transferSol({
@@ -174,7 +186,7 @@ const { instructions } = await client.execute({
 });
 ```
 
-See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API reference.
+See the [@lazorkit/sdk-legacy README](https://github.com/lazor-kit/lazorkit-protocol/tree/main/sdk/sdk-legacy) for full API reference. The same SDK transparently handles both this build (program-v2, no fees) and the commercial build (lazorkit-protocol, with fees) — it probes ProtocolConfig on first use and conditionally appends fee accounts.
 
 ---
 
@@ -184,14 +196,14 @@ See [sdk/solita-client/README.md](sdk/solita-client/README.md) for full API refe
 # Start local validator with program loaded
 cd tests-sdk && npm run validator:start
 
-# Run all 56 tests (integration + security + permission + session)
+# Run all 65 tests
 npm test
 
 # Run CU benchmarks
 npm run benchmark
 ```
 
-Tests cover: wallet lifecycle, authority management, execute, deferred execution, sessions, replay protection, counter edge cases, end-to-end workflows, permission boundaries, session-based execution, and security attack vectors (reentrancy, cross-wallet isolation, accounts hash binding).
+Tests cover: wallet lifecycle, authority management, execute, deferred execution, sessions, session **action enforcement** (program whitelist/blacklist, SOL spending caps), replay protection, counter edge cases, end-to-end workflows, permission boundaries, session-based execution, and security attack vectors (reentrancy, cross-wallet isolation, accounts hash binding).
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 
@@ -199,7 +211,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for full development workflow.
 
 ## Security
 
-LazorKit V2 has been audited by **Accretion** (Solana Foundation funded).
+LazorKit V2 has been audited by **Accretion**.
 
 **Status**: 17/17 security issues resolved
 
@@ -222,7 +234,7 @@ Report vulnerabilities via [SECURITY.md](SECURITY.md).
 |---|---|
 | [Architecture](docs/Architecture.md) | Account structures, security mechanisms, instruction reference |
 | [Costs](docs/Costs.md) | CU benchmarks, rent costs, transaction size analysis |
-| [SDK API](sdk/solita-client/README.md) | TypeScript SDK reference |
+| [@lazorkit/sdk-legacy](https://github.com/lazor-kit/lazorkit-protocol/tree/main/sdk/sdk-legacy) | TypeScript SDK reference |
 | [Development](DEVELOPMENT.md) | Build, test, deploy workflow |
 | [Contributing](CONTRIBUTING.md) | How to contribute |
 | [Security](SECURITY.md) | Vulnerability reporting |

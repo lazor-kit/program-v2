@@ -16,6 +16,7 @@ import {
 import * as crypto from 'crypto';
 import {
   setupTest,
+  PROGRAM_ID,
   sendTx,
   sendTxExpectError,
   getSlot,
@@ -25,7 +26,7 @@ import {
   LazorKitClient,
   ed25519,
   session,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Session Execute', () => {
   let ctx: TestContext;
@@ -38,12 +39,12 @@ describe('Session Execute', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
 
     ownerKp = Keypair.generate();
     const userSeed = crypto.randomBytes(32);
 
-    const result = client.createWallet({
+    const result = await client.createWallet({
       payer: ctx.payer.publicKey,
       userSeed,
       owner: { type: 'ed25519', publicKey: ownerKp.publicKey },

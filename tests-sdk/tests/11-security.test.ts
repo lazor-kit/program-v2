@@ -41,7 +41,7 @@ import {
   packCompactInstructions,
   computeAccountsHash,
   DISC_EXECUTE,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Security', () => {
   let ctx: TestContext;
@@ -49,7 +49,7 @@ describe('Security', () => {
 
   beforeAll(async () => {
     ctx = await setupTest();
-    client = new LazorKitClient(ctx.connection);
+    client = new LazorKitClient(ctx.connection, PROGRAM_ID);
   });
 
   // ─── Counter increment verification ─────────────────────────────
@@ -63,7 +63,7 @@ describe('Security', () => {
       ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: {
@@ -154,7 +154,7 @@ describe('Security', () => {
       const ownerKp = Keypair.generate();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: { type: 'ed25519', publicKey: ownerKp.publicKey },
@@ -194,7 +194,7 @@ describe('Security', () => {
       // Create wallet A
       const ownerA = Keypair.generate();
       const seedA = crypto.randomBytes(32);
-      const resultA = client.createWallet({
+      const resultA = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed: seedA,
         owner: { type: 'ed25519', publicKey: ownerA.publicKey },
@@ -206,7 +206,7 @@ describe('Security', () => {
       // Create wallet B
       const ownerB = Keypair.generate();
       const seedB = crypto.randomBytes(32);
-      const resultB = client.createWallet({
+      const resultB = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed: seedB,
         owner: { type: 'ed25519', publicKey: ownerB.publicKey },
@@ -238,7 +238,7 @@ describe('Security', () => {
       const ownerKey = await generateMockSecp256r1Key();
       const userSeed = crypto.randomBytes(32);
 
-      const result = client.createWallet({
+      const result = await client.createWallet({
         payer: ctx.payer.publicKey,
         userSeed,
         owner: {
@@ -292,7 +292,7 @@ describe('Security', () => {
       // Build layout with recipientA
       const fixedAccounts = [ctx.payer.publicKey, result.walletPda, authorityPda, result.vaultPda, SYSVAR_INSTRUCTIONS_PUBKEY];
       const { compactInstructions, remainingAccounts } =
-        (await import('../../sdk/solita-client/src/utils/compact')).buildCompactLayout(fixedAccounts, [transferIx]);
+        (await import('@lazorkit/sdk-legacy')).buildCompactLayout(fixedAccounts, [transferIx]);
       const packed = packCompactInstructions(compactInstructions);
 
       // Compute accounts hash with recipientA (the one we sign)
@@ -306,7 +306,7 @@ describe('Security', () => {
       ];
       const accountsHash = computeAccountsHash(allAccountMetas, compactInstructions);
 
-      const { concatParts } = await import('../../sdk/solita-client/src/utils/signing');
+      const { concatParts } = await import('@lazorkit/sdk-legacy');
       const signedPayload = concatParts([packed, accountsHash]);
 
       // Sign with the correct data (recipientA in accounts hash)
@@ -336,6 +336,7 @@ describe('Security', () => {
         packedInstructions: packed,
         authPayload,
         remainingAccounts: tamperedRemaining,
+      programId: PROGRAM_ID,
       });
 
       // Should fail — accounts hash won't match

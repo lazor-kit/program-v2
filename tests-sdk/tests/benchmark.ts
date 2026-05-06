@@ -39,11 +39,11 @@ import {
   DISC_EXECUTE,
   DISC_AUTHORIZE,
   ROLE_ADMIN,
-  PROGRAM_ID,
   createAuthorizeIx,
   createExecuteDeferredIx,
   computeInstructionsHash,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
+import { PROGRAM_ID } from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 
 const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8899';
@@ -133,9 +133,9 @@ async function benchCreateWalletEd25519(connection: Connection, payer: Keypair):
   const userSeed = crypto.randomBytes(32);
   const pubkeyBytes = ownerKp.publicKey.toBytes();
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes, PROGRAM_ID);
 
   const ix = createCreateWalletIx({
     payer: payer.publicKey,
@@ -146,6 +146,7 @@ async function benchCreateWalletEd25519(connection: Connection, payer: Keypair):
     authType: AUTH_TYPE_ED25519,
     authBump,
     credentialOrPubkey: pubkeyBytes,
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix]);
@@ -163,9 +164,9 @@ async function benchCreateWalletSecp256r1(connection: Connection, payer: Keypair
   const key = await generateMockSecp256r1Key();
   const userSeed = crypto.randomBytes(32);
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash, PROGRAM_ID);
 
   const ix = createCreateWalletIx({
     payer: payer.publicKey,
@@ -178,6 +179,7 @@ async function benchCreateWalletSecp256r1(connection: Connection, payer: Keypair
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
     rpId: key.rpId,
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix]);
@@ -197,9 +199,9 @@ async function benchAddAuthorityEd25519(connection: Connection, payer: Keypair):
   const userSeed = crypto.randomBytes(32);
   const pubkeyBytes = ownerKp.publicKey.toBytes();
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -210,12 +212,13 @@ async function benchAddAuthorityEd25519(connection: Connection, payer: Keypair):
     authType: AUTH_TYPE_ED25519,
     authBump,
     credentialOrPubkey: pubkeyBytes,
+      programId: PROGRAM_ID,
   })]);
 
   // Now add a new Ed25519 authority (admin adds spender)
   const newKp = Keypair.generate();
   const newPubkey = newKp.publicKey.toBytes();
-  const [newAuthPda] = findAuthorityPda(walletPda, newPubkey);
+  const [newAuthPda] = findAuthorityPda(walletPda, newPubkey, PROGRAM_ID);
 
   const ix = createAddAuthorityIx({
     payer: payer.publicKey,
@@ -226,6 +229,7 @@ async function benchAddAuthorityEd25519(connection: Connection, payer: Keypair):
     newRole: ROLE_ADMIN,
     credentialOrPubkey: newPubkey,
     authorizerSigner: ownerKp.publicKey,
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix], [ownerKp]);
@@ -244,9 +248,9 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
   const key = await generateMockSecp256r1Key();
   const userSeed = crypto.randomBytes(32);
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -259,6 +263,7 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
     rpId: key.rpId,
+      programId: PROGRAM_ID,
   })]);
 
   // Fund vault
@@ -318,6 +323,7 @@ async function benchExecuteSecp256r1(connection: Connection, payer: Keypair): Pr
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: true },
     ],
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [precompileIx, ix]);
@@ -337,9 +343,9 @@ async function benchCreateSession(connection: Connection, payer: Keypair): Promi
   const userSeed = crypto.randomBytes(32);
   const pubkeyBytes = ownerKp.publicKey.toBytes();
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -350,11 +356,12 @@ async function benchCreateSession(connection: Connection, payer: Keypair): Promi
     authType: AUTH_TYPE_ED25519,
     authBump,
     credentialOrPubkey: pubkeyBytes,
+      programId: PROGRAM_ID,
   })]);
 
   const sessionKp = Keypair.generate();
   const sessionKeyBytes = sessionKp.publicKey.toBytes();
-  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
+  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes, PROGRAM_ID);
 
   const currentSlot = await getSlot(connection);
   const expiresAt = currentSlot + 9000n;
@@ -367,6 +374,7 @@ async function benchCreateSession(connection: Connection, payer: Keypair): Promi
     sessionKey: sessionKeyBytes,
     expiresAt,
     authorizerSigner: ownerKp.publicKey,
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix], [ownerKp]);
@@ -386,9 +394,9 @@ async function benchExecuteSession(connection: Connection, payer: Keypair): Prom
   const userSeed = crypto.randomBytes(32);
   const pubkeyBytes = ownerKp.publicKey.toBytes();
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, pubkeyBytes, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -399,12 +407,13 @@ async function benchExecuteSession(connection: Connection, payer: Keypair): Prom
     authType: AUTH_TYPE_ED25519,
     authBump,
     credentialOrPubkey: pubkeyBytes,
+      programId: PROGRAM_ID,
   })]);
 
   // Create session
   const sessionKp = Keypair.generate();
   const sessionKeyBytes = sessionKp.publicKey.toBytes();
-  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes);
+  const [sessionPda] = findSessionPda(walletPda, sessionKeyBytes, PROGRAM_ID);
 
   const currentSlot = await getSlot(connection);
   const expiresAt = currentSlot + 9000n;
@@ -417,6 +426,7 @@ async function benchExecuteSession(connection: Connection, payer: Keypair): Prom
     sessionKey: sessionKeyBytes,
     expiresAt,
     authorizerSigner: ownerKp.publicKey,
+      programId: PROGRAM_ID,
   })], [ownerKp]);
 
   // Fund vault
@@ -450,6 +460,7 @@ async function benchExecuteSession(connection: Connection, payer: Keypair): Prom
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: true },
     ],
+      programId: PROGRAM_ID,
   });
 
   const result = await sendAndMeasure(connection, payer, [ix], [sessionKp]);
@@ -473,9 +484,9 @@ async function benchDeferredExecution(
   const key = await generateMockSecp256r1Key();
   const userSeed = crypto.randomBytes(32);
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -488,6 +499,7 @@ async function benchDeferredExecution(
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
     rpId: key.rpId,
+      programId: PROGRAM_ID,
   })]);
 
   // Fund vault
@@ -536,7 +548,7 @@ async function benchDeferredExecution(
     sysvarIxIndex: 6,
   });
 
-  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1);
+  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1, PROGRAM_ID);
 
   // === TX1: Authorize ===
   const authorizeIx = createAuthorizeIx({
@@ -548,6 +560,7 @@ async function benchDeferredExecution(
     accountsHash,
     expiryOffset: 300,
     authPayload,
+      programId: PROGRAM_ID,
   });
 
   const authResult = await sendAndMeasure(connection, payer, [precompileIx, authorizeIx]);
@@ -573,6 +586,7 @@ async function benchDeferredExecution(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: recipient, isSigner: false, isWritable: true },
     ],
+      programId: PROGRAM_ID,
   });
 
   const execResult = await sendAndMeasure(connection, payer, [executeDeferredIx]);
@@ -596,9 +610,9 @@ async function benchDeferredMultiInstruction(
   const key = await generateMockSecp256r1Key();
   const userSeed = crypto.randomBytes(32);
 
-  const [walletPda] = findWalletPda(userSeed);
-  const [vaultPda] = findVaultPda(walletPda);
-  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash);
+  const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+  const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
+  const [authPda, authBump] = findAuthorityPda(walletPda, key.credentialIdHash, PROGRAM_ID);
 
   await sendAndMeasure(connection, payer, [createCreateWalletIx({
     payer: payer.publicKey,
@@ -611,6 +625,7 @@ async function benchDeferredMultiInstruction(
     credentialOrPubkey: key.credentialIdHash,
     secp256r1Pubkey: key.publicKeyBytes,
     rpId: key.rpId,
+      programId: PROGRAM_ID,
   })]);
 
   // Fund vault
@@ -663,7 +678,7 @@ async function benchDeferredMultiInstruction(
     sysvarIxIndex: 6,
   });
 
-  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1);
+  const [deferredExecPda] = findDeferredExecPda(walletPda, authPda, 1, PROGRAM_ID);
 
   // TX1: Authorize
   const authorizeIx = createAuthorizeIx({
@@ -675,6 +690,7 @@ async function benchDeferredMultiInstruction(
     accountsHash,
     expiryOffset: 300,
     authPayload,
+      programId: PROGRAM_ID,
   });
 
   const authResult = await sendAndMeasure(connection, payer, [precompileIx, authorizeIx]);
@@ -702,6 +718,7 @@ async function benchDeferredMultiInstruction(
       { pubkey: recipient2, isSigner: false, isWritable: true },
       { pubkey: recipient3, isSigner: false, isWritable: true },
     ],
+      programId: PROGRAM_ID,
   });
 
   const execResult = await sendAndMeasure(connection, payer, [executeDeferredIx]);

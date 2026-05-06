@@ -92,10 +92,10 @@
       "accounts": [
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true,
           "docs": [
-            "Transaction payer"
+            "Payer and rent contributor"
           ]
         },
         {
@@ -108,10 +108,10 @@
         },
         {
           "name": "adminAuthority",
-          "isMut": false,
-          "isSigner": true,
+          "isMut": true,
+          "isSigner": false,
           "docs": [
-            "Admin authority PDA authorizing this action"
+            "Admin authority PDA authorizing this action (counter incremented)"
           ]
         },
         {
@@ -186,7 +186,7 @@
       "accounts": [
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true,
           "docs": [
             "Transaction payer"
@@ -202,10 +202,10 @@
         },
         {
           "name": "adminAuthority",
-          "isMut": false,
-          "isSigner": true,
+          "isMut": true,
+          "isSigner": false,
           "docs": [
-            "Admin authority PDA authorizing this action"
+            "Admin authority PDA authorizing this action (counter incremented)"
           ]
         },
         {
@@ -245,10 +245,10 @@
       "accounts": [
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true,
           "docs": [
-            "Transaction payer"
+            "Payer and rent contributor"
           ]
         },
         {
@@ -273,6 +273,14 @@
           "isSigner": false,
           "docs": [
             "New owner authority PDA to be created"
+          ]
+        },
+        {
+          "name": "refundDestination",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Account to receive rent refund from closed current owner"
           ]
         },
         {
@@ -335,7 +343,7 @@
       "accounts": [
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true,
           "docs": [
             "Transaction payer"
@@ -351,18 +359,18 @@
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
-            "Authority or Session PDA authorizing execution"
+            "Authority or Session PDA authorizing execution (counter incremented)"
           ]
         },
         {
           "name": "vault",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
-            "Vault PDA"
+            "Vault PDA (signer for CPI, lamports debited)"
           ]
         },
         {
@@ -407,10 +415,10 @@
         },
         {
           "name": "adminAuthority",
-          "isMut": false,
-          "isSigner": true,
+          "isMut": true,
+          "isSigner": false,
           "docs": [
-            "Admin/Owner authority PDA authorizing logic"
+            "Admin/Owner authority PDA authorizing logic (counter incremented)"
           ]
         },
         {
@@ -650,7 +658,7 @@
       "accounts": [
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true,
           "docs": [
             "Transaction payer"

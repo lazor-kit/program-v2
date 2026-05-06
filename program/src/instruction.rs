@@ -26,13 +26,13 @@ pub enum ProgramIx {
     },
 
     /// Add a new authority to the wallet
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Payer and rent contributor")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
+        writable,
         name = "admin_authority",
-        desc = "Admin authority PDA authorizing this action"
+        desc = "Admin authority PDA authorizing this action (counter incremented)"
     )]
     #[account(
         3,
@@ -57,13 +57,13 @@ pub enum ProgramIx {
     },
 
     /// Remove an authority from the wallet
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
+        writable,
         name = "admin_authority",
-        desc = "Admin authority PDA authorizing this action"
+        desc = "Admin authority PDA authorizing this action (counter incremented)"
     )]
     #[account(
         3,
@@ -86,7 +86,7 @@ pub enum ProgramIx {
     RemoveAuthority,
 
     /// Transfer ownership (atomic swap of Owner role)
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Payer and rent contributor")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
@@ -100,10 +100,16 @@ pub enum ProgramIx {
         name = "new_owner_authority",
         desc = "New owner authority PDA to be created"
     )]
-    #[account(4, name = "system_program", desc = "System Program")]
-    #[account(5, name = "rent_sysvar", desc = "Rent Sysvar")]
     #[account(
-        6,
+        4,
+        writable,
+        name = "refund_destination",
+        desc = "Account to receive rent refund from closed current owner"
+    )]
+    #[account(5, name = "system_program", desc = "System Program")]
+    #[account(6, name = "rent_sysvar", desc = "Rent Sysvar")]
+    #[account(
+        7,
         signer,
         optional,
         name = "authorizer_signer",
@@ -116,14 +122,15 @@ pub enum ProgramIx {
     },
 
     /// Execute transactions
-    #[account(0, signer, name = "payer", desc = "Transaction payer")]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
+        writable,
         name = "authority",
-        desc = "Authority or Session PDA authorizing execution"
+        desc = "Authority or Session PDA authorizing execution (counter incremented)"
     )]
-    #[account(3, name = "vault", desc = "Vault PDA")]
+    #[account(3, writable, name = "vault", desc = "Vault PDA (signer for CPI, lamports debited)")]
     #[account(
         4,
         optional,
@@ -142,9 +149,9 @@ pub enum ProgramIx {
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
-        signer,
+        writable,
         name = "admin_authority",
-        desc = "Admin/Owner authority PDA authorizing logic"
+        desc = "Admin/Owner authority PDA authorizing logic (counter incremented)"
     )]
     #[account(3, writable, name = "session", desc = "New session PDA to be created")]
     #[account(4, name = "system_program", desc = "System Program")]
@@ -202,13 +209,7 @@ pub enum ProgramIx {
     ///
     /// Verifies compact instructions against stored hashes, executes via CPI
     /// with vault PDA signing, then closes the DeferredExec account.
-    #[account(
-        0,
-        signer,
-        writable,
-        name = "payer",
-        desc = "Transaction payer"
-    )]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
     #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(2, writable, name = "vault", desc = "Vault PDA (signer for CPI)")]
     #[account(
@@ -223,9 +224,7 @@ pub enum ProgramIx {
         name = "refund_destination",
         desc = "Account to receive rent refund from closed DeferredExec"
     )]
-    ExecuteDeferred {
-        instructions: Vec<u8>,
-    },
+    ExecuteDeferred { instructions: Vec<u8> },
 
     /// Reclaim an expired DeferredExec account and refund rent
     ///
@@ -253,29 +252,15 @@ pub enum ProgramIx {
     /// Revoke a session key early (before expiry)
     ///
     /// Only Owner or Admin can revoke. Closes the session account and refunds rent.
-    #[account(
-        0,
-        signer,
-        name = "payer",
-        desc = "Transaction payer"
-    )]
-    #[account(
-        1,
-        name = "wallet",
-        desc = "Wallet PDA"
-    )]
+    #[account(0, signer, writable, name = "payer", desc = "Transaction payer")]
+    #[account(1, name = "wallet", desc = "Wallet PDA")]
     #[account(
         2,
         writable,
         name = "admin_authority",
         desc = "Owner/Admin authority PDA (counter incremented for Secp256r1)"
     )]
-    #[account(
-        3,
-        writable,
-        name = "session",
-        desc = "Session PDA to revoke"
-    )]
+    #[account(3, writable, name = "session", desc = "Session PDA to revoke")]
     #[account(
         4,
         writable,
@@ -341,7 +326,9 @@ pub enum LazorKitInstruction {
     /// 2. `[]` Wallet PDA
     /// 3. `[writable]` Current Owner Authority PDA
     /// 4. `[writable]` New Owner Authority PDA
-    /// 5. `[]` System Program
+    /// 5. `[writable]` Refund Destination
+    /// 6. `[]` System Program
+    /// 7. `[]` Rent Sysvar
     TransferOwnership {
         new_type: u8,
         new_pubkey: [u8; 33],

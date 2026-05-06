@@ -7,7 +7,7 @@ import {
   type AccountMeta,
 } from '@solana/web3.js';
 import * as crypto from 'crypto';
-import { setupTest, sendTx, getSlot, type TestContext } from './common';
+import { setupTest, sendTx, getSlot, PROGRAM_ID, type TestContext } from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
 import {
   findWalletPda,
@@ -24,8 +24,8 @@ import {
   ROLE_SPENDER,
   DISC_ADD_AUTHORITY,
   DISC_EXECUTE,
-} from '../../sdk/solita-client/src';
-import { AuthorityAccount } from '../../sdk/solita-client/src/generated/accounts';
+} from '@lazorkit/sdk-legacy';
+import { AuthorityAccount } from '@lazorkit/sdk-legacy';
 
 describe('Counter Edge Cases', () => {
   let ctx: TestContext;
@@ -39,11 +39,12 @@ describe('Counter Edge Cases', () => {
     const ownerKey = await generateMockSecp256r1Key();
     const userSeed = crypto.randomBytes(32);
 
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
+    const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+    const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
     const [ownerAuthPda, authBump] = findAuthorityPda(
       walletPda,
       ownerKey.credentialIdHash,
+      PROGRAM_ID,
     );
 
     await sendTx(ctx, [
@@ -58,6 +59,7 @@ describe('Counter Edge Cases', () => {
         credentialOrPubkey: ownerKey.credentialIdHash,
         secp256r1Pubkey: ownerKey.publicKeyBytes,
         rpId: ownerKey.rpId,
+      programId: PROGRAM_ID,
       }),
     ]);
 
@@ -73,7 +75,7 @@ describe('Counter Edge Cases', () => {
     // 1. AddAuthority (counter becomes 1)
     const adminKp = Keypair.generate();
     const adminPubkey = adminKp.publicKey.toBytes();
-    const [adminAuthPda] = findAuthorityPda(walletPda, adminPubkey);
+    const [adminAuthPda] = findAuthorityPda(walletPda, adminPubkey, PROGRAM_ID);
 
     const slot1 = await getSlot(ctx);
     const dataPayload = Buffer.concat([
@@ -108,6 +110,7 @@ describe('Counter Edge Cases', () => {
         newRole: ROLE_ADMIN,
         credentialOrPubkey: adminPubkey,
         authPayload: ap1,
+      programId: PROGRAM_ID,
       }),
     ]);
 
@@ -174,6 +177,7 @@ describe('Counter Edge Cases', () => {
           },
           { pubkey: execRecipient, isSigner: false, isWritable: true },
         ],
+      programId: PROGRAM_ID,
       }),
     ]);
 
@@ -190,11 +194,12 @@ describe('Counter Edge Cases', () => {
     const key2 = await generateMockSecp256r1Key();
     const userSeed = crypto.randomBytes(32);
 
-    const [walletPda] = findWalletPda(userSeed);
-    const [vaultPda] = findVaultPda(walletPda);
+    const [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+    const [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
     const [auth1Pda, auth1Bump] = findAuthorityPda(
       walletPda,
       key1.credentialIdHash,
+      PROGRAM_ID,
     );
 
     // Create wallet with key1 as owner
@@ -210,11 +215,12 @@ describe('Counter Edge Cases', () => {
         credentialOrPubkey: key1.credentialIdHash,
         secp256r1Pubkey: key1.publicKeyBytes,
         rpId: key1.rpId,
+      programId: PROGRAM_ID,
       }),
     ]);
 
     // Add key2 as spender via key1 (counter1 goes to 1)
-    const [auth2Pda] = findAuthorityPda(walletPda, key2.credentialIdHash);
+    const [auth2Pda] = findAuthorityPda(walletPda, key2.credentialIdHash, PROGRAM_ID);
     const slot = await getSlot(ctx);
 
     const rpIdBytes = Buffer.from(key2.rpId, 'utf-8');
@@ -255,6 +261,7 @@ describe('Counter Edge Cases', () => {
         secp256r1Pubkey: key2.publicKeyBytes,
         rpId: key2.rpId,
         authPayload,
+      programId: PROGRAM_ID,
       }),
     ]);
 

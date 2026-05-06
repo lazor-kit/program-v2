@@ -10,8 +10,31 @@ use pinocchio::{
 use pinocchio_pubkey::declare_id;
 use pinocchio_system::ID as SYSTEM_ID;
 
-// LazorKit Program ID
+// LazorKit Program ID — chosen at build time via the `mainnet` / `devnet`
+// cargo features. Exactly one must be enabled; otherwise the build fails
+// loudly via the `compile_error!` below. This prevents accidental cross-
+// cluster deploys (a binary compiled with one ID malfunctions if deployed
+// to a slot at the other ID — every internal `crate::ID` check fails).
+//
+// The mainnet ID intentionally matches lazorkit-protocol's mainnet ID:
+// program-v2 (no-fee foundation variant) is deployed to that slot for the
+// duration of the foundation contract; at contract end, the upgrade
+// authority swaps the binary at the same slot to lazorkit-protocol's
+// commercial build. dApp integrators keep using the same program ID
+// throughout — only the on-chain behavior changes.
+#[cfg(all(feature = "mainnet", not(feature = "devnet")))]
+declare_id!("LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi");
+
+#[cfg(all(feature = "devnet", not(feature = "mainnet")))]
 declare_id!("FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao");
+
+#[cfg(any(
+    all(feature = "mainnet", feature = "devnet"),
+    all(not(feature = "mainnet"), not(feature = "devnet"))
+))]
+compile_error!(
+    "LazorKit: pick exactly one cluster — `--features mainnet` OR `--features devnet`"
+);
 
 #[allow(unused_imports)]
 use std::mem::MaybeUninit;

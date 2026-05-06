@@ -12,6 +12,7 @@ import {
   sendTx,
   sendTxExpectError,
   getSlot,
+  PROGRAM_ID,
   type TestContext,
 } from './common';
 import { generateMockSecp256r1Key, signSecp256r1 } from './secp256r1Utils';
@@ -25,7 +26,7 @@ import {
   computeAccountsHash,
   AUTH_TYPE_SECP256R1,
   DISC_EXECUTE,
-} from '../../sdk/solita-client/src';
+} from '@lazorkit/sdk-legacy';
 
 describe('Replay Prevention (Odometer)', () => {
   let ctx: TestContext;
@@ -92,6 +93,7 @@ describe('Replay Prevention (Odometer)', () => {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: recipient, isSigner: false, isWritable: true },
       ],
+      programId: PROGRAM_ID,
     });
 
     return { precompileIx, ix };
@@ -103,11 +105,12 @@ describe('Replay Prevention (Odometer)', () => {
     ownerKey = await generateMockSecp256r1Key();
     const userSeed = crypto.randomBytes(32);
 
-    [walletPda] = findWalletPda(userSeed);
-    [vaultPda] = findVaultPda(walletPda);
+    [walletPda] = findWalletPda(userSeed, PROGRAM_ID);
+    [vaultPda] = findVaultPda(walletPda, PROGRAM_ID);
     const [authPda, authBump] = findAuthorityPda(
       walletPda,
       ownerKey.credentialIdHash,
+      PROGRAM_ID,
     );
     ownerAuthorityPda = authPda;
 
@@ -123,6 +126,7 @@ describe('Replay Prevention (Odometer)', () => {
         credentialOrPubkey: ownerKey.credentialIdHash,
         secp256r1Pubkey: ownerKey.publicKeyBytes,
         rpId: ownerKey.rpId,
+      programId: PROGRAM_ID,
       }),
     ]);
 
