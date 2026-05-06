@@ -26,6 +26,8 @@ pub struct CompactInstruction {
 }
 
 /// Reference version of CompactInstruction that borrows its data.
+/// Used by the Execute hot path to avoid Vec<u8> allocations during parse
+/// + decompress.
 ///
 /// # Fields
 /// * `program_id_index` - Index of the program ID in the account list
@@ -35,6 +37,108 @@ pub struct CompactInstructionRef<'a> {
     pub program_id_index: u8,
     pub accounts: &'a [u8],
     pub data: &'a [u8],
+}
+
+impl<'a> CompactInstructionRef<'a> {
+    /// Deserialize a CompactInstructionRef from bytes — zero-copy, the
+    /// returned struct borrows from `bytes`.
+    /// Format: [program_id_index: u8][num_accounts: u8][accounts...][data_len: u16][data...]
+    pub fn from_bytes(bytes: &'a [u8]) -> Result<(Self, &'a [u8]), ProgramError> {
+        if bytes.len() < 4 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let program_id_index = bytes[0];
+        let num_accounts = bytes[1] as usize;
+
+        if bytes.len() < 2 + num_accounts + 2 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let accounts = &bytes[2..2 + num_accounts];
+        let data_len_offset = 2 + num_accounts;
+        let data_len =
+            u16::from_le_bytes([bytes[data_len_offset], bytes[data_len_offset + 1]]) as usize;
+
+        let data_start = data_len_offset + 2;
+        if bytes.len() < data_start + data_len {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let data = &bytes[data_start..data_start + data_len];
+        let rest = &bytes[data_start + data_len..];
+
+        Ok((
+            CompactInstructionRef {
+                program_id_index,
+                accounts,
+                data,
+            },
+            rest,
+        ))
+    }
+
+    /// Decompress into a full Instruction without cloning the instruction
+    /// data. `account_infos` lifetime 'b is tracked separately from the
+    /// instruction-data lifetime 'a.
+    pub fn decompress<'b>(
+        &self,
+        account_infos: &'b [AccountInfo],
+    ) -> Result<DecompressedInstructionRef<'a, 'b>, ProgramError> {
+        if (self.program_id_index as usize) >= account_infos.len() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        let program_id = account_infos[self.program_id_index as usize].key();
+
+        let mut accounts: Vec<&AccountInfo> = Vec::with_capacity(self.accounts.len());
+        for &index in self.accounts {
+            if (index as usize) >= account_infos.len() {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            accounts.push(&account_infos[index as usize]);
+        }
+
+        Ok(DecompressedInstructionRef {
+            program_id,
+            accounts,
+            data: self.data,
+        })
+    }
+}
+
+/// Zero-copy variant of DecompressedInstruction. `data` borrows from the
+/// original instruction_data — no clone.
+pub struct DecompressedInstructionRef<'a, 'b> {
+    pub program_id: &'b Pubkey,
+    pub accounts: Vec<&'b AccountInfo>,
+    pub data: &'a [u8],
+}
+
+/// Parse + return total bytes consumed (ref-based, no allocations for
+/// account index bytes or instruction data).
+pub fn parse_compact_instructions_ref_with_len<'a>(
+    bytes: &'a [u8],
+) -> Result<(Vec<CompactInstructionRef<'a>>, usize), ProgramError> {
+    if bytes.is_empty() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    let num_instructions = bytes[0] as usize;
+    if num_instructions > MAX_COMPACT_INSTRUCTIONS {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    let mut instructions = Vec::with_capacity(num_instructions);
+    let mut remaining = &bytes[1..];
+
+    for _ in 0..num_instructions {
+        let (ix, rest) = CompactInstructionRef::from_bytes(remaining)?;
+        instructions.push(ix);
+        remaining = rest;
+    }
+
+    let consumed = bytes.len() - remaining.len();
+    Ok((instructions, consumed))
 }
 
 impl CompactInstructions {
@@ -52,8 +156,12 @@ impl CompactInstructions {
     /// # Returns
     /// * `Vec<u8>` - Serialized instruction data
     pub fn into_bytes(&self) -> Vec<u8> {
+        // Lengths are encoded as u8 — values > 255 would silently truncate and corrupt
+        // the instruction stream on deserialization. Enforce at runtime, not just debug.
+        assert!(self.inner_instructions.len() <= 255, "instruction count exceeds u8 max");
         let mut bytes = vec![self.inner_instructions.len() as u8];
         for ix in self.inner_instructions.iter() {
+            assert!(ix.accounts.len() <= 255, "account count exceeds u8 max");
             bytes.push(ix.program_id_index);
             bytes.push(ix.accounts.len() as u8);
             bytes.extend(ix.accounts.iter());
@@ -105,6 +213,7 @@ impl CompactInstruction {
 
     /// Serialize this CompactInstruction to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
+        assert!(self.accounts.len() <= 255, "account count exceeds u8 max");
         let mut bytes = Vec::with_capacity(4 + self.accounts.len() + self.data.len());
         bytes.push(self.program_id_index);
         bytes.push(self.accounts.len() as u8);
@@ -150,14 +259,31 @@ pub struct DecompressedInstruction<'a> {
     pub data: Vec<u8>, // Owned data to avoid lifetime issues
 }
 
+/// Maximum number of compact instructions per Execute call.
+/// Prevents compute-unit exhaustion DoS.
+pub const MAX_COMPACT_INSTRUCTIONS: usize = 16;
+
 /// Parse multiple CompactInstructions from bytes
 /// Format: [num_instructions: u8][instruction_0][instruction_1]...
 pub fn parse_compact_instructions(bytes: &[u8]) -> Result<Vec<CompactInstruction>, ProgramError> {
+    parse_compact_instructions_with_len(bytes).map(|(ixs, _)| ixs)
+}
+
+/// Parse + return total bytes consumed. Used by the Execute processor to
+/// split the instruction data into the compact-instructions prefix and the
+/// auth payload suffix without re-serializing.
+pub fn parse_compact_instructions_with_len(
+    bytes: &[u8],
+) -> Result<(Vec<CompactInstruction>, usize), ProgramError> {
     if bytes.is_empty() {
         return Err(ProgramError::InvalidInstructionData);
     }
 
     let num_instructions = bytes[0] as usize;
+    if num_instructions > MAX_COMPACT_INSTRUCTIONS {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
     let mut instructions = Vec::with_capacity(num_instructions);
     let mut remaining = &bytes[1..];
 
@@ -167,7 +293,8 @@ pub fn parse_compact_instructions(bytes: &[u8]) -> Result<Vec<CompactInstruction
         remaining = rest;
     }
 
-    Ok(instructions)
+    let consumed = bytes.len() - remaining.len();
+    Ok((instructions, consumed))
 }
 
 /// Serialize multiple CompactInstructions to bytes
@@ -257,20 +384,31 @@ mod tests {
 
     #[test]
     fn test_max_accounts() {
-        // Test with maximum number of accounts (u8::MAX = 255)
-        let accounts: Vec<u8> = (0..=255).collect();
+        // Test with 255 accounts (the valid u8 max)
+        let accounts: Vec<u8> = (0..255).collect();
         let ix = CompactInstruction {
             program_id_index: 0,
-            accounts,
+            accounts: accounts.clone(),
             data: vec![1],
         };
 
         let bytes = ix.to_bytes();
         let (deserialized, _) = CompactInstruction::from_bytes(&bytes).unwrap();
+        assert_eq!(deserialized.accounts.len(), 255);
+    }
 
-        // Note: accounts.len() wraps to 0 when cast to u8!
-        // This is a known limitation - can't have exactly 256 accounts
-        assert_eq!(deserialized.accounts.len(), 0); // Wraps around!
+    #[test]
+    #[should_panic(expected = "account count exceeds u8 max")]
+    fn test_256_accounts_panics() {
+        // 256 accounts would silently truncate to 0 via `as u8`.
+        // The assert! guard must catch this.
+        let accounts: Vec<u8> = (0..=255).collect(); // 256 elements
+        let ix = CompactInstruction {
+            program_id_index: 0,
+            accounts,
+            data: vec![1],
+        };
+        let _ = ix.to_bytes(); // should panic
     }
 
     #[test]

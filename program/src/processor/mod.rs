@@ -6,6 +6,7 @@ pub mod authorize;
 pub mod create_session;
 pub mod create_wallet;
 pub mod execute;
+pub mod execute_actions;
 pub mod execute_deferred;
 pub mod manage_authority;
 pub mod reclaim_deferred;

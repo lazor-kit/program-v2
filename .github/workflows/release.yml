@@ -1,0 +1,153 @@
+name: release
+
+# Triggered by pushing an `audit-frozen-v*` tag (or a `v*` semver release tag).
+# Builds the mainnet and devnet SBF binaries, records their SHA-256 hashes,
+# and attaches the .so files + a manifest to the GitHub Release.
+#
+# The release artifacts are the source of truth for what gets deployed to
+# mainnet — production deploys must use a binary downloaded from a release,
+# not a locally-built one. See docs/MAINNET_DEPLOY.md.
+
+on:
+  push:
+    tags:
+      - 'audit-frozen-v*'
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # for creating GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so source_revision in security_txt embeds the right SHA.
+          fetch-depth: 0
+
+      - name: Install Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Pin Solana CLI to the version declared in Cargo.toml
+        run: |
+          DECLARED=$(grep -A1 'workspace.metadata.cli' Cargo.toml | grep solana | sed -E 's/.*"([^"]+)".*/\1/')
+          INSTALLED=$(solana --version | awk '{print $2}')
+          echo "Declared: $DECLARED"
+          echo "Installed: $INSTALLED"
+          if [ "$DECLARED" != "$INSTALLED" ]; then
+            echo "::warning::Installed Solana CLI ($INSTALLED) does not match declared ($DECLARED). Verified-build hashes may differ from what consumers reproduce."
+          fi
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ hashFiles('**/Cargo.lock') }}-${{ github.ref_name }}
+
+      - name: Build mainnet binary
+        working-directory: program
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: cargo build-sbf --features mainnet
+
+      - name: Hash + stage mainnet artifact
+        run: |
+          mkdir -p release-artifacts
+          cp target/deploy/lazorkit_program.so release-artifacts/lazorkit_program-mainnet.so
+          MAINNET_SHA=$(shasum -a 256 release-artifacts/lazorkit_program-mainnet.so | awk '{print $1}')
+          echo "MAINNET_SHA=$MAINNET_SHA" >> "$GITHUB_ENV"
+          echo "mainnet sha256: $MAINNET_SHA"
+
+      - name: Build devnet binary
+        working-directory: program
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: cargo build-sbf --features devnet
+
+      - name: Hash + stage devnet artifact
+        run: |
+          cp target/deploy/lazorkit_program.so release-artifacts/lazorkit_program-devnet.so
+          DEVNET_SHA=$(shasum -a 256 release-artifacts/lazorkit_program-devnet.so | awk '{print $1}')
+          echo "DEVNET_SHA=$DEVNET_SHA" >> "$GITHUB_ENV"
+          echo "devnet sha256: $DEVNET_SHA"
+
+      - name: Verify binaries differ
+        run: |
+          if [ "$MAINNET_SHA" = "$DEVNET_SHA" ]; then
+            echo "::error::mainnet and devnet binaries are identical — dual-cluster mechanism broken"
+            exit 1
+          fi
+
+      - name: Stage IDL + keypair
+        run: |
+          cp program/idl.json release-artifacts/idl.json
+          # The keypair file is regenerated per build; useful as a record but
+          # NOT for deployment (the actual mainnet keypair is held off-CI).
+          if [ -f target/deploy/lazorkit_program-keypair.json ]; then
+            cp target/deploy/lazorkit_program-keypair.json release-artifacts/build-keypair.json
+          fi
+
+      - name: Write release manifest
+        run: |
+          cat > release-artifacts/MANIFEST.txt <<EOF
+          LazorKit program-v2 release manifest
+          tag:                 ${{ github.ref_name }}
+          commit:              ${{ github.sha }}
+          built:               $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          solana-cli:          $(solana --version)
+          rust-toolchain:      $(rustc --version)
+
+          mainnet binary:      lazorkit_program-mainnet.so
+          mainnet sha256:      $MAINNET_SHA
+          mainnet program ID:  LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi
+
+          devnet binary:       lazorkit_program-devnet.so
+          devnet sha256:       $DEVNET_SHA
+          devnet program ID:   FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao
+
+          To reproduce these hashes locally:
+            git checkout ${{ github.ref_name }}
+            cd program
+            cargo build-sbf --features mainnet   # → mainnet sha256 above
+            cargo build-sbf --features devnet    # → devnet sha256 above
+
+          To deploy: see docs/MAINNET_DEPLOY.md
+          EOF
+          cat release-artifacts/MANIFEST.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            **Tag:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+
+            **Mainnet binary:** `lazorkit_program-mainnet.so`
+            **Mainnet sha256:** `${{ env.MAINNET_SHA }}`
+            **Mainnet program ID:** `LazorjRFNavitUaBu5m3WaNPjU1maipvSW2rZfAFAKi` (slot shared with `lazorkit-protocol`)
+
+            **Devnet binary:** `lazorkit_program-devnet.so`
+            **Devnet sha256:** `${{ env.DEVNET_SHA }}`
+            **Devnet program ID:** `FLb7fyAtkfA4TSa2uYcAT8QKHd2pkoMHgmqfnXFXo7ao`
+
+            See [`MANIFEST.txt`](./MANIFEST.txt) for build environment + reproduction
+            commands and [`docs/MAINNET_DEPLOY.md`](../docs/MAINNET_DEPLOY.md) for
+            deployment procedure.
+          files: |
+            release-artifacts/lazorkit_program-mainnet.so
+            release-artifacts/lazorkit_program-devnet.so
+            release-artifacts/idl.json
+            release-artifacts/MANIFEST.txt
+          draft: ${{ startsWith(github.ref_name, 'audit-frozen-') }}
+          prerelease: ${{ startsWith(github.ref_name, 'audit-frozen-') }}
