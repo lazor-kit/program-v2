@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run --fileParallelism=false",
     "test:watch": "vitest --fileParallelism=false",
-    "validator:start": "cd ../program && cargo build-sbf --features devnet && cd - && solana-test-validator --bpf-program $(solana-keygen pubkey ../target/deploy/lazorkit_program-keypair.json) ../target/deploy/lazorkit_program.so --reset",
+    "validator:start": "cd ../program && cargo build-sbf --features devnet && cd - && solana-test-validator --ledger \"$HOME/test-ledger\" --bpf-program $(solana-keygen pubkey ../target/deploy/lazorkit_program-keypair.json) ../target/deploy/lazorkit_program.so --reset",
+    "validator:stop": "pkill -f solana-test-validator || true",
     "benchmark": "npx tsx tests/benchmark.ts",
     "pretest": "echo 'Ensure solana-test-validator is running with the program loaded'"
   },
