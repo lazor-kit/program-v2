@@ -44,23 +44,12 @@ jobs:
             -A clippy::too_many_arguments \
             -A unused_mut
 
-  tsc:
-    name: tsc (tests-sdk)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: tests-sdk/package-lock.json
-
-      - name: install
-        working-directory: tests-sdk
-        run: npm ci || npm install
-
-      - name: tsc --noEmit
-        working-directory: tests-sdk
-        run: npx tsc --noEmit
+# tsc on tests-sdk is intentionally NOT included here.
+#
+# tests-sdk depends on `@lazorkit/sdk-legacy` via a `file:` link to the
+# sibling lazorkit-protocol checkout, which doesn't exist in CI. Wiring
+# this up cleanly requires switching to the npm-published version
+# (^0.3.1+) once it lands, then restoring the tsc job.
+#
+# Type errors are still caught locally via `npx tsc --noEmit` from
+# tests-sdk against the file: linked SDK.
