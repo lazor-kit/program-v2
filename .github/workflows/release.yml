@@ -22,7 +22,7 @@ jobs:
       contents: write   # for creating GitHub Releases
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Full history so source_revision in security_txt embeds the right SHA.
           fetch-depth: 0
